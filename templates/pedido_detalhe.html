@@ -146,11 +146,11 @@
         {% endif %}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:76px">
-        <a href="{{ url_for('orcamento_detalhe', orc_id=orc.id) }}" class="btn btn-ghost btn-sm">Detalhes</a>
+        <a href="{{ url_for('orcamento_detalhe', oid=orc.id) }}" class="btn btn-ghost btn-sm">Detalhes</a>
         <button onclick="openPdf('{{ orc.ficheiro_pdf }}','{{ orc.empresa }}')" class="btn btn-ghost btn-sm">👁 Ver</button>
         <a href="{{ url_for('preview_pdf', filename=orc.ficheiro_pdf) }}" target="_blank" class="btn btn-ghost btn-sm">↗ Tab</a>
         {% if pedido.estado not in ['aprovado','cancelado'] %}
-        <form method="POST" action="{{ url_for('apagar_orcamento', orc_id=orc.id) }}" onsubmit="return confirm('Remover?')">
+        <form method="POST" action="{{ url_for('apagar_orcamento', oid=orc.id) }}" onsubmit="return confirm('Remover?')">
           <button type="submit" class="btn btn-danger btn-sm">Remover</button>
         </form>
         {% endif %}
