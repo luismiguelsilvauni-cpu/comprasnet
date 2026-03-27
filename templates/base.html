@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ComprasNet{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #171b25;
+            --surface2: #1e2330;
+            --border: #2a3045;
+            --border-light: #3a4560;
+            --text: #e8eaf0;
+            --text-muted: #7a85a0;
+            --text-dim: #4a5470;
+            --accent: #3b6ef0;
+            --accent-hover: #4f7ff5;
+            --accent-glow: rgba(59,110,240,0.15);
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+            --gold: #e8b84b;
+            --radius: 8px;
+            --shadow: 0 2px 16px rgba(0,0,0,0.4);
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: 14px; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 220px; min-height: 100vh; background: var(--surface);
+            border-right: 1px solid var(--border); display: flex; flex-direction: column;
+            position: fixed; top: 0; left: 0; z-index: 100;
+        }
+        .sidebar-logo {
+            padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+        }
+        .sidebar-logo .app-name {
+            font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.3px;
+        }
+        .sidebar-logo .app-sub {
+            font-size: 11px; color: var(--text-muted); margin-top: 2px; font-family: 'DM Mono', monospace;
+        }
+        .sidebar-logo .logo-icon {
+            width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .sidebar-nav { flex: 1; padding: 12px 0; }
+        .nav-section { padding: 0 12px; margin-bottom: 4px; }
+        .nav-label { font-size: 10px; font-weight: 600; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; padding: 8px 8px 4px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+            border-radius: 6px; color: var(--text-muted); text-decoration: none;
+            font-size: 13px; font-weight: 500; transition: all 0.15s; cursor: pointer;
+        }
+        .nav-item:hover { background: var(--surface2); color: var(--text); }
+        .nav-item.active { background: var(--accent-glow); color: var(--accent); }
+        .nav-item .icon { font-size: 15px; width: 18px; text-align: center; }
+        .sidebar-bottom { padding: 12px; border-top: 1px solid var(--border); }
+        .user-info { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 6px; }
+        .avatar {
+            width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 700; color: white; flex-shrink: 0;
+        }
+        .user-name { font-size: 13px; font-weight: 500; line-height: 1.2; }
+        .user-role { font-size: 11px; color: var(--text-muted); }
+        .logout-btn {
+            display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+            border-radius: 6px; color: var(--text-muted); text-decoration: none;
+            font-size: 12px; margin-top: 4px; transition: all 0.15s;
+        }
+        .logout-btn:hover { background: rgba(239,68,68,0.1); color: var(--danger); }
+
+        /* ── Main ── */
+        .main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+        .topbar {
+            background: var(--surface); border-bottom: 1px solid var(--border);
+            padding: 0 28px; height: 56px; display: flex; align-items: center;
+            justify-content: space-between; position: sticky; top: 0; z-index: 50;
+        }
+        .page-title { font-size: 16px; font-weight: 600; color: var(--text); }
+        .topbar-actions { display: flex; align-items: center; gap: 10px; }
+        .content { padding: 24px 28px; flex: 1; }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px;
+        }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+        /* ── Stat tiles ── */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden;
+        }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
+        .stat-card.warning::before { background: var(--warning); }
+        .stat-card.success::before { background: var(--success); }
+        .stat-card.info::before { background: var(--info); }
+        .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 700; color: var(--text); font-family: 'DM Mono', monospace; }
+        .stat-icon { position: absolute; top: 16px; right: 16px; font-size: 20px; opacity: 0.3; }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+            border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
+            border: none; text-decoration: none; transition: all 0.15s; white-space: nowrap;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--border-light); }
+        .btn-danger { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); }
+        .btn-danger:hover { background: rgba(239,68,68,0.2); }
+        .btn-success { background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid rgba(34,197,94,0.2); }
+        .btn-success:hover { background: rgba(34,197,94,0.2); }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+        /* ── Table ── */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+        td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: var(--surface2); }
+
+        /* ── Badges ── */
+        .badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+        }
+        .badge-blue { background: var(--accent-glow); color: var(--accent); }
+        .badge-green { background: rgba(34,197,94,0.1); color: var(--success); }
+        .badge-yellow { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .badge-red { background: rgba(239,68,68,0.1); color: var(--danger); }
+        .badge-gray { background: var(--surface2); color: var(--text-muted); }
+        .badge-cyan { background: rgba(6,182,212,0.1); color: var(--info); }
+        .badge-gold { background: rgba(232,184,75,0.1); color: var(--gold); border: 1px solid rgba(232,184,75,0.2); }
+
+        /* ── Forms ── */
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
+        input, select, textarea {
+            width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+            padding: 9px 12px; color: var(--text); font-size: 13px; font-family: inherit;
+            transition: border-color 0.15s; outline: none;
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        select option { background: var(--surface2); }
+        textarea { resize: vertical; min-height: 80px; }
+
+        /* ── Flash messages ── */
+        .flash-container { position: fixed; top: 16px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+        .flash {
+            padding: 12px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+            display: flex; align-items: center; gap: 8px; min-width: 280px;
+            animation: slideIn 0.3s ease; box-shadow: var(--shadow);
+        }
+        .flash-success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: var(--success); }
+        .flash-error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: var(--danger); }
+        .flash-info { background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3); color: var(--info); }
+        @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* ── Upload drop zone ── */
+        .drop-zone {
+            border: 2px dashed var(--border); border-radius: var(--radius);
+            padding: 32px; text-align: center; transition: all 0.2s; cursor: pointer;
+        }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-glow); }
+        .drop-zone-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.5; }
+        .drop-zone-text { color: var(--text-muted); font-size: 13px; }
+        .drop-zone-text strong { color: var(--accent); }
+
+        /* ── Progress ── */
+        .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; width: 0; }
+
+        /* ── Divider ── */
+        .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+        /* ── Comparison table (special) ── */
+        .compare-table { display: grid; gap: 12px; }
+        .compare-card {
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 16px; display: grid;
+            grid-template-columns: 1fr auto; align-items: start; gap: 12px;
+        }
+        .compare-card.best { border-color: var(--success); background: rgba(34,197,94,0.05); }
+        .compare-card.selected { border-color: var(--gold); }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .sidebar { width: 60px; }
+            .sidebar .app-name, .sidebar .app-sub, .sidebar .user-name, .sidebar .user-role, .nav-item span { display: none; }
+            .main { margin-left: 60px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ── Misc ── */
+        .mono { font-family: 'DM Mono', monospace; }
+        .text-muted { color: var(--text-muted); }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+        .text-warning { color: var(--warning); }
+        .text-gold { color: var(--gold); }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-8 { gap: 8px; }
+        .gap-12 { gap: 12px; }
+        .mt-4 { margin-top: 4px; }
+        .mt-8 { margin-top: 8px; }
+        .mt-16 { margin-top: 16px; }
+        .mt-20 { margin-top: 20px; }
+        .mb-4 { margin-bottom: 4px; }
+        .mb-16 { margin-bottom: 16px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    </style>
+</head>
+<body>
+{% if current_user.is_authenticated %}
+<nav class="sidebar">
+    <div class="sidebar-logo">
+        <div class="logo-icon">📦</div>
+        <div class="app-name">ComprasNet</div>
+        <div class="app-sub">v1.0 · PHC Integration</div>
+    </div>
+    <div class="sidebar-nav">
+        <div class="nav-section">
+            <div class="nav-label">Principal</div>
+            <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <span class="icon">⊞</span><span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('pedidos') }}" class="nav-item {% if 'pedido' in request.endpoint %}active{% endif %}">
+                <span class="icon">📋</span><span>Pedidos de Compra</span>
+            </a>
+        </div>
+        {% if current_user.is_admin %}
+        <div class="nav-section" style="margin-top:12px">
+            <div class="nav-label">Admin</div>
+            <a href="{{ url_for('admin_utilizadores') }}" class="nav-item {% if request.endpoint == 'admin_utilizadores' %}active{% endif %}">
+                <span class="icon">👥</span><span>Utilizadores</span>
+            </a>
+            <a href="{{ url_for('admin_phc') }}" class="nav-item {% if request.endpoint == 'admin_phc' %}active{% endif %}">
+                <span class="icon">🔗</span><span>Integração PHC</span>
+            </a>
+            <a href="{{ url_for('admin_ia') }}" class="nav-item {% if request.endpoint == 'admin_ia' %}active{% endif %}">
+                <span class="icon">🤖</span><span>Provedor IA</span>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    <div class="sidebar-bottom">
+        <div class="user-info">
+            <div class="avatar">{{ current_user.nome[0].upper() }}</div>
+            <div>
+                <div class="user-name">{{ current_user.nome }}</div>
+                <div class="user-role">{{ '🔑 Admin' if current_user.is_admin else current_user.departamento or 'Utilizador' }}</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="logout-btn">
+            <span>⎋</span><span>Sair</span>
+        </a>
+    </div>
+</nav>
+{% endif %}
+
+<main class="main">
+    {% if current_user.is_authenticated %}
+    <div class="topbar">
+        <div class="page-title">{% block page_title %}{% endblock %}</div>
+        <div class="topbar-actions">{% block topbar_actions %}{% endblock %}</div>
+    </div>
+    {% endif %}
+    
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-container" id="flashContainer">
+    {% for category, message in messages %}
+    <div class="flash flash-{{ category }}">
+        <span>{% if category == 'success' %}✓{% elif category == 'error' %}✕{% else %}ℹ{% endif %}</span>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+<script>
+    setTimeout(() => {
+        document.getElementById('flashContainer')?.remove();
+    }, 4000);
+</script>
+{% endif %}
+{% endwith %}
+</body>
+</html>

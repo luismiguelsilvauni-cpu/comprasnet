@@ -1,0 +1,38 @@
+# Base de dados (dados locais - nunca partilhar)
+instance/
+*.db
+*.db-journal
+
+# PDFs carregados (dados locais)
+uploads/
+
+# Backups
+backups/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+*.egg-info/
+
+# Environment / chaves API
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+*.log

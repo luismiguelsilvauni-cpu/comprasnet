@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · ComprasNet{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary">+ Novo Pedido</a>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total de Pedidos</div>
+        <div class="stat-value">{{ total_pedidos }}</div>
+        <div class="stat-icon">📋</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">Pedidos Abertos</div>
+        <div class="stat-value">{{ pedidos_abertos }}</div>
+        <div class="stat-icon">⏳</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-label">Aprovados</div>
+        <div class="stat-value">{{ pedidos_aprovados }}</div>
+        <div class="stat-icon">✅</div>
+    </div>
+    <div class="stat-card info">
+        <div class="stat-label">Orçamentos Carregados</div>
+        <div class="stat-value">{{ total_orcamentos }}</div>
+        <div class="stat-icon">📄</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="flex items-center justify-between mb-16">
+        <div class="card-title" style="margin-bottom:0">Pedidos Recentes</div>
+        <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">Ver todos →</a>
+    </div>
+    
+    {% if pedidos_recentes %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Título</th>
+                    <th>Departamento</th>
+                    <th>Prioridade</th>
+                    <th>Estado</th>
+                    <th>Orçamentos</th>
+                    <th>Criado em</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in pedidos_recentes %}
+            <tr>
+                <td class="mono text-muted">PC-{{ '%04d' % p.id }}</td>
+                <td>{{ p.titulo }}</td>
+                <td class="text-muted">{{ p.departamento or '—' }}</td>
+                <td>
+                    {% if p.prioridade == 'urgente' %}<span class="badge badge-red">🔴 Urgente</span>
+                    {% elif p.prioridade == 'alta' %}<span class="badge badge-yellow">🟡 Alta</span>
+                    {% elif p.prioridade == 'baixa' %}<span class="badge badge-gray">⚪ Baixa</span>
+                    {% else %}<span class="badge badge-blue">🔵 Normal</span>{% endif %}
+                </td>
+                <td>
+                    {% if p.estado == 'aberto' %}<span class="badge badge-blue">Aberto</span>
+                    {% elif p.estado == 'em_analise' %}<span class="badge badge-yellow">Em análise</span>
+                    {% elif p.estado == 'aprovado' %}<span class="badge badge-green">✓ Aprovado</span>
+                    {% elif p.estado == 'cancelado' %}<span class="badge badge-gray">Cancelado</span>{% endif %}
+                </td>
+                <td>
+                    {% set n = p.orcamentos|length %}
+                    <span class="mono">{{ n }}/3</span>
+                    <div class="progress-bar" style="width:80px">
+                        <div class="progress-fill" style="width:{{ (n/3*100)|int }}%"></div>
+                    </div>
+                </td>
+                <td class="text-muted">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td>
+                <td><a href="{{ url_for('pedido_detalhe', pid=p.id) }}" class="btn btn-ghost btn-sm">Ver →</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding: 48px; color: var(--text-muted);">
+        <div style="font-size:32px; margin-bottom:12px">📭</div>
+        <div>Ainda não existem pedidos de compra.</div>
+        <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary" style="margin-top:16px; display:inline-flex">+ Criar Primeiro Pedido</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

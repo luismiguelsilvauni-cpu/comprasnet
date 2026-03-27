@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Novo Pedido · ComprasNet{% endblock %}
+{% block page_title %}Novo Pedido de Compra{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 640px;">
+    <div class="card">
+        <div class="card-title">Informações do Pedido</div>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label>Título do Pedido *</label>
+                <input type="text" name="titulo" placeholder="Ex: Compra de material de escritório Q1 2025" required autofocus>
+            </div>
+            
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Departamento</label>
+                    <input type="text" name="departamento" placeholder="Ex: Produção, Manutenção...">
+                </div>
+                <div class="form-group">
+                    <label>Prioridade</label>
+                    <select name="prioridade">
+                        <option value="baixa">⚪ Baixa</option>
+                        <option value="normal" selected>🔵 Normal</option>
+                        <option value="alta">🟡 Alta</option>
+                        <option value="urgente">🔴 Urgente</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Descrição / Justificação</label>
+                <textarea name="descricao" placeholder="Descreva o que necessita adquirir e porquê..."></textarea>
+            </div>
+            
+            <hr class="divider">
+            
+            <div class="flex gap-8" style="justify-content:flex-end">
+                <a href="{{ url_for('pedidos') }}" class="btn btn-ghost">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Criar Pedido →</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card mt-16" style="background: var(--surface2); border-style: dashed;">
+        <div style="font-size:13px; color:var(--text-muted);">
+            <strong style="color:var(--text)">ℹ Processo de compra:</strong>
+            Após criar o pedido, poderá carregar até <strong>3 orçamentos em PDF</strong> de diferentes fornecedores.
+            O sistema irá analisar automaticamente cada PDF e extrair preços, descontos e itens.
+            No final, seleciona o melhor orçamento e aprova a compra.
+        </div>
+    </div>
+</div>
+{% endblock %}

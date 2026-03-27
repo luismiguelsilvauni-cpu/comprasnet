@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+{% block title %}PC-{{ '%04d' % pedido.id }} · ComprasNet{% endblock %}
+{% block page_title %}PC-{{ '%04d' % pedido.id }} · {{ pedido.titulo }}{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">← Pedidos</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+
+<!-- ═══════════════════ LEFT ═══════════════════ -->
+<div>
+
+<!-- LINHAS DO PEDIDO -->
+<div class="card mb-16">
+  <div class="flex items-center justify-between mb-16">
+    <div class="card-title" style="margin-bottom:0">Artigos do Pedido
+      <span class="mono text-muted" style="font-weight:400" id="linhaCount">({{ pedido.linhas|length }})</span>
+    </div>
+    {% if pedido.estado not in ['aprovado','cancelado'] %}
+    <div class="flex gap-8">
+      <button class="btn btn-ghost btn-sm" onclick="toggleSearch()">🔍 Pesquisar Artigo PHC</button>
+      <button class="btn btn-ghost btn-sm" onclick="adicionarLinhaManual()">+ Manual</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarLinhas()">💾 Guardar</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Article search box -->
+  {% if pedido.estado not in ['aprovado','cancelado'] %}
+  <div id="searchBox" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Pesquise por referência, designação ou família PHC:</div>
+    <input id="searchInput" type="text" placeholder="Ex: HID-001, cilindro, hidráulico..." 
+           style="margin-bottom:8px" oninput="pesquisarArtigos(this.value)">
+    <div id="searchResults" style="max-height:260px;overflow-y:auto;display:none;flex-direction:column;gap:4px"></div>
+  </div>
+  {% endif %}
+
+  <!-- Lines table -->
+  <div id="linhasContainer">
+    {% if pedido.linhas %}
+    <div class="table-wrap">
+      <table id="linhasTable">
+        <thead>
+          <tr>
+            <th style="width:32px"></th>
+            <th>Referência</th>
+            <th>Designação</th>
+            <th style="width:60px">Qtd</th>
+            <th style="width:50px">Un</th>
+            <th style="width:90px">Stock PHC</th>
+            <th style="width:100px">P.Custo</th>
+            <th style="width:100px">P.Ponderado</th>
+            <th>Fornec. Hab.</th>
+            {% if pedido.estado not in ['aprovado','cancelado'] %}<th style="width:36px"></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody id="linhasTbody">
+        {% for l in pedido.linhas %}
+        <tr class="linha-row" data-id="{{ l.id }}">
+          <td class="text-muted mono" style="font-size:11px">{{ loop.index }}</td>
+          <td>
+            <span class="mono" style="font-size:12px;color:var(--accent)">{{ l.referencia }}</span>
+            {% if l.artigo_ref %}<span class="badge badge-blue" style="font-size:10px;margin-left:4px">PHC</span>{% endif %}
+          </td>
+          <td style="font-size:13px">{{ l.designacao }}</td>
+          <td class="mono">{{ l.quantidade }} </td>
+          <td class="mono text-muted">{{ l.unidade }}</td>
+          <td class="mono {% if l.stock_atual <= 0 %}text-danger{% elif l.stock_atual < 5 %}text-warning{% else %}text-success{% endif %}">
+            {{ '%.2f'|format(l.stock_atual) }}
+          </td>
+          <td class="mono">{{ '%.4f'|format(l.preco_custo_ref) }} €</td>
+          <td class="mono">{{ '%.4f'|format(l.preco_pcp_ref) }} €</td>
+          <td class="text-muted" style="font-size:12px">{{ l.fornecedor_hab or '—' }}</td>
+          {% if pedido.estado not in ['aprovado','cancelado'] %}
+          <td><button onclick="removerLinha(this)" class="btn btn-danger btn-sm" style="padding:3px 7px">✕</button></td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div id="emptyLinhas" style="text-align:center;padding:32px;color:var(--text-muted)">
+      <div style="font-size:28px;margin-bottom:8px">📋</div>
+      <div>Nenhum artigo adicionado ainda.</div>
+      {% if pedido.estado not in ['aprovado','cancelado'] %}
+      <div style="font-size:12px;margin-top:4px">Use a pesquisa PHC ou adicione manualmente.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ORÇAMENTOS -->
+<div class="card mb-16">
+  <div class="flex items-center justify-between mb-16">
+    <div class="card-title" style="margin-bottom:0">Orçamentos
+      <span class="mono text-muted" style="font-weight:400">{{ orcamentos|length }}/3</span>
+    </div>
+    {% if orcamentos|length >= 2 and pedido.estado not in ['aprovado','cancelado'] %}
+    <span class="badge badge-green">✓ Pronto para aprovar</span>
+    {% endif %}
+  </div>
+
+  {% if orcamentos %}
+  <div style="display:flex;flex-direction:column;gap:12px">
+    {% for orc in orcamentos %}
+    <div style="background:var(--surface2);border:1px solid {% if loop.first and orcamentos|length>1 %}rgba(34,197,94,.35){% elif orc.selecionado %}var(--gold){% else %}var(--border){% endif %};border-radius:8px;padding:16px;display:grid;grid-template-columns:1fr auto;gap:12px">
+      <div>
+        <div class="flex items-center gap-8 mb-4">
+          <strong style="font-size:15px">{{ orc.empresa }}</strong>
+          {% if loop.first and orcamentos|length>1 %}<span class="badge badge-green">🏆 Melhor</span>{% endif %}
+          {% if orc.selecionado %}<span class="badge badge-gold">★ Selecionado</span>{% endif %}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:10px 0">
+          <div><div style="font-size:10px;color:var(--text-muted)">SUBTOTAL</div><div class="mono" style="font-size:13px">{{ '%.2f'|format(orc.subtotal) }} €</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted)">DESCONTO</div><div class="mono" style="font-size:13px;color:var(--warning)">{{ '%.2f'|format(orc.desconto_total) }} €{% if orc.desconto_percentagem>0 %} <span style="font-size:10px">({{ '%.1f'|format(orc.desconto_percentagem) }}%)</span>{% endif %}</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted)">IVA</div><div class="mono" style="font-size:13px">{{ '%.2f'|format(orc.iva_valor) }} €</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted)">TOTAL</div><div class="mono" style="font-size:17px;font-weight:700">{{ '%.2f'|format(orc.total) }} €</div></div>
+        </div>
+        {% if orc.items %}
+        <details><summary style="font-size:12px;color:var(--accent);cursor:pointer">{{ orc.items|length }} linha(s)</summary>
+          <div class="table-wrap" style="margin-top:8px">
+            <table style="font-size:12px">
+              <thead><tr><th>Descrição</th><th>Ref</th><th>Qtd</th><th>P.Unit</th><th>Desc</th><th>Total</th></tr></thead>
+              <tbody>{% for i in orc.items %}<tr><td>{{ i.descricao }}</td><td class="mono text-muted">{{ i.referencia or '—' }}</td><td class="mono">{{ i.quantidade }} {{ i.unidade }}</td><td class="mono">{{ '%.2f'|format(i.preco_unitario) }} €</td><td class="mono">{{ '%.2f'|format(i.desconto_item) }} €</td><td class="mono"><strong>{{ '%.2f'|format(i.total_item) }} €</strong></td></tr>{% endfor %}</tbody>
+            </table>
+          </div>
+        </details>
+        {% endif %}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:76px">
+        <a href="{{ url_for('orcamento_detalhe', orc_id=orc.id) }}" class="btn btn-ghost btn-sm">Detalhes</a>
+        <a href="{{ url_for('download_pdf', filename=orc.ficheiro_pdf) }}" class="btn btn-ghost btn-sm" target="_blank">📄 PDF</a>
+        {% if pedido.estado not in ['aprovado','cancelado'] %}
+        <form method="POST" action="{{ url_for('apagar_orcamento', orc_id=orc.id) }}" onsubmit="return confirm('Remover?')">
+          <button type="submit" class="btn btn-danger btn-sm">Remover</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:28px;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:8px">📄</div><div>Sem orçamentos. Carregue PDFs abaixo.</div></div>
+  {% endif %}
+</div>
+
+<!-- UPLOAD -->
+{% if pedido.estado not in ['aprovado','cancelado'] and orcamentos|length < 3 %}
+<div class="card">
+  <div class="card-title">Carregar Orçamento PDF ({{ orcamentos|length }}/3)</div>
+  <div class="form-group">
+    <label>Fornecedor (opcional — extraído do PDF automaticamente)</label>
+    <input type="text" id="fornecedorInput" placeholder="Ex: Empresa XYZ, Lda.">
+  </div>
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('pdfInput').click()">
+    <div class="drop-zone-icon">📤</div>
+    <div class="drop-zone-text"><strong>Clique para selecionar</strong> ou arraste o PDF aqui<br><span style="font-size:12px;display:block;margin-top:4px">A IA extrai empresa, preços, descontos e itens automaticamente</span></div>
+    <div class="progress-bar mt-8" id="uploadProgress" style="display:none"><div class="progress-fill" id="uploadFill"></div></div>
+  </div>
+  <input type="file" id="pdfInput" accept=".pdf" style="display:none">
+  <div id="uploadStatus" style="margin-top:10px;font-size:13px;display:none"></div>
+</div>
+{% elif pedido.estado not in ['aprovado','cancelado'] %}
+<div class="card" style="background:rgba(34,197,94,.05);border-color:rgba(34,197,94,.2);text-align:center;padding:20px">
+  <div style="font-size:22px;margin-bottom:6px">✅</div>
+  <div style="font-weight:600">3 orçamentos carregados</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Pode aprovar no painel lateral.</div>
+</div>
+{% endif %}
+
+</div><!-- end left -->
+
+<!-- ═══════════════════ RIGHT ═══════════════════ -->
+<div>
+  <!-- Info card -->
+  <div class="card mb-16">
+    <div class="card-title">Detalhes</div>
+    <div style="display:flex;flex-direction:column;gap:12px;font-size:13px">
+      <div><div style="color:var(--text-muted);font-size:10px;margin-bottom:2px">REFERÊNCIA</div><div class="mono" style="font-size:15px;font-weight:700">PC-{{ '%04d' % pedido.id }}</div></div>
+      <div><div style="color:var(--text-muted);font-size:10px;margin-bottom:2px">ESTADO</div>
+        {% if pedido.estado=='aberto' %}<span class="badge badge-blue">Aberto</span>
+        {% elif pedido.estado=='em_analise' %}<span class="badge badge-yellow">Em análise</span>
+        {% elif pedido.estado=='aprovado' %}<span class="badge badge-green">✓ Aprovado</span>
+        {% elif pedido.estado=='cancelado' %}<span class="badge badge-gray">Cancelado</span>{% endif %}
+      </div>
+      <div><div style="color:var(--text-muted);font-size:10px;margin-bottom:2px">PRIORIDADE</div>
+        {% if pedido.prioridade=='urgente' %}<span class="badge badge-red">🔴 Urgente</span>
+        {% elif pedido.prioridade=='alta' %}<span class="badge badge-yellow">🟡 Alta</span>
+        {% elif pedido.prioridade=='baixa' %}<span class="badge badge-gray">Baixa</span>
+        {% else %}<span class="badge badge-blue">Normal</span>{% endif %}
+      </div>
+      {% if pedido.departamento %}<div><div style="color:var(--text-muted);font-size:10px;margin-bottom:2px">DEPARTAMENTO</div><div>{{ pedido.departamento }}</div></div>{% endif %}
+      <div><div style="color:var(--text-muted);font-size:10px;margin-bottom:2px">CRIADO POR</div><div>{{ pedido.criador.nome if pedido.criador else '—' }}</div></div>
+      <div><div style="color:var(--text-muted);font-size:10px;margin-bottom:2px">DATA</div><div>{{ pedido.data_criacao.strftime('%d/%m/%Y %H:%M') }}</div></div>
+      {% if pedido.descricao %}<div><div style="color:var(--text-muted);font-size:10px;margin-bottom:2px">DESCRIÇÃO</div><div style="line-height:1.5;color:var(--text-muted)">{{ pedido.descricao }}</div></div>{% endif %}
+    </div>
+  </div>
+
+  <!-- Approval -->
+  {% if pedido.estado not in ['aprovado','cancelado'] %}
+  <div class="card" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.03)">
+    <div class="card-title">Aprovar Pedido</div>
+    {% if orcamentos %}
+    <form method="POST" action="{{ url_for('aprovar_pedido', pedido_id=pedido.id) }}">
+      <div class="form-group">
+        <label>Orçamento selecionado</label>
+        <select name="orcamento_id">
+          {% for orc in orcamentos %}
+          <option value="{{ orc.id }}" {% if loop.first %}selected{% endif %}>{{ orc.empresa }} — {{ '%.2f'|format(orc.total) }} €{% if loop.first and orcamentos|length>1 %} ✓{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-success" style="width:100%" onclick="return confirm('Confirma aprovação?')">✓ Aprovar Pedido</button>
+    </form>
+    {% else %}
+    <div style="font-size:13px;color:var(--text-muted);text-align:center;padding:12px">Carregue pelo menos 1 orçamento.</div>
+    {% endif %}
+    <form method="POST" action="{{ url_for('cancelar_pedido', pedido_id=pedido.id) }}" style="margin-top:8px">
+      <button type="submit" class="btn btn-danger" style="width:100%;font-size:12px" onclick="return confirm('Cancelar pedido?')">Cancelar Pedido</button>
+    </form>
+  </div>
+  {% elif pedido.estado=='aprovado' %}
+  <div class="card" style="border-color:var(--gold);background:rgba(232,184,75,.04);text-align:center;padding:24px">
+    <div style="font-size:28px;margin-bottom:8px">🏆</div>
+    <div style="font-weight:700;color:var(--gold)">Pedido Aprovado</div>
+    {% set sel = orcamentos|selectattr('selecionado')|first %}
+    {% if sel %}
+    <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Fornecedor: <strong style="color:var(--text)">{{ sel.empresa }}</strong></div>
+    <div class="mono" style="font-size:20px;font-weight:700;margin-top:4px">{{ '%.2f'|format(sel.total) }} €</div>
+    {% endif %}
+    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">{{ pedido.data_aprovacao.strftime('%d/%m/%Y %H:%M') if pedido.data_aprovacao else '' }}</div>
+  </div>
+  {% endif %}
+</div><!-- end right -->
+</div><!-- end grid -->
+
+<!-- ═══ ARTICLE DETAIL MODAL ═══ -->
+<div id="artigoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:540px;max-width:95vw;max-height:80vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-16">
+      <h3 style="font-size:15px;font-weight:600" id="modalTitle">Artigo</h3>
+      <button onclick="fecharModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div id="modalBody"></div>
+    <div class="flex gap-8" style="justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="fecharModal()">Fechar</button>
+      <button class="btn btn-primary" id="modalAddBtn" onclick="adicionarDoModal()">+ Adicionar ao Pedido</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let linhas = {{ linhas_json | safe }};
+let modalArtigo = null;
+let searchTimer = null;
+
+// ── Search ─────────────────────────────────────────────────────────────────
+function toggleSearch(){
+  const b = document.getElementById('searchBox');
+  b.style.display = b.style.display==='none' ? 'block' : 'none';
+  if(b.style.display==='block') document.getElementById('searchInput').focus();
+}
+
+function pesquisarArtigos(q){
+  clearTimeout(searchTimer);
+  if(q.length < 2){ document.getElementById('searchResults').style.display='none'; return; }
+  searchTimer = setTimeout(()=>{
+    fetch(`/api/artigos?q=${encodeURIComponent(q)}`)
+      .then(r=>r.json()).then(data=>{
+        const box = document.getElementById('searchResults');
+        if(!data.length){ box.style.display='none'; return; }
+        box.style.display='flex';
+        box.innerHTML = data.map(a=>`
+          <div onclick="verArtigo('${a.referencia}')" style="padding:10px 12px;border-radius:6px;cursor:pointer;background:var(--surface);border:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center"
+               onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div>
+              <div style="font-size:12px;font-family:monospace;color:var(--accent)">${a.referencia}</div>
+              <div style="font-size:13px;margin-top:2px">${a.designacao||''}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${a.familia||''}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:11px;color:var(--text-muted)">Stock</div>
+              <div style="font-size:13px;font-weight:600;color:${a.stock_atual<=0?'var(--danger)':a.stock_atual<5?'var(--warning)':'var(--success)'}">${a.stock_atual.toFixed(2)} ${a.unidade}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${a.preco_custo.toFixed(4)} €</div>
+            </div>
+          </div>`).join('');
+      });
+  }, 300);
+}
+
+function verArtigo(ref){
+  fetch(`/api/artigos/${encodeURIComponent(ref)}`)
+    .then(r=>r.json()).then(a=>{
+      modalArtigo = a;
+      document.getElementById('modalTitle').textContent = `${a.referencia} · ${a.designacao}`;
+      let hist = '';
+      if(a.historico && a.historico.length){
+        hist = `<div style="margin-top:16px"><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Últimas Compras PHC</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+        ${a.historico.slice(0,5).map(h=>`
+          <div style="background:var(--surface2);border-radius:6px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;font-size:12px">
+            <div><strong>${h.fornecedor_nome}</strong><div style="color:var(--text-muted)">${h.data_compra} · Doc ${h.num_documento}</div></div>
+            <div style="text-align:right"><div style="font-weight:700">${h.preco.toFixed(4)} €</div>${h.desconto>0?`<div style="color:var(--warning)">-${h.desconto.toFixed(1)}%</div>`:''}</div>
+          </div>`).join('')}</div></div>`;
+      }
+      document.getElementById('modalBody').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div style="background:var(--surface2);border-radius:6px;padding:12px">
+            <div style="font-size:10px;color:var(--text-muted)">STOCK ATUAL</div>
+            <div style="font-size:18px;font-weight:700;color:${a.stock_atual<=0?'var(--danger)':a.stock_atual<5?'var(--warning)':'var(--success)'}">${a.stock_atual.toFixed(2)} ${a.unidade}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:12px">
+            <div style="font-size:10px;color:var(--text-muted)">FAMÍLIA</div>
+            <div style="font-size:14px">${a.familia||'—'}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:12px">
+            <div style="font-size:10px;color:var(--text-muted)">P. CUSTO</div>
+            <div style="font-size:16px;font-weight:600;font-family:monospace">${a.preco_custo.toFixed(4)} €</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:12px">
+            <div style="font-size:10px;color:var(--text-muted)">P. CUSTO PONDERADO</div>
+            <div style="font-size:16px;font-weight:600;font-family:monospace">${a.pcp.toFixed(4)} €</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Quantidade a pedir</label>
+          <input type="number" id="modalQtd" value="1" min="0.01" step="0.01" style="max-width:120px">
+        </div>
+        <div class="form-group">
+          <label>Fornecedor habitual (opcional)</label>
+          <input type="text" id="modalFornec" placeholder="Nome do fornecedor...">
+        </div>
+        ${hist}`;
+      document.getElementById('artigoModal').style.display='flex';
+    });
+}
+
+function adicionarDoModal(){
+  if(!modalArtigo) return;
+  const qtd = parseFloat(document.getElementById('modalQtd').value) || 1;
+  const forn = document.getElementById('modalFornec').value.trim();
+  adicionarLinha({
+    referencia: modalArtigo.referencia,
+    designacao: modalArtigo.designacao,
+    unidade: modalArtigo.unidade,
+    quantidade: qtd,
+    stock_atual: modalArtigo.stock_atual,
+    preco_custo_ref: modalArtigo.preco_custo,
+    preco_pcp_ref: modalArtigo.pcp,
+    fornecedor_hab: forn,
+    observacoes: '',
+    artigo_ref: modalArtigo.referencia
+  });
+  fecharModal();
+  document.getElementById('searchInput').value='';
+  document.getElementById('searchResults').style.display='none';
+}
+
+function fecharModal(){ document.getElementById('artigoModal').style.display='none'; modalArtigo=null; }
+
+// ── Lines management ───────────────────────────────────────────────────────
+function adicionarLinhaManual(){
+  adicionarLinha({referencia:'',designacao:'Nova linha',unidade:'un',quantidade:1,
+    stock_atual:0,preco_custo_ref:0,preco_pcp_ref:0,fornecedor_hab:'',observacoes:'',artigo_ref:''});
+}
+
+function adicionarLinha(l){
+  linhas.push(l);
+  renderLinhas();
+}
+
+function removerLinha(btn){
+  const tr = btn.closest('tr');
+  const idx = Array.from(document.getElementById('linhasTbody').rows).indexOf(tr);
+  linhas.splice(idx,1);
+  renderLinhas();
+}
+
+function renderLinhas(){
+  const tbody = document.getElementById('linhasTbody') || criarTabela();
+  tbody.innerHTML = linhas.map((l,i)=>`
+    <tr class="linha-row">
+      <td class="mono text-muted" style="font-size:11px">${i+1}</td>
+      <td><span class="mono" style="font-size:12px;color:var(--accent)">${l.referencia||'—'}</span>${l.artigo_ref?'<span class="badge badge-blue" style="font-size:10px;margin-left:4px">PHC</span>':''}</td>
+      <td><input type="text" value="${escHtml(l.designacao)}" onchange="linhas[${i}].designacao=this.value" style="background:transparent;border:none;color:var(--text);font-size:13px;padding:0;width:100%"></td>
+      <td><input type="number" value="${l.quantidade}" min="0.01" step="0.01" onchange="linhas[${i}].quantidade=parseFloat(this.value)||1" style="background:transparent;border:none;color:var(--text);font-family:monospace;font-size:13px;padding:0;width:60px"></td>
+      <td class="mono text-muted">${l.unidade}</td>
+      <td class="mono ${l.stock_atual<=0?'text-danger':l.stock_atual<5?'text-warning':'text-success'}">${(l.stock_atual||0).toFixed(2)}</td>
+      <td class="mono">${(l.preco_custo_ref||0).toFixed(4)} €</td>
+      <td class="mono">${(l.preco_pcp_ref||0).toFixed(4)} €</td>
+      <td><input type="text" value="${escHtml(l.fornecedor_hab||'')}" onchange="linhas[${i}].fornecedor_hab=this.value" placeholder="—" style="background:transparent;border:none;color:var(--text-muted);font-size:12px;padding:0;width:100%"></td>
+      <td><button onclick="removerLinha(this)" class="btn btn-danger btn-sm" style="padding:3px 7px">✕</button></td>
+    </tr>`).join('');
+  document.getElementById('linhaCount').textContent = `(${linhas.length})`;
+  const empty = document.getElementById('emptyLinhas');
+  if(empty) empty.style.display = linhas.length ? 'none' : 'block';
+}
+
+function criarTabela(){
+  const container = document.getElementById('linhasContainer');
+  container.innerHTML = `<div class="table-wrap"><table id="linhasTable">
+    <thead><tr><th style="width:32px"></th><th>Referência</th><th>Designação</th><th style="width:60px">Qtd</th><th style="width:50px">Un</th><th style="width:90px">Stock PHC</th><th style="width:100px">P.Custo</th><th style="width:100px">P.Ponderado</th><th>Fornec. Hab.</th><th style="width:36px"></th></tr></thead>
+    <tbody id="linhasTbody"></tbody></table></div>
+    <div id="emptyLinhas" style="display:none;text-align:center;padding:32px;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div>Sem artigos adicionados.</div></div>`;
+  return document.getElementById('linhasTbody');
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function guardarLinhas(){
+  fetch('/pedidos/{{ pedido.id }}/linhas', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({linhas: linhas})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok){
+      const btn = document.querySelector('[onclick="guardarLinhas()"]');
+      btn.textContent='✓ Guardado'; btn.style.background='var(--success)';
+      setTimeout(()=>{ btn.textContent='💾 Guardar'; btn.style.background=''; },2500);
+    } else { alert('Erro: '+(d.error||'desconhecido')); }
+  }).catch(()=>alert('Erro de ligação.'));
+}
+
+// ── Upload ─────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const pdfInput = document.getElementById('pdfInput');
+if(dropZone){
+  dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over');});
+  dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag-over');if(e.dataTransfer.files[0])uploadPdf(e.dataTransfer.files[0]);});
+  pdfInput.addEventListener('change',()=>{if(pdfInput.files[0])uploadPdf(pdfInput.files[0]);});
+}
+function uploadPdf(file){
+  if(!file.name.endsWith('.pdf')){showUploadStatus('❌ Apenas PDFs.','error');return;}
+  const fd=new FormData(); fd.append('pdf',file); fd.append('fornecedor',document.getElementById('fornecedorInput')?.value||'');
+  dropZone.style.pointerEvents='none';
+  document.getElementById('uploadProgress').style.display='block';
+  showUploadStatus('🔄 A analisar PDF com IA...','info');
+  let p=0; const iv=setInterval(()=>{p=Math.min(p+Math.random()*15,85);document.getElementById('uploadFill').style.width=p+'%';},400);
+  fetch('/pedidos/{{ pedido.id }}/upload',{method:'POST',body:fd})
+    .then(r=>r.json()).then(d=>{
+      clearInterval(iv); document.getElementById('uploadFill').style.width='100%';
+      if(d.success){showUploadStatus(`✅ <strong>${d.empresa}</strong> · ${d.total.toFixed(2)} € · ${d.num_items} item(s)`,'success');setTimeout(()=>location.reload(),1600);}
+      else{showUploadStatus('❌ '+(d.error||'Erro'),'error');dropZone.style.pointerEvents='';}
+    }).catch(()=>{clearInterval(iv);showUploadStatus('❌ Erro de ligação.','error');dropZone.style.pointerEvents='';});
+}
+function showUploadStatus(msg,type){
+  const el=document.getElementById('uploadStatus');
+  el.style.display='block';
+  el.style.color=type==='error'?'var(--danger)':type==='success'?'var(--success)':'var(--info)';
+  el.innerHTML=msg;
+}
+</script>

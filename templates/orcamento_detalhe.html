@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Orçamento · {{ orc.empresa }}{% endblock %}
+{% block page_title %}Orçamento · {{ orc.empresa }}{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('pedido_detalhe', pid=orc.pedido_id) }}" class="btn btn-ghost btn-sm">← Pedido PC-{{ '%04d' % orc.pedido_id }}</a>
+    <a href="{{ url_for('download_pdf', filename=orc.ficheiro_pdf) }}" class="btn btn-ghost btn-sm" target="_blank">📄 Ver PDF Original</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:800px">
+    <div class="card mb-16">
+        <div class="card-title">Informação do Fornecedor</div>
+        <div class="grid-3" style="gap:20px">
+            <div>
+                <div style="color:var(--text-muted); font-size:11px; margin-bottom:4px">EMPRESA</div>
+                <div style="font-size:16px; font-weight:600">{{ orc.empresa }}</div>
+            </div>
+            {% if orc.nif %}<div>
+                <div style="color:var(--text-muted); font-size:11px; margin-bottom:4px">NIF</div>
+                <div class="mono">{{ orc.nif }}</div>
+            </div>{% endif %}
+            {% if orc.contacto %}<div>
+                <div style="color:var(--text-muted); font-size:11px; margin-bottom:4px">CONTACTO</div>
+                <div>{{ orc.contacto }}</div>
+            </div>{% endif %}
+            {% if orc.numero_orcamento %}<div>
+                <div style="color:var(--text-muted); font-size:11px; margin-bottom:4px">Nº ORÇAMENTO</div>
+                <div class="mono">{{ orc.numero_orcamento }}</div>
+            </div>{% endif %}
+            {% if orc.data_orcamento %}<div>
+                <div style="color:var(--text-muted); font-size:11px; margin-bottom:4px">DATA</div>
+                <div>{{ orc.data_orcamento.strftime('%d/%m/%Y') }}</div>
+            </div>{% endif %}
+            {% if orc.validade %}<div>
+                <div style="color:var(--text-muted); font-size:11px; margin-bottom:4px">VALIDADE</div>
+                <div>{{ orc.validade.strftime('%d/%m/%Y') }}</div>
+            </div>{% endif %}
+        </div>
+    </div>
+    
+    <div class="card mb-16">
+        <div class="card-title">Resumo Financeiro</div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px">
+            <div style="text-align:center; background:var(--surface2); border-radius:8px; padding:16px">
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px">SUBTOTAL</div>
+                <div class="mono" style="font-size:18px; font-weight:600">{{ '%.2f'|format(orc.subtotal) }} €</div>
+            </div>
+            <div style="text-align:center; background:rgba(245,158,11,0.08); border-radius:8px; padding:16px; border:1px solid rgba(245,158,11,0.2)">
+                <div style="font-size:11px; color:var(--warning); margin-bottom:4px">DESCONTO</div>
+                <div class="mono" style="font-size:18px; font-weight:600; color:var(--warning)">{{ '%.2f'|format(orc.desconto_total) }} €</div>
+                {% if orc.desconto_percentagem > 0 %}<div style="font-size:11px; color:var(--text-muted)">{{ '%.1f'|format(orc.desconto_percentagem) }}%</div>{% endif %}
+            </div>
+            <div style="text-align:center; background:var(--surface2); border-radius:8px; padding:16px">
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px">IVA</div>
+                <div class="mono" style="font-size:18px; font-weight:600">{{ '%.2f'|format(orc.iva_valor) }} €</div>
+            </div>
+            <div style="text-align:center; background:rgba(59,110,240,0.08); border-radius:8px; padding:16px; border:1px solid rgba(59,110,240,0.2)">
+                <div style="font-size:11px; color:var(--accent); margin-bottom:4px">TOTAL c/ IVA</div>
+                <div class="mono" style="font-size:22px; font-weight:700; color:var(--text)">{{ '%.2f'|format(orc.total) }} €</div>
+            </div>
+        </div>
+    </div>
+    
+    {% if orc.items %}
+    <div class="card mb-16">
+        <div class="card-title">Linhas de Produto ({{ orc.items|length }})</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Descrição</th>
+                        <th>Referência</th>
+                        <th>Qtd</th>
+                        <th>P. Unitário</th>
+                        <th>Desconto</th>
+                        <th>Total Linha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in orc.items %}
+                <tr>
+                    <td class="mono text-muted" style="font-size:11px">{{ loop.index }}</td>
+                    <td>{{ item.descricao }}</td>
+                    <td class="mono text-muted">{{ item.referencia or '—' }}</td>
+                    <td class="mono">{{ item.quantidade }} {{ item.unidade }}</td>
+                    <td class="mono">{{ '%.2f'|format(item.preco_unitario) }} €</td>
+                    <td class="mono text-warning">{{ '%.2f'|format(item.desconto_item) }} €</td>
+                    <td class="mono" style="font-weight:600">{{ '%.2f'|format(item.total_item) }} €</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if orc.observacoes %}
+    <div class="card">
+        <div class="card-title">Observações / Condições</div>
+        <div style="font-size:13px; line-height:1.6; color:var(--text-muted)">{{ orc.observacoes }}</div>
+    </div>
+    {% endif %}
+    
+    <div style="font-size:12px; color:var(--text-dim); margin-top:12px">
+        Carregado por {{ orc.carregador.nome if orc.carregador else '—' }} em {{ orc.data_upload.strftime('%d/%m/%Y %H:%M') }}
+    </div>
+</div>
+{% endblock %}

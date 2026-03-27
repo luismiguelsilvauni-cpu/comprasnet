@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Pedidos de Compra · ComprasNet{% endblock %}
+{% block page_title %}Pedidos de Compra{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary">+ Novo Pedido</a>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-16" style="padding: 12px 20px;">
+    <div class="flex items-center gap-8">
+        <span style="font-size:12px; color:var(--text-muted); font-weight:600">FILTRAR:</span>
+        <a href="{{ url_for('pedidos') }}" class="badge {% if not estado_filtro %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Todos</a>
+        <a href="{{ url_for('pedidos', estado='aberto') }}" class="badge {% if estado_filtro == 'aberto' %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Abertos</a>
+        <a href="{{ url_for('pedidos', estado='em_analise') }}" class="badge {% if estado_filtro == 'em_analise' %}badge-yellow{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Em Análise</a>
+        <a href="{{ url_for('pedidos', estado='aprovado') }}" class="badge {% if estado_filtro == 'aprovado' %}badge-green{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Aprovados</a>
+        <a href="{{ url_for('pedidos', estado='cancelado') }}" class="badge {% if estado_filtro == 'cancelado' %}badge-red{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Cancelados</a>
+    </div>
+</div>
+
+<div class="card">
+    {% if pedidos %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ref.</th>
+                    <th>Título</th>
+                    <th>Departamento</th>
+                    <th>Criado por</th>
+                    <th>Prioridade</th>
+                    <th>Estado</th>
+                    <th>Orçamentos</th>
+                    <th>Data</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in pedidos %}
+            <tr>
+                <td class="mono text-muted" style="font-size:12px">PC-{{ '%04d' % p.id }}</td>
+                <td style="font-weight:500">{{ p.titulo }}</td>
+                <td class="text-muted">{{ p.departamento or '—' }}</td>
+                <td class="text-muted">{{ p.criador.nome if p.criador else '—' }}</td>
+                <td>
+                    {% if p.prioridade == 'urgente' %}<span class="badge badge-red">🔴 Urgente</span>
+                    {% elif p.prioridade == 'alta' %}<span class="badge badge-yellow">🟡 Alta</span>
+                    {% elif p.prioridade == 'baixa' %}<span class="badge badge-gray">Baixa</span>
+                    {% else %}<span class="badge badge-blue">Normal</span>{% endif %}
+                </td>
+                <td>
+                    {% if p.estado == 'aberto' %}<span class="badge badge-blue">Aberto</span>
+                    {% elif p.estado == 'em_analise' %}<span class="badge badge-yellow">Em análise</span>
+                    {% elif p.estado == 'aprovado' %}<span class="badge badge-green">✓ Aprovado</span>
+                    {% elif p.estado == 'cancelado' %}<span class="badge badge-gray">Cancelado</span>{% endif %}
+                </td>
+                <td>
+                    {% set n = p.orcamentos|length %}
+                    <div class="flex items-center gap-8">
+                        <span class="mono" style="font-size:12px">{{ n }}/3</span>
+                        <div class="progress-bar" style="width:60px">
+                            <div class="progress-fill" style="width:{{ (n/3*100)|int }}%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-muted" style="font-size:12px">{{ p.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td><a href="{{ url_for('pedido_detalhe', pid=p.id) }}" class="btn btn-ghost btn-sm">Ver →</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding: 64px; color: var(--text-muted);">
+        <div style="font-size:40px; margin-bottom:16px">📭</div>
+        <div style="font-size:15px; margin-bottom:8px">Nenhum pedido encontrado</div>
+        <div style="font-size:13px">{% if estado_filtro %}Tente mudar o filtro.{% else %}Crie o primeiro pedido de compra.{% endif %}</div>
+        {% if not estado_filtro %}
+        <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary" style="margin-top:20px; display:inline-flex">+ Novo Pedido</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

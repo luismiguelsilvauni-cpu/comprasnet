@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}Configuração IA · ComprasNet{% endblock %}
+{% block page_title %}Provedor de Inteligência Artificial{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;max-width:960px">
+
+<!-- LEFT -->
+<div>
+
+<!-- Provider selector -->
+<div class="card mb-16">
+  <div class="card-title">Escolha do Provedor</div>
+  <form method="POST" id="mainForm">
+    <input type="hidden" name="action" value="save">
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+
+      <label style="cursor:pointer">
+        <input type="radio" name="provider" value="lmstudio" {% if cfg.provider=='lmstudio' or not cfg.provider %}checked{% endif %}
+               onchange="switchProvider('lmstudio')" style="display:none">
+        <div class="provider-card {% if cfg.provider=='lmstudio' or not cfg.provider %}selected{% endif %}" id="card-lmstudio">
+          <div style="font-size:24px;margin-bottom:8px">🖥️</div>
+          <div style="font-weight:600;font-size:14px">LM Studio</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Local · Gratuito · Windows</div>
+          <div style="margin-top:8px"><span class="badge badge-green" style="font-size:10px">Recomendado</span></div>
+        </div>
+      </label>
+
+      <label style="cursor:pointer">
+        <input type="radio" name="provider" value="ollama" {% if cfg.provider=='ollama' %}checked{% endif %}
+               onchange="switchProvider('ollama')" style="display:none">
+        <div class="provider-card {% if cfg.provider=='ollama' %}selected{% endif %}" id="card-ollama">
+          <div style="font-size:24px;margin-bottom:8px">🦙</div>
+          <div style="font-weight:600;font-size:14px">Ollama</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Local · Gratuito · CLI</div>
+          <div style="margin-top:8px"><span class="badge badge-blue" style="font-size:10px">Avançado</span></div>
+        </div>
+      </label>
+
+      <label style="cursor:pointer">
+        <input type="radio" name="provider" value="claude" {% if cfg.provider=='claude' %}checked{% endif %}
+               onchange="switchProvider('claude')" style="display:none">
+        <div class="provider-card {% if cfg.provider=='claude' %}selected{% endif %}" id="card-claude">
+          <div style="font-size:24px;margin-bottom:8px">☁️</div>
+          <div style="font-weight:600;font-size:14px">Claude API</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Nuvem · Pago · Mais preciso</div>
+          <div style="margin-top:8px"><span class="badge badge-yellow" style="font-size:10px">Requer internet</span></div>
+        </div>
+      </label>
+    </div>
+
+    <!-- LM Studio / Ollama config -->
+    <div id="localConfig" style="{% if cfg.provider=='claude' %}display:none{% endif %}">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Endereço do servidor</label>
+          <input type="text" name="lm_host" value="{{ cfg.lm_host or 'localhost' }}"
+                 placeholder="localhost">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            Se o LM Studio corre no mesmo PC: <code>localhost</code>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Porta</label>
+          <input type="number" name="lm_port" value="{{ cfg.lm_port or 1234 }}"
+                 placeholder="1234">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            LM Studio padrão: <code>1234</code> · Ollama: <code>11434</code>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nome do modelo carregado</label>
+        <input type="text" name="lm_model" value="{{ cfg.lm_model or '' }}"
+               placeholder="qwen2.5-7b-instruct" id="modelInput">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          Copie o nome exato do modelo tal como aparece no LM Studio.
+        </div>
+      </div>
+    </div>
+
+    <!-- Claude API config -->
+    <div id="claudeConfig" style="{% if cfg.provider != 'claude' %}display:none{% endif %}">
+      <div class="form-group">
+        <label>Chave API Anthropic</label>
+        <input type="password" name="claude_api_key"
+               placeholder="{% if cfg.claude_api_key %}••••••••••••••••{% else %}sk-ant-api03-...{% endif %}">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          Obtenha em <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button type="submit" class="btn btn-primary">💾 Guardar Configuração</button>
+    </div>
+  </form>
+</div>
+
+<!-- Test buttons -->
+<div class="card mb-16">
+  <div class="card-title">Testar Provedor</div>
+  <div class="flex gap-8">
+    <form method="POST" style="flex:1">
+      <input type="hidden" name="action" value="test">
+      <button type="submit" class="btn btn-ghost" style="width:100%">
+        🔌 Testar Ligação
+      </button>
+    </form>
+    <form method="POST" style="flex:1">
+      <input type="hidden" name="action" value="test_pdf">
+      <button type="submit" class="btn btn-primary" style="width:100%">
+        📄 Testar Extração PDF
+      </button>
+    </form>
+  </div>
+  {% if cfg.ultimo_teste %}
+  <div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--text-muted)">
+    <span>Último teste: {{ cfg.ultimo_teste.strftime('%d/%m/%Y %H:%M') }}</span>
+    {% if cfg.teste_ok %}
+      <span class="badge badge-green">✓ OK</span>
+    {% else %}
+      <span class="badge badge-red">✕ Falhou</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- LM Studio install guide -->
+<div class="card" style="border-style:dashed;background:var(--surface2)" id="lmGuide">
+  <div class="card-title">📖 Como instalar e configurar o LM Studio</div>
+  <div style="font-size:13px;line-height:1.9;color:var(--text-muted)">
+
+    <strong style="color:var(--text)">1. Instalar LM Studio</strong><br>
+    Descarregar em <a href="https://lmstudio.ai" target="_blank" style="color:var(--accent)">lmstudio.ai</a>
+    → botão <em>"Download for Windows"</em> → instalar normalmente.<br><br>
+
+    <strong style="color:var(--text)">2. Descarregar um modelo</strong><br>
+    Abrir LM Studio → separador <em>"Discover"</em> (ícone 🔍)<br>
+    Pesquisar: <code style="color:var(--accent)">qwen2.5-7b-instruct</code><br>
+    Clicar no resultado → botão <strong>Download</strong> (≈4.5 GB, demora consoante a ligação)<br><br>
+
+    <strong style="color:var(--text)">3. Carregar o modelo</strong><br>
+    Separador <em>"Chat"</em> → no topo, clicar em <em>"Select a model"</em> → escolher o modelo descarregado.<br>
+    Aguardar carregar (barra de progresso no fundo).<br><br>
+
+    <strong style="color:var(--text)">4. Ativar o servidor local</strong><br>
+    Separador <em>"Local Server"</em> (ícone ↔️ ou <code>&lt;-&gt;</code>)<br>
+    Clicar <strong>"Start Server"</strong> → deve aparecer <em>"Running on port 1234"</em><br>
+    ⚠️ Este passo é obrigatório — sem o servidor ativo, o ComprasNet não consegue comunicar.<br><br>
+
+    <strong style="color:var(--text)">5. Copiar o nome do modelo</strong><br>
+    No separador Local Server, o nome do modelo aparece no topo (ex: <code>qwen2.5-7b-instruct</code>)<br>
+    Copiar esse nome exato para o campo <em>"Nome do modelo"</em> acima.<br><br>
+
+    <strong style="color:var(--text)">6. Testar</strong><br>
+    Clicar <em>"Testar Ligação"</em> e depois <em>"Testar Extração PDF"</em> aqui em cima.
+
+    <div style="margin-top:16px;padding:12px;background:rgba(59,110,240,.08);border-radius:6px;border:1px solid rgba(59,110,240,.2)">
+      💡 <strong style="color:var(--text)">Dica para PC partilhado:</strong>
+      O LM Studio pode ser configurado para iniciar automaticamente com o Windows.
+      Vá a <em>Settings → General → Launch at startup</em>.
+      O servidor só precisa de estar ativo quando alguém vai usar o ComprasNet para analisar PDFs.
+    </div>
+  </div>
+</div>
+
+</div><!-- end left -->
+
+<!-- RIGHT SIDEBAR -->
+<div>
+  <!-- Status -->
+  <div class="card mb-16">
+    <div class="card-title">Estado Atual</div>
+    <div style="text-align:center;padding:16px">
+      {% if cfg.provider == 'lmstudio' %}
+        <div style="font-size:32px;margin-bottom:8px">🖥️</div>
+        <div style="font-weight:600">LM Studio</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ cfg.lm_host }}:{{ cfg.lm_port }}</div>
+      {% elif cfg.provider == 'ollama' %}
+        <div style="font-size:32px;margin-bottom:8px">🦙</div>
+        <div style="font-weight:600">Ollama</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ cfg.lm_host }}:{{ cfg.lm_port }}</div>
+      {% else %}
+        <div style="font-size:32px;margin-bottom:8px">☁️</div>
+        <div style="font-weight:600">Claude API</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">api.anthropic.com</div>
+      {% endif %}
+      {% if cfg.lm_model %}
+      <div style="margin-top:12px;background:var(--surface2);border-radius:6px;padding:8px;font-size:12px;font-family:monospace;color:var(--accent)">
+        {{ cfg.lm_model }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recommended models -->
+  <div class="card mb-16">
+    <div class="card-title">Modelos Recomendados</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      {% for m in modelos %}
+      <div style="background:var(--surface2);border-radius:6px;padding:12px;border:1px solid var(--border);cursor:pointer"
+           onclick="document.getElementById('modelInput').value='{{ m.id }}'"
+           onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:12px;font-weight:600">{{ m.label }}</div>
+        <div style="font-size:11px;color:var(--warning);margin-top:3px">{{ m.ram }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">{{ m.notes }}</div>
+        <div style="margin-top:6px">
+          <code style="font-size:10px;color:var(--accent);background:var(--bg);padding:2px 6px;border-radius:4px">{{ m.id }}</code>
+        </div>
+      </div>
+      {% endfor %}
+      <div style="font-size:11px;color:var(--text-dim);text-align:center">Clique num modelo para usar o seu nome</div>
+    </div>
+  </div>
+
+  <!-- Comparison -->
+  <div class="card" style="border-style:dashed">
+    <div class="card-title">Comparação</div>
+    <div style="font-size:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:6px;align-items:center">
+        <div></div>
+        <div style="text-align:center;font-weight:600;font-size:10px">LM Studio</div>
+        <div style="text-align:center;font-weight:600;font-size:10px">Ollama</div>
+        <div style="text-align:center;font-weight:600;font-size:10px">Claude</div>
+        {% for row in [
+          ('Custo', '✅ Grátis', '✅ Grátis', '⚠️ ~0.003€/PDF'),
+          ('Internet', '✅ Não', '✅ Não', '❌ Sim'),
+          ('Instalação', '✅ Fácil', '⚠️ CLI', '✅ Só chave'),
+          ('Precisão', '⭐⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐⭐'),
+          ('Velocidade', '⚠️ ~10s', '⚠️ ~10s', '✅ ~3s'),
+        ] %}
+        <div style="color:var(--text-muted);font-size:11px">{{ row[0] }}</div>
+        <div style="text-align:center;font-size:11px">{{ row[1] }}</div>
+        <div style="text-align:center;font-size:11px">{{ row[2] }}</div>
+        <div style="text-align:center;font-size:11px">{{ row[3] }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end grid -->
+
+<style>
+.provider-card {
+  border: 2px solid var(--border); border-radius: 10px; padding: 16px;
+  text-align: center; transition: all .15s; background: var(--surface2);
+}
+.provider-card:hover { border-color: var(--accent); background: var(--accent-glow); }
+.provider-card.selected { border-color: var(--accent); background: var(--accent-glow); }
+</style>
+
+<script>
+function switchProvider(p) {
+  ['lmstudio','ollama','claude'].forEach(id => {
+    document.getElementById('card-'+id).classList.remove('selected');
+  });
+  document.getElementById('card-'+p).classList.add('selected');
+  document.getElementById('localConfig').style.display  = p !== 'claude' ? 'block' : 'none';
+  document.getElementById('claudeConfig').style.display = p === 'claude' ? 'block' : 'none';
+  // Adjust default port
+  const portInput = document.querySelector('[name=lm_port]');
+  if (p === 'ollama') portInput.value = 11434;
+  else if (p === 'lmstudio') portInput.value = 1234;
+}
+// Make provider cards clickable
+document.querySelectorAll('.provider-card').forEach(card => {
+  card.parentElement.addEventListener('click', () => {
+    const radio = card.parentElement.querySelector('input[type=radio]');
+    radio.checked = true;
+    switchProvider(radio.value);
+  });
+});
+</script>
+{% endblock %}

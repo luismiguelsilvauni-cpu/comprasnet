@@ -1,0 +1,25 @@
+diff --git a/app.py b/app.py
+index 271182f..6b4ff6d 100644
+--- a/app.py
++++ b/app.py
+@@ -446,11 +446,6 @@ def init_db():
+         except Exception as e:
+             print(f"⚠️  Erro ao criar admin: {e}")
+ 
+-if __name__ == '__main__':
+-    init_db()
+-    print("🚀 ComprasNet em http://0.0.0.0:5000")
+-    app.run(host='0.0.0.0', port=5000, debug=False)
+-
+ # ── ADMIN IA ──────────────────────────────────────────────────────────────────
+ 
+ @app.route('/admin/ia', methods=['GET', 'POST'])
+@@ -502,3 +497,8 @@ Subtotal: 300,00 €   IVA 23%: 69,00 €   TOTAL: 369,00 €"""
+ 
+     return render_template('admin_ia.html', cfg=cfg,
+                            modelos=RECOMMENDED_MODELS.get('lmstudio', []))
++
++if __name__ == '__main__':
++    init_db()
++    print("🚀 ComprasNet em http://0.0.0.0:5000")
++    app.run(host='0.0.0.0', port=5000, debug=False)
