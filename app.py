@@ -15,6 +15,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+app.config['BAK_FOLDER'] = os.path.join(os.path.dirname(__file__), 'bak_uploads')
+os.makedirs(app.config['BAK_FOLDER'], exist_ok=True)
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -329,6 +331,71 @@ def apagar_orcamento(oid):
 @login_required
 def download_pdf(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+# ── BAK UPLOAD & RESTORE ──────────────────────────────────────────────────────
+
+@app.route('/admin/phc/upload_bak', methods=['POST'])
+@login_required
+def upload_bak():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+    if 'bak' not in request.files:
+        return jsonify({'error': 'Nenhum ficheiro enviado.'}), 400
+    file = request.files['bak']
+    if not file.filename.lower().endswith('.bak'):
+        return jsonify({'error': 'Apenas ficheiros .bak são aceites.'}), 400
+    bak_path = os.path.join(app.config['BAK_FOLDER'], 'phc_backup.bak')
+    file.save(bak_path)
+    cfg = ConfigPHC.query.first()
+    if not cfg:
+        return jsonify({'error': 'Configure primeiro a ligação ao SQL Server.'}), 400
+    win_path = os.path.abspath(bak_path)
+    messages = []
+    def progress(msg): messages.append(msg)
+    try:
+        from bak_restore import restore_bak, verify_phc_database
+        ok, msg = restore_bak(cfg, win_path, progress_callback=progress)
+        if not ok:
+            return jsonify({'error': msg, 'log': messages}), 500
+        valid, vmsg, stats = verify_phc_database(cfg)
+        if not valid:
+            return jsonify({'error': vmsg, 'log': messages}), 500
+        messages.append(vmsg)
+        from phc_sync import sync_all
+        sync_stats = sync_all(app, cfg)
+        messages.append(
+            f"Sincronização: {sync_stats['artigos']['inseridos']} artigos novos / "
+            f"{sync_stats['artigos']['atualizados']} atualizados"
+        )
+        return jsonify({
+            'success': True, 'log': messages,
+            'stats': {
+                'artigos': sync_stats['artigos']['inseridos'] + sync_stats['artigos']['atualizados'],
+                'fornecedores': sync_stats['fornecedores']['inseridos'] + sync_stats['fornecedores']['atualizados'],
+            }
+        })
+    except ImportError as e:
+        return jsonify({'error': f'Módulo em falta: {e}. Instale pyodbc.'}), 500
+    except Exception as e:
+        messages.append(f'Erro: {e}')
+        return jsonify({'error': str(e), 'log': messages}), 500
+
+
+@app.route('/admin/phc/check_sqlserver')
+@login_required
+def check_sqlserver():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+    cfg = ConfigPHC.query.first()
+    if not cfg:
+        return jsonify({'ok': False, 'msg': 'Sem configuração SQL Server.'})
+    try:
+        from bak_restore import check_sqlserver_available
+        ok, msg = check_sqlserver_available(cfg)
+        return jsonify({'ok': ok, 'msg': msg})
+    except ImportError:
+        return jsonify({'ok': False, 'msg': 'pyodbc não instalado.'})
 
 # ── PHC CONFIG & SYNC ─────────────────────────────────────────────────────────
 

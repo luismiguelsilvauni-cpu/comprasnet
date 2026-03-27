@@ -36,3 +36,6 @@ $RECYCLE.BIN/
 
 # Logs
 *.log
+-e 
+# BAK uploads
+bak_uploads/
