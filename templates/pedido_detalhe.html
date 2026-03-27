@@ -6,6 +6,18 @@
 {% endblock %}
 
 {% block content %}
+<!-- PDF Preview Modal -->
+<div id="pdfModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <span id="pdfModalTitle" style="font-size:14px;font-weight:600"></span>
+    <div class="flex gap-8">
+      <a id="pdfNewTab" href="#" target="_blank" class="btn btn-ghost btn-sm">↗ Nova tab</a>
+      <button onclick="document.getElementById('pdfModal').style.display='none';document.getElementById('pdfFrame').src='';" class="btn btn-ghost btn-sm">✕ Fechar</button>
+    </div>
+  </div>
+  <iframe id="pdfFrame" style="flex:1;width:100%;border:none;background:#fff"></iframe>
+</div>
+
 <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
 
 <!-- ═══════════════════ LEFT ═══════════════════ -->
@@ -98,6 +110,9 @@
     <div class="card-title" style="margin-bottom:0">Orçamentos
       <span class="mono text-muted" style="font-weight:400">{{ orcamentos|length }}/3</span>
     </div>
+    {% if orcamentos|length >= 1 %}
+    <a href="{{ url_for('comparacao_pedido', pid=pedido.id) }}" class="btn btn-ghost btn-sm">📊 Ver Comparação</a>
+    {% endif %}
     {% if orcamentos|length >= 2 and pedido.estado not in ['aprovado','cancelado'] %}
     <span class="badge badge-green">✓ Pronto para aprovar</span>
     {% endif %}
@@ -132,7 +147,8 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:76px">
         <a href="{{ url_for('orcamento_detalhe', orc_id=orc.id) }}" class="btn btn-ghost btn-sm">Detalhes</a>
-        <a href="{{ url_for('download_pdf', filename=orc.ficheiro_pdf) }}" class="btn btn-ghost btn-sm" target="_blank">📄 PDF</a>
+        <button onclick="openPdf('{{ orc.ficheiro_pdf }}','{{ orc.empresa }}')" class="btn btn-ghost btn-sm">👁 Ver</button>
+        <a href="{{ url_for('preview_pdf', filename=orc.ficheiro_pdf) }}" target="_blank" class="btn btn-ghost btn-sm">↗ Tab</a>
         {% if pedido.estado not in ['aprovado','cancelado'] %}
         <form method="POST" action="{{ url_for('apagar_orcamento', orc_id=orc.id) }}" onsubmit="return confirm('Remover?')">
           <button type="submit" class="btn btn-danger btn-sm">Remover</button>
@@ -446,6 +462,12 @@ function uploadPdf(file){
       if(d.success){showUploadStatus(`✅ <strong>${d.empresa}</strong> · ${d.total.toFixed(2)} € · ${d.num_items} item(s)`,'success');setTimeout(()=>location.reload(),1600);}
       else{showUploadStatus('❌ '+(d.error||'Erro'),'error');dropZone.style.pointerEvents='';}
     }).catch(()=>{clearInterval(iv);showUploadStatus('❌ Erro de ligação.','error');dropZone.style.pointerEvents='';});
+}
+function openPdf(filename, empresa) {
+  document.getElementById('pdfModalTitle').textContent = empresa + ' — ' + filename;
+  document.getElementById('pdfFrame').src = '/uploads/preview/' + filename;
+  document.getElementById('pdfNewTab').href = '/uploads/preview/' + filename;
+  document.getElementById('pdfModal').style.display = 'flex';
 }
 function showUploadStatus(msg,type){
   const el=document.getElementById('uploadStatus');

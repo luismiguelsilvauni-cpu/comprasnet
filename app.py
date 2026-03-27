@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, FornecedorPHC, ConfigPHC, ConfigIA
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
@@ -290,6 +290,110 @@ def upload_orcamento(pid):
     db.session.commit()
     return jsonify({'success':True,'orcamento_id':orc.id,'empresa':orc.empresa,
                     'total':orc.total,'num_items':len(dados.get('items',[]))})
+
+
+# ── ALIAS MATCHING ────────────────────────────────────────────────────────────
+
+@app.route('/pedidos/<int:pid>/match', methods=['POST'])
+@login_required
+def match_orcamento(pid):
+    """Run alias matching on all orcamentos of a pedido."""
+    p = PedidoCompra.query.get_or_404(pid)
+    aliases = AliasArtigo.query.all()
+    results = []
+    for orc in p.orcamentos:
+        from alias_matcher import match_orcamento_items
+        r = match_orcamento_items(orc, p, aliases)
+        results.extend(r)
+    db.session.commit()
+    return jsonify({'ok': True, 'matches': len([r for r in results if r['artigo_ref']]),'total': len(results)})
+
+
+@app.route('/api/alias', methods=['POST'])
+@login_required
+def criar_alias():
+    """Manually link a supplier description to a PHC article."""
+    data = request.get_json()
+    artigo_ref     = data.get('artigo_ref', '').strip()
+    descricao_orig = data.get('descricao_orig', '').strip()
+    fornecedor     = data.get('fornecedor', '').strip()
+    referencia_forn= data.get('referencia_forn', '').strip()
+    item_id        = data.get('item_id')
+
+    if not artigo_ref or not descricao_orig:
+        return jsonify({'error': 'artigo_ref e descricao_orig são obrigatórios'}), 400
+
+    artigo = ArtigoPHC.query.filter_by(referencia=artigo_ref).first()
+    if not artigo:
+        return jsonify({'error': f'Artigo {artigo_ref} não encontrado'}), 404
+
+    from alias_matcher import save_alias
+    save_alias(db, artigo_ref, descricao_orig, fornecedor,
+               referencia_forn, current_user.id, confianca=1.0)
+
+    # Update the item if provided
+    if item_id:
+        item = ItemOrcamento.query.get(item_id)
+        if item:
+            item.artigo_ref_match = artigo_ref
+            item.match_confianca  = 1.0
+            db.session.commit()
+
+    return jsonify({'ok': True, 'artigo_ref': artigo_ref, 'designacao': artigo.designacao})
+
+
+@app.route('/api/alias/<int:alias_id>', methods=['DELETE'])
+@login_required
+def apagar_alias(alias_id):
+    alias = AliasArtigo.query.get_or_404(alias_id)
+    db.session.delete(alias)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/aliases')
+@login_required
+def listar_aliases():
+    """List all aliases, optionally filtered by artigo_ref."""
+    ref = request.args.get('ref', '').strip()
+    q = AliasArtigo.query
+    if ref:
+        q = q.filter_by(artigo_ref=ref)
+    aliases = q.order_by(AliasArtigo.vezes_usado.desc()).all()
+    return jsonify([{
+        'id':             a.id,
+        'artigo_ref':     a.artigo_ref,
+        'fornecedor':     a.fornecedor,
+        'descricao_orig': a.descricao_orig,
+        'referencia_forn':a.referencia_forn,
+        'confianca':      a.confianca,
+        'vezes_usado':    a.vezes_usado,
+        'data_criacao':   a.data_criacao.strftime('%d/%m/%Y') if a.data_criacao else '',
+    } for a in aliases])
+
+
+@app.route('/pedidos/<int:pid>/comparacao')
+@login_required
+def comparacao_pedido(pid):
+    """Comparison matrix page: pedido lines vs orcamento items."""
+    p    = PedidoCompra.query.get_or_404(pid)
+    orcs = Orcamento.query.filter_by(pedido_id=pid).all()
+    from alias_matcher import build_comparison_matrix
+    matrix = build_comparison_matrix(p, orcs)
+    return render_template('comparacao.html', pedido=p, orcamentos=orcs, matrix=matrix)
+
+
+# ── PDF PREVIEW ───────────────────────────────────────────────────────────────
+
+@app.route('/uploads/preview/<filename>')
+@login_required
+def preview_pdf(filename):
+    """Serve PDF for inline preview."""
+    return send_from_directory(
+        app.config['UPLOAD_FOLDER'], filename,
+        mimetype='application/pdf',
+        as_attachment=False
+    )
 
 @app.route('/pedidos/<int:pid>/aprovar', methods=['POST'])
 @login_required

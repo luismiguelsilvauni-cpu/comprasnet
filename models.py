@@ -28,6 +28,21 @@ class ArtigoPHC(db.Model):
     familia               = db.Column(db.String(100))
     taxa_iva              = db.Column(db.Float, default=23)
     ultima_sync           = db.Column(db.DateTime)
+    aliases               = db.relationship('AliasArtigo', backref='artigo', lazy=True, cascade='all, delete-orphan')
+
+class AliasArtigo(db.Model):
+    """Maps supplier descriptions to PHC articles. Learned over time."""
+    __tablename__ = 'aliases_artigo'
+    id             = db.Column(db.Integer, primary_key=True)
+    artigo_ref     = db.Column(db.String(50), db.ForeignKey('artigos_phc.referencia'), nullable=False, index=True)
+    fornecedor     = db.Column(db.String(200))          # supplier name (nullable = any supplier)
+    descricao_orig = db.Column(db.String(500))          # exact description from supplier PDF
+    descricao_norm = db.Column(db.String(500))          # normalised lowercase for matching
+    referencia_forn= db.Column(db.String(100))          # supplier's own reference code
+    confianca      = db.Column(db.Float, default=1.0)   # 1.0=manual, 0.x=auto-learned
+    criado_por     = db.Column(db.Integer, db.ForeignKey('users.id'))
+    data_criacao   = db.Column(db.DateTime, default=datetime.utcnow)
+    vezes_usado    = db.Column(db.Integer, default=0)
 
 class FornecedorPHC(db.Model):
     __tablename__ = 'fornecedores_phc'
@@ -78,7 +93,7 @@ class LinhaPedido(db.Model):
     id              = db.Column(db.Integer, primary_key=True)
     pedido_id       = db.Column(db.Integer, db.ForeignKey('pedidos_compra.id'), nullable=False)
     ordem           = db.Column(db.Integer, default=0)
-    artigo_ref      = db.Column(db.String(50), nullable=True, index=True)
+    artigo_ref      = db.Column(db.String(50), db.ForeignKey('artigos_phc.referencia'), nullable=True, index=True)
     referencia      = db.Column(db.String(50))
     designacao      = db.Column(db.String(300))
     unidade         = db.Column(db.String(20), default='un')
@@ -88,6 +103,8 @@ class LinhaPedido(db.Model):
     preco_pcp_ref   = db.Column(db.Float, default=0)
     fornecedor_hab  = db.Column(db.String(200))
     observacoes     = db.Column(db.String(500))
+    # back-ref to PHC article for live data
+    artigo          = db.relationship('ArtigoPHC', foreign_keys=[artigo_ref], lazy=True)
 
 class Orcamento(db.Model):
     __tablename__ = 'orcamentos'
@@ -125,19 +142,17 @@ class ItemOrcamento(db.Model):
     preco_unitario = db.Column(db.Float, default=0)
     desconto_item  = db.Column(db.Float, default=0)
     total_item     = db.Column(db.Float, default=0)
-
+    # Matched PHC article (set after alias matching)
+    artigo_ref_match = db.Column(db.String(50), nullable=True)
+    match_confianca  = db.Column(db.Float, default=0)   # 0=no match, 1=exact
 
 class ConfigIA(db.Model):
-    """AI provider configuration (one row)."""
     __tablename__ = 'config_ia'
     id             = db.Column(db.Integer, primary_key=True)
-    provider       = db.Column(db.String(20), default='lmstudio')  # lmstudio | ollama | claude
-    # LM Studio / Ollama
+    provider       = db.Column(db.String(20), default='lmstudio')
     lm_host        = db.Column(db.String(100), default='localhost')
     lm_port        = db.Column(db.Integer, default=1234)
     lm_model       = db.Column(db.String(200), default='')
-    # Claude API
     claude_api_key = db.Column(db.String(200), default='')
-    # Meta
     ultimo_teste   = db.Column(db.DateTime)
     teste_ok       = db.Column(db.Boolean, default=False)

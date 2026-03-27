@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Comparação · PC-{{ '%04d' % pedido.id }}{% endblock %}
+{% block page_title %}Comparação de Orçamentos · PC-{{ '%04d' % pedido.id }}{% endblock %}
+{% block topbar_actions %}
+    <a href="{{ url_for('pedido_detalhe', pid=pedido.id) }}" class="btn btn-ghost btn-sm">← Pedido</a>
+    <button class="btn btn-ghost btn-sm" onclick="runMatch()">🔄 Reanalisar correspondências</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- PDF Preview Modal -->
+<div id="pdfModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <span id="pdfModalTitle" style="font-size:14px;font-weight:600"></span>
+    <div class="flex gap-8">
+      <a id="pdfNewTab" href="#" target="_blank" class="btn btn-ghost btn-sm">↗ Nova tab</a>
+      <button onclick="closePdfModal()" class="btn btn-ghost btn-sm">✕ Fechar</button>
+    </div>
+  </div>
+  <iframe id="pdfFrame" style="flex:1;width:100%;border:none;background:#fff"></iframe>
+</div>
+
+<!-- Alias Edit Modal -->
+<div id="aliasModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:520px;max-width:95vw">
+    <div class="flex items-center justify-between mb-16">
+      <h3 style="font-size:15px;font-weight:600">Associar Artigo Manualmente</h3>
+      <button onclick="closeAlias()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Descrição do fornecedor:</div>
+    <div id="aliasDescForn" style="background:var(--surface2);border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:16px;border-left:3px solid var(--warning)"></div>
+    <div class="form-group">
+      <label>Pesquisar artigo PHC</label>
+      <input type="text" id="aliasSearch" placeholder="Referência ou designação..." oninput="pesquisarAliasArtigo(this.value)">
+    </div>
+    <div id="aliasResults" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin-bottom:16px"></div>
+    <div id="aliasSelected" style="display:none;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:16px">
+      <span style="color:var(--success)">✓ Selecionado:</span> <strong id="aliasSelectedLabel"></strong>
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeAlias()">Cancelar</button>
+      <button class="btn btn-primary" id="aliasSaveBtn" onclick="guardarAlias()" disabled>Guardar Associação</button>
+    </div>
+  </div>
+</div>
+
+<!-- Summary bar -->
+<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+  {% for orc in orcamentos %}
+  <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-size:11px;color:var(--text-muted)">{{ loop.index }}º FORNECEDOR</div>
+      <div style="font-weight:600;font-size:14px;margin-top:2px">{{ orc.empresa }}</div>
+      <div style="font-size:18px;font-weight:700;font-family:monospace;color:var(--accent);margin-top:4px">{{ '%.2f'|format(orc.total) }} €</div>
+    </div>
+    <div class="flex gap-4" style="flex-direction:column;align-items:flex-end">
+      <button onclick="openPdf('{{ orc.ficheiro_pdf }}','{{ orc.empresa }}')" class="btn btn-ghost btn-sm">👁 Ver PDF</button>
+      <a href="{{ url_for('preview_pdf', filename=orc.ficheiro_pdf) }}" target="_blank" class="btn btn-ghost btn-sm">↗ Nova tab</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Comparison matrix -->
+<div class="card">
+  <div class="card-title">Comparação Linha-a-Linha</div>
+
+  {% if not matrix %}
+  <div style="text-align:center;padding:40px;color:var(--text-muted)">
+    <div style="font-size:28px;margin-bottom:8px">📋</div>
+    <div>Sem artigos no pedido ou sem orçamentos carregados.</div>
+  </div>
+  {% else %}
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;min-width:700px">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px 12px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);min-width:200px">ARTIGO (PHC)</th>
+          <th style="text-align:center;padding:10px 12px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);width:60px">QTD</th>
+          <th style="text-align:right;padding:10px 12px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border)">Ú. PREÇO COMPRA</th>
+          {% for orc in orcamentos %}
+          <th style="text-align:right;padding:10px 12px;font-size:11px;border-bottom:1px solid var(--border);color:var(--accent)">
+            {{ orc.empresa|truncate(20) }}
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in matrix %}
+      {% set linha = row.linha %}
+      <tr style="border-bottom:1px solid var(--border)">
+        <!-- PHC Article -->
+        <td style="padding:12px">
+          <div style="font-size:12px;font-family:monospace;color:var(--accent)">{{ linha.referencia or '—' }}</div>
+          <div style="font-size:13px;font-weight:500;margin-top:2px">{{ linha.designacao }}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+            Stock: <span style="color:{% if linha.stock_atual <= 0 %}var(--danger){% elif linha.stock_atual < 5 %}var(--warning){% else %}var(--success){% endif %}">{{ '%.2f'|format(linha.stock_atual) }} {{ linha.unidade }}</span>
+          </div>
+        </td>
+        <!-- Qty -->
+        <td style="padding:12px;text-align:center;font-family:monospace;font-size:13px">{{ linha.quantidade }}</td>
+        <!-- Last purchase price -->
+        <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px">
+          {% if linha.preco_pcp_ref > 0 %}
+          <div>{{ '%.4f'|format(linha.preco_pcp_ref) }} €</div>
+          <div style="font-size:10px;color:var(--text-muted)">ponderado</div>
+          {% else %}
+          <span style="color:var(--text-dim)">—</span>
+          {% endif %}
+        </td>
+        <!-- Per orcamento columns -->
+        {% for ocol in row.orcamentos %}
+        <td style="padding:12px;text-align:right;background:{% if row.melhor_idx == loop.index0 and ocol.matched %}rgba(34,197,94,.05){% endif %}">
+          {% if ocol.matched and ocol.item %}
+            <div style="font-size:14px;font-weight:700;font-family:monospace;color:{% if row.melhor_idx == loop.index0 %}var(--success){% else %}var(--text){% endif %}">
+              {{ '%.4f'|format(ocol.preco_unitario) }} €
+              {% if row.melhor_idx == loop.index0 %}<span style="font-size:10px">★</span>{% endif %}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+              Total: {{ '%.2f'|format(ocol.total) }} €
+            </div>
+            <div style="font-size:10px;margin-top:4px">
+              {% if ocol.confianca >= 1.0 %}
+                <span class="badge badge-green" style="font-size:9px">✓ manual</span>
+              {% elif ocol.confianca >= 0.9 %}
+                <span class="badge badge-blue" style="font-size:9px">ref.</span>
+              {% else %}
+                <span class="badge badge-yellow" style="font-size:9px">~{{ (ocol.confianca*100)|int }}%</span>
+              {% endif %}
+            </div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:2px;max-width:140px;text-align:right">
+              "{{ ocol.item.descricao|truncate(40) }}"
+            </div>
+            <!-- Manual association button -->
+            <button onclick="openAlias({{ ocol.item.id }},'{{ ocol.item.descricao|replace("'","\\'")|replace('"','\\"') }}','{{ ocol.orcamento_id }}','{{ ocol.empresa|replace("'","\\'")|replace('"','\\"') }}')"
+              class="btn btn-ghost" style="font-size:10px;padding:2px 6px;margin-top:4px">✏️ Associar</button>
+          {% else %}
+            <span style="color:var(--text-dim);font-size:12px">—</span>
+            <!-- Try to find unmatched items to link -->
+            {% if ocol.orcamento_id %}
+            <div style="margin-top:4px">
+              <button onclick="openAliasNew('{{ linha.artigo_ref }}','{{ linha.designacao|replace("'","\\'")|replace('"','\\"') }}',{{ ocol.orcamento_id }},'{{ ocol.empresa|replace("'","\\'")|replace('"','\\"') }}')"
+                class="btn btn-ghost" style="font-size:10px;padding:2px 6px;color:var(--warning)">+ Associar linha</button>
+            </div>
+            {% endif %}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      <!-- Totals row -->
+      <tr style="background:var(--surface2);border-top:2px solid var(--border)">
+        <td colspan="3" style="padding:12px;font-weight:600;font-size:13px">TOTAL</td>
+        {% for i, orc in enumerate(orcamentos) %}
+        <td style="padding:12px;text-align:right;font-family:monospace;font-weight:700;font-size:15px;color:{% if loop.first %}var(--success){% else %}var(--text){% endif %}">
+          {{ '%.2f'|format(orc.total) }} €
+        </td>
+        {% endfor %}
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Aliases section -->
+<div class="card mt-16">
+  <div class="flex items-center justify-between mb-16">
+    <div class="card-title" style="margin-bottom:0">Associações Aprendidas (Aliases)</div>
+    <span style="font-size:12px;color:var(--text-muted)">Correspondências entre descrições de fornecedores e artigos PHC</span>
+  </div>
+  <div id="aliasesTable">
+    <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">A carregar...</div>
+  </div>
+</div>
+
+<script>
+// ── PDF Modal ──────────────────────────────────────────────────────────────
+function openPdf(filename, empresa) {
+  document.getElementById('pdfModalTitle').textContent = empresa + ' — ' + filename;
+  document.getElementById('pdfFrame').src = '/uploads/preview/' + filename;
+  document.getElementById('pdfNewTab').href = '/uploads/preview/' + filename;
+  document.getElementById('pdfModal').style.display = 'flex';
+}
+function closePdfModal() {
+  document.getElementById('pdfModal').style.display = 'none';
+  document.getElementById('pdfFrame').src = '';
+}
+
+// ── Match ──────────────────────────────────────────────────────────────────
+function runMatch() {
+  fetch('/pedidos/{{ pedido.id }}/match', {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok) { alert(`✅ ${d.matches} de ${d.total} linhas associadas. A recarregar...`); location.reload(); }
+    });
+}
+
+// ── Alias Modal ────────────────────────────────────────────────────────────
+let aliasItemId = null, aliasOrcId = null, aliasEmpresa = '';
+let selectedArtigo = null;
+
+function openAlias(itemId, descForn, orcId, empresa) {
+  aliasItemId = itemId; aliasOrcId = orcId; aliasEmpresa = empresa;
+  document.getElementById('aliasDescForn').textContent = descForn;
+  document.getElementById('aliasSearch').value = '';
+  document.getElementById('aliasResults').innerHTML = '';
+  document.getElementById('aliasSelected').style.display = 'none';
+  document.getElementById('aliasSaveBtn').disabled = true;
+  selectedArtigo = null;
+  document.getElementById('aliasModal').style.display = 'flex';
+}
+
+function openAliasNew(artigoRef, designacao, orcId, empresa) {
+  // Open alias modal pre-filled with the PHC article, to pick a supplier line
+  aliasItemId = null; aliasOrcId = orcId; aliasEmpresa = empresa;
+  document.getElementById('aliasDescForn').textContent = '(selecione a linha do orçamento do fornecedor)';
+  document.getElementById('aliasSearch').value = artigoRef;
+  pesquisarAliasArtigo(artigoRef);
+  document.getElementById('aliasSelected').style.display = 'none';
+  document.getElementById('aliasSaveBtn').disabled = true;
+  selectedArtigo = null;
+  document.getElementById('aliasModal').style.display = 'flex';
+}
+
+function closeAlias() { document.getElementById('aliasModal').style.display = 'none'; }
+
+let aliasTimer = null;
+function pesquisarAliasArtigo(q) {
+  clearTimeout(aliasTimer);
+  if(q.length < 2) { document.getElementById('aliasResults').innerHTML = ''; return; }
+  aliasTimer = setTimeout(()=>{
+    fetch('/api/artigos?q=' + encodeURIComponent(q)).then(r=>r.json()).then(data=>{
+      const box = document.getElementById('aliasResults');
+      if(!data.length){box.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:8px">Sem resultados</div>';return;}
+      box.innerHTML = data.slice(0,8).map(a=>`
+        <div onclick="selecionarArtigo('${a.referencia}','${a.designacao.replace(/'/g,"\\'")}','${a.unidade}')"
+          style="padding:10px 12px;border-radius:6px;cursor:pointer;background:var(--surface);border:1px solid var(--border);display:flex;justify-content:space-between"
+          onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div>
+            <div style="font-size:11px;font-family:monospace;color:var(--accent)">${a.referencia}</div>
+            <div style="font-size:13px">${a.designacao}</div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted)">${a.unidade}</div>
+        </div>`).join('');
+    });
+  }, 250);
+}
+
+function selecionarArtigo(ref, design, unidade) {
+  selectedArtigo = {ref, design};
+  document.getElementById('aliasSelectedLabel').textContent = ref + ' — ' + design;
+  document.getElementById('aliasSelected').style.display = 'block';
+  document.getElementById('aliasSaveBtn').disabled = false;
+}
+
+function guardarAlias() {
+  if(!selectedArtigo) return;
+  const descForn = document.getElementById('aliasDescForn').textContent;
+  fetch('/api/alias', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      artigo_ref: selectedArtigo.ref,
+      descricao_orig: descForn,
+      fornecedor: aliasEmpresa,
+      item_id: aliasItemId
+    })
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok){ closeAlias(); runMatch(); }
+    else alert('Erro: ' + d.error);
+  });
+}
+
+// ── Aliases table ──────────────────────────────────────────────────────────
+function loadAliases() {
+  fetch('/api/aliases').then(r=>r.json()).then(data=>{
+    const el = document.getElementById('aliasesTable');
+    if(!data.length){
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Sem associações guardadas. Associe manualmente linhas de orçamentos aos artigos PHC.</div>';
+      return;
+    }
+    el.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Artigo PHC</th><th>Descrição Fornecedor</th><th>Fornecedor</th><th>Confiança</th><th>Usos</th><th>Data</th><th></th></tr></thead>
+      <tbody>${data.map(a=>`<tr>
+        <td class="mono" style="font-size:12px;color:var(--accent)">${a.artigo_ref}</td>
+        <td style="font-size:12px">${a.descricao_orig}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${a.fornecedor||'—'}</td>
+        <td><span class="badge ${a.confianca>=1?'badge-green':'badge-yellow'}">${a.confianca>=1?'Manual':'Auto '+Math.round(a.confianca*100)+'%'}</span></td>
+        <td class="mono" style="font-size:12px">${a.vezes_usado}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${a.data_criacao}</td>
+        <td><button onclick="apagarAlias(${a.id})" class="btn btn-danger btn-sm">✕</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  });
+}
+
+function apagarAlias(id) {
+  if(!confirm('Remover esta associação?')) return;
+  fetch('/api/alias/'+id,{method:'DELETE'}).then(()=>loadAliases());
+}
+
+loadAliases();
+</script>
+{% endblock %}
