@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
@@ -919,6 +919,395 @@ def count_pendentes():
     return jsonify({'count': n})
 
 
+# ══════════════════════════════════════════════════════════════
+#  CONFIG GERAL (tema, empresa, backup)
+# ══════════════════════════════════════════════════════════════
+
+def get_config_geral():
+    cfg = ConfigGeral.query.first()
+    if not cfg:
+        cfg = ConfigGeral()
+        db.session.add(cfg)
+        db.session.commit()
+    return cfg
+
+
+@app.context_processor
+def inject_config():
+    """Make ConfigGeral available in all templates."""
+    try:
+        return {'cfg_geral': get_config_geral()}
+    except Exception:
+        return {'cfg_geral': None}
+
+
+@app.route('/admin/config', methods=['GET', 'POST'])
+@login_required
+def admin_config():
+    if not current_user.is_admin:
+        flash('Sem permissão.', 'error')
+        return redirect(url_for('dashboard'))
+    cfg = get_config_geral()
+    if request.method == 'POST':
+        action = request.form.get('action', 'save')
+        if action == 'save':
+            cfg.empresa_nome       = request.form.get('empresa_nome', '').strip() or 'ComprasNet'
+            cfg.empresa_abrev      = request.form.get('empresa_abrev', '').strip()
+            cfg.empresa_nif        = request.form.get('empresa_nif', '').strip()
+            cfg.empresa_morada     = request.form.get('empresa_morada', '').strip()
+            cfg.empresa_tel        = request.form.get('empresa_tel', '').strip()
+            cfg.empresa_email      = request.form.get('empresa_email', '').strip()
+            cfg.cor_accent         = request.form.get('cor_accent', '#3b6ef0')
+            cfg.cor_bg             = request.form.get('cor_bg', '#0f1117')
+            cfg.cor_surface        = request.form.get('cor_surface', '#171b25')
+            cfg.backup_local_path  = request.form.get('backup_local_path', 'backups').strip()
+            cfg.backup_rede_path   = request.form.get('backup_rede_path', '').strip()
+            cfg.backup_hora        = request.form.get('backup_hora', '02:00')
+            cfg.backup_manter_dias = int(request.form.get('backup_manter_dias', 30))
+            cfg.backup_auto_ativo  = request.form.get('backup_auto_ativo') == 'on'
+            cfg.claude_chat_ativo  = request.form.get('claude_chat_ativo') == 'on'
+            cfg.claude_chat_sistema= request.form.get('claude_chat_sistema', '').strip()
+            # Logo upload
+            if 'logo' in request.files and request.files['logo'].filename:
+                logo = request.files['logo']
+                logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logo_empresa.png')
+                logo.save(logo_path)
+                cfg.empresa_logo_path = 'logo_empresa.png'
+            db.session.commit()
+            flash('Configurações guardadas.', 'success')
+        elif action == 'backup':
+            from backup_manager import fazer_backup
+            ok, msg = fazer_backup(app, cfg)
+            flash(msg, 'success' if ok else 'error')
+        return redirect(url_for('admin_config'))
+
+    from backup_manager import listar_backups
+    backups = listar_backups(app, cfg)
+    return render_template('admin_config.html', cfg=cfg, backups=backups)
+
+
+# ══════════════════════════════════════════════════════════════
+#  CLIENTES
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/clientes')
+@login_required
+def clientes():
+    q = request.args.get('q', '').strip()
+    query = Cliente.query.filter_by(ativo=True)
+    if q:
+        like = f'%{q}%'
+        query = query.filter(db.or_(
+            Cliente.nome.ilike(like),
+            Cliente.abreviatura.ilike(like),
+            Cliente.nif.ilike(like),
+        ))
+    todos = query.order_by(Cliente.nome).all()
+    return render_template('clientes.html', clientes=todos, q=q)
+
+
+@app.route('/clientes/sync_phc', methods=['POST'])
+@login_required
+def sync_clientes_phc():
+    """Sync clients from PHC ec table (clientes only)."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+    cfg_phc = ConfigPHC.query.first()
+    if not cfg_phc:
+        return jsonify({'error': 'PHC não configurado'}), 400
+    try:
+        from phc_sync import get_phc_connection
+        conn = get_phc_connection(cfg_phc)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT no, nome, ISNULL(abrev,'') abrev, ISNULL(nipc,'') nipc,
+                   ISNULL(morada,'') morada, ISNULL(local,'') local,
+                   ISNULL(codpost,'') codpost, ISNULL(pais,'Portugal') pais,
+                   ISNULL(tel,'') tel, ISNULL(tlm,'') tlm,
+                   ISNULL(email,'') email, ISNULL(www,'') www
+            FROM ec
+            WHERE cliente=1 AND ISNULL(inactivo,0)=0
+            ORDER BY nome
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        inseridos = atualizados = 0
+        for r in rows:
+            c = Cliente.query.filter_by(phc_no=int(r[0])).first()
+            if c:
+                c.nome=r[1];c.abreviatura=r[2];c.nif=r[3];c.morada=r[4]
+                c.localidade=r[5];c.cod_postal=r[6];c.pais=r[7]
+                c.telefone=r[8];c.telemovel=r[9];c.email=r[10];c.website=r[11]
+                c.ultima_sync_phc=datetime.utcnow(); atualizados+=1
+            else:
+                db.session.add(Cliente(phc_no=int(r[0]),nome=r[1],abreviatura=r[2],
+                    nif=r[3],morada=r[4],localidade=r[5],cod_postal=r[6],pais=r[7],
+                    telefone=r[8],telemovel=r[9],email=r[10],website=r[11],
+                    ultima_sync_phc=datetime.utcnow())); inseridos+=1
+        db.session.commit()
+        return jsonify({'ok':True,'inseridos':inseridos,'atualizados':atualizados})
+    except Exception as e:
+        return jsonify({'error':str(e)}), 500
+
+
+@app.route('/clientes/novo', methods=['GET','POST'])
+@login_required
+def novo_cliente():
+    if request.method == 'POST':
+        nome = request.form.get('nome','').strip()
+        if not nome:
+            flash('Nome é obrigatório.','error')
+            return render_template('cliente_form.html', cliente=None)
+        c = Cliente(nome=nome,
+            abreviatura=request.form.get('abreviatura','').strip(),
+            nif=request.form.get('nif','').strip(),
+            morada=request.form.get('morada','').strip(),
+            localidade=request.form.get('localidade','').strip(),
+            cod_postal=request.form.get('cod_postal','').strip(),
+            pais=request.form.get('pais','Portugal').strip(),
+            telefone=request.form.get('telefone','').strip(),
+            telemovel=request.form.get('telemovel','').strip(),
+            email=request.form.get('email','').strip(),
+            website=request.form.get('website','').strip(),
+            notas=request.form.get('notas','').strip())
+        db.session.add(c); db.session.commit()
+        flash(f'Cliente {nome} criado.','success')
+        return redirect(url_for('cliente_detalhe', cid=c.id))
+    return render_template('cliente_form.html', cliente=None)
+
+
+@app.route('/clientes/<int:cid>')
+@login_required
+def cliente_detalhe(cid):
+    c = Cliente.query.get_or_404(cid)
+    # Get articles sold to this client from PHC
+    consumiveis = []
+    cfg_phc = ConfigPHC.query.first()
+    if cfg_phc and cfg_phc.ultima_sync:
+        try:
+            from phc_sync import get_phc_connection
+            conn = get_phc_connection(cfg_phc)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT TOP 200
+                    fl.ref, fl.design, fl.qtt, fl.preco,
+                    ft.data, ft.fno, ft.serie
+                FROM fl
+                INNER JOIN ft ON ft.ftstamp=fl.ftstamp
+                INNER JOIN ec ON ec.no=ft.no
+                WHERE ec.no=? AND ft.anulado=0
+                  AND fl.ref IS NOT NULL AND fl.ref<>''
+                ORDER BY ft.data DESC
+            """, c.phc_no or -1)
+            rows = cursor.fetchall()
+            conn.close()
+            consumiveis = [{'ref':r[0],'design':r[1],'qtt':float(r[2] or 0),
+                            'preco':float(r[3] or 0),
+                            'data':r[4].strftime('%d/%m/%Y') if r[4] else '—',
+                            'doc':f"{r[6]}{r[5]}"} for r in rows]
+        except Exception:
+            pass
+    return render_template('cliente_detalhe.html', cliente=c, consumiveis=consumiveis)
+
+
+@app.route('/clientes/<int:cid>/editar', methods=['GET','POST'])
+@login_required
+def editar_cliente(cid):
+    c = Cliente.query.get_or_404(cid)
+    if request.method == 'POST':
+        c.nome=request.form.get('nome','').strip()
+        c.abreviatura=request.form.get('abreviatura','').strip()
+        c.nif=request.form.get('nif','').strip()
+        c.morada=request.form.get('morada','').strip()
+        c.localidade=request.form.get('localidade','').strip()
+        c.cod_postal=request.form.get('cod_postal','').strip()
+        c.pais=request.form.get('pais','Portugal').strip()
+        c.telefone=request.form.get('telefone','').strip()
+        c.telemovel=request.form.get('telemovel','').strip()
+        c.email=request.form.get('email','').strip()
+        c.website=request.form.get('website','').strip()
+        c.notas=request.form.get('notas','').strip()
+        c.atualizado_em=datetime.utcnow()
+        db.session.commit()
+        flash('Cliente atualizado.','success')
+        return redirect(url_for('cliente_detalhe', cid=cid))
+    return render_template('cliente_form.html', cliente=c)
+
+
+# ── Embarcações ──────────────────────────────────────────────
+
+@app.route('/clientes/<int:cid>/embarcacoes/nova', methods=['GET','POST'])
+@login_required
+def nova_embarcacao(cid):
+    cliente = Cliente.query.get_or_404(cid)
+    if request.method == 'POST':
+        e = Embarcacao(
+            cliente_id=cid,
+            nome=request.form.get('nome','').strip(),
+            matricula=request.form.get('matricula','').strip(),
+            tipo=request.form.get('tipo','').strip(),
+            ano_construcao=request.form.get('ano_construcao') or None,
+            comprimento=request.form.get('comprimento') or None,
+            largura=request.form.get('largura') or None,
+            notas=request.form.get('notas','').strip()
+        )
+        db.session.add(e); db.session.flush()
+        # Default components
+        for cat in ['Motor Propulsor','Caixa Inversora/Redutora','Veio Propulsor','Hélice']:
+            db.session.add(ComponenteEmbarcacao(
+                embarcacao_id=e.id, categoria=cat,
+                label=cat, campos_extra='[]', ordem=['Motor Propulsor','Caixa Inversora/Redutora','Veio Propulsor','Hélice'].index(cat)
+            ))
+        db.session.commit()
+        flash(f'Embarcação {e.nome} criada.','success')
+        return redirect(url_for('embarcacao_detalhe', cid=cid, eid=e.id))
+    return render_template('embarcacao_form.html', cliente=cliente, embarcacao=None)
+
+
+@app.route('/clientes/<int:cid>/embarcacoes/<int:eid>')
+@login_required
+def embarcacao_detalhe(cid, eid):
+    cliente = Cliente.query.get_or_404(cid)
+    emb = Embarcacao.query.filter_by(id=eid, cliente_id=cid).first_or_404()
+    return render_template('embarcacao_detalhe.html', cliente=cliente, embarcacao=emb)
+
+
+@app.route('/clientes/<int:cid>/embarcacoes/<int:eid>/componente', methods=['POST'])
+@login_required
+def salvar_componente(cid, eid):
+    data = request.get_json()
+    comp_id = data.get('id')
+    if comp_id:
+        comp = ComponenteEmbarcacao.query.get_or_404(comp_id)
+    else:
+        comp = ComponenteEmbarcacao(embarcacao_id=eid)
+        db.session.add(comp)
+    comp.categoria   = data.get('categoria','').strip()
+    comp.label       = data.get('label','').strip()
+    comp.marca       = data.get('marca','').strip()
+    comp.modelo      = data.get('modelo','').strip()
+    comp.num_serie   = data.get('num_serie','').strip()
+    comp.ano         = data.get('ano') or None
+    comp.campos_extra= json.dumps(data.get('campos_extra', []))
+    comp.notas       = data.get('notas','').strip()
+    comp.atualizado_em = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'ok': True, 'id': comp.id})
+
+
+@app.route('/componentes/<int:comp_id>', methods=['DELETE'])
+@login_required
+def apagar_componente(comp_id):
+    comp = ComponenteEmbarcacao.query.get_or_404(comp_id)
+    db.session.delete(comp); db.session.commit()
+    return jsonify({'ok': True})
+
+
+# ── PHC Consumíveis search ───────────────────────────────────
+
+@app.route('/api/clientes/<int:cid>/consumiveis')
+@login_required
+def api_consumiveis_cliente(cid):
+    cliente = Cliente.query.get_or_404(cid)
+    q = request.args.get('q','').strip()
+    cfg_phc = ConfigPHC.query.first()
+    if not cfg_phc or not cfg_phc.ultima_sync or not cliente.phc_no:
+        return jsonify([])
+    try:
+        from phc_sync import get_phc_connection
+        conn = get_phc_connection(cfg_phc)
+        cursor = conn.cursor()
+        like = f'%{q}%' if q else '%'
+        cursor.execute("""
+            SELECT TOP 100
+                fl.ref, fl.design, fl.qtt, fl.preco, ft.data, ft.fno, ft.serie
+            FROM fl
+            INNER JOIN ft ON ft.ftstamp=fl.ftstamp
+            WHERE ft.no=? AND ft.anulado=0
+              AND (fl.ref LIKE ? OR fl.design LIKE ?)
+              AND fl.ref IS NOT NULL AND fl.ref<>''
+            ORDER BY ft.data DESC
+        """, cliente.phc_no, like, like)
+        rows = cursor.fetchall()
+        conn.close()
+        return jsonify([{
+            'ref':r[0],'design':r[1],'qtt':float(r[2] or 0),
+            'preco':float(r[3] or 0),
+            'data':r[4].strftime('%d/%m/%Y') if r[4] else '—',
+            'doc':f"{r[6]}{r[5]}"
+        } for r in rows])
+    except Exception as e:
+        return jsonify({'error':str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════
+#  CLAUDE CHAT
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/chat')
+@login_required
+def chat_claude():
+    cfg = get_config_geral()
+    cfg_ia = ConfigIA.query.first()
+    return render_template('chat_claude.html', cfg=cfg, cfg_ia=cfg_ia)
+
+
+@app.route('/api/chat', methods=['POST'])
+@login_required
+def api_chat():
+    """Proxy chat messages to Claude API or LM Studio."""
+    data = request.get_json()
+    messages = data.get('messages', [])
+    imagem_b64 = data.get('imagem_b64')   # optional base64 image
+    imagem_tipo = data.get('imagem_tipo', 'image/jpeg')
+
+    cfg_ia  = ConfigIA.query.first()
+    cfg     = get_config_geral()
+    sistema = cfg.claude_chat_sistema if cfg else 'És um assistente técnico.'
+
+    if not cfg_ia:
+        return jsonify({'error': 'IA não configurada'}), 400
+
+    try:
+        if cfg_ia.provider == 'claude':
+            import anthropic
+            client = anthropic.Anthropic(api_key=cfg_ia.claude_api_key or '')
+            # Build last message content (may include image)
+            last = messages[-1] if messages else {'role':'user','content':'Olá'}
+            content = []
+            if imagem_b64:
+                content.append({'type':'image','source':{
+                    'type':'base64','media_type':imagem_tipo,'data':imagem_b64}})
+            content.append({'type':'text','text':last.get('content','')})
+            api_msgs = [{'role':m['role'],'content':m['content']}
+                        for m in messages[:-1]]
+            api_msgs.append({'role':last['role'],'content':content})
+            resp = client.messages.create(
+                model='claude-sonnet-4-20250514', max_tokens=1500,
+                system=sistema, messages=api_msgs)
+            return jsonify({'ok':True,'text':resp.content[0].text})
+
+        else:  # LM Studio / Ollama
+            import urllib.request
+            base = f"http://{cfg_ia.lm_host}:{cfg_ia.lm_port}"
+            api_msgs = [{'role':'system','content':sistema}] + [
+                {'role':m['role'],'content':m['content']} for m in messages]
+            payload = json.dumps({
+                'model': cfg_ia.lm_model or 'default',
+                'messages': api_msgs,
+                'temperature': 0.7, 'max_tokens': 1500, 'stream': False
+            }).encode()
+            req = urllib.request.Request(
+                base + '/v1/chat/completions', data=payload,
+                headers={'Content-Type':'application/json'}, method='POST')
+            with urllib.request.urlopen(req, timeout=60) as r:
+                resp = json.loads(r.read())
+            return jsonify({'ok':True,'text':resp['choices'][0]['message']['content']})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():
@@ -996,5 +1385,11 @@ Subtotal: 300,00 €   IVA 23%: 69,00 €   TOTAL: 369,00 €"""
 
 if __name__ == '__main__':
     init_db()
+    # Start backup scheduler
+    try:
+        from backup_manager import iniciar_scheduler
+        iniciar_scheduler(app)
+    except Exception as e:
+        print(f"⚠️  Backup scheduler não iniciado: {e}")
     print("🚀 ComprasNet em http://0.0.0.0:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)

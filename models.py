@@ -195,3 +195,108 @@ class PendingMatch(db.Model):
     confirmado_por      = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     data_confirmacao    = db.Column(db.DateTime, nullable=True)
     criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ══════════════════════════════════════════════════════════════
+#  CLIENTES + EMBARCAÇÕES
+# ══════════════════════════════════════════════════════════════
+
+class Cliente(db.Model):
+    """Client profile — synced from PHC ec table + manual complement."""
+    __tablename__ = 'clientes'
+    id               = db.Column(db.Integer, primary_key=True)
+    # PHC link
+    phc_no           = db.Column(db.Integer, unique=True, nullable=True, index=True)
+    # Core fields (from PHC or manual)
+    nome             = db.Column(db.String(200), nullable=False)
+    abreviatura      = db.Column(db.String(50))
+    nif              = db.Column(db.String(20))
+    morada           = db.Column(db.String(300))
+    localidade       = db.Column(db.String(100))
+    cod_postal       = db.Column(db.String(20))
+    pais             = db.Column(db.String(50), default='Portugal')
+    telefone         = db.Column(db.String(50))
+    telemovel        = db.Column(db.String(50))
+    email            = db.Column(db.String(150))
+    website          = db.Column(db.String(200))
+    # Extra manual fields
+    notas            = db.Column(db.Text)
+    ativo            = db.Column(db.Boolean, default=True)
+    # Meta
+    criado_em        = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em    = db.Column(db.DateTime, default=datetime.utcnow)
+    ultima_sync_phc  = db.Column(db.DateTime)
+    embarcacoes      = db.relationship('Embarcacao', backref='cliente',
+                                       lazy=True, cascade='all, delete-orphan')
+
+
+class Embarcacao(db.Model):
+    """Vessel belonging to a client."""
+    __tablename__ = 'embarcacoes'
+    id               = db.Column(db.Integer, primary_key=True)
+    cliente_id       = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
+    nome             = db.Column(db.String(200), nullable=False)
+    matricula        = db.Column(db.String(50))
+    tipo             = db.Column(db.String(100))   # Lancha, Veleiro, etc.
+    ano_construcao   = db.Column(db.Integer)
+    comprimento      = db.Column(db.Float)          # metros
+    largura          = db.Column(db.Float)
+    ativo            = db.Column(db.Boolean, default=True)
+    notas            = db.Column(db.Text)
+    criado_em        = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em    = db.Column(db.DateTime, default=datetime.utcnow)
+    componentes      = db.relationship('ComponenteEmbarcacao', backref='embarcacao',
+                                       lazy=True, cascade='all, delete-orphan')
+
+
+class ComponenteEmbarcacao(db.Model):
+    """Any mechanical component of a vessel (engine, gearbox, shaft, etc.)."""
+    __tablename__ = 'componentes_embarcacao'
+    id               = db.Column(db.Integer, primary_key=True)
+    embarcacao_id    = db.Column(db.Integer, db.ForeignKey('embarcacoes.id'), nullable=False)
+    categoria        = db.Column(db.String(100))   # Motor, Caixa Inversora, Veio, etc.
+    label            = db.Column(db.String(200))   # display name
+    marca            = db.Column(db.String(100))
+    modelo           = db.Column(db.String(100))
+    num_serie        = db.Column(db.String(100))
+    ano              = db.Column(db.Integer)
+    # Flexible extra fields stored as JSON: [{"campo":"Diâmetro","valor":"50mm"}, ...]
+    campos_extra     = db.Column(db.Text, default='[]')
+    notas            = db.Column(db.Text)
+    ordem            = db.Column(db.Integer, default=0)
+    criado_em        = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em    = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ══════════════════════════════════════════════════════════════
+#  CONFIGURAÇÃO GERAL (tema, empresa, backup)
+# ══════════════════════════════════════════════════════════════
+
+class ConfigGeral(db.Model):
+    """App-wide settings: theme, company info, backup."""
+    __tablename__ = 'config_geral'
+    id                    = db.Column(db.Integer, primary_key=True)
+    # Company
+    empresa_nome          = db.Column(db.String(200), default='ComprasNet')
+    empresa_abrev         = db.Column(db.String(50),  default='CN')
+    empresa_nif           = db.Column(db.String(20))
+    empresa_morada        = db.Column(db.String(300))
+    empresa_tel           = db.Column(db.String(50))
+    empresa_email         = db.Column(db.String(150))
+    empresa_logo_path     = db.Column(db.String(300))
+    # Theme
+    cor_accent            = db.Column(db.String(7),   default='#3b6ef0')
+    cor_bg                = db.Column(db.String(7),   default='#0f1117')
+    cor_surface           = db.Column(db.String(7),   default='#171b25')
+    tema_nome             = db.Column(db.String(50),  default='dark')
+    # Backup
+    backup_local_path     = db.Column(db.String(500), default='backups')
+    backup_rede_path      = db.Column(db.String(500))
+    backup_hora           = db.Column(db.String(5),   default='02:00')
+    backup_manter_dias    = db.Column(db.Integer,     default=30)
+    backup_auto_ativo     = db.Column(db.Boolean,     default=True)
+    ultimo_backup         = db.Column(db.DateTime)
+    ultimo_backup_ok      = db.Column(db.Boolean)
+    # Claude chat
+    claude_chat_ativo     = db.Column(db.Boolean,     default=True)
+    claude_chat_sistema   = db.Column(db.Text,        default='És um assistente técnico especializado em equipamentos navais e hidráulicos. Responde sempre em português.')

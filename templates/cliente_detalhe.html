@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ cliente.nome }} · ComprasNet{% endblock %}
+{% block page_title %}{{ cliente.nome }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('clientes') }}" class="btn btn-ghost btn-sm">← Clientes</a>
+  <a href="{{ url_for('editar_cliente', cid=cliente.id) }}" class="btn btn-ghost btn-sm">✏️ Editar</a>
+  <a href="{{ url_for('nova_embarcacao', cid=cliente.id) }}" class="btn btn-primary btn-sm">⚓ + Embarcação</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start">
+
+<!-- LEFT: Client profile -->
+<div>
+  <div class="card mb-16">
+    <div style="text-align:center;padding:16px 0 20px">
+      <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;margin:0 auto 12px">
+        {{ cliente.nome[0].upper() }}
+      </div>
+      <div style="font-size:18px;font-weight:700">{{ cliente.nome }}</div>
+      {% if cliente.abreviatura %}
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px">{{ cliente.abreviatura }}</div>
+      {% endif %}
+      {% if cliente.phc_no %}
+      <div class="badge badge-blue" style="margin-top:8px;font-size:10px">PHC #{{ cliente.phc_no }}</div>
+      {% endif %}
+    </div>
+    <hr class="divider" style="margin:0 0 16px">
+    {% macro info(label, val, mono=false) %}
+    {% if val %}
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;margin-bottom:2px">{{ label }}</div>
+      <div style="font-size:13px{% if mono %};font-family:monospace{% endif %}">{{ val }}</div>
+    </div>
+    {% endif %}
+    {% endmacro %}
+    {{ info('NIF', cliente.nif, true) }}
+    {{ info('Morada', cliente.morada) }}
+    {{ info('Localidade', (cliente.localidade or '') + (' ' + cliente.cod_postal if cliente.cod_postal else '') + (' · ' + cliente.pais if cliente.pais != 'Portugal' else '')) }}
+    {{ info('Telefone', cliente.telefone) }}
+    {{ info('Telemóvel', cliente.telemovel) }}
+    {{ info('Email', cliente.email) }}
+    {{ info('Website', cliente.website) }}
+    {% if cliente.notas %}
+    <hr class="divider">
+    <div style="font-size:12px;color:var(--text-muted);line-height:1.6">{{ cliente.notas }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- RIGHT: Vessels + Consumables -->
+<div>
+
+  <!-- Vessels -->
+  <div class="card mb-16">
+    <div class="flex items-center justify-between mb-16">
+      <div class="card-title" style="margin-bottom:0">⚓ Embarcações ({{ cliente.embarcacoes|length }})</div>
+      <a href="{{ url_for('nova_embarcacao', cid=cliente.id) }}" class="btn btn-ghost btn-sm">+ Nova</a>
+    </div>
+    {% if cliente.embarcacoes %}
+    <div style="display:flex;flex-direction:column;gap:10px">
+      {% for e in cliente.embarcacoes %}
+      <a href="{{ url_for('embarcacao_detalhe', cid=cliente.id, eid=e.id) }}"
+         style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)"
+         onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div>
+          <div style="font-weight:600;font-size:14px">{{ e.nome }}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+            {% if e.tipo %}{{ e.tipo }}{% endif %}
+            {% if e.matricula %} · Matrícula: {{ e.matricula }}{% endif %}
+            {% if e.ano_construcao %} · {{ e.ano_construcao }}{% endif %}
+            · {{ e.componentes|length }} componente(s)
+          </div>
+        </div>
+        <span style="color:var(--accent)">→</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:32px;color:var(--text-muted)">
+      <div style="font-size:28px;margin-bottom:8px">⚓</div>
+      <div>Sem embarcações registadas.</div>
+      <a href="{{ url_for('nova_embarcacao', cid=cliente.id) }}" class="btn btn-primary btn-sm" style="margin-top:12px;display:inline-flex">+ Adicionar Embarcação</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Consumables -->
+  <div class="card">
+    <div class="flex items-center justify-between mb-16">
+      <div class="card-title" style="margin-bottom:0">🔧 Histórico de Artigos Vendidos (PHC)</div>
+    </div>
+    {% if not cliente.phc_no %}
+    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">
+      Este cliente não está ligado ao PHC. Edite e associe um número PHC para ver o histórico.
+    </div>
+    {% else %}
+    <div class="form-group mb-16">
+      <input type="text" id="consumSearch" placeholder="Pesquisar artigos (ex: Filtro, Óleo, Correia...)"
+             oninput="pesquisarConsumiveis(this.value)">
+    </div>
+    <div id="consumTabela">
+      {% if consumiveis %}
+      {% include 'partials/consumiveis_table.html' ignore missing %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Referência</th><th>Designação</th><th>Qtd</th><th>Preço</th><th>Data</th><th>Doc.</th></tr></thead>
+          <tbody>
+          {% for c in consumiveis %}
+          <tr>
+            <td class="mono" style="font-size:12px;color:var(--accent)">{{ c.ref }}</td>
+            <td style="font-size:13px">{{ c.design }}</td>
+            <td class="mono">{{ '%.2f'|format(c.qtt) }}</td>
+            <td class="mono">{{ '%.2f'|format(c.preco) }} €</td>
+            <td style="font-size:12px;color:var(--text-muted)">{{ c.data }}</td>
+            <td style="font-size:12px;color:var(--text-muted)">{{ c.doc }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div id="consumVazio" style="text-align:center;padding:32px;color:var(--text-muted)">
+        <div style="font-size:24px;margin-bottom:8px">📦</div>
+        <div>Sem histórico de artigos vendidos para este cliente.</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+</div>
+
+<script>
+let consumTimer = null;
+function pesquisarConsumiveis(q) {
+  clearTimeout(consumTimer);
+  consumTimer = setTimeout(() => {
+    fetch('/api/clientes/{{ cliente.id }}/consumiveis?q=' + encodeURIComponent(q))
+      .then(r=>r.json()).then(data => {
+        const box = document.getElementById('consumTabela');
+        if (!data.length) {
+          box.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted)"><div style="font-size:24px;margin-bottom:8px">📦</div><div>Sem resultados para "'+q+'"</div></div>';
+          return;
+        }
+        const rows = data.map(c=>`<tr>
+          <td class="mono" style="font-size:12px;color:var(--accent)">${c.ref}</td>
+          <td style="font-size:13px">${c.design}</td>
+          <td class="mono">${c.qtt.toFixed(2)}</td>
+          <td class="mono">${c.preco.toFixed(2)} €</td>
+          <td style="font-size:12px;color:var(--text-muted)">${c.data}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${c.doc}</td>
+        </tr>`).join('');
+        box.innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th>Referência</th><th>Designação</th><th>Qtd</th><th>Preço</th><th>Data</th><th>Doc.</th></tr></thead>
+          <tbody>${rows}</tbody></table></div>`;
+      });
+  }, 300);
+}
+</script>
+{% endblock %}

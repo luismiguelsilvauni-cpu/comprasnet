@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Clientes · ComprasNet{% endblock %}
+{% block page_title %}Clientes{% endblock %}
+{% block topbar_actions %}
+  <button class="btn btn-ghost btn-sm" id="btnSyncPHC" onclick="syncPHC()">🔄 Sincronizar PHC</button>
+  <a href="{{ url_for('novo_cliente') }}" class="btn btn-primary btn-sm">+ Novo Cliente</a>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-16" style="padding:12px 20px">
+  <form method="GET" style="display:flex;gap:10px;align-items:center">
+    <input type="text" name="q" value="{{ q }}" placeholder="Pesquisar por nome, NIF, abreviatura..."
+           style="flex:1;max-width:400px" autofocus>
+    <button type="submit" class="btn btn-primary btn-sm">Pesquisar</button>
+    {% if q %}<a href="{{ url_for('clientes') }}" class="btn btn-ghost btn-sm">✕ Limpar</a>{% endif %}
+  </form>
+</div>
+
+<div class="card">
+  {% if clientes %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Nome</th><th>Abrev.</th><th>NIF</th><th>Localidade</th>
+        <th>Telefone</th><th>Email</th><th>Embarcações</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for c in clientes %}
+      <tr>
+        <td style="font-weight:500">
+          {{ c.nome }}
+          {% if c.phc_no %}<span class="badge badge-blue" style="font-size:9px">PHC</span>{% endif %}
+        </td>
+        <td class="mono text-muted">{{ c.abreviatura or '—' }}</td>
+        <td class="mono">{{ c.nif or '—' }}</td>
+        <td class="text-muted">{{ c.localidade or '—' }}</td>
+        <td class="text-muted">{{ c.telefone or c.telemovel or '—' }}</td>
+        <td class="text-muted" style="font-size:12px">{{ c.email or '—' }}</td>
+        <td>
+          {% set n = c.embarcacoes|length %}
+          {% if n > 0 %}
+          <span class="badge badge-cyan">⚓ {{ n }}</span>
+          {% else %}<span class="text-muted">—</span>{% endif %}
+        </td>
+        <td><a href="{{ url_for('cliente_detalhe', cid=c.id) }}" class="btn btn-ghost btn-sm">Ver →</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:64px;color:var(--text-muted)">
+    <div style="font-size:40px;margin-bottom:16px">👥</div>
+    <div style="font-size:15px;margin-bottom:8px">{% if q %}Sem resultados para "{{ q }}"{% else %}Sem clientes{% endif %}</div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+      <button onclick="syncPHC()" class="btn btn-ghost">🔄 Importar do PHC</button>
+      <a href="{{ url_for('novo_cliente') }}" class="btn btn-primary">+ Criar manualmente</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div id="syncMsg" style="display:none;position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;font-size:13px;box-shadow:var(--shadow)"></div>
+
+<script>
+function syncPHC() {
+  const btn = document.getElementById('btnSyncPHC');
+  const msg = document.getElementById('syncMsg');
+  btn.disabled = true; btn.textContent = '⏳ A sincronizar...';
+  msg.style.display = 'block'; msg.textContent = 'A importar clientes do PHC...';
+  fetch('/clientes/sync_phc', {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){
+        msg.textContent = `✅ ${d.inseridos} novos · ${d.atualizados} atualizados`;
+        setTimeout(()=>location.reload(), 1500);
+      } else {
+        msg.textContent = '❌ ' + (d.error||'Erro');
+        btn.disabled=false; btn.textContent='🔄 Sincronizar PHC';
+      }
+    }).catch(()=>{ msg.textContent='❌ Erro de ligação'; btn.disabled=false; btn.textContent='🔄 Sincronizar PHC'; });
+}
+</script>
+{% endblock %}

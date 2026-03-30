@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Nova Embarcação · ComprasNet{% endblock %}
+{% block page_title %}Nova Embarcação — {{ cliente.nome }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('cliente_detalhe', cid=cliente.id) }}" class="btn btn-ghost btn-sm">← {{ cliente.nome }}</a>
+{% endblock %}
+{% block content %}
+<div style="max-width:560px">
+<div class="card">
+  <div class="card-title">Dados da Embarcação</div>
+  <form method="POST">
+    <div class="form-group">
+      <label>Nome da Embarcação *</label>
+      <input type="text" name="nome" required autofocus placeholder="Ex: Sagres II">
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Tipo</label>
+        <select name="tipo">
+          <option value="">— Seleccionar —</option>
+          <option>Lancha</option><option>Veleiro</option><option>Iate</option>
+          <option>Semi-rígido</option><option>Bote</option><option>Rebocador</option>
+          <option>Trabalho</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Matrícula</label>
+        <input type="text" name="matricula" placeholder="PT-XXX-XX">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Comprimento (m)</label>
+        <input type="number" name="comprimento" step="0.1" placeholder="12.5">
+      </div>
+      <div class="form-group">
+        <label>Largura (m)</label>
+        <input type="number" name="largura" step="0.1" placeholder="4.2">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Ano de Construção</label>
+      <input type="number" name="ano_construcao" placeholder="2015" min="1900" max="2100">
+    </div>
+    <div class="form-group">
+      <label>Notas</label>
+      <textarea name="notas" rows="2" placeholder="Informação adicional..."></textarea>
+    </div>
+    <hr class="divider">
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <a href="{{ url_for('cliente_detalhe', cid=cliente.id) }}" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary">Criar Embarcação</button>
+    </div>
+  </form>
+</div>
+<div class="card mt-16" style="border-style:dashed;background:var(--surface2)">
+  <div style="font-size:13px;color:var(--text-muted)">
+    ℹ️ Após criar a embarcação, poderá adicionar componentes como Motor Propulsor, Caixa Inversora, Veio e campos personalizados.
+  </div>
+</div>
+</div>
+{% endblock %}

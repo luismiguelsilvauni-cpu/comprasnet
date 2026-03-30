@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}{{ embarcacao.nome }} · {{ cliente.nome }}{% endblock %}
+{% block page_title %}⚓ {{ embarcacao.nome }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('cliente_detalhe', cid=cliente.id) }}" class="btn btn-ghost btn-sm">← {{ cliente.nome }}</a>
+  <button onclick="adicionarComponente()" class="btn btn-ghost btn-sm">+ Componente</button>
+  <button onclick="guardarTudo()" class="btn btn-primary btn-sm" id="btnGuardar">💾 Guardar</button>
+{% endblock %}
+
+{% block content %}
+<!-- Vessel info header -->
+<div class="card mb-16">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">TIPO</div>
+      <div style="font-size:14px">{{ embarcacao.tipo or '—' }}</div></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">MATRÍCULA</div>
+      <div style="font-size:14px;font-family:monospace">{{ embarcacao.matricula or '—' }}</div></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">ANO</div>
+      <div style="font-size:14px">{{ embarcacao.ano_construcao or '—' }}</div></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">DIMENSÕES</div>
+      <div style="font-size:14px">{{ '%.1f'|format(embarcacao.comprimento) if embarcacao.comprimento else '—' }} × {{ '%.1f'|format(embarcacao.largura) if embarcacao.largura else '—' }} m</div></div>
+  </div>
+  {% if embarcacao.notas %}
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--text-muted)">{{ embarcacao.notas }}</div>
+  {% endif %}
+</div>
+
+<!-- Components -->
+<div id="componentesContainer" style="display:flex;flex-direction:column;gap:16px">
+{% for comp in embarcacao.componentes|sort(attribute='ordem') %}
+{% set extras = comp.campos_extra | tojson | safe %}
+<div class="card componente-card" data-id="{{ comp.id }}" data-ordem="{{ comp.ordem }}">
+  <div class="flex items-center justify-between mb-16">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">{{ '⚙️' if 'Motor' in comp.categoria else '🔧' if 'Caixa' in comp.categoria else '⚡' if 'Veio' in comp.categoria else '🌀' if 'Hélice' in comp.categoria else '🔩' }}</span>
+      <div>
+        <input type="text" class="comp-label" value="{{ comp.label }}"
+               style="background:transparent;border:none;font-size:15px;font-weight:600;color:var(--text);padding:0;width:100%"
+               placeholder="Nome do componente">
+        <input type="text" class="comp-categoria" value="{{ comp.categoria }}"
+               style="background:transparent;border:none;font-size:11px;color:var(--text-muted);padding:0;margin-top:2px"
+               placeholder="Categoria">
+      </div>
+    </div>
+    <button onclick="removerComponente(this)" class="btn btn-danger btn-sm">✕</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">
+    <div class="form-group" style="margin-bottom:0">
+      <label>Marca</label>
+      <input type="text" class="comp-marca" value="{{ comp.marca or '' }}" placeholder="Ex: Volvo">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Modelo</label>
+      <input type="text" class="comp-modelo" value="{{ comp.modelo or '' }}" placeholder="Ex: D6-370">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Nº Série</label>
+      <input type="text" class="comp-serie" value="{{ comp.num_serie or '' }}" placeholder="SN-XXXX">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Ano</label>
+      <input type="number" class="comp-ano" value="{{ comp.ano or '' }}" placeholder="2020">
+    </div>
+  </div>
+
+  <!-- Extra dynamic fields -->
+  <div class="extras-container" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+    <!-- Populated by JS -->
+  </div>
+  <button onclick="adicionarCampoExtra(this)" class="btn btn-ghost btn-sm" style="font-size:11px">+ Campo personalizado</button>
+
+  <div class="form-group" style="margin-top:12px;margin-bottom:0">
+    <label>Notas</label>
+    <textarea class="comp-notas" rows="2" placeholder="Observações, intervalos de manutenção, etc.">{{ comp.notas or '' }}</textarea>
+  </div>
+
+  <script>
+  // Init extras for this component
+  (function() {
+    const extras = {{ extras }};
+    const container = document.currentScript.previousElementSibling.previousElementSibling.previousElementSibling;
+    extras.forEach(e => adicionarCampoExtraValor(container, e.campo, e.valor));
+  })();
+  </script>
+</div>
+{% endfor %}
+</div>
+
+<!-- New component modal -->
+<div id="novoCompModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:400px">
+    <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Novo Componente</h3>
+    <div class="form-group">
+      <label>Categoria</label>
+      <select id="novaCategoria">
+        <option>Motor Propulsor</option>
+        <option>Caixa Inversora/Redutora</option>
+        <option>Veio Propulsor</option>
+        <option>Hélice</option>
+        <option>Gerador</option>
+        <option>Bomba</option>
+        <option>Outro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Nome / Label</label>
+      <input type="text" id="novaLabel" placeholder="Ex: Motor Babord">
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button onclick="fecharNovoComp()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="confirmarNovoComp()" class="btn btn-primary">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CID = {{ cliente.id }};
+const EID = {{ embarcacao.id }};
+
+function adicionarComponente() {
+  document.getElementById('novoCompModal').style.display = 'flex';
+  document.getElementById('novaLabel').focus();
+}
+function fecharNovoComp() { document.getElementById('novoCompModal').style.display = 'none'; }
+function confirmarNovoComp() {
+  const cat   = document.getElementById('novaCategoria').value;
+  const label = document.getElementById('novaLabel').value.trim() || cat;
+  fecharNovoComp();
+  // Save new component immediately
+  fetch(`/clientes/${CID}/embarcacoes/${EID}/componente`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({categoria:cat, label, campos_extra:[]})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok) location.reload();
+  });
+}
+
+function removerComponente(btn) {
+  if(!confirm('Remover este componente?')) return;
+  const card = btn.closest('.componente-card');
+  const id = card.dataset.id;
+  if(id && id!='undefined') {
+    fetch(`/componentes/${id}`, {method:'DELETE'})
+      .then(r=>r.json()).then(d=>{ if(d.ok) card.remove(); });
+  } else card.remove();
+}
+
+function adicionarCampoExtra(btn) {
+  const container = btn.previousElementSibling;
+  adicionarCampoExtraValor(container, '', '');
+}
+
+function adicionarCampoExtraValor(container, campo, valor) {
+  const div = document.createElement('div');
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center';
+  div.innerHTML = `
+    <input type="text" placeholder="Campo (ex: Diâmetro)" value="${escHtml(campo)}"
+           style="font-size:12px" class="extra-campo">
+    <input type="text" placeholder="Valor (ex: 50mm)" value="${escHtml(valor)}"
+           style="font-size:12px" class="extra-valor">
+    <button onclick="this.closest('div').remove()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px">✕</button>`;
+  container.appendChild(div);
+}
+
+function escHtml(s) { return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function guardarTudo() {
+  const btn = document.getElementById('btnGuardar');
+  btn.disabled = true; btn.textContent = '⏳ A guardar...';
+  const cards = document.querySelectorAll('.componente-card');
+  const promises = Array.from(cards).map(card => {
+    const id = card.dataset.id;
+    const extras = Array.from(card.querySelectorAll('.extras-container > div')).map(row => ({
+      campo: row.querySelector('.extra-campo').value.trim(),
+      valor: row.querySelector('.extra-valor').value.trim()
+    })).filter(e => e.campo);
+    return fetch(`/clientes/${CID}/embarcacoes/${EID}/componente`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        id: id && id!='undefined' ? parseInt(id) : null,
+        categoria:   card.querySelector('.comp-categoria').value,
+        label:       card.querySelector('.comp-label').value,
+        marca:       card.querySelector('.comp-marca').value,
+        modelo:      card.querySelector('.comp-modelo').value,
+        num_serie:   card.querySelector('.comp-serie').value,
+        ano:         card.querySelector('.comp-ano').value || null,
+        notas:       card.querySelector('.comp-notas').value,
+        campos_extra: extras,
+      })
+    }).then(r=>r.json());
+  });
+  Promise.all(promises).then(() => {
+    btn.textContent = '✅ Guardado';
+    btn.style.background = 'var(--success)';
+    setTimeout(()=>{ btn.disabled=false; btn.textContent='💾 Guardar'; btn.style.background=''; }, 2000);
+  }).catch(()=>{ btn.disabled=false; btn.textContent='💾 Guardar'; });
+}
+</script>
+{% endblock %}

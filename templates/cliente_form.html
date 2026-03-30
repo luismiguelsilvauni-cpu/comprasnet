@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{% if cliente %}Editar Cliente{% else %}Novo Cliente{% endif %} · ComprasNet{% endblock %}
+{% block page_title %}{% if cliente %}Editar: {{ cliente.nome }}{% else %}Novo Cliente{% endif %}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('clientes') }}" class="btn btn-ghost btn-sm">← Clientes</a>
+{% endblock %}
+{% block content %}
+<div style="max-width:680px">
+<div class="card">
+  <div class="card-title">Dados do Cliente</div>
+  <form method="POST">
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Nome Completo *</label>
+        <input type="text" name="nome" value="{{ cliente.nome if cliente else '' }}" required autofocus>
+      </div>
+      <div class="form-group">
+        <label>Abreviatura</label>
+        <input type="text" name="abreviatura" value="{{ cliente.abreviatura if cliente else '' }}" placeholder="Ex: UCN">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>NIF</label>
+        <input type="text" name="nif" value="{{ cliente.nif if cliente else '' }}" placeholder="123456789">
+      </div>
+      <div class="form-group">
+        <label>País</label>
+        <input type="text" name="pais" value="{{ cliente.pais if cliente else 'Portugal' }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Morada</label>
+      <input type="text" name="morada" value="{{ cliente.morada if cliente else '' }}">
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Localidade</label>
+        <input type="text" name="localidade" value="{{ cliente.localidade if cliente else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Código Postal</label>
+        <input type="text" name="cod_postal" value="{{ cliente.cod_postal if cliente else '' }}" placeholder="0000-000">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Telefone</label>
+        <input type="text" name="telefone" value="{{ cliente.telefone if cliente else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Telemóvel</label>
+        <input type="text" name="telemovel" value="{{ cliente.telemovel if cliente else '' }}">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" value="{{ cliente.email if cliente else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Website</label>
+        <input type="text" name="website" value="{{ cliente.website if cliente else '' }}" placeholder="www.empresa.pt">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notas</label>
+      <textarea name="notas" rows="3">{{ cliente.notas if cliente else '' }}</textarea>
+    </div>
+    <hr class="divider">
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <a href="{{ url_for('clientes') }}" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary">{% if cliente %}Guardar Alterações{% else %}Criar Cliente{% endif %}</button>
+    </div>
+  </form>
+</div>
+</div>
+{% endblock %}

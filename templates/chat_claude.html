@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Chat Claude · ComprasNet{% endblock %}
+{% block page_title %}Assistente Técnico Claude{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 280px;gap:20px;height:calc(100vh - 140px)">
+
+<!-- Chat area -->
+<div class="card" style="display:flex;flex-direction:column;padding:0;overflow:hidden">
+  <!-- Messages -->
+  <div id="chatMessages" style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px">
+    <div class="msg-system" style="text-align:center;padding:20px">
+      <div style="font-size:32px;margin-bottom:8px">🤖</div>
+      <div style="font-size:14px;font-weight:600">Assistente Técnico</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:6px;max-width:400px;margin-left:auto;margin-right:auto">
+        Faça perguntas técnicas, envie fotos de componentes, peça diagnósticos.
+        Especializado em equipamentos navais e hidráulicos.
+      </div>
+    </div>
+  </div>
+
+  <!-- Image preview -->
+  <div id="imgPreview" style="display:none;padding:8px 20px;background:var(--surface2);border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img id="imgThumb" style="height:48px;border-radius:4px;object-fit:cover">
+      <div style="flex:1;font-size:12px;color:var(--text-muted)" id="imgNome"></div>
+      <button onclick="limparImagem()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px">✕</button>
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div style="padding:16px 20px;border-top:1px solid var(--border);background:var(--surface)">
+    <div style="display:flex;gap-10px;gap:10px;align-items:flex-end">
+      <label style="cursor:pointer;flex-shrink:0" title="Enviar imagem">
+        <input type="file" id="imgInput" accept="image/*" onchange="selecionarImagem(this)" style="display:none">
+        <div class="btn btn-ghost btn-sm" style="padding:8px">📎</div>
+      </label>
+      <textarea id="chatInput" placeholder="Escreva a sua pergunta técnica..."
+                style="flex:1;resize:none;min-height:44px;max-height:120px;font-size:13px"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem()}"
+                oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button onclick="enviarMensagem()" class="btn btn-primary" style="flex-shrink:0;height:44px" id="btnEnviar">
+        Enviar ↵
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:6px">
+      Enter para enviar · Shift+Enter para nova linha · 📎 para enviar imagem
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar: suggestions -->
+<div style="display:flex;flex-direction:column;gap:12px">
+  <div class="card">
+    <div class="card-title">💡 Sugestões de perguntas</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      {% set sugestoes = [
+        'Qual o intervalo de manutenção recomendado para um motor Volvo Penta?',
+        'Como interpretar um código de avaria num motor diesel marítimo?',
+        'Que viscosidade de óleo usar numa caixa inversora ZF?',
+        'Quais os sintomas de desgaste de um veio propulsor?',
+        'Como calcular a hélice correcta para um motor de 300HP?',
+        'Que filtros devo verificar numa manutenção anual?',
+      ] %}
+      {% for s in sugestoes %}
+      <button onclick="usarSugestao(this.textContent)" class="btn btn-ghost btn-sm" style="text-align:left;white-space:normal;font-size:11px;line-height:1.4;height:auto;padding:8px 10px">
+        {{ s }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ Sessão</div>
+    <button onclick="limparChat()" class="btn btn-ghost btn-sm" style="width:100%">🗑️ Nova conversa</button>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px" id="chatInfo">0 mensagens</div>
+  </div>
+
+  {% if cfg_ia %}
+  <div class="card" style="border-style:dashed">
+    <div style="font-size:11px;color:var(--text-muted)">
+      Provedor: <strong>{{ cfg_ia.provider }}</strong><br>
+      {% if cfg_ia.lm_model %}Modelo: <span class="mono">{{ cfg_ia.lm_model[:20] }}</span>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+</div>
+
+<style>
+.msg-user { align-self:flex-end; max-width:75%; }
+.msg-user .bubble {
+  background:var(--accent); color:#fff; border-radius:12px 12px 2px 12px;
+  padding:10px 14px; font-size:13px; line-height:1.5;
+}
+.msg-ai { align-self:flex-start; max-width:80%; }
+.msg-ai .bubble {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:12px 12px 12px 2px; padding:10px 14px; font-size:13px; line-height:1.6;
+}
+.msg-ai .bubble pre { background:var(--bg); padding:8px; border-radius:4px; overflow-x:auto; font-size:12px; margin:8px 0; }
+.msg-ai .bubble code { font-family:monospace; background:var(--bg); padding:1px 4px; border-radius:3px; }
+.msg-meta { font-size:10px; color:var(--text-dim); margin-top:3px; }
+.typing { display:flex; gap:4px; align-items:center; padding:12px 14px; }
+.typing span { width:6px; height:6px; background:var(--text-muted); border-radius:50%; animation:bounce .8s infinite; }
+.typing span:nth-child(2) { animation-delay:.15s; }
+.typing span:nth-child(3) { animation-delay:.3s; }
+@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+</style>
+
+<script>
+let messages = [];
+let imgData = null, imgTipo = null;
+
+function usarSugestao(txt) {
+  document.getElementById('chatInput').value = txt.trim();
+  document.getElementById('chatInput').focus();
+}
+
+function selecionarImagem(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64full = e.target.result;
+    imgData  = b64full.split(',')[1];
+    imgTipo  = file.type || 'image/jpeg';
+    document.getElementById('imgThumb').src = b64full;
+    document.getElementById('imgNome').textContent = file.name;
+    document.getElementById('imgPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function limparImagem() {
+  imgData = imgTipo = null;
+  document.getElementById('imgInput').value = '';
+  document.getElementById('imgPreview').style.display = 'none';
+}
+
+function enviarMensagem() {
+  const input = document.getElementById('chatInput');
+  const txt = input.value.trim();
+  if (!txt && !imgData) return;
+
+  const userContent = txt || '(imagem)';
+  messages.push({role:'user', content: userContent});
+  adicionarBolha('user', userContent, imgData ? document.getElementById('imgThumb').src : null);
+  input.value = ''; input.style.height = '';
+
+  // Show typing indicator
+  const typingId = 'typing-' + Date.now();
+  const chatBox = document.getElementById('chatMessages');
+  chatBox.insertAdjacentHTML('beforeend',
+    `<div class="msg-ai" id="${typingId}"><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div></div>`);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true;
+
+  const payload = {messages, imagem_b64: imgData, imagem_tipo: imgTipo};
+  limparImagem();
+
+  fetch('/api/chat', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).then(r=>r.json()).then(d=>{
+    document.getElementById(typingId)?.remove();
+    if (d.ok) {
+      messages.push({role:'assistant', content: d.text});
+      adicionarBolha('ai', d.text);
+    } else {
+      adicionarBolha('ai', '❌ Erro: ' + (d.error || 'Desconhecido'));
+    }
+  }).catch(e=>{
+    document.getElementById(typingId)?.remove();
+    adicionarBolha('ai', '❌ Erro de ligação: ' + e);
+  }).finally(()=>{ btn.disabled=false; });
+
+  atualizarInfo();
+}
+
+function adicionarBolha(role, txt, imgSrc=null) {
+  const chatBox = document.getElementById('chatMessages');
+  const hora    = new Date().toLocaleTimeString('pt-PT', {hour:'2-digit',minute:'2-digit'});
+  let content   = '';
+  if (imgSrc) content += `<img src="${imgSrc}" style="max-width:200px;border-radius:6px;margin-bottom:6px;display:block">`;
+  // Simple markdown-ish rendering
+  const htmlTxt = txt.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
+                      .replace(/`([^`]+)`/g, '<code>$1</code>')
+                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\n/g, '<br>');
+  content += htmlTxt;
+  chatBox.insertAdjacentHTML('beforeend', `
+    <div class="msg-${role}">
+      <div class="bubble">${content}</div>
+      <div class="msg-meta">${hora}</div>
+    </div>`);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function limparChat() {
+  if (messages.length && !confirm('Iniciar nova conversa?')) return;
+  messages = [];
+  const box = document.getElementById('chatMessages');
+  box.innerHTML = `<div class="msg-system" style="text-align:center;padding:20px">
+    <div style="font-size:32px;margin-bottom:8px">🤖</div>
+    <div style="font-size:14px;font-weight:600">Assistente Técnico</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:6px">Nova conversa iniciada.</div></div>`;
+  atualizarInfo();
+}
+
+function atualizarInfo() {
+  const n = messages.filter(m=>m.role==='user').length;
+  document.getElementById('chatInfo').textContent = `${n} pergunta${n!==1?'s':''}`;
+}
+
+document.getElementById('chatInput').focus();
+</script>
+{% endblock %}

@@ -8,6 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
+            --accent: {{ cfg_geral.cor_accent if cfg_geral else '#3b6ef0' }};
+            --bg:     {{ cfg_geral.cor_bg if cfg_geral else '#0f1117' }};
+            --surface:{{ cfg_geral.cor_surface if cfg_geral else '#171b25' }};
             --bg: #0f1117;
             --surface: #171b25;
             --surface2: #1e2330;
@@ -233,7 +236,7 @@
 <nav class="sidebar">
     <div class="sidebar-logo">
         <div class="logo-icon">📦</div>
-        <div class="app-name">ComprasNet</div>
+        <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
         <div class="app-sub">v1.0 · PHC Integration</div>
     </div>
     <div class="sidebar-nav">
@@ -241,6 +244,9 @@
             <div class="nav-label">Principal</div>
             <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
                 <span class="icon">⊞</span><span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('clientes') }}" class="nav-item {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
+                <span class="icon">👥</span><span>Clientes</span>
             </a>
             <a href="{{ url_for('pedidos') }}" class="nav-item {% if 'pedido' in request.endpoint and 'reposicao' not in request.endpoint %}active{% endif %}">
                 <span class="icon">📋</span><span>Pedidos de Compra</span>
@@ -266,6 +272,9 @@
             <a href="{{ url_for('admin_ia') }}" class="nav-item {% if request.endpoint == 'admin_ia' %}active{% endif %}">
                 <span class="icon">🤖</span><span>Provedor IA</span>
             </a>
+            <a href="{{ url_for('admin_config') }}" class="nav-item {% if request.endpoint == 'admin_config' %}active{% endif %}">
+                <span class="icon">⚙️</span><span>Config. Geral</span>
+            </a>
         </div>
         {% endif %}
     </div>
@@ -277,6 +286,9 @@
                 <div class="user-role">{{ '🔑 Admin' if current_user.is_admin else current_user.departamento or 'Utilizador' }}</div>
             </div>
         </div>
+        <a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">💬</span><span>Chat Claude</span>
+        </a>
         <a href="{{ url_for('changelog') }}" class="nav-item {% if request.endpoint == 'changelog' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">📋</span><span>Actualizações</span>
         </a>
@@ -329,5 +341,14 @@
     }).catch(()=>{});
 })();
 </script>
+
+{% if cfg_geral and cfg_geral.claude_chat_ativo and current_user.is_authenticated %}
+<div id="chatFloat" style="position:fixed;bottom:24px;right:24px;z-index:999">
+  <a href="{{ url_for('chat_claude') }}"
+     style="width:52px;height:52px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 20px rgba(59,110,240,.5);text-decoration:none;transition:transform .2s"
+     onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"
+     title="Chat com Claude">🤖</a>
+</div>
+{% endif %}
 </body>
 </html>
