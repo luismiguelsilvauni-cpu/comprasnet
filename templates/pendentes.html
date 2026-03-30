@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Associações Pendentes · ComprasNet{% endblock %}
+{% block page_title %}Associações Pendentes de Confirmação{% endblock %}
+{% block topbar_actions %}
+  {% if pedido_id_filtro %}
+  <a href="{{ url_for('pendentes') }}" class="btn btn-ghost btn-sm">Ver todas</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if not pendentes %}
+<div class="card" style="text-align:center;padding:64px">
+  <div style="font-size:48px;margin-bottom:16px">✅</div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:8px">Sem associações pendentes</div>
+  <div style="font-size:13px;color:var(--text-muted)">
+    Todas as linhas de orçamentos foram associadas ou confirmadas.
+  </div>
+</div>
+{% else %}
+
+<div class="card mb-16" style="background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.3);padding:14px 20px">
+  <div class="flex items-center gap-12">
+    <div style="font-size:20px">⚠️</div>
+    <div style="font-size:13px">
+      <strong>{{ pendentes|length }} linha(s)</strong> de orçamentos aguardam confirmação de associação ao artigo PHC correcto.
+      Confirme ou rejeite cada sugestão — o sistema aprende com cada decisão.
+    </div>
+  </div>
+</div>
+
+<!-- Group by pedido -->
+{% set pedidos_vistos = [] %}
+{% for pm in pendentes %}
+{% if pm.pedido_id not in pedidos_vistos %}
+{% set _ = pedidos_vistos.append(pm.pedido_id) %}
+
+<div class="card mb-16">
+  <div class="flex items-center justify-between mb-16">
+    <div>
+      <div class="card-title" style="margin-bottom:2px">
+        Pedido PC-{{ '%04d' % pm.pedido_id }}
+      </div>
+      <div style="font-size:12px;color:var(--text-muted)">
+        {{ pendentes|selectattr('pedido_id','eq',pm.pedido_id)|list|length }} linha(s) pendente(s)
+      </div>
+    </div>
+    <a href="{{ url_for('pedido_detalhe', pid=pm.pedido_id) }}" class="btn btn-ghost btn-sm">Ver Pedido →</a>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+  {% for p in pendentes if p.pedido_id == pm.pedido_id %}
+  <div class="pending-card" id="pm-{{ p.id }}" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">
+
+      <!-- Supplier side -->
+      <div>
+        <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:6px">Linha do orçamento</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">{{ p.descricao_forn }}</div>
+        {% if p.referencia_forn %}
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Ref. fornecedor: <span class="mono">{{ p.referencia_forn }}</span></div>
+        {% endif %}
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Fornecedor: <strong>{{ p.fornecedor }}</strong></div>
+      </div>
+
+      <!-- AI suggestion -->
+      <div>
+        <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:6px">
+          Sugestão automática
+          {% if p.metodo == 'ai' %}<span class="badge badge-blue" style="font-size:9px">IA</span>
+          {% elif p.metodo and 'fuzzy' in p.metodo %}<span class="badge badge-yellow" style="font-size:9px">Fuzzy</span>
+          {% elif p.metodo %}<span class="badge badge-green" style="font-size:9px">{{ p.metodo }}</span>
+          {% endif %}
+        </div>
+        {% if p.artigo_ref_sugerido %}
+        {% set artigo = namespace(obj=none) %}
+        {% for a in artigos_phc if a.referencia == p.artigo_ref_sugerido %}
+          {% set artigo.obj = a %}
+        {% endfor %}
+        <div style="font-size:13px;font-weight:600;color:var(--accent)" class="mono">{{ p.artigo_ref_sugerido }}</div>
+        <div style="font-size:13px;color:var(--text);margin-top:2px">{{ artigo.obj.designacao if artigo.obj else '—' }}</div>
+        <div style="margin-top:6px">
+          {% set pct = (p.confianca_sugerido * 100)|int %}
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="height:4px;flex:1;background:var(--border);border-radius:2px">
+              <div style="height:100%;width:{{ pct }}%;background:{% if pct>=80 %}var(--success){% elif pct>=60 %}var(--warning){% else %}var(--danger){% endif %};border-radius:2px"></div>
+            </div>
+            <span style="font-size:11px;color:var(--text-muted)">{{ pct }}%</span>
+          </div>
+        </div>
+        {% else %}
+        <div style="color:var(--text-dim);font-size:13px">Sem sugestão automática</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+
+      <!-- Search PHC article -->
+      <div style="flex:1;min-width:200px;position:relative">
+        <input type="text" placeholder="Pesquisar artigo PHC para associar..."
+               id="search-{{ p.id }}" oninput="pesquisar({{ p.id }}, this.value)"
+               style="font-size:12px">
+        <div id="results-{{ p.id }}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:var(--shadow)"></div>
+      </div>
+
+      {% if p.artigo_ref_sugerido %}
+      <button onclick="confirmar({{ p.id }}, '{{ p.artigo_ref_sugerido }}')"
+              class="btn btn-success btn-sm">
+        ✓ Confirmar sugestão
+      </button>
+      {% endif %}
+
+      <button onclick="ignorar({{ p.id }})" class="btn btn-ghost btn-sm" style="color:var(--text-dim)">
+        ✕ Sem artigo PHC
+      </button>
+    </div>
+
+    <!-- Selected article display -->
+    <div id="sel-{{ p.id }}" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-size:13px">
+      <span style="color:var(--success)">✓ Selecionado:</span>
+      <strong id="sel-label-{{ p.id }}"></strong>
+      <button onclick="confirmarSelecionado({{ p.id }})" class="btn btn-success btn-sm" style="margin-left:12px">Confirmar</button>
+    </div>
+  </div>
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+<!-- Pass artigos_phc refs for JS -->
+<script>
+const artigosPHC = {{ artigos_phc_json | safe }};
+let timers = {};
+let seleccionados = {};  // {pm_id: artigo_ref}
+
+function pesquisar(pmId, q) {
+  clearTimeout(timers[pmId]);
+  const res = document.getElementById('results-' + pmId);
+  if (q.length < 2) { res.style.display='none'; return; }
+  timers[pmId] = setTimeout(() => {
+    fetch('/api/artigos?q=' + encodeURIComponent(q))
+      .then(r=>r.json()).then(data => {
+        if (!data.length) { res.style.display='none'; return; }
+        res.style.display = 'block';
+        res.innerHTML = data.slice(0,8).map(a =>
+          `<div onclick="selecionar(${pmId},'${a.referencia}','${escJs(a.designacao)}')"
+            style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px"
+            onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+            <div style="font-family:monospace;color:var(--accent)">${a.referencia}</div>
+            <div style="margin-top:2px">${a.designacao}</div>
+          </div>`
+        ).join('');
+      });
+  }, 250);
+}
+
+function selecionar(pmId, ref, design) {
+  seleccionados[pmId] = ref;
+  document.getElementById('results-'+pmId).style.display = 'none';
+  document.getElementById('search-'+pmId).value = ref + ' — ' + design;
+  document.getElementById('sel-'+pmId).style.display = 'block';
+  document.getElementById('sel-label-'+pmId).textContent = ref + ' — ' + design;
+}
+
+function confirmarSelecionado(pmId) {
+  const ref = seleccionados[pmId];
+  if (ref) confirmar(pmId, ref);
+}
+
+function confirmar(pmId, artigo_ref) {
+  fetch('/pendentes/' + pmId + '/confirmar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({artigo_ref})
+  }).then(r=>r.json()).then(d => {
+    if (d.ok) {
+      const card = document.getElementById('pm-'+pmId);
+      card.style.transition = 'opacity .4s';
+      card.style.opacity = '0';
+      setTimeout(() => {
+        card.remove();
+        atualizarBadge();
+        verificarVazio();
+      }, 400);
+    } else alert('Erro: ' + d.error);
+  });
+}
+
+function ignorar(pmId) {
+  if (!confirm('Marcar esta linha como "sem artigo PHC correspondente"?')) return;
+  fetch('/pendentes/' + pmId + '/ignorar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({})
+  }).then(r=>r.json()).then(d => {
+    if (d.ok) {
+      const card = document.getElementById('pm-'+pmId);
+      card.style.opacity = '0';
+      setTimeout(() => { card.remove(); atualizarBadge(); verificarVazio(); }, 400);
+    }
+  });
+}
+
+function atualizarBadge() {
+  fetch('/api/pendentes/count').then(r=>r.json()).then(d => {
+    const badge = document.getElementById('sidebarBadgePendentes');
+    if (badge) badge.textContent = d.count > 0 ? d.count : '';
+  });
+}
+
+function verificarVazio() {
+  const cards = document.querySelectorAll('.pending-card');
+  if (cards.length === 0) location.reload();
+}
+
+function escJs(s) { return String(s||'').replace(/'/g,"\\'"); }
+</script>
+{% endblock %}

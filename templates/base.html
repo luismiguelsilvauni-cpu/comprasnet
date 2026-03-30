@@ -248,6 +248,11 @@
             <a href="{{ url_for('reposicao') }}" class="nav-item {% if request.endpoint == 'reposicao' or request.endpoint == 'analisar_artigo' %}active{% endif %}">
                 <span class="icon">📦</span><span>Reposição de Stock</span>
             </a>
+            <a href="{{ url_for('pendentes') }}" class="nav-item {% if request.endpoint == 'pendentes' %}active{% endif %}">
+                <span class="icon">🔗</span>
+                <span>Associações Pendentes</span>
+                <span id="sidebarBadgePendentes" style="margin-left:auto;background:var(--warning);color:#000;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center"></span>
+            </a>
         </div>
         {% if current_user.is_admin %}
         <div class="nav-section" style="margin-top:12px">
@@ -312,5 +317,17 @@
 </script>
 {% endif %}
 {% endwith %}
+
+<script>
+// Update pending matches badge in sidebar
+(function() {
+  fetch('/api/pendentes/count')
+    .then(r=>r.json())
+    .then(d=>{
+      const b = document.getElementById('sidebarBadgePendentes');
+      if(b) b.textContent = d.count > 0 ? d.count : '';
+    }).catch(()=>{});
+})();
+</script>
 </body>
 </html>

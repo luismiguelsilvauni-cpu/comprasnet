@@ -173,3 +173,25 @@ class ConfigReposicao(db.Model):
     ignorar_parados_dias        = db.Column(db.Integer, default=365)
     atualizado_em               = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_por              = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+class PendingMatch(db.Model):
+    """Supplier line matches that need human confirmation."""
+    __tablename__ = 'pending_matches'
+    id                  = db.Column(db.Integer, primary_key=True)
+    pedido_id           = db.Column(db.Integer, db.ForeignKey('pedidos_compra.id'), nullable=False)
+    orcamento_id        = db.Column(db.Integer, db.ForeignKey('orcamentos.id'), nullable=False)
+    item_id             = db.Column(db.Integer, db.ForeignKey('items_orcamento.id'), nullable=False)
+    # Supplier side
+    descricao_forn      = db.Column(db.String(500))
+    referencia_forn     = db.Column(db.String(100))
+    fornecedor          = db.Column(db.String(200))
+    # AI/fuzzy suggestion
+    artigo_ref_sugerido = db.Column(db.String(50), nullable=True)
+    confianca_sugerido  = db.Column(db.Float, default=0)
+    metodo              = db.Column(db.String(30))
+    # Operator decision
+    confirmado          = db.Column(db.Boolean, default=False)
+    artigo_ref_final    = db.Column(db.String(50), nullable=True)
+    confirmado_por      = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    data_confirmacao    = db.Column(db.DateTime, nullable=True)
+    criado_em           = db.Column(db.DateTime, default=datetime.utcnow)

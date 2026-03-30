@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
@@ -832,6 +832,91 @@ Com os melhores cumprimentos,
         'assunto': f'Pedido de Orçamento — {len(artigos)} referência(s)',
         'para': data.get('email_fornecedor', ''),
     })
+
+
+# ── PENDING MATCHES ───────────────────────────────────────────────────────────
+
+@app.route('/pendentes')
+@login_required
+def pendentes():
+    """All unconfirmed matches across all pedidos."""
+    pedido_id = request.args.get('pedido_id', type=int)
+    q = PendingMatch.query.filter_by(confirmado=False)
+    if pedido_id:
+        q = q.filter_by(pedido_id=pedido_id)
+    pendentes = q.order_by(PendingMatch.criado_em.desc()).all()
+
+    # Count by pedido for sidebar badge
+    total = PendingMatch.query.filter_by(confirmado=False).count()
+    artigos_phc = ArtigoPHC.query.order_by(ArtigoPHC.referencia).all()
+    artigos_phc_json = json.dumps([{
+        'referencia': a.referencia, 'designacao': a.designacao
+    } for a in artigos_phc])
+    return render_template('pendentes.html', pendentes=pendentes,
+                           total=total, pedido_id_filtro=pedido_id,
+                           artigos_phc=artigos_phc,
+                           artigos_phc_json=artigos_phc_json)
+
+
+@app.route('/pendentes/<int:pm_id>/confirmar', methods=['POST'])
+@login_required
+def confirmar_match(pm_id):
+    """Confirm a pending match — saves alias and updates item."""
+    pm = PendingMatch.query.get_or_404(pm_id)
+    data = request.get_json()
+    artigo_ref = data.get('artigo_ref', '').strip()
+
+    if not artigo_ref:
+        return jsonify({'error': 'artigo_ref obrigatório'}), 400
+
+    # Verify article exists
+    artigo = ArtigoPHC.query.filter_by(referencia=artigo_ref).first()
+    if not artigo:
+        return jsonify({'error': f'Artigo {artigo_ref} não encontrado'}), 404
+
+    # Update pending match
+    pm.confirmado        = True
+    pm.artigo_ref_final  = artigo_ref
+    pm.confirmado_por    = current_user.id
+    pm.data_confirmacao  = datetime.utcnow()
+
+    # Update the item
+    from models import ItemOrcamento
+    item = ItemOrcamento.query.get(pm.item_id)
+    if item:
+        item.artigo_ref_match = artigo_ref
+        item.match_confianca  = 1.0
+
+    # Save alias so it learns
+    from alias_matcher import save_alias
+    save_alias(db, artigo_ref,
+               pm.descricao_forn, pm.fornecedor,
+               pm.referencia_forn, current_user.id, confianca=1.0)
+
+    db.session.commit()
+    return jsonify({'ok': True, 'artigo_ref': artigo_ref,
+                    'designacao': artigo.designacao})
+
+
+@app.route('/pendentes/<int:pm_id>/ignorar', methods=['POST'])
+@login_required
+def ignorar_match(pm_id):
+    """Mark as confirmed with no match (intentionally unlinked)."""
+    pm = PendingMatch.query.get_or_404(pm_id)
+    pm.confirmado       = True
+    pm.artigo_ref_final = None
+    pm.confirmado_por   = current_user.id
+    pm.data_confirmacao = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/pendentes/count')
+@login_required
+def count_pendentes():
+    """Badge count for sidebar."""
+    n = PendingMatch.query.filter_by(confirmado=False).count()
+    return jsonify({'count': n})
 
 
 def init_db():
