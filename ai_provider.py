@@ -213,7 +213,8 @@ def test_provider(cfg) -> tuple[bool, str]:
         try:
             import urllib.request, json
             # Test Gemini REST API directly (no library needed)
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={cfg.gemini_api_key}"
+            model_test = cfg.gemini_model or "gemini-1.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_test}:generateContent?key={cfg.gemini_api_key}"
             payload = json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode()
             req = urllib.request.Request(url, data=payload,
                 headers={"Content-Type": "application/json"}, method="POST")
@@ -239,15 +240,15 @@ def test_provider(cfg) -> tuple[bool, str]:
 RECOMMENDED_MODELS = {
     "gemini": [
         {
-            "id":    "gemini-1.5-flash",
-            "label": "Gemini 1.5 Flash (Recomendado — Gratuito)",
+            "id":    "gemini-2.0-flash",
+            "label": "Gemini 2.0 Flash (Recomendado — Gratuito)",
             "ram":   "Cloud — sem requisitos locais",
             "notes": "Muito rápido, excelente para PDFs. Tier gratuito generoso (~1500 req/dia).",
             "search": "gemini-1.5-flash"
         },
         {
-            "id":    "gemini-1.5-pro",
-            "label": "Gemini 1.5 Pro (Mais preciso)",
+            "id":    "gemini-2.0-flash-lite",
+            "label": "Gemini 2.0 Flash Lite (Mais leve)",
             "ram":   "Cloud — sem requisitos locais",
             "notes": "Melhor qualidade, quota gratuita menor (50 req/dia).",
             "search": "gemini-1.5-pro"
