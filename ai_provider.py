@@ -213,7 +213,7 @@ def test_provider(cfg) -> tuple[bool, str]:
         try:
             import urllib.request, json
             # Test Gemini REST API directly (no library needed)
-            model_test = cfg.gemini_model or "gemini-2.0-flash"
+            model_test = _get_best_gemini_model(cfg.gemini_api_key)
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_test}:generateContent?key={cfg.gemini_api_key}"
             payload = json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode()
             req = urllib.request.Request(url, data=payload,
@@ -221,7 +221,7 @@ def test_provider(cfg) -> tuple[bool, str]:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read())
             if data.get("candidates"):
-                return True, "✅ Gemini API ligada com sucesso! Chave válida e gratuita."
+                return True, f"✅ Gemini API ligada com sucesso! Modelo: {model_test} (gratuito)"
             return False, f"Resposta inesperada: {str(data)[:100]}"
         except urllib.error.HTTPError as e:
             body = e.read().decode()
