@@ -156,3 +156,20 @@ class ConfigIA(db.Model):
     claude_api_key = db.Column(db.String(200), default='')
     ultimo_teste   = db.Column(db.DateTime)
     teste_ok       = db.Column(db.Boolean, default=False)
+
+class ConfigReposicao(db.Model):
+    """User-editable replenishment parameters (one row per article or global)."""
+    __tablename__ = 'config_reposicao'
+    id                          = db.Column(db.Integer, primary_key=True)
+    artigo_ref                  = db.Column(db.String(50), nullable=True, index=True)  # NULL = global
+    meses_historico             = db.Column(db.Integer, default=24)
+    lead_time_dias              = db.Column(db.Float, default=7)
+    fator_seguranca             = db.Column(db.Float, default=1.5)
+    meses_cobertura             = db.Column(db.Integer, default=2)
+    custo_encomenda             = db.Column(db.Float, default=25.0)
+    taxa_posse_anual            = db.Column(db.Float, default=0.20)
+    quantidade_minima_encomenda = db.Column(db.Float, default=1)
+    alertar_dias_cobertura      = db.Column(db.Integer, default=30)
+    ignorar_parados_dias        = db.Column(db.Integer, default=365)
+    atualizado_em               = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_por              = db.Column(db.Integer, db.ForeignKey('users.id'))

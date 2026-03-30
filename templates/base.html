@@ -242,8 +242,11 @@
             <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
                 <span class="icon">⊞</span><span>Dashboard</span>
             </a>
-            <a href="{{ url_for('pedidos') }}" class="nav-item {% if 'pedido' in request.endpoint %}active{% endif %}">
+            <a href="{{ url_for('pedidos') }}" class="nav-item {% if 'pedido' in request.endpoint and 'reposicao' not in request.endpoint %}active{% endif %}">
                 <span class="icon">📋</span><span>Pedidos de Compra</span>
+            </a>
+            <a href="{{ url_for('reposicao') }}" class="nav-item {% if request.endpoint == 'reposicao' or request.endpoint == 'analisar_artigo' %}active{% endif %}">
+                <span class="icon">📦</span><span>Reposição de Stock</span>
             </a>
         </div>
         {% if current_user.is_admin %}

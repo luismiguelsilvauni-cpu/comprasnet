@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
@@ -436,6 +436,176 @@ def apagar_orcamento(oid):
 def download_pdf(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+
+
+# ── REPOSIÇÃO ─────────────────────────────────────────────────────────────────
+
+@app.route('/reposicao')
+@login_required
+def reposicao():
+    """Replenishment suggestions dashboard."""
+    from reposicao import CONFIG_PADRAO
+    cfg_global = ConfigReposicao.query.filter_by(artigo_ref=None).first()
+    if not cfg_global:
+        cfg_global = ConfigReposicao()
+        db.session.add(cfg_global)
+        db.session.commit()
+    artigos = ArtigoPHC.query.order_by(ArtigoPHC.referencia).all()
+    return render_template('reposicao.html',
+        cfg=cfg_global, artigos=artigos,
+        total_artigos=len(artigos),
+        config_padrao=CONFIG_PADRAO)
+
+
+@app.route('/reposicao/config', methods=['POST'])
+@login_required
+def salvar_config_reposicao():
+    """Save global or per-article replenishment config."""
+    artigo_ref = request.form.get('artigo_ref', '').strip() or None
+    cfg = ConfigReposicao.query.filter_by(artigo_ref=artigo_ref).first()
+    if not cfg:
+        cfg = ConfigReposicao(artigo_ref=artigo_ref)
+        db.session.add(cfg)
+
+    cfg.meses_historico             = int(request.form.get('meses_historico', 24))
+    cfg.lead_time_dias              = float(request.form.get('lead_time_dias', 7))
+    cfg.fator_seguranca             = float(request.form.get('fator_seguranca', 1.5))
+    cfg.meses_cobertura             = int(request.form.get('meses_cobertura', 2))
+    cfg.custo_encomenda             = float(request.form.get('custo_encomenda', 25))
+    cfg.taxa_posse_anual            = float(request.form.get('taxa_posse_anual', 0.20))
+    cfg.quantidade_minima_encomenda = float(request.form.get('quantidade_minima_encomenda', 1))
+    cfg.alertar_dias_cobertura      = int(request.form.get('alertar_dias_cobertura', 30))
+    cfg.ignorar_parados_dias        = int(request.form.get('ignorar_parados_dias', 365))
+    cfg.atualizado_em               = datetime.utcnow()
+    cfg.atualizado_por              = current_user.id
+    db.session.commit()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'ok': True})
+    flash('Configuração de reposição guardada.', 'success')
+    return redirect(url_for('reposicao'))
+
+
+@app.route('/reposicao/analisar/<ref>')
+@login_required
+def analisar_artigo(ref):
+    """Analyse one article and return replenishment suggestion as JSON."""
+    from reposicao import analisar_artigo as _analisar, CONFIG_PADRAO
+
+    cfg_phc    = ConfigPHC.query.first()
+    cfg_artigo = ConfigReposicao.query.filter_by(artigo_ref=ref).first()
+    cfg_global = ConfigReposicao.query.filter_by(artigo_ref=None).first()
+
+    # Build config dict: defaults → global override → per-article override
+    config = dict(CONFIG_PADRAO)
+    if cfg_global:
+        for k in CONFIG_PADRAO:
+            v = getattr(cfg_global, k, None)
+            if v is not None:
+                config[k] = v
+    if cfg_artigo:
+        for k in CONFIG_PADRAO:
+            v = getattr(cfg_artigo, k, None)
+            if v is not None:
+                config[k] = v
+
+    resultado = _analisar(cfg_phc, config, ref)
+    return jsonify(resultado)
+
+
+@app.route('/reposicao/lista')
+@login_required
+def lista_reposicao():
+    """Return all articles needing replenishment as JSON (for table)."""
+    from reposicao import analisar_artigo as _analisar, CONFIG_PADRAO
+
+    cfg_phc    = ConfigPHC.query.first()
+    cfg_global = ConfigReposicao.query.filter_by(artigo_ref=None).first()
+
+    config = dict(CONFIG_PADRAO)
+    if cfg_global:
+        for k in CONFIG_PADRAO:
+            v = getattr(cfg_global, k, None)
+            if v is not None:
+                config[k] = v
+
+    familia = request.args.get('familia', '').strip()
+    apenas_alertas = request.args.get('alertas', '0') == '1'
+
+    query = ArtigoPHC.query
+    if familia:
+        query = query.filter_by(familia=familia)
+
+    artigos = query.order_by(ArtigoPHC.referencia).limit(200).all()
+    resultados = []
+    for a in artigos:
+        cfg_art = ConfigReposicao.query.filter_by(artigo_ref=a.referencia).first()
+        cfg_final = dict(config)
+        if cfg_art:
+            for k in CONFIG_PADRAO:
+                v = getattr(cfg_art, k, None)
+                if v is not None: cfg_final[k] = v
+
+        r = _analisar(cfg_phc, cfg_final, a.referencia,
+                      stock_atual=a.stock_atual,
+                      preco_custo=a.preco_custo_ponderado or a.preco_custo)
+
+        if apenas_alertas and not r.get('precisa_encomendar'):
+            continue
+        # Skip completely inactive articles
+        dias_sem_mov = r.get('dias_sem_movimento', 0) or 0
+        if dias_sem_mov > cfg_final.get('ignorar_parados_dias', 365):
+            continue
+
+        resultados.append(r)
+
+    # Sort: needs ordering first, then by coverage days
+    resultados.sort(key=lambda x: (
+        not x.get('precisa_encomendar', False),
+        x.get('dias_cobertura_atual') or 9999
+    ))
+
+    return jsonify(resultados)
+
+
+@app.route('/reposicao/gerar_pedido', methods=['POST'])
+@login_required
+def gerar_pedido_reposicao():
+    """Create a PedidoCompra from selected replenishment suggestions."""
+    data = request.get_json()
+    artigos_sel = data.get('artigos', [])
+    if not artigos_sel:
+        return jsonify({'error': 'Nenhum artigo selecionado.'}), 400
+
+    titulo = data.get('titulo') or f"Reposição de stock — {datetime.now().strftime('%d/%m/%Y')}"
+    p = PedidoCompra(
+        titulo=titulo,
+        descricao='Gerado automaticamente pelo motor de reposição.',
+        prioridade='normal',
+        estado='aberto',
+        criado_por=current_user.id,
+        data_criacao=datetime.utcnow()
+    )
+    db.session.add(p)
+    db.session.flush()
+
+    for i, a in enumerate(artigos_sel):
+        artigo = ArtigoPHC.query.filter_by(referencia=a['referencia']).first()
+        linha = LinhaPedido(
+            pedido_id=p.id, ordem=i,
+            artigo_ref=a['referencia'],
+            referencia=a['referencia'],
+            designacao=a.get('designacao', ''),
+            unidade=a.get('unidade', 'un'),
+            quantidade=float(a.get('quantidade_sugerida', 1)),
+            stock_atual=float(artigo.stock_atual if artigo else 0),
+            preco_custo_ref=float(artigo.preco_custo if artigo else 0),
+            preco_pcp_ref=float(artigo.preco_custo_ponderado if artigo else 0),
+        )
+        db.session.add(linha)
+
+    db.session.commit()
+    return jsonify({'ok': True, 'pedido_id': p.id, 'titulo': titulo})
 
 # ── BAK UPLOAD & RESTORE ──────────────────────────────────────────────────────
 

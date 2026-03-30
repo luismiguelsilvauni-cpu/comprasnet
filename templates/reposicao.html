@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+{% block title %}Reposição de Stock · ComprasNet{% endblock %}
+{% block page_title %}Sugestões de Reposição{% endblock %}
+{% block topbar_actions %}
+  <button class="btn btn-ghost btn-sm" onclick="document.getElementById('configPanel').style.display=document.getElementById('configPanel').style.display==='none'?'block':'none'">⚙️ Configurar Métricas</button>
+  <button class="btn btn-primary btn-sm" id="btnGerarPedido" onclick="gerarPedido()" disabled>📋 Gerar Pedido de Compra</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- Config Panel -->
+<div id="configPanel" style="display:none;margin-bottom:20px">
+<div class="card" style="border-color:rgba(59,110,240,.3)">
+  <div class="card-title">⚙️ Métricas Globais de Reposição <span style="font-weight:400;color:var(--text-muted)">(aplicadas a todos os artigos sem config individual)</span></div>
+  <form method="POST" action="{{ url_for('salvar_config_reposicao') }}">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div class="form-group">
+        <label>Meses de histórico a analisar</label>
+        <input type="number" name="meses_historico" value="{{ cfg.meses_historico or 24 }}" min="1" max="60">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Quanto mais meses, mais preciso o consumo médio</div>
+      </div>
+      <div class="form-group">
+        <label>Lead time padrão (dias)</label>
+        <input type="number" name="lead_time_dias" value="{{ cfg.lead_time_dias or 7 }}" min="1" step="0.5">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Prazo médio de entrega do fornecedor</div>
+      </div>
+      <div class="form-group">
+        <label>Fator de segurança</label>
+        <input type="number" name="fator_seguranca" value="{{ cfg.fator_seguranca or 1.5 }}" min="1" max="5" step="0.1">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">1.5 = 50% extra sobre o mínimo necessário</div>
+      </div>
+      <div class="form-group">
+        <label>Meses de cobertura alvo</label>
+        <input type="number" name="meses_cobertura" value="{{ cfg.meses_cobertura or 2 }}" min="1" max="12">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Quantos meses de stock comprar de cada vez</div>
+      </div>
+      <div class="form-group">
+        <label>Custo fixo por encomenda (€)</label>
+        <input type="number" name="custo_encomenda" value="{{ cfg.custo_encomenda or 25 }}" min="0" step="0.5">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Custo administrativo por pedido (para EOQ)</div>
+      </div>
+      <div class="form-group">
+        <label>Taxa de posse anual (%)</label>
+        <input type="number" name="taxa_posse_anual" value="{{ ((cfg.taxa_posse_anual or 0.20) * 100)|int }}" min="1" max="50" id="taxaPosseInput" oninput="document.getElementsByName('taxa_posse_anual')[0].value=this.value/100">
+        <input type="hidden" name="taxa_posse_anual" value="{{ cfg.taxa_posse_anual or 0.20 }}">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Custo de guardar stock (armazém, capital, etc.)</div>
+      </div>
+      <div class="form-group">
+        <label>Quantidade mínima de encomenda</label>
+        <input type="number" name="quantidade_minima_encomenda" value="{{ cfg.quantidade_minima_encomenda or 1 }}" min="0.01" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Alertar se cobertura &lt; X dias</label>
+        <input type="number" name="alertar_dias_cobertura" value="{{ cfg.alertar_dias_cobertura or 30 }}" min="1">
+      </div>
+      <div class="form-group">
+        <label>Ignorar artigos parados &gt; X dias</label>
+        <input type="number" name="ignorar_parados_dias" value="{{ cfg.ignorar_parados_dias or 365 }}" min="1">
+      </div>
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end;margin-top:4px">
+      <button type="submit" class="btn btn-primary">💾 Guardar e Recalcular</button>
+    </div>
+  </form>
+</div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-16" style="padding:12px 20px">
+  <div class="flex items-center gap-8" style="flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--text-muted);font-weight:600">FILTRAR:</span>
+    <button onclick="carregarLista(false)" class="badge badge-blue" style="cursor:pointer;border:none">Todos</button>
+    <button onclick="carregarLista(true)" class="badge badge-red" style="cursor:pointer;border:none">🔴 Só alertas</button>
+    <select id="familiaFilter" onchange="carregarLista()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;max-width:200px">
+      <option value="">Todas as famílias</option>
+      {% set familias = artigos|map(attribute='familia')|select|unique|sort %}
+      {% for f in familias %}
+        {% if f %}<option value="{{ f }}">{{ f }}</option>{% endif %}
+      {% endfor %}
+    </select>
+    <div style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="statusMsg">A carregar...</div>
+  </div>
+</div>
+
+<!-- Results table -->
+<div class="card">
+  <div id="tabelaReposicao">
+    <div style="text-align:center;padding:48px;color:var(--text-muted)">
+      <div style="font-size:32px;margin-bottom:12px">📊</div>
+      <div>A calcular sugestões de reposição...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Article detail modal -->
+<div id="artigoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:640px;max-width:95vw;max-height:85vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-16">
+      <h3 id="modalArtigoTitulo" style="font-size:15px;font-weight:600"></h3>
+      <button onclick="fecharModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div id="modalArtigoConteudo"></div>
+
+    <!-- Per-article config -->
+    <details style="margin-top:20px">
+      <summary style="font-size:12px;color:var(--accent);cursor:pointer;margin-bottom:12px">⚙️ Configuração específica deste artigo</summary>
+      <form id="configArtigoForm" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+        <input type="hidden" name="artigo_ref" id="cfgArtigoRef">
+        <div class="form-group">
+          <label>Lead time (dias)</label>
+          <input type="number" name="lead_time_dias" step="0.5" min="1" placeholder="Global">
+        </div>
+        <div class="form-group">
+          <label>Qtd mínima encomenda</label>
+          <input type="number" name="quantidade_minima_encomenda" step="0.01" min="0.01" placeholder="Global">
+        </div>
+        <div class="form-group">
+          <label>Meses cobertura alvo</label>
+          <input type="number" name="meses_cobertura" min="1" placeholder="Global">
+        </div>
+        <div class="form-group">
+          <label>Fator de segurança</label>
+          <input type="number" name="fator_seguranca" step="0.1" min="1" placeholder="Global">
+        </div>
+        <div style="grid-column:1/-1;text-align:right">
+          <button type="button" onclick="guardarConfigArtigo()" class="btn btn-primary btn-sm">Guardar config deste artigo</button>
+        </div>
+      </form>
+    </details>
+
+    <div class="flex gap-8" style="justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="fecharModal()">Fechar</button>
+      <button class="btn btn-success" id="modalAddPedidoBtn" onclick="adicionarSeleccionado()">+ Adicionar à seleção</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let seleccionados = {};   // {ref: resultado_obj}
+let modalAtual = null;
+
+// ── Load table ───────────────────────────────────────────────────────────────
+function carregarLista(apenasAlertas) {
+  const familia = document.getElementById('familiaFilter').value;
+  let url = '/reposicao/lista?';
+  if (apenasAlertas) url += 'alertas=1&';
+  if (familia) url += 'familia=' + encodeURIComponent(familia);
+
+  document.getElementById('tabelaReposicao').innerHTML =
+    '<div style="text-align:center;padding:48px;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:8px">⏳</div><div>A calcular...</div></div>';
+  document.getElementById('statusMsg').textContent = 'A calcular...';
+
+  fetch(url).then(r => r.json()).then(data => {
+    document.getElementById('statusMsg').textContent = `${data.length} artigo(s)`;
+    renderTabela(data);
+  }).catch(() => {
+    document.getElementById('tabelaReposicao').innerHTML =
+      '<div style="padding:20px;color:var(--danger)">Erro ao carregar dados.</div>';
+  });
+}
+
+function renderTabela(data) {
+  if (!data.length) {
+    document.getElementById('tabelaReposicao').innerHTML =
+      '<div style="text-align:center;padding:48px;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:8px">✅</div><div>Sem artigos a repor com os filtros actuais.</div></div>';
+    return;
+  }
+
+  const rows = data.map(r => {
+    const alerta  = r.precisa_encomendar;
+    const rotCor  = {alta:'var(--success)',media:'var(--warning)',baixa:'var(--danger)',parado:'var(--text-dim)'}[r.rotatividade] || 'var(--text-muted)';
+    const selActive = seleccionados[r.referencia] ? 'background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.3);' : '';
+
+    return `<tr style="${alerta?'background:rgba(239,68,68,.03);':''}" id="row-${r.referencia.replace(/[^a-z0-9]/gi,'_')}">
+      <td style="padding:10px 8px;width:32px">
+        <input type="checkbox" onchange="toggleSel('${r.referencia}',this.checked)"
+          ${seleccionados[r.referencia]?'checked':''} style="width:auto">
+      </td>
+      <td style="padding:10px 12px">
+        <div style="font-size:11px;font-family:monospace;color:var(--accent)">${r.referencia}</div>
+        <div style="font-size:13px;font-weight:500;margin-top:1px">${r.designacao||''}</div>
+        ${r.familia?`<div style="font-size:10px;color:var(--text-dim)">${r.familia}</div>`:''}
+      </td>
+      <td style="padding:10px 12px;text-align:right;font-family:monospace">
+        <div style="font-size:15px;font-weight:700;color:${alerta?'var(--danger)':'var(--success)'}">${fmt(r.stock_atual)} ${r.unidade}</div>
+        ${r.dias_cobertura_atual!=null?`<div style="font-size:10px;color:var(--text-muted)">~${r.dias_cobertura_atual} dias</div>`:''}
+      </td>
+      <td style="padding:10px 12px;text-align:right;font-family:monospace;font-size:12px">
+        <div>${fmt(r.consumo_medio_mensal)} ${r.unidade}/mês</div>
+        <div style="color:var(--text-muted)">${fmt(r.consumo_medio_diario,4)}/dia</div>
+      </td>
+      <td style="padding:10px 12px;text-align:right;font-family:monospace;font-size:12px">
+        <div>${fmt(r.ponto_reorder)} ${r.unidade}</div>
+        <div style="color:var(--text-muted)">SS: ${fmt(r.stock_seguranca)}</div>
+      </td>
+      <td style="padding:10px 12px;text-align:center">
+        <span style="color:${rotCor};font-size:12px;font-weight:600">${r.rotatividade||'—'}</span>
+        ${r.indice_sazonalidade!=1?`<div style="font-size:10px;color:var(--text-muted)">sazo: ${r.indice_sazonalidade}x</div>`:''}
+      </td>
+      <td style="padding:10px 12px;text-align:right">
+        ${alerta
+          ? `<div style="font-size:16px;font-weight:700;font-family:monospace;color:var(--warning)">${fmt(r.quantidade_sugerida)} ${r.unidade}</div>
+             <div style="font-size:10px;color:var(--text-muted)">EOQ: ${fmt(r.eoq)}</div>`
+          : `<span style="color:var(--text-dim);font-size:12px">OK</span>`}
+      </td>
+      <td style="padding:10px 8px">
+        <button onclick="verDetalhe('${r.referencia}')" class="btn btn-ghost btn-sm">Ver</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tabelaReposicao').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:32px"><input type="checkbox" id="selAll" onchange="selTodos(this.checked)" style="width:auto"></th>
+          <th>Artigo</th>
+          <th style="text-align:right">Stock Atual</th>
+          <th style="text-align:right">Consumo Médio</th>
+          <th style="text-align:right">Ponto Reorder</th>
+          <th style="text-align:center">Rotatividade</th>
+          <th style="text-align:right">Qtd Sugerida</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  // Store data for modal access
+  window._reposicaoData = {};
+  data.forEach(r => window._reposicaoData[r.referencia] = r);
+}
+
+function fmt(v, dec=2) { return v!=null ? parseFloat(v).toFixed(dec) : '—'; }
+
+// ── Selection ────────────────────────────────────────────────────────────────
+function toggleSel(ref, checked) {
+  if (checked && window._reposicaoData[ref]) {
+    seleccionados[ref] = window._reposicaoData[ref];
+  } else {
+    delete seleccionados[ref];
+  }
+  updateBtnPedido();
+}
+
+function selTodos(checked) {
+  if (!window._reposicaoData) return;
+  Object.keys(window._reposicaoData).forEach(ref => {
+    const r = window._reposicaoData[ref];
+    if (checked && r.precisa_encomendar) seleccionados[ref] = r;
+    else delete seleccionados[ref];
+  });
+  document.querySelectorAll('tbody input[type=checkbox]').forEach(cb => {
+    const ref = cb.closest('tr').id.replace('row-','').replace(/_/g,'-');
+    cb.checked = !!seleccionados[ref];
+  });
+  updateBtnPedido();
+}
+
+function updateBtnPedido() {
+  const n = Object.keys(seleccionados).length;
+  const btn = document.getElementById('btnGerarPedido');
+  btn.disabled = n === 0;
+  btn.textContent = n > 0 ? `📋 Gerar Pedido (${n} artigos)` : '📋 Gerar Pedido de Compra';
+}
+
+// ── Article detail modal ─────────────────────────────────────────────────────
+function verDetalhe(ref) {
+  modalAtual = ref;
+  document.getElementById('modalArtigoTitulo').textContent = 'A carregar...';
+  document.getElementById('artigoModal').style.display = 'flex';
+  document.getElementById('cfgArtigoRef').value = ref;
+
+  fetch('/reposicao/analisar/' + encodeURIComponent(ref))
+    .then(r => r.json()).then(d => {
+      modalAtual = d;
+      document.getElementById('modalArtigoTitulo').textContent = `${d.referencia} · ${d.designacao}`;
+      document.getElementById('modalArtigoConteudo').innerHTML = renderDetalhe(d);
+      document.getElementById('modalAddPedidoBtn').textContent =
+        seleccionados[ref] ? '✓ Na seleção' : '+ Adicionar à seleção';
+    });
+}
+
+function renderDetalhe(d) {
+  const kpi = (label, val, unit='', cor='') =>
+    `<div style="background:var(--surface2);border-radius:6px;padding:12px;text-align:center">
+      <div style="font-size:10px;color:var(--text-muted)">${label}</div>
+      <div style="font-size:18px;font-weight:700;font-family:monospace;color:${cor||'var(--text)'}">${val} ${unit}</div>
+    </div>`;
+
+  const sazoTable = d.sazonalidade_meses ? Object.entries(d.sazonalidade_meses).map(([m,v]) => {
+    const meses = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const cor = v>1.2?'var(--danger)':v<0.8?'var(--success)':'var(--text)';
+    return `<td style="text-align:center;padding:4px 6px;font-size:11px">
+      <div style="color:var(--text-muted)">${meses[m]||m}</div>
+      <div style="color:${cor};font-weight:600">${v}x</div>
+    </td>`;
+  }).join('') : '';
+
+  return `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+      ${kpi('STOCK ATUAL', fmt(d.stock_atual), d.unidade, d.precisa_encomendar?'var(--danger)':'var(--success)')}
+      ${kpi('CONSUMO/MÊS', fmt(d.consumo_medio_mensal), d.unidade)}
+      ${kpi('PONTO REORDER', fmt(d.ponto_reorder), d.unidade, 'var(--warning)')}
+      ${kpi('QTD SUGERIDA', fmt(d.quantidade_sugerida), d.unidade, d.precisa_encomendar?'var(--warning)':'var(--text-muted)')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+      ${kpi('STOCK SEGURANÇA', fmt(d.stock_seguranca), d.unidade)}
+      ${kpi('EOQ', fmt(d.eoq), d.unidade)}
+      ${kpi('LEAD TIME', d.lead_time_dias, 'dias')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--surface2);border-radius:6px;padding:12px">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">ROTATIVIDADE</div>
+        <div style="font-weight:600">${d.rotatividade||'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${d.dias_sem_movimento} dias sem movimento</div>
+        <div style="font-size:11px;color:var(--text-muted)">${d.total_meses_historico} meses de histórico</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:6px;padding:12px">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">COBERTURA ATUAL</div>
+        <div style="font-weight:600;font-size:18px;font-family:monospace">${d.dias_cobertura_atual!=null?d.dias_cobertura_atual+'dias':'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">com stock actual</div>
+      </div>
+    </div>
+    ${sazoTable ? `<div style="margin-bottom:8px">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600">SAZONALIDADE</div>
+      <table style="width:100%"><tr>${sazoTable}</tr></table>
+    </div>` : ''}
+    ${!d.tem_historico_phc ? '<div style="padding:10px;background:rgba(245,158,11,.08);border-radius:6px;font-size:12px;color:var(--warning)">⚠️ Sem histórico de movimentos PHC. Métricas baseadas apenas no stock actual.</div>' : ''}`;
+}
+
+function fecharModal() {
+  document.getElementById('artigoModal').style.display = 'none';
+  modalAtual = null;
+}
+
+function adicionarSeleccionado() {
+  if (!modalAtual || typeof modalAtual !== 'object') return;
+  const ref = modalAtual.referencia;
+  if (seleccionados[ref]) {
+    delete seleccionados[ref];
+    document.getElementById('modalAddPedidoBtn').textContent = '+ Adicionar à seleção';
+  } else {
+    seleccionados[ref] = modalAtual;
+    document.getElementById('modalAddPedidoBtn').textContent = '✓ Na seleção';
+  }
+  updateBtnPedido();
+  // Update checkbox in table
+  const row = document.getElementById('row-' + ref.replace(/[^a-z0-9]/gi,'_'));
+  if (row) row.querySelector('input[type=checkbox]').checked = !!seleccionados[ref];
+}
+
+// ── Per-article config ────────────────────────────────────────────────────────
+function guardarConfigArtigo() {
+  const form = document.getElementById('configArtigoForm');
+  const fd = new FormData(form);
+  fetch('/reposicao/config', {method:'POST', body:fd,
+    headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(r=>r.json()).then(d => {
+      if(d.ok) { alert('✅ Config guardada. A recalcular...'); fecharModal(); carregarLista(false); }
+    });
+}
+
+// ── Generate purchase order ───────────────────────────────────────────────────
+function gerarPedido() {
+  const artigos = Object.values(seleccionados).filter(r => r.precisa_encomendar);
+  if (!artigos.length) { alert('Seleccione artigos que precisam de reposição.'); return; }
+
+  const titulo = prompt('Título do pedido de compra:', `Reposição stock — ${new Date().toLocaleDateString('pt-PT')}`);
+  if (!titulo) return;
+
+  fetch('/reposicao/gerar_pedido', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({titulo, artigos: artigos.map(r => ({
+      referencia: r.referencia, designacao: r.designacao,
+      unidade: r.unidade, quantidade_sugerida: r.quantidade_sugerida
+    }))})
+  }).then(r=>r.json()).then(d => {
+    if(d.ok) window.location.href = '/pedidos/' + d.pedido_id;
+    else alert('Erro: ' + d.error);
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+carregarLista(false);
+</script>
+{% endblock %}
