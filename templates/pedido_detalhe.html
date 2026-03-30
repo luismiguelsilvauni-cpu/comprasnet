@@ -253,6 +253,50 @@
 </div><!-- end right -->
 </div><!-- end grid -->
 
+
+<!-- Supplier popup modal -->
+<div id="fornecedorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:620px;max-width:95vw;max-height:85vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-16">
+      <div>
+        <h3 style="font-size:15px;font-weight:600" id="fornModalTitulo">Fornecedores habituais</h3>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="fornModalRef"></div>
+      </div>
+      <button onclick="fecharFornModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+
+    <!-- Supplier list -->
+    <div id="fornLista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px"></div>
+
+    <!-- Email generator -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">📧 Gerar Email de Consulta de Orçamento</div>
+      <div class="form-group">
+        <label>Empresa própria (assinatura)</label>
+        <input type="text" id="emailEmpresa" placeholder="Nome da vossa empresa" value="">
+      </div>
+      <div class="form-group">
+        <label>Email do fornecedor (opcional)</label>
+        <input type="text" id="emailFornecedor" placeholder="fornecedor@empresa.pt">
+      </div>
+      <button onclick="gerarEmail()" class="btn btn-primary" style="width:100%;margin-bottom:12px">✍️ Gerar texto de email</button>
+
+      <div id="emailResultado" style="display:none">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+          <span>Assunto: <strong id="emailAssunto"></strong></span>
+          <button onclick="copiarEmail()" class="btn btn-ghost btn-sm" id="btnCopiar">📋 Copiar</button>
+        </div>
+        <textarea id="emailTexto" style="width:100%;min-height:240px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;font-family:inherit;color:var(--text);line-height:1.6;resize:vertical"></textarea>
+      </div>
+    </div>
+
+    <div class="flex gap-8" style="justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="fecharFornModal()">Fechar</button>
+      <button class="btn btn-primary" id="fornAddBtn" onclick="adicionarDoFornModal()">+ Adicionar ao Pedido</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ ARTICLE DETAIL MODAL ═══ -->
 <div id="artigoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:540px;max-width:95vw;max-height:80vh;overflow-y:auto">
@@ -469,6 +513,119 @@ function openPdf(filename, empresa) {
   document.getElementById('pdfNewTab').href = '/uploads/preview/' + filename;
   document.getElementById('pdfModal').style.display = 'flex';
 }
+
+// ── Supplier popup ─────────────────────────────────────────────────────────
+let fornModalArtigo = null;
+
+function verArtigo(ref) {
+  fetch(`/api/artigos/${encodeURIComponent(ref)}`)
+    .then(r=>r.json()).then(a=>{
+      fornModalArtigo = a;
+      document.getElementById('fornModalTitulo').textContent = a.designacao || ref;
+      document.getElementById('fornModalRef').textContent = ref;
+      document.getElementById('emailResultado').style.display = 'none';
+      document.getElementById('emailFornecedor').value = '';
+
+      // Render suppliers
+      const lista = document.getElementById('fornLista');
+      const forns = a.fornecedores || [];
+      if (forns.length === 0) {
+        lista.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;text-align:center">Sem fornecedores habituais registados para este artigo.<br><span style="font-size:11px">Histórico de compras PHC não disponível ou artigo nunca comprado.</span></div>';
+      } else {
+        lista.innerHTML = forns.map(f => `
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer"
+               onclick="selecionarFornecedor('${escJs(f.nome)}','${escJs(f.email)}')"
+               onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div>
+              <div style="font-weight:600;font-size:14px">${f.nome}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+                ${f.email ? '📧 ' + f.email : ''}
+                ${f.tel ? ' · 📞 ' + f.tel : ''}
+              </div>
+              ${f.ultimo_preco ? `<div style="font-size:11px;color:var(--text-dim);margin-top:2px">Último preço: ${parseFloat(f.ultimo_preco).toFixed(4)} € · ${f.ultima_compra}</div>` : ''}
+            </div>
+            <div style="font-size:11px;color:var(--accent)">Seleccionar →</div>
+          </div>`).join('');
+      }
+
+      document.getElementById('fornecedorModal').style.display = 'flex';
+    });
+}
+
+function selecionarFornecedor(nome, email) {
+  document.getElementById('emailFornecedor').value = email || '';
+  // Highlight selected
+  document.querySelectorAll('#fornLista > div').forEach(el => {
+    el.style.borderColor = el.textContent.includes(nome) ? 'var(--accent)' : 'var(--border)';
+    el.style.background   = el.textContent.includes(nome) ? 'var(--accent-glow)' : 'var(--surface2)';
+  });
+}
+
+function fecharFornModal() {
+  document.getElementById('fornecedorModal').style.display = 'none';
+  fornModalArtigo = null;
+}
+
+function adicionarDoFornModal() {
+  if (!fornModalArtigo) return;
+  const qtd  = 1;
+  const forn = document.getElementById('emailFornecedor').value.trim() ||
+               (fornModalArtigo.fornecedores?.[0]?.nome || '');
+  adicionarLinha({
+    referencia:      fornModalArtigo.referencia,
+    designacao:      fornModalArtigo.designacao,
+    unidade:         fornModalArtigo.unidade,
+    quantidade:      qtd,
+    stock_atual:     fornModalArtigo.stock_atual,
+    preco_custo_ref: fornModalArtigo.preco_custo,
+    preco_pcp_ref:   fornModalArtigo.pcp,
+    fornecedor_hab:  forn,
+    observacoes:     '',
+    artigo_ref:      fornModalArtigo.referencia
+  });
+  fecharFornModal();
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').style.display = 'none';
+}
+
+// ── Email generator ─────────────────────────────────────────────────────────
+function gerarEmail() {
+  const artigos = linhas.filter(l => l.referencia).map(l => ({
+    referencia:  l.referencia,
+    designacao:  l.designacao,
+    quantidade:  l.quantidade,
+    unidade:     l.unidade
+  }));
+  if (!artigos.length) { alert('Adicione artigos ao pedido primeiro.'); return; }
+
+  fetch('/api/email_consulta', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      fornecedor:        document.getElementById('emailFornecedor').value,
+      empresa_propria:   document.getElementById('emailEmpresa').value || 'a nossa empresa',
+      email_fornecedor:  document.getElementById('emailFornecedor').value,
+      artigos
+    })
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) {
+      document.getElementById('emailAssunto').textContent = d.assunto;
+      document.getElementById('emailTexto').value = d.texto;
+      document.getElementById('emailResultado').style.display = 'block';
+      document.getElementById('btnCopiar').textContent = '📋 Copiar';
+    }
+  });
+}
+
+function copiarEmail() {
+  const txt = document.getElementById('emailTexto').value;
+  navigator.clipboard.writeText(txt).then(() => {
+    document.getElementById('btnCopiar').textContent = '✅ Copiado!';
+    setTimeout(() => document.getElementById('btnCopiar').textContent = '📋 Copiar', 2000);
+  });
+}
+
+function escJs(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
+
 function showUploadStatus(msg,type){
   const el=document.getElementById('uploadStatus');
   el.style.display='block';

@@ -213,6 +213,26 @@ def api_artigo_detalhe(ref):
             historico = get_historico_compras(cfg, ref)
     except Exception:
         pass
+    # Get known suppliers for this article from purchase history + FornecedorPHC
+    fornecedores = []
+    seen = set()
+    for h in historico:
+        nome = h.get('fornecedor_nome', '')
+        if nome and nome not in seen:
+            seen.add(nome)
+            # Try to find email in local FornecedorPHC cache
+            forn_db = FornecedorPHC.query.filter(
+                FornecedorPHC.nome.ilike(f'%{nome}%')
+            ).first()
+            fornecedores.append({
+                'nome':   nome,
+                'no':     h.get('fornecedor_no'),
+                'email':  forn_db.email if forn_db else '',
+                'tel':    forn_db.telefone if forn_db else '',
+                'ultimo_preco': h.get('preco', 0),
+                'ultima_compra': h.get('data_compra', ''),
+            })
+
     return jsonify({
         'referencia':  a.referencia,
         'designacao':  a.designacao,
@@ -223,6 +243,7 @@ def api_artigo_detalhe(ref):
         'familia':     a.familia,
         'taxa_iva':    a.taxa_iva,
         'historico':   historico,
+        'fornecedores': fornecedores,
     })
 
 # ── ORÇAMENTOS ────────────────────────────────────────────────────────────────
@@ -763,6 +784,55 @@ def apagar_utilizador(uid):
     return redirect(url_for('admin_utilizadores'))
 
 # ── INIT ──────────────────────────────────────────────────────────────────────
+
+# ── CHANGELOG ─────────────────────────────────────────────────────────────────
+
+@app.route('/changelog')
+@login_required
+def changelog():
+    return render_template('changelog.html')
+
+
+# ── EMAIL CONSULTA ─────────────────────────────────────────────────────────────
+
+@app.route('/api/email_consulta', methods=['POST'])
+@login_required
+def gerar_email_consulta():
+    """Generate a quote request email text for a list of articles."""
+    data       = request.get_json()
+    fornecedor = data.get('fornecedor', '')
+    artigos    = data.get('artigos', [])   # [{referencia, designacao, quantidade, unidade}]
+    empresa    = data.get('empresa_propria', 'a nossa empresa')
+
+    if not artigos:
+        return jsonify({'error': 'Sem artigos'}), 400
+
+    linhas_artigos = '\n'.join([
+        f"  - {a.get('referencia','')} | {a.get('designacao','')} | Qtd: {a.get('quantidade',1)} {a.get('unidade','un')}"
+        for a in artigos
+    ])
+
+    texto = f"""Boa tarde,
+
+Gostaríamos de solicitar orçamento para os seguintes artigos/materiais:
+
+{linhas_artigos}
+
+Agradecemos o envio do vosso melhor preço, incluindo condições de pagamento, prazo de entrega e validade da proposta.
+
+Para qualquer esclarecimento, estamos disponíveis.
+
+Com os melhores cumprimentos,
+{current_user.nome}
+{empresa}"""
+
+    return jsonify({
+        'ok': True,
+        'texto': texto,
+        'assunto': f'Pedido de Orçamento — {len(artigos)} referência(s)',
+        'para': data.get('email_fornecedor', ''),
+    })
+
 
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""

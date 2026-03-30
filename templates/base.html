@@ -272,6 +272,9 @@
                 <div class="user-role">{{ '🔑 Admin' if current_user.is_admin else current_user.departamento or 'Utilizador' }}</div>
             </div>
         </div>
+        <a href="{{ url_for('changelog') }}" class="nav-item {% if request.endpoint == 'changelog' %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">📋</span><span>Actualizações</span>
+        </a>
         <a href="{{ url_for('logout') }}" class="logout-btn">
             <span>⎋</span><span>Sair</span>
         </a>
