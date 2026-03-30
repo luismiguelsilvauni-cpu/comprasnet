@@ -213,8 +213,8 @@ def test_provider(cfg) -> tuple[bool, str]:
         try:
             import urllib.request, json
             # Test Gemini REST API directly (no library needed)
-            model_test = cfg.gemini_model or "gemini-1.5-flash"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_test}:generateContent?key={cfg.gemini_api_key}"
+            model_test = cfg.gemini_model or "gemini-2.0-flash"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_test}:generateContent?key={cfg.gemini_api_key}"
             payload = json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode()
             req = urllib.request.Request(url, data=payload,
                 headers={"Content-Type": "application/json"}, method="POST")

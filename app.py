@@ -1488,6 +1488,42 @@ def api_tunnel_url():
     return jsonify({'url': _tunnel_url, 'ativo': _tunnel_url is not None})
 
 
+@app.route('/api/gemini/models')
+@login_required
+def api_gemini_models():
+    """Fetch available Gemini models from Google API in real-time."""
+    cfg_ia = ConfigIA.query.first()
+    if not cfg_ia or not cfg_ia.gemini_api_key:
+        return jsonify({'error': 'Chave API Gemini não configurada'}), 400
+    try:
+        import urllib.request, json as _json
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={cfg_ia.gemini_api_key}"
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        # Filter only models that support generateContent
+        models = []
+        for m in data.get('models', []):
+            methods = m.get('supportedGenerationMethods', [])
+            if 'generateContent' in methods:
+                name = m['name'].replace('models/', '')
+                # Only include flash/pro variants (skip embedding etc)
+                if any(x in name for x in ['flash', 'pro', 'ultra']):
+                    models.append({
+                        'id': name,
+                        'label': m.get('displayName', name),
+                        'description': m.get('description', '')[:80],
+                    })
+        # Sort: flash first, then pro
+        models.sort(key=lambda x: (0 if 'flash' in x['id'] else 1, x['id']))
+        return jsonify({'models': models})
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        return jsonify({'error': f'Erro HTTP {e.code}: {body[:150]}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():
