@@ -1308,6 +1308,123 @@ def api_chat():
         return jsonify({'error': str(e)}), 500
 
 
+# ── AUTO-UPDATE ────────────────────────────────────────────────────────────────
+
+@app.route('/admin/update', methods=['GET', 'POST'])
+@login_required
+def admin_update():
+    if not current_user.is_admin:
+        flash('Sem permissão.', 'error')
+        return redirect(url_for('dashboard'))
+    return render_template('admin_update.html')
+
+
+@app.route('/api/update/check')
+@login_required
+def update_check():
+    """Check if there are updates available on GitHub."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+    import subprocess
+    try:
+        # Fetch remote without merging
+        result = subprocess.run(
+            ['git', 'fetch', 'origin', 'main'],
+            capture_output=True, text=True, timeout=15,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        if result.returncode != 0:
+            return jsonify({'error': f'Erro ao verificar: {result.stderr}'}), 500
+
+        # Compare local vs remote
+        local = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        ).stdout.strip()
+
+        remote = subprocess.run(
+            ['git', 'rev-parse', 'origin/main'],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        ).stdout.strip()
+
+        # Get list of new commits
+        log = subprocess.run(
+            ['git', 'log', f'HEAD..origin/main', '--oneline'],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        ).stdout.strip()
+
+        tem_updates = local != remote
+        commits = [l for l in log.split('\n') if l.strip()] if log else []
+
+        return jsonify({
+            'tem_updates': tem_updates,
+            'commits_pendentes': len(commits),
+            'commits': commits[:10],
+            'versao_local':  local[:8],
+            'versao_remota': remote[:8],
+        })
+    except FileNotFoundError:
+        return jsonify({'error': 'Git não encontrado. Instale o Git.'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/update/apply', methods=['POST'])
+@login_required
+def update_apply():
+    """Apply updates from GitHub (git pull + db upgrade)."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+    import subprocess
+    cwd = os.path.dirname(os.path.abspath(__file__))
+
+    def run(cmd):
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=cwd)
+        return r.returncode == 0, r.stdout + r.stderr
+
+    steps = []
+
+    # 1. Backup first
+    try:
+        from backup_manager import fazer_backup
+        ok, msg = fazer_backup(app)
+        steps.append({'passo': 'Backup', 'ok': ok, 'msg': msg.split("\n")[0]})
+    except Exception as e:
+        steps.append({'passo': 'Backup', 'ok': False, 'msg': str(e)})
+
+    # 2. Git pull
+    ok, out = run(['git', 'pull', 'origin', 'main'])
+    steps.append({'passo': 'Download actualizações (git pull)', 'ok': ok, 'msg': out[:200]})
+    if not ok:
+        return jsonify({'ok': False, 'steps': steps, 'msg': 'Falhou no git pull'})
+
+    # 3. pip install
+    import sys
+    ok, out = run([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt', '-q'])
+    steps.append({'passo': 'Dependências Python', 'ok': ok, 'msg': 'OK' if ok else out[:200]})
+
+    # 4. DB migrations
+    ok, out = run([sys.executable, '-m', 'flask', 'db', 'upgrade'])
+    steps.append({'passo': 'Migração base de dados', 'ok': ok, 'msg': 'OK' if ok else out[:200]})
+
+    # 5. Schedule restart
+    steps.append({'passo': 'Reiniciar servidor', 'ok': True, 'msg': 'A reiniciar em 3 segundos...'})
+
+    def restart():
+        import time, signal
+        time.sleep(3)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    import threading
+    threading.Thread(target=restart, daemon=True).start()
+
+    return jsonify({'ok': True, 'steps': steps,
+                    'msg': 'Actualização aplicada. O servidor irá reiniciar automaticamente.'})
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():

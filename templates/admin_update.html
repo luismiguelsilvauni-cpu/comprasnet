@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Actualizações do Software · ComprasNet{% endblock %}
+{% block page_title %}Actualizações Automáticas{% endblock %}
+
+{% block content %}
+<div style="max-width:680px">
+
+<!-- Status card -->
+<div class="card mb-16" id="statusCard">
+  <div class="flex items-center justify-between mb-16">
+    <div class="card-title" style="margin-bottom:0">Estado do Software</div>
+    <button onclick="verificar()" class="btn btn-ghost btn-sm" id="btnVerificar">
+      🔍 Verificar actualizações
+    </button>
+  </div>
+
+  <div id="statusArea" style="text-align:center;padding:32px;color:var(--text-muted)">
+    <div style="font-size:32px;margin-bottom:12px">🔄</div>
+    <div>Clique em "Verificar actualizações" para verificar se há novidades.</div>
+  </div>
+</div>
+
+<!-- Apply button (hidden until updates found) -->
+<div id="applyCard" style="display:none" class="card mb-16" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.03)">
+  <div class="card-title">✅ Actualizações disponíveis</div>
+  <div id="commitsList" style="margin-bottom:16px;font-size:13px;color:var(--text-muted)"></div>
+  <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:12px 14px;font-size:12px;margin-bottom:16px">
+    ⚠️ A actualização faz automaticamente um <strong>backup da base de dados</strong> antes de aplicar qualquer alteração.
+    Os seus dados ficam sempre seguros.
+  </div>
+  <button onclick="aplicar()" class="btn btn-primary" style="width:100%" id="btnAplicar">
+    ▶️ Aplicar Actualizações Agora
+  </button>
+</div>
+
+<!-- Progress (hidden during update) -->
+<div id="progressCard" style="display:none" class="card mb-16">
+  <div class="card-title">⏳ A aplicar actualizações...</div>
+  <div id="stepsList" style="display:flex;flex-direction:column;gap:10px"></div>
+</div>
+
+<!-- How it works -->
+<div class="card" style="border-style:dashed;background:var(--surface2)">
+  <div class="card-title">ℹ️ Como funciona</div>
+  <div style="font-size:13px;color:var(--text-muted);line-height:1.8">
+    <strong style="color:var(--text)">1. Verificar</strong> — compara a versão instalada com a versão mais recente no GitHub.<br>
+    <strong style="color:var(--text)">2. Backup automático</strong> — guarda uma cópia da base de dados antes de qualquer alteração.<br>
+    <strong style="color:var(--text)">3. Download</strong> — descarrega só os ficheiros que mudaram (git pull).<br>
+    <strong style="color:var(--text)">4. Migração</strong> — actualiza a base de dados se necessário (preserva todos os dados).<br>
+    <strong style="color:var(--text)">5. Reinício</strong> — o servidor reinicia automaticamente com a nova versão.<br><br>
+    <div style="padding:10px 12px;background:rgba(59,110,240,.08);border-radius:6px;border:1px solid rgba(59,110,240,.2)">
+      💡 Para que as actualizações automáticas funcionem, o repositório GitHub tem de estar
+      sincronizado com as alterações mais recentes. Se não houver actualizações disponíveis
+      significa que está na versão mais recente.
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function verificar() {
+  const btn = document.getElementById('btnVerificar');
+  const area = document.getElementById('statusArea');
+  btn.disabled = true; btn.textContent = '⏳ A verificar...';
+  area.innerHTML = '<div style="font-size:28px;margin-bottom:8px">⏳</div><div>A verificar GitHub...</div>';
+  document.getElementById('applyCard').style.display = 'none';
+
+  fetch('/api/update/check').then(r=>r.json()).then(d => {
+    btn.disabled = false; btn.textContent = '🔍 Verificar actualizações';
+
+    if (d.error) {
+      area.innerHTML = `<div style="font-size:28px;margin-bottom:8px">❌</div>
+        <div style="color:var(--danger)">${d.error}</div>`;
+      return;
+    }
+
+    if (d.tem_updates) {
+      area.innerHTML = `<div style="font-size:28px;margin-bottom:8px">🎉</div>
+        <div style="font-weight:600;color:var(--success)">${d.commits_pendentes} actualização(ões) disponível(eis)</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px">
+          Local: <code>${d.versao_local}</code> → Remoto: <code>${d.versao_remota}</code>
+        </div>`;
+      const commits = d.commits.map(c =>
+        `<div style="padding:6px 10px;background:var(--surface2);border-radius:4px;font-size:12px;font-family:monospace">${c}</div>`
+      ).join('');
+      document.getElementById('commitsList').innerHTML = commits;
+      document.getElementById('applyCard').style.display = 'block';
+    } else {
+      area.innerHTML = `<div style="font-size:28px;margin-bottom:8px">✅</div>
+        <div style="font-weight:600;color:var(--success)">Está na versão mais recente!</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px">Versão: <code>${d.versao_local}</code></div>`;
+    }
+  }).catch(e => {
+    btn.disabled = false; btn.textContent = '🔍 Verificar actualizações';
+    area.innerHTML = `<div style="color:var(--danger)">❌ Erro de ligação: ${e}</div>`;
+  });
+}
+
+function aplicar() {
+  if (!confirm('Confirma a aplicação das actualizações?\n\nUm backup será feito automaticamente antes.')) return;
+
+  document.getElementById('applyCard').style.display = 'none';
+  document.getElementById('progressCard').style.display = 'block';
+  document.getElementById('btnVerificar').disabled = true;
+  document.getElementById('btnAplicar').disabled = true;
+
+  fetch('/api/update/apply', {method:'POST'}).then(r=>r.json()).then(d => {
+    const list = document.getElementById('stepsList');
+    list.innerHTML = '';
+    (d.steps || []).forEach(s => {
+      list.insertAdjacentHTML('beforeend', `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:6px">
+          <span style="font-size:18px">${s.ok ? '✅' : '❌'}</span>
+          <div>
+            <div style="font-size:13px;font-weight:500">${s.passo}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${s.msg}</div>
+          </div>
+        </div>`);
+    });
+
+    if (d.ok) {
+      list.insertAdjacentHTML('beforeend', `
+        <div style="text-align:center;padding:16px;color:var(--success);font-size:14px;font-weight:600">
+          🎉 Actualização concluída! O servidor está a reiniciar...<br>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
+            A página irá recarregar automaticamente em 8 segundos.
+          </div>
+        </div>`);
+      setTimeout(() => location.reload(), 8000);
+    } else {
+      list.insertAdjacentHTML('beforeend', `
+        <div style="text-align:center;padding:16px;color:var(--danger)">
+          ❌ ${d.msg}<br>
+          <button onclick="location.reload()" class="btn btn-ghost btn-sm" style="margin-top:8px">Recarregar</button>
+        </div>`);
+    }
+  }).catch(e => {
+    document.getElementById('stepsList').insertAdjacentHTML('beforeend',
+      `<div style="color:var(--danger)">❌ Erro: ${e}<br><small>O servidor pode ter reiniciado — aguarde e recarregue a página.</small></div>`);
+    setTimeout(() => location.reload(), 6000);
+  });
+}
+
+// Auto-check on load
+verificar();
+</script>
+{% endblock %}

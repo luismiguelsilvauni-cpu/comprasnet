@@ -289,6 +289,9 @@
         <a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">💬</span><span>Chat Claude</span>
         </a>
+        <a href="{{ url_for('admin_update') }}" class="nav-item {% if request.endpoint == 'admin_update' %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">⬆️</span><span>Actualizações</span>
+        </a>
         <a href="{{ url_for('changelog') }}" class="nav-item {% if request.endpoint == 'changelog' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">📋</span><span>Actualizações</span>
         </a>
