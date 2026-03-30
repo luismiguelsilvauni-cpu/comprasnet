@@ -213,6 +213,22 @@ def test_provider(cfg) -> tuple[bool, str]:
 # ── Model recommendations ─────────────────────────────────────────────────────
 
 RECOMMENDED_MODELS = {
+    "gemini": [
+        {
+            "id":    "gemini-1.5-flash",
+            "label": "Gemini 1.5 Flash (Recomendado — Gratuito)",
+            "ram":   "Cloud — sem requisitos locais",
+            "notes": "Muito rápido, excelente para PDFs. Tier gratuito generoso (~1500 req/dia).",
+            "search": "gemini-1.5-flash"
+        },
+        {
+            "id":    "gemini-1.5-pro",
+            "label": "Gemini 1.5 Pro (Mais preciso)",
+            "ram":   "Cloud — sem requisitos locais",
+            "notes": "Melhor qualidade, quota gratuita menor (50 req/dia).",
+            "search": "gemini-1.5-pro"
+        },
+    ],
     "lmstudio": [
         {
             "id":    "qwen2.5-7b-instruct",

@@ -1349,12 +1349,15 @@ def admin_ia():
         action = request.form.get('action')
 
         if action == 'save':
-            cfg.provider  = request.form.get('provider', 'lmstudio')
-            cfg.lm_host   = request.form.get('lm_host', 'localhost').strip()
-            cfg.lm_port   = int(request.form.get('lm_port', 1234))
-            cfg.lm_model  = request.form.get('lm_model', '').strip()
+            cfg.provider     = request.form.get('provider', 'lmstudio')
+            cfg.lm_host      = request.form.get('lm_host', 'localhost').strip()
+            cfg.lm_port      = int(request.form.get('lm_port', 1234))
+            cfg.lm_model     = request.form.get('lm_model', '').strip()
             key = request.form.get('claude_api_key', '').strip()
             if key: cfg.claude_api_key = key
+            gkey = request.form.get('gemini_api_key', '').strip()
+            if gkey: cfg.gemini_api_key = gkey
+            cfg.gemini_model = request.form.get('gemini_model', 'gemini-1.5-flash').strip()
             db.session.commit()
             flash('Configuração de IA guardada.', 'success')
 

@@ -14,7 +14,7 @@
   <form method="POST" id="mainForm">
     <input type="hidden" name="action" value="save">
 
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
 
       <label style="cursor:pointer">
         <input type="radio" name="provider" value="lmstudio" {% if cfg.provider=='lmstudio' or not cfg.provider %}checked{% endif %}
@@ -48,10 +48,21 @@
           <div style="margin-top:8px"><span class="badge badge-yellow" style="font-size:10px">Requer internet</span></div>
         </div>
       </label>
+
+      <label style="cursor:pointer">
+        <input type="radio" name="provider" value="gemini" {% if cfg.provider=='gemini' %}checked{% endif %}
+               onchange="switchProvider('gemini')" style="display:none">
+        <div class="provider-card {% if cfg.provider=='gemini' %}selected{% endif %}" id="card-gemini">
+          <div style="font-size:24px;margin-bottom:8px">💎</div>
+          <div style="font-weight:600;font-size:14px">Gemini Flash</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Nuvem · Gratuito · Google</div>
+          <div style="margin-top:8px"><span class="badge badge-green" style="font-size:10px">✅ Gratuito</span></div>
+        </div>
+      </label>
     </div>
 
     <!-- LM Studio / Ollama config -->
-    <div id="localConfig" style="{% if cfg.provider=='claude' %}display:none{% endif %}">
+    <div id="localConfig" style="{% if cfg.provider in ['claude','gemini'] %}display:none{% endif %}">
       <div class="grid-2">
         <div class="form-group">
           <label>Endereço do servidor</label>
@@ -255,16 +266,18 @@
 
 <script>
 function switchProvider(p) {
-  ['lmstudio','ollama','claude'].forEach(id => {
+  ['lmstudio','ollama','claude','gemini'].forEach(id => {
     document.getElementById('card-'+id).classList.remove('selected');
   });
   document.getElementById('card-'+p).classList.add('selected');
-  document.getElementById('localConfig').style.display  = p !== 'claude' ? 'block' : 'none';
+  document.getElementById('localConfig').style.display  = ['lmstudio','ollama'].includes(p) ? 'block' : 'none';
   document.getElementById('claudeConfig').style.display = p === 'claude' ? 'block' : 'none';
+  document.getElementById('geminiConfig').style.display = p === 'gemini' ? 'block' : 'none';
   // Adjust default port
   const portInput = document.querySelector('[name=lm_port]');
   if (p === 'ollama') portInput.value = 11434;
   else if (p === 'lmstudio') portInput.value = 1234;
+  // Gemini/Claude don't use local port
 }
 // Make provider cards clickable
 document.querySelectorAll('.provider-card').forEach(card => {

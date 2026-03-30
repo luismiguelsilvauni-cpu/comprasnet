@@ -149,11 +149,17 @@ class ItemOrcamento(db.Model):
 class ConfigIA(db.Model):
     __tablename__ = 'config_ia'
     id             = db.Column(db.Integer, primary_key=True)
-    provider       = db.Column(db.String(20), default='lmstudio')
+    provider       = db.Column(db.String(20), default='lmstudio')  # lmstudio|ollama|claude|gemini
+    # LM Studio / Ollama
     lm_host        = db.Column(db.String(100), default='localhost')
     lm_port        = db.Column(db.Integer, default=1234)
     lm_model       = db.Column(db.String(200), default='')
+    # Claude API
     claude_api_key = db.Column(db.String(200), default='')
+    # Gemini API
+    gemini_api_key = db.Column(db.String(200), default='')
+    gemini_model   = db.Column(db.String(100), default='gemini-1.5-flash')
+    # Meta
     ultimo_teste   = db.Column(db.DateTime)
     teste_ok       = db.Column(db.Boolean, default=False)
 
