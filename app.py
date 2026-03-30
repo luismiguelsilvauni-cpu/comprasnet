@@ -1425,6 +1425,69 @@ def update_apply():
                     'msg': 'Actualização aplicada. O servidor irá reiniciar automaticamente.'})
 
 
+# ── TUNNEL STATUS ─────────────────────────────────────────────────────────────
+
+# Global variable to store tunnel URL
+_tunnel_url = None
+
+def set_tunnel_url(url: str):
+    global _tunnel_url
+    _tunnel_url = url
+
+def detect_tunnel_url() -> str | None:
+    """Try to get tunnel URL from cloudflared metrics endpoint."""
+    global _tunnel_url
+    if _tunnel_url:
+        return _tunnel_url
+    try:
+        import urllib.request
+        # cloudflared exposes metrics on port 20241
+        with urllib.request.urlopen('http://localhost:20241/metrics', timeout=2) as r:
+            text = r.read().decode()
+        # Look for tunnel URL in metrics
+        import re
+        match = re.search(r'tunnel_id="([^"]+)"', text)
+        if match:
+            # Try to get the hostname from cloudflared API
+            with urllib.request.urlopen('http://localhost:20241/', timeout=2) as r2:
+                pass
+    except Exception:
+        pass
+
+    # Try reading from cloudflared log output if saved
+    try:
+        import subprocess, re
+        result = subprocess.run(
+            ['powershell', '-Command',
+             'Get-NetTCPConnection -LocalPort 20241 -ErrorAction SilentlyContinue'],
+            capture_output=True, text=True, timeout=3
+        )
+    except Exception:
+        pass
+    return _tunnel_url
+
+
+@app.route('/acesso-externo')
+@login_required
+def acesso_externo():
+    tunnel_url = detect_tunnel_url()
+    return render_template('acesso_externo.html', tunnel_url=tunnel_url)
+
+
+@app.route('/api/tunnel/url', methods=['GET', 'POST'])
+@login_required
+def api_tunnel_url():
+    global _tunnel_url
+    if request.method == 'POST':
+        data = request.get_json()
+        url = data.get('url', '').strip()
+        if url.startswith('https://') and 'trycloudflare.com' in url:
+            _tunnel_url = url
+            return jsonify({'ok': True, 'url': url})
+        return jsonify({'error': 'URL inválido'}), 400
+    return jsonify({'url': _tunnel_url, 'ativo': _tunnel_url is not None})
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():

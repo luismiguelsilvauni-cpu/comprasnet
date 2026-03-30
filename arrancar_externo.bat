@@ -5,36 +5,34 @@ echo    Cloudflare Tunnel
 echo ============================================
 echo.
 
-REM Check cloudflared exists
 if not exist "cloudflared.exe" (
     echo ERRO: cloudflared.exe nao encontrado.
-    echo Descarregue em: https://github.com/cloudflare/cloudflared/releases/latest
-    echo Copie o ficheiro cloudflared-windows-amd64.exe para esta pasta
-    echo e renomeie para cloudflared.exe
-    echo.
+    echo Descarregue em:
+    echo https://github.com/cloudflare/cloudflared/releases/download/2026.3.0/cloudflared-windows-amd64.exe
+    echo Copie para esta pasta e renomeie para cloudflared.exe
     pause
     exit /b 1
 )
 
-REM Activate venv and start ComprasNet in background
 if exist "venv\Scripts\activate.bat" (
     call venv\Scripts\activate.bat
 )
 
 echo [1/2] A iniciar ComprasNet em http://localhost:5000 ...
 start "ComprasNet Server" cmd /k "python app.py"
-
 echo A aguardar servidor iniciar...
-timeout /t 4 /nobreak > nul
+timeout /t 5 /nobreak > nul
 
 echo [2/2] A iniciar Cloudflare Tunnel...
 echo.
 echo O URL publico aparecera abaixo em alguns segundos.
-echo Partilhe esse URL com quem precisar de aceder externamente.
+echo Copie o URL e partilhe com quem precisar de aceder remotamente.
+echo Esse URL tambem fica disponivel em: http://localhost:5000/acesso-externo
 echo.
-echo Para parar: feche esta janela (o servidor ComprasNet continua ativo).
+echo Prima CTRL+C para parar o tunnel (o servidor ComprasNet continua ativo).
 echo.
 
-cloudflared tunnel --url http://localhost:5000
+REM Start cloudflared and capture output to detect URL
+cloudflared tunnel --url http://localhost:5000 2>&1 | powershell -Command "$input | ForEach-Object { Write-Host $_; if ($_ -match 'https://[a-z0-9\-]+\.trycloudflare\.com') { $url = $matches[0]; try { Invoke-RestMethod -Uri 'http://localhost:5000/api/tunnel/url' -Method POST -Body ('{\"url\":\"' + $url + '\"}') -ContentType 'application/json' -ErrorAction SilentlyContinue } catch {} } }"
 
 pause

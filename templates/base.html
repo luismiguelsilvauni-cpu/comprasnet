@@ -286,6 +286,9 @@
                 <div class="user-role">{{ '🔑 Admin' if current_user.is_admin else current_user.departamento or 'Utilizador' }}</div>
             </div>
         </div>
+        <a href="{{ url_for('acesso_externo') }}" class="nav-item {% if request.endpoint == 'acesso_externo' %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">🌐</span><span>Acesso Externo</span>
+        </a>
         <a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">💬</span><span>Chat Claude</span>
         </a>

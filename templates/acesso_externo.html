@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Acesso Externo · ComprasNet{% endblock %}
+{% block page_title %}Acesso Externo{% endblock %}
+
+{% block content %}
+<div style="max-width:640px">
+
+<!-- Current tunnel status -->
+<div class="card mb-16" id="tunnelCard" style="{% if tunnel_url %}border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.03){% else %}border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.03){% endif %}">
+  <div style="text-align:center;padding:20px">
+    {% if tunnel_url %}
+    <div style="font-size:40px;margin-bottom:12px">🌐</div>
+    <div style="font-weight:700;font-size:16px;color:var(--success);margin-bottom:8px">Tunnel Activo</div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 20px;margin:16px 0;font-family:monospace;font-size:15px;word-break:break-all;color:var(--accent)">
+      {{ tunnel_url }}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button onclick="copiarURL('{{ tunnel_url }}')" class="btn btn-primary" id="btnCopiar">
+        📋 Copiar URL
+      </button>
+      <a href="{{ tunnel_url }}" target="_blank" class="btn btn-ghost">
+        ↗ Abrir em nova tab
+      </a>
+      <button onclick="partilharQR('{{ tunnel_url }}')" class="btn btn-ghost">
+        📱 QR Code
+      </button>
+    </div>
+    {% else %}
+    <div style="font-size:40px;margin-bottom:12px">⚠️</div>
+    <div style="font-weight:700;font-size:16px;color:var(--warning);margin-bottom:8px">Tunnel não detectado</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+      O Cloudflare Tunnel não está activo ou o URL ainda não foi registado.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Manual URL input -->
+<div class="card mb-16">
+  <div class="card-title">📝 Registar URL manualmente</div>
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+    Se o URL não foi detectado automaticamente, cole-o aqui após correr o <code>arrancar_externo.bat</code>.
+  </p>
+  <div style="display:flex;gap:10px">
+    <input type="text" id="urlManual"
+           placeholder="https://xxx-yyy-zzz.trycloudflare.com"
+           value="{{ tunnel_url or '' }}" style="flex:1">
+    <button onclick="registarURL()" class="btn btn-primary">Registar</button>
+  </div>
+  <div id="regMsg" style="margin-top:8px;font-size:12px;display:none"></div>
+</div>
+
+<!-- QR Code modal -->
+<div id="qrModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:32px;text-align:center;max-width:320px">
+    <div style="font-size:15px;font-weight:600;color:#000;margin-bottom:16px">Scan para aceder</div>
+    <div id="qrContainer"></div>
+    <div style="font-size:12px;color:#666;margin-top:12px;word-break:break-all" id="qrUrl"></div>
+    <button onclick="document.getElementById('qrModal').style.display='none'"
+            style="margin-top:16px;padding:8px 20px;border-radius:6px;border:1px solid #ddd;cursor:pointer;background:#f5f5f5">
+      Fechar
+    </button>
+  </div>
+</div>
+
+<!-- Instructions -->
+<div class="card mb-16">
+  <div class="card-title">📖 Como usar</div>
+  <div style="font-size:13px;color:var(--text-muted);line-height:2">
+    <strong style="color:var(--text)">1.</strong> No servidor, correr <code>arrancar_externo.bat</code><br>
+    <strong style="color:var(--text)">2.</strong> O URL fica registado automaticamente nesta página<br>
+    <strong style="color:var(--text)">3.</strong> Copiar o URL ou usar o QR Code no telemóvel<br>
+    <strong style="color:var(--text)">4.</strong> Qualquer pessoa com o URL acede ao ComprasNet<br><br>
+    <div style="padding:10px 14px;background:rgba(245,158,11,.08);border-radius:6px;border:1px solid rgba(245,158,11,.2)">
+      ⚠️ O URL <strong>muda</strong> cada vez que reinicia o tunnel.
+      Partilhe sempre o URL actual desta página.
+    </div>
+  </div>
+</div>
+
+<!-- Auto-refresh -->
+<div class="card" style="border-style:dashed">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:13px;color:var(--text-muted)">
+      Verificar automaticamente a cada 30 segundos
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="autoRefresh" checked style="width:auto">
+      <span style="font-size:13px">Auto-refresh</span>
+    </label>
+  </div>
+  <div style="font-size:11px;color:var(--text-dim);margin-top:6px" id="lastCheck"></div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+function copiarURL(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('btnCopiar');
+    btn.textContent = '✅ Copiado!';
+    btn.style.background = 'var(--success)';
+    setTimeout(() => { btn.textContent = '📋 Copiar URL'; btn.style.background = ''; }, 2500);
+  });
+}
+
+function partilharQR(url) {
+  const container = document.getElementById('qrContainer');
+  container.innerHTML = '';
+  new QRCode(container, {
+    text: url,
+    width: 200, height: 200,
+    colorDark: '#000000', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  document.getElementById('qrUrl').textContent = url;
+  document.getElementById('qrModal').style.display = 'flex';
+}
+
+function registarURL() {
+  const url = document.getElementById('urlManual').value.trim();
+  const msg = document.getElementById('regMsg');
+  if (!url.includes('trycloudflare.com') && !url.startsWith('https://')) {
+    msg.style.display='block'; msg.style.color='var(--danger)';
+    msg.textContent = '❌ URL inválido. Deve começar com https://'; return;
+  }
+  fetch('/api/tunnel/url', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({url})
+  }).then(r=>r.json()).then(d => {
+    if (d.ok) {
+      msg.style.display='block'; msg.style.color='var(--success)';
+      msg.textContent = '✅ URL registado. A recarregar...';
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      msg.style.display='block'; msg.style.color='var(--danger)';
+      msg.textContent = '❌ ' + (d.error || 'Erro');
+    }
+  });
+}
+
+// Auto-refresh check
+function verificarTunnel() {
+  if (!document.getElementById('autoRefresh').checked) return;
+  fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
+    document.getElementById('lastCheck').textContent =
+      'Última verificação: ' + new Date().toLocaleTimeString('pt-PT');
+    if (d.ativo && !window._currentUrl) {
+      location.reload();
+    }
+    window._currentUrl = d.url;
+  }).catch(() => {});
+}
+
+window._currentUrl = {{ tunnel_url | tojson }};
+setInterval(verificarTunnel, 30000);
+verificarTunnel();
+</script>
+{% endblock %}
