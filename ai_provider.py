@@ -2,13 +2,7 @@
 ai_provider.py
 ──────────────
 Abstração do provedor de IA para análise de PDFs.
-Suporta:
-  - LM Studio  (servidor local OpenAI-compatible, porta 1234)
-  - Ollama     (servidor local OpenAI-compatible, porta 11434)
-  - Claude API (Anthropic, requer chave API + internet)
-
-O ComprasNet usa sempre a mesma função analyze_pdf().
-A escolha do provedor é feita nas configurações e guardada na BD.
+Suporta LM Studio, Ollama, Claude API e Gemini Flash (gratuito).
 """
 
 import json
@@ -17,8 +11,6 @@ import urllib.request
 import urllib.error
 
 logger = logging.getLogger(__name__)
-
-# ── Prompt (igual para todos os provedores) ───────────────────────────────────
 
 SYSTEM_PROMPT = """És um assistente especializado em análise de documentos comerciais portugueses.
 A tua tarefa é extrair informação estruturada de orçamentos e propostas comerciais.
@@ -60,126 +52,180 @@ Retorna APENAS este objeto JSON preenchido (sem mais nada):
     "observacoes": null
 }}
 
-Regras obrigatórias:
-- Valores monetários são números decimais (float), nunca strings
-- Datas no formato YYYY-MM-DD ou null se não existir
+Regras:
+- Valores monetários são floats, nunca strings
+- Datas no formato YYYY-MM-DD ou null
 - Se não encontrares empresa, usa "Fornecedor Desconhecido"
-- Extrai TODOS os itens/linhas de produto que encontrares
-- O total deve incluir IVA se disponível"""
+- Extrai TODOS os itens/linhas de produto"""
 
 
-def _parse_response(raw: str) -> tuple[dict | None, str | None]:
-    """Extract JSON from model response, tolerating markdown fences."""
+def _parse_response(raw: str) -> tuple:
     text = raw.strip()
-    # Strip ```json ... ``` or ``` ... ```
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    # Find first { and last }
     start = text.find("{")
     end   = text.rfind("}")
     if start == -1 or end == -1:
-        return None, f"Não foi encontrado JSON na resposta: {text[:200]}"
+        return None, f"JSON não encontrado: {text[:200]}"
     try:
         return json.loads(text[start:end+1]), None
     except json.JSONDecodeError as e:
-        return None, f"JSON inválido: {e} — resposta: {text[:200]}"
+        return None, f"JSON inválido: {e}"
 
 
-# ── LM Studio / Ollama (OpenAI-compatible endpoint) ──────────────────────────
+# ── Gemini auto-detect ────────────────────────────────────────────────────────
+
+def _get_best_gemini_model(api_key: str) -> str:
+    """Query Google API and return best available model. Auto-updates if deprecated."""
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read())
+        models = []
+        for m in data.get('models', []):
+            if 'generateContent' in m.get('supportedGenerationMethods', []):
+                name = m['name'].replace('models/', '')
+                if 'flash' in name and 'lite' not in name and 'thinking' not in name:
+                    models.append(name)
+        models.sort(reverse=True)
+        if models:
+            return models[0]
+    except Exception:
+        pass
+
+    # Fallback: try known models in order
+    for model in ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest']:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = json.dumps({"contents": [{"parts": [{"text": "hi"}]}]}).encode()
+            req = urllib.request.Request(url, data=payload,
+                headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                json.loads(resp.read())
+            return model
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                continue
+            return model
+        except Exception:
+            continue
+    return 'gemini-2.0-flash'
+
+
+# ── Providers ─────────────────────────────────────────────────────────────────
 
 def _call_openai_compat(base_url: str, model: str, pdf_text: str, filename: str,
-                         timeout: int = 120) -> tuple[dict | None, str | None]:
-    """
-    POST to any OpenAI-compatible /v1/chat/completions endpoint.
-    Works with LM Studio (port 1234) and Ollama (port 11434).
-    Uses only stdlib urllib — no openai package needed.
-    """
+                         timeout: int = 120) -> tuple:
     payload = json.dumps({
         "model": model,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": _build_user_prompt(pdf_text, filename)}
         ],
-        "temperature": 0.1,
-        "max_tokens": 2000,
-        "stream": False
-    }).encode("utf-8")
-
+        "temperature": 0.1, "max_tokens": 2000, "stream": False
+    }).encode()
     url = base_url.rstrip("/") + "/v1/chat/completions"
-    req = urllib.request.Request(
-        url,
-        data=payload,
+    req = urllib.request.Request(url, data=payload,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
-        method="POST"
-    )
+        method="POST")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        raw = data["choices"][0]["message"]["content"]
-        return _parse_response(raw)
+            data = json.loads(resp.read())
+        return _parse_response(data["choices"][0]["message"]["content"])
     except urllib.error.URLError as e:
         return None, f"Não foi possível ligar ao servidor de IA em {base_url} — {e.reason}"
-    except (KeyError, IndexError) as e:
-        return None, f"Resposta inesperada do servidor de IA: {e}"
     except Exception as e:
         return None, f"Erro inesperado: {e}"
 
 
-def _call_lmstudio(cfg, pdf_text: str, filename: str) -> tuple[dict | None, str | None]:
-    base_url = f"http://{cfg.lm_host}:{cfg.lm_port}"
-    return _call_openai_compat(base_url, cfg.lm_model, pdf_text, filename)
+def _call_lmstudio(cfg, pdf_text: str, filename: str) -> tuple:
+    return _call_openai_compat(f"http://{cfg.lm_host}:{cfg.lm_port}",
+                                cfg.lm_model, pdf_text, filename)
 
 
-def _call_ollama(cfg, pdf_text: str, filename: str) -> tuple[dict | None, str | None]:
-    base_url = f"http://{cfg.lm_host}:{cfg.lm_port}"
-    return _call_openai_compat(base_url, cfg.lm_model, pdf_text, filename)
+def _call_ollama(cfg, pdf_text: str, filename: str) -> tuple:
+    return _call_openai_compat(f"http://{cfg.lm_host}:{cfg.lm_port}",
+                                cfg.lm_model, pdf_text, filename)
 
 
-def _call_claude(cfg, pdf_text: str, filename: str) -> tuple[dict | None, str | None]:
+def _call_claude(cfg, pdf_text: str, filename: str) -> tuple:
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=cfg.claude_api_key or "")
+        client = anthropic.Anthropic(api_key=cfg.claude_api_key or '')
         msg = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2000,
+            model="claude-sonnet-4-20250514", max_tokens=2000,
             system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": _build_user_prompt(pdf_text, filename)}]
-        )
+            messages=[{"role": "user", "content": _build_user_prompt(pdf_text, filename)}])
         return _parse_response(msg.content[0].text)
     except ImportError:
-        return None, "Biblioteca anthropic não instalada. Execute: pip install anthropic"
+        return None, "Biblioteca anthropic não instalada."
     except Exception as e:
         return None, f"Erro Claude API: {e}"
 
 
+def _call_gemini(cfg, pdf_text: str, filename: str) -> tuple:
+    """Call Google Gemini API via REST — no library needed, free tier."""
+    api_key = cfg.gemini_api_key or ""
+    if not api_key:
+        return None, "Chave API Gemini não configurada."
+
+    # Auto-detect best available model
+    model = cfg.gemini_model or ""
+    if not model or model in ('gemini-1.5-flash', 'gemini-1.5-pro'):
+        model = _get_best_gemini_model(api_key)
+        try:
+            from models import ConfigIA, db
+            cfg_db = ConfigIA.query.first()
+            if cfg_db and cfg_db.gemini_model != model:
+                cfg_db.gemini_model = model
+                db.session.commit()
+                logger.info(f"Gemini model auto-updated to: {model}")
+        except Exception:
+            pass
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        prompt = SYSTEM_PROMPT + "\n\n" + _build_user_prompt(pdf_text, filename)
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2000}
+        }).encode()
+        req = urllib.request.Request(url, data=payload,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        return _parse_response(text)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        if "API_KEY_INVALID" in body:
+            return None, "Chave API Gemini inválida."
+        return None, f"Erro Gemini HTTP {e.code}: {body[:200]}"
+    except Exception as e:
+        return None, f"Erro Gemini: {e}"
+
+
 # ── Public interface ──────────────────────────────────────────────────────────
 
-def analyze_pdf(cfg, pdf_text: str, filename: str) -> tuple[dict | None, str | None]:
-    """
-    Analyze a PDF quote using the configured AI provider.
-    cfg: ConfigIA model instance (or None → returns fallback empty dict)
-    Returns (data_dict, error_string).  One of them is always None.
-    """
+def analyze_pdf(cfg, pdf_text: str, filename: str) -> tuple:
     if not cfg or not pdf_text.strip():
         return None, "Texto do PDF vazio ou sem configuração de IA."
-
     provider = cfg.provider if cfg else "lmstudio"
-
     if provider == "lmstudio":
         return _call_lmstudio(cfg, pdf_text, filename)
     elif provider == "ollama":
         return _call_ollama(cfg, pdf_text, filename)
     elif provider == "claude":
         return _call_claude(cfg, pdf_text, filename)
-    else:
-        return None, f"Provedor desconhecido: {provider}"
+    elif provider == "gemini":
+        return _call_gemini(cfg, pdf_text, filename)
+    return None, f"Provedor desconhecido: {provider}"
 
 
-def test_provider(cfg) -> tuple[bool, str]:
-    """Quick connectivity test. Returns (ok, message)."""
+def test_provider(cfg) -> tuple:
     if cfg.provider in ("lmstudio", "ollama"):
-        # Just check if the /v1/models endpoint responds
         url = f"http://{cfg.lm_host}:{cfg.lm_port}/v1/models"
         req = urllib.request.Request(url, method="GET")
         try:
@@ -188,14 +234,45 @@ def test_provider(cfg) -> tuple[bool, str]:
             models = [m["id"] for m in data.get("data", [])]
             label = "LM Studio" if cfg.provider == "lmstudio" else "Ollama"
             if models:
-                return True, f"{label} ativo — {len(models)} modelo(s) disponível(eis): {', '.join(models[:3])}"
-            else:
-                return True, f"{label} ativo mas sem modelos carregados. Carregue um modelo primeiro."
+                return True, f"{label} ativo — modelos: {', '.join(models[:3])}"
+            return True, f"{label} ativo mas sem modelos carregados."
         except urllib.error.URLError as e:
             label = "LM Studio" if cfg.provider == "lmstudio" else "Ollama"
-            porta = cfg.lm_port
-            return False, (f"{label} não encontrado em {cfg.lm_host}:{porta}. "
-                           f"Verifique se o servidor está iniciado e o 'Local Server' ativo.")
+            return False, f"{label} não encontrado em {cfg.lm_host}:{cfg.lm_port}."
+
+    elif cfg.provider == "gemini":
+        if not cfg.gemini_api_key:
+            return False, "Chave API Gemini não configurada."
+        try:
+            model = _get_best_gemini_model(cfg.gemini_api_key)
+            # Save detected model
+            try:
+                from models import ConfigIA, db
+                cfg_db = ConfigIA.query.first()
+                if cfg_db:
+                    cfg_db.gemini_model = model
+                    db.session.commit()
+            except Exception:
+                pass
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={cfg.gemini_api_key}"
+            payload = json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode()
+            req = urllib.request.Request(url, data=payload,
+                headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+            if data.get("candidates"):
+                return True, f"✅ Gemini API OK! Modelo activo: {model} (gratuito)"
+            return False, f"Resposta inesperada: {str(data)[:100]}"
+        except urllib.error.HTTPError as e:
+            body = e.read().decode()
+            if "API_KEY_INVALID" in body:
+                return False, "❌ Chave API inválida."
+            if "PERMISSION_DENIED" in body:
+                return False, "❌ Sem permissão. Active a API em aistudio.google.com."
+            return False, f"❌ Erro HTTP {e.code}: {body[:150]}"
+        except Exception as e:
+            return False, f"❌ Erro: {e}"
+
     elif cfg.provider == "claude":
         if not cfg.claude_api_key:
             return False, "Chave API Claude não configurada."
@@ -207,74 +284,23 @@ def test_provider(cfg) -> tuple[bool, str]:
             return True, "Claude API ligada com sucesso."
         except Exception as e:
             return False, f"Erro Claude API: {e}"
-    elif cfg.provider == "gemini":
-        if not cfg.gemini_api_key:
-            return False, "Chave API Gemini não configurada. Cole a chave no campo acima."
-        try:
-            import urllib.request, json
-            # Test Gemini REST API directly (no library needed)
-            model_test = _get_best_gemini_model(cfg.gemini_api_key)
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_test}:generateContent?key={cfg.gemini_api_key}"
-            payload = json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode()
-            req = urllib.request.Request(url, data=payload,
-                headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read())
-            if data.get("candidates"):
-                return True, f"✅ Gemini API ligada com sucesso! Modelo: {model_test} (gratuito)"
-            return False, f"Resposta inesperada: {str(data)[:100]}"
-        except urllib.error.HTTPError as e:
-            body = e.read().decode()
-            if "API_KEY_INVALID" in body:
-                return False, "❌ Chave API inválida. Verifique que copiou correctamente."
-            if "PERMISSION_DENIED" in body:
-                return False, "❌ Sem permissão. Active a API em aistudio.google.com."
-            return False, f"❌ Erro HTTP {e.code}: {body[:150]}"
-        except Exception as e:
-            return False, f"❌ Erro: {e}"
+
     return False, "Provedor inválido."
 
 
-# ── Model recommendations ─────────────────────────────────────────────────────
-
 RECOMMENDED_MODELS = {
     "gemini": [
-        {
-            "id":    "gemini-2.0-flash",
-            "label": "Gemini 2.0 Flash (Recomendado — Gratuito)",
-            "ram":   "Cloud — sem requisitos locais",
-            "notes": "Muito rápido, excelente para PDFs. Tier gratuito generoso (~1500 req/dia).",
-            "search": "gemini-1.5-flash"
-        },
-        {
-            "id":    "gemini-2.0-flash-lite",
-            "label": "Gemini 2.0 Flash Lite (Mais leve)",
-            "ram":   "Cloud — sem requisitos locais",
-            "notes": "Melhor qualidade, quota gratuita menor (50 req/dia).",
-            "search": "gemini-1.5-pro"
-        },
+        {"id": "gemini-2.0-flash", "label": "Gemini 2.0 Flash (Recomendado — Gratuito)",
+         "ram": "Cloud", "notes": "Modelo mais recente e gratuito.", "search": "gemini-2.0-flash"},
+        {"id": "gemini-2.0-flash-lite", "label": "Gemini 2.0 Flash Lite (Mais leve)",
+         "ram": "Cloud", "notes": "Mais rápido, ideal para PDFs simples.", "search": "gemini-2.0-flash-lite"},
     ],
     "lmstudio": [
-        {
-            "id":    "qwen2.5-7b-instruct",
-            "label": "Qwen 2.5 7B Instruct (Recomendado)",
-            "ram":   "~5 GB RAM",
-            "notes": "Excelente para extração de dados em português. Melhor opção para PC partilhado.",
-            "search": "qwen2.5-7b-instruct"
-        },
-        {
-            "id":    "mistral-7b-instruct-v0.3",
-            "label": "Mistral 7B Instruct v0.3",
-            "ram":   "~5 GB RAM",
-            "notes": "Bom desempenho geral, bom com tabelas e números.",
-            "search": "mistral-7b-instruct-v0.3"
-        },
-        {
-            "id":    "phi-3.5-mini-instruct",
-            "label": "Phi 3.5 Mini (Mais leve)",
-            "ram":   "~3 GB RAM",
-            "notes": "Para PCs com pouca RAM disponível. Menos preciso mas funcional.",
-            "search": "phi-3.5-mini-instruct"
-        },
+        {"id": "qwen2.5-7b-instruct", "label": "Qwen 2.5 7B Instruct (Recomendado)",
+         "ram": "~5 GB RAM", "notes": "Excelente para português.", "search": "qwen2.5-7b-instruct"},
+        {"id": "mistral-7b-instruct-v0.3", "label": "Mistral 7B Instruct",
+         "ram": "~5 GB RAM", "notes": "Bom com tabelas e números.", "search": "mistral-7b-instruct-v0.3"},
+        {"id": "phi-3.5-mini-instruct", "label": "Phi 3.5 Mini (Mais leve)",
+         "ram": "~3 GB RAM", "notes": "Para PCs com pouca RAM.", "search": "phi-3.5-mini-instruct"},
     ]
 }
