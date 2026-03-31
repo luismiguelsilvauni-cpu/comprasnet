@@ -1,6 +1,15 @@
 {% extends "mobile/base.html" %}
 {% block title %}Chat · ComprasNet{% endblock %}
-{% block topbar %}<div class="topbar-title">🤖 Assistente Claude</div>{% endblock %}
+{% block topbar %}
+<div class="topbar-title">🤖 Assistente
+  {% if cfg_ia %}
+    {% if cfg_ia.provider == 'gemini' %}<span style="font-size:11px;color:var(--success)"> · Gemini</span>
+    {% elif cfg_ia.provider == 'claude' %}<span style="font-size:11px;color:var(--accent)"> · Claude</span>
+    {% elif cfg_ia.provider in ('lmstudio','ollama') %}<span style="font-size:11px;color:var(--warning)"> · Local</span>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
 
 {% block head %}
 <style>

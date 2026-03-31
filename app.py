@@ -1256,39 +1256,74 @@ def chat_claude():
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def api_chat():
-    """Proxy chat messages to Claude API or LM Studio."""
-    data = request.get_json()
-    messages = data.get('messages', [])
-    imagem_b64 = data.get('imagem_b64')   # optional base64 image
-    imagem_tipo = data.get('imagem_tipo', 'image/jpeg')
+    """Chat using the configured AI provider (Gemini, Claude, LM Studio, Ollama)."""
+    data       = request.get_json()
+    messages   = data.get('messages', [])
+    imagem_b64 = data.get('imagem_b64')
+    imagem_tipo= data.get('imagem_tipo', 'image/jpeg')
 
     cfg_ia  = ConfigIA.query.first()
     cfg     = get_config_geral()
-    sistema = cfg.claude_chat_sistema if cfg else 'És um assistente técnico.'
+    sistema = (cfg.claude_chat_sistema if cfg else None) or \
+              'És um assistente técnico especializado em equipamentos e compras industriais. Responde sempre em português.'
 
     if not cfg_ia:
-        return jsonify({'error': 'IA não configurada'}), 400
+        return jsonify({'error': 'IA não configurada. Configure em Admin → Provedor IA.'}), 400
+
+    provider = cfg_ia.provider
 
     try:
-        if cfg_ia.provider == 'claude':
+        # ── Gemini ────────────────────────────────────────────────────────────
+        if provider == 'gemini':
+            from ai_provider import _get_best_gemini_model
+            api_key = cfg_ia.gemini_api_key or ''
+            if not api_key:
+                return jsonify({'error': 'Chave API Gemini não configurada.'}), 400
+            model = cfg_ia.gemini_model or _get_best_gemini_model(api_key)
+            # Build conversation history for Gemini
+            contents = []
+            if sistema:
+                contents.append({'role':'user','parts':[{'text': sistema}]})
+                contents.append({'role':'model','parts':[{'text': 'Entendido. Estou pronto para ajudar.'}]})
+            for m in messages:
+                role = 'user' if m['role'] == 'user' else 'model'
+                parts = []
+                if imagem_b64 and m == messages[-1]:
+                    parts.append({'inline_data':{'mime_type': imagem_tipo, 'data': imagem_b64}})
+                parts.append({'text': m['content']})
+                contents.append({'role': role, 'parts': parts})
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = json.dumps({
+                'contents': contents,
+                'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 1500}
+            }).encode()
+            import urllib.request
+            req = urllib.request.Request(url, data=payload,
+                headers={'Content-Type':'application/json'}, method='POST')
+            with urllib.request.urlopen(req, timeout=60) as r:
+                resp = json.loads(r.read())
+            text = resp['candidates'][0]['content']['parts'][0]['text']
+            return jsonify({'ok': True, 'text': text, 'provider': 'gemini', 'model': model})
+
+        # ── Claude API ────────────────────────────────────────────────────────
+        elif provider == 'claude':
             import anthropic
             client = anthropic.Anthropic(api_key=cfg_ia.claude_api_key or '')
-            # Build last message content (may include image)
             last = messages[-1] if messages else {'role':'user','content':'Olá'}
             content = []
             if imagem_b64:
                 content.append({'type':'image','source':{
                     'type':'base64','media_type':imagem_tipo,'data':imagem_b64}})
             content.append({'type':'text','text':last.get('content','')})
-            api_msgs = [{'role':m['role'],'content':m['content']}
-                        for m in messages[:-1]]
+            api_msgs = [{'role':m['role'],'content':m['content']} for m in messages[:-1]]
             api_msgs.append({'role':last['role'],'content':content})
             resp = client.messages.create(
                 model='claude-sonnet-4-20250514', max_tokens=1500,
                 system=sistema, messages=api_msgs)
-            return jsonify({'ok':True,'text':resp.content[0].text})
+            return jsonify({'ok':True,'text':resp.content[0].text, 'provider':'claude'})
 
-        else:  # LM Studio / Ollama
+        # ── LM Studio / Ollama ────────────────────────────────────────────────
+        elif provider in ('lmstudio', 'ollama'):
             import urllib.request
             base = f"http://{cfg_ia.lm_host}:{cfg_ia.lm_port}"
             api_msgs = [{'role':'system','content':sistema}] + [
@@ -1298,12 +1333,15 @@ def api_chat():
                 'messages': api_msgs,
                 'temperature': 0.7, 'max_tokens': 1500, 'stream': False
             }).encode()
-            req = urllib.request.Request(
-                base + '/v1/chat/completions', data=payload,
+            req = urllib.request.Request(base + '/v1/chat/completions', data=payload,
                 headers={'Content-Type':'application/json'}, method='POST')
             with urllib.request.urlopen(req, timeout=60) as r:
                 resp = json.loads(r.read())
-            return jsonify({'ok':True,'text':resp['choices'][0]['message']['content']})
+            return jsonify({'ok':True,'text':resp['choices'][0]['message']['content'],
+                           'provider':provider})
+
+        else:
+            return jsonify({'error': f'Provedor "{provider}" não suportado no chat.'}), 400
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

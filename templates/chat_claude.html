@@ -1,6 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Chat Claude · ComprasNet{% endblock %}
-{% block page_title %}Assistente Técnico Claude{% endblock %}
+{% block title %}Chat · ComprasNet{% endblock %}
+{% block page_title %}
+Assistente Técnico
+{% if cfg_ia %}
+  {% if cfg_ia.provider == 'gemini' %}
+    <span class="badge badge-green" style="font-size:11px;margin-left:8px">💎 Gemini</span>
+  {% elif cfg_ia.provider == 'claude' %}
+    <span class="badge badge-blue" style="font-size:11px;margin-left:8px">☁️ Claude</span>
+  {% elif cfg_ia.provider == 'lmstudio' %}
+    <span class="badge badge-yellow" style="font-size:11px;margin-left:8px">🖥️ LM Studio</span>
+  {% elif cfg_ia.provider == 'ollama' %}
+    <span class="badge badge-yellow" style="font-size:11px;margin-left:8px">🦙 Ollama</span>
+  {% endif %}
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;height:calc(100vh - 140px)">
@@ -76,14 +89,24 @@
     <div style="font-size:11px;color:var(--text-muted);margin-top:8px" id="chatInfo">0 mensagens</div>
   </div>
 
-  {% if cfg_ia %}
   <div class="card" style="border-style:dashed">
     <div style="font-size:11px;color:var(--text-muted)">
-      Provedor: <strong>{{ cfg_ia.provider }}</strong><br>
-      {% if cfg_ia.lm_model %}Modelo: <span class="mono">{{ cfg_ia.lm_model[:20] }}</span>{% endif %}
+      {% if cfg_ia %}
+      Provedor activo: <strong>{{ cfg_ia.provider }}</strong><br>
+      {% if cfg_ia.provider == 'gemini' %}
+        Modelo: <span class="mono">{{ cfg_ia.gemini_model or 'auto' }}</span><br>
+        <span style="color:var(--success)">✅ Gratuito</span>
+      {% elif cfg_ia.provider == 'claude' %}
+        Modelo: <span class="mono">claude-sonnet</span>
+      {% elif cfg_ia.provider in ('lmstudio','ollama') %}
+        Modelo: <span class="mono">{{ (cfg_ia.lm_model or 'default')[:25] }}</span>
+      {% endif %}
+      {% else %}
+      <span style="color:var(--danger)">⚠️ IA não configurada</span><br>
+      <a href="{{ url_for('admin_ia') }}" style="color:var(--accent)">Configurar →</a>
+      {% endif %}
     </div>
   </div>
-  {% endif %}
 </div>
 </div>
 
