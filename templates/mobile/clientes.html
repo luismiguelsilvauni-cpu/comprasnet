@@ -1,0 +1,36 @@
+{% extends "mobile/base.html" %}
+{% block title %}Clientes · ComprasNet{% endblock %}
+{% block topbar %}<div class="topbar-title">👥 Clientes</div>{% endblock %}
+{% block content %}
+<form method="GET" action="/mobile/clientes">
+  <div class="search-bar" style="margin-top:12px">
+    <input type="text" name="q" value="{{ q }}" placeholder="Nome ou NIF..." autocomplete="off">
+  </div>
+</form>
+{% if not clientes %}
+<div class="empty">
+  <div class="empty-icon">👥</div>
+  <div class="empty-text">{% if q %}Sem resultados{% else %}Sem clientes{% endif %}</div>
+  <div class="empty-sub">{% if q %}Tente outro nome ou NIF{% else %}Importe do PHC no desktop{% endif %}</div>
+</div>
+{% else %}
+<div class="section-header">{{ clientes|length }} cliente(s)</div>
+<div class="card">
+{% for c in clientes %}
+<a href="/mobile/clientes/{{ c.id }}" class="card-item" style="text-decoration:none;color:var(--text)">
+  <div style="width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">
+    {{ c.nome[0].upper() }}
+  </div>
+  <div class="card-item-text">
+    <div class="card-item-title">{{ c.nome }}</div>
+    <div class="card-item-sub">
+      {% if c.nif %}NIF {{ c.nif }} · {% endif %}
+      {{ c.embarcacoes|length }} embarcação(ões)
+    </div>
+  </div>
+  <span class="card-item-right">›</span>
+</a>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

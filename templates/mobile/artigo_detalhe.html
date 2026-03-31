@@ -1,0 +1,83 @@
+{% extends "mobile/base.html" %}
+{% block title %}{{ artigo.referencia }} · ComprasNet{% endblock %}
+{% block topbar %}
+  <a href="/mobile/artigos" class="topbar-back">‹</a>
+  <div class="topbar-title mono" style="font-size:15px">{{ artigo.referencia }}</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stock card -->
+<div class="card" style="margin-top:16px">
+  <div style="padding:20px 16px;text-align:center;border-bottom:1px solid var(--border)">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Stock Actual</div>
+    <div style="font-size:48px;font-weight:700;font-family:monospace;
+                color:{% if artigo.stock_atual <= 0 %}var(--danger){% elif artigo.stock_atual < 5 %}var(--warning){% else %}var(--success){% endif %}">
+      {{ '%.2f'|format(artigo.stock_atual) }}
+    </div>
+    <div style="font-size:16px;color:var(--muted);margin-top:4px">{{ artigo.unidade }}</div>
+    {% if artigo.stock_atual <= 0 %}
+    <div class="badge badge-red" style="margin-top:8px">Sem stock</div>
+    {% elif artigo.stock_atual < 5 %}
+    <div class="badge badge-yellow" style="margin-top:8px">Stock baixo</div>
+    {% else %}
+    <div class="badge badge-green" style="margin-top:8px">Em stock</div>
+    {% endif %}
+  </div>
+
+  <div style="padding:16px">
+    <div style="font-size:16px;font-weight:600;margin-bottom:4px">{{ artigo.designacao or '—' }}</div>
+    {% if artigo.familia %}
+    <div style="font-size:13px;color:var(--accent)">{{ artigo.familia }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Prices -->
+<div class="section-header">Preços</div>
+<div class="card">
+  <div class="card-item">
+    <div class="card-item-text">
+      <div class="price-label">Preço de Custo</div>
+      <div class="price">{{ '%.4f'|format(artigo.preco_custo) }} €</div>
+    </div>
+  </div>
+  <div class="card-item">
+    <div class="card-item-text">
+      <div class="price-label">Preço Custo Ponderado</div>
+      <div class="price">{{ '%.4f'|format(artigo.preco_custo_ponderado) }} €</div>
+    </div>
+  </div>
+  <div class="card-item">
+    <div class="card-item-text">
+      <div class="price-label">IVA</div>
+      <div style="font-size:18px;font-weight:600;font-family:monospace">{{ artigo.taxa_iva|int }}%</div>
+    </div>
+  </div>
+</div>
+
+{% if historico %}
+<!-- Purchase history -->
+<div class="section-header">Últimas Compras</div>
+<div class="card">
+  {% for h in historico %}
+  <div class="card-item">
+    <div class="card-item-text">
+      <div class="card-item-title">{{ h.fornecedor_nome }}</div>
+      <div class="card-item-sub">{{ h.data_compra }} · Doc {{ h.num_documento }}</div>
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      <div class="mono" style="font-size:15px;font-weight:700">{{ '%.4f'|format(h.preco) }} €</div>
+      {% if h.desconto > 0 %}
+      <div style="font-size:11px;color:var(--warning)">-{{ '%.1f'|format(h.desconto) }}%</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Actions -->
+<div style="padding:16px">
+  <a href="/mobile/artigos" class="btn btn-ghost" style="display:flex">← Voltar à pesquisa</a>
+</div>
+{% endblock %}

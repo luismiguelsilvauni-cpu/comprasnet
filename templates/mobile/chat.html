@@ -1,0 +1,102 @@
+{% extends "mobile/base.html" %}
+{% block title %}Chat · ComprasNet{% endblock %}
+{% block topbar %}<div class="topbar-title">🤖 Assistente Claude</div>{% endblock %}
+
+{% block head %}
+<style>
+  .content { padding-bottom: 80px; }
+  .chat-messages { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg-user .bubble {
+    background: var(--accent); color: white;
+    border-radius: 18px 18px 4px 18px; padding: 10px 14px;
+    font-size: 14px; line-height: 1.5; max-width: 85%; align-self: flex-end;
+    margin-left: auto;
+  }
+  .msg-ai .bubble {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px 18px 18px 4px; padding: 10px 14px;
+    font-size: 14px; line-height: 1.6; max-width: 90%;
+  }
+  .chat-input-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    display: flex; gap: 8px; align-items: flex-end; z-index: 200;
+  }
+  .chat-input-bar textarea {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 10px 14px; color: var(--text);
+    font-size: 14px; font-family: inherit; outline: none; resize: none;
+    max-height: 100px; line-height: 1.4;
+  }
+  .chat-input-bar button {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
+    border: none; color: white; font-size: 18px; cursor: pointer; flex-shrink: 0;
+  }
+  .typing { display: flex; gap: 4px; padding: 10px 14px; }
+  .typing span { width: 7px; height: 7px; background: var(--muted); border-radius: 50%;
+                  animation: bounce .8s infinite; }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-messages" id="chatMessages">
+  <div style="text-align:center;padding:24px;color:var(--muted)">
+    <div style="font-size:40px;margin-bottom:8px">🤖</div>
+    <div style="font-size:14px;font-weight:600;color:var(--text)">Assistente Técnico</div>
+    <div style="font-size:12px;margin-top:6px">Pergunte sobre equipamentos, stocks, manutenções...</div>
+  </div>
+</div>
+
+<div class="chat-input-bar">
+  <textarea id="chatInput" placeholder="Escreva a sua pergunta..." rows="1"
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviar()}"></textarea>
+  <button onclick="enviar()">↑</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let messages = [];
+
+function enviar() {
+  const input = document.getElementById('chatInput');
+  const txt = input.value.trim();
+  if (!txt) return;
+  messages.push({role:'user', content:txt});
+  adicionarBolha('user', txt);
+  input.value = ''; input.style.height = 'auto';
+
+  const typingId = 'typing-' + Date.now();
+  const box = document.getElementById('chatMessages');
+  box.insertAdjacentHTML('beforeend',
+    `<div class="msg-ai" id="${typingId}"><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div></div>`);
+  box.scrollTop = box.scrollHeight;
+
+  fetch('/api/chat', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({messages})
+  }).then(r=>r.json()).then(d=>{
+    document.getElementById(typingId)?.remove();
+    const text = d.ok ? d.text : '❌ ' + (d.error||'Erro');
+    messages.push({role:'assistant', content: d.text || ''});
+    adicionarBolha('ai', text);
+  }).catch(e=>{
+    document.getElementById(typingId)?.remove();
+    adicionarBolha('ai', '❌ Erro de ligação');
+  });
+}
+
+function adicionarBolha(role, txt) {
+  const box = document.getElementById('chatMessages');
+  const html = txt.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  box.insertAdjacentHTML('beforeend',
+    `<div class="msg-${role}"><div class="bubble">${html}</div></div>`);
+  box.scrollTop = box.scrollHeight;
+}
+</script>
+{% endblock %}

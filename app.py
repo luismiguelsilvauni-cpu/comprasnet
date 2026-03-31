@@ -934,11 +934,12 @@ def get_config_geral():
 
 @app.context_processor
 def inject_config():
-    """Make ConfigGeral available in all templates."""
+    """Make ConfigGeral and datetime available in all templates."""
+    from datetime import datetime as _dt
     try:
-        return {'cfg_geral': get_config_geral()}
+        return {'cfg_geral': get_config_geral(), 'now': _dt.now}
     except Exception:
-        return {'cfg_geral': None}
+        return {'cfg_geral': None, 'now': _dt.now}
 
 
 @app.route('/admin/config', methods=['GET', 'POST'])
@@ -1522,6 +1523,93 @@ def api_gemini_models():
         return jsonify({'error': f'Erro HTTP {e.code}: {body[:150]}'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ── PWA + MOBILE ──────────────────────────────────────────────────────────────
+
+@app.route('/manifest.json')
+def manifest():
+    return send_from_directory('static', 'manifest.json',
+                               mimetype='application/manifest+json')
+
+@app.route('/sw.js')
+def service_worker():
+    return send_from_directory('static', 'sw.js',
+                               mimetype='application/javascript')
+
+@app.route('/mobile')
+@login_required
+def mobile_home():
+    total_artigos  = ArtigoPHC.query.count()
+    pedidos_abertos = PedidoCompra.query.filter_by(estado='aberto').count()
+    total_clientes = Cliente.query.filter_by(ativo=True).count()
+    return render_template('mobile/home.html',
+        total_artigos=total_artigos,
+        pedidos_abertos=pedidos_abertos,
+        total_clientes=total_clientes)
+
+@app.route('/mobile/artigos')
+@login_required
+def mobile_artigos():
+    q = request.args.get('q', '').strip()
+    artigos = []
+    if q and len(q) >= 2:
+        like = f'%{q}%'
+        artigos = ArtigoPHC.query.filter(db.or_(
+            ArtigoPHC.referencia.ilike(like),
+            ArtigoPHC.designacao.ilike(like),
+        )).order_by(ArtigoPHC.referencia).limit(30).all()
+    return render_template('mobile/artigos.html', artigos=artigos, q=q)
+
+@app.route('/mobile/artigos/<ref>')
+@login_required
+def mobile_artigo_detalhe(ref):
+    artigo = ArtigoPHC.query.filter_by(referencia=ref).first_or_404()
+    historico = []
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if cfg_phc and cfg_phc.ultima_sync:
+            from phc_sync import get_historico_compras
+            historico = get_historico_compras(cfg_phc, ref)[:5]
+    except Exception:
+        pass
+    return render_template('mobile/artigo_detalhe.html', artigo=artigo, historico=historico)
+
+@app.route('/mobile/pedidos')
+@login_required
+def mobile_pedidos():
+    estado = request.args.get('estado', '')
+    q = PedidoCompra.query
+    if estado:
+        q = q.filter_by(estado=estado)
+    pedidos = q.order_by(PedidoCompra.data_criacao.desc()).limit(30).all()
+    return render_template('mobile/pedidos.html', pedidos=pedidos, estado=estado)
+
+@app.route('/mobile/clientes')
+@login_required
+def mobile_clientes():
+    q_str = request.args.get('q', '').strip()
+    query = Cliente.query.filter_by(ativo=True)
+    if q_str:
+        like = f'%{q_str}%'
+        query = query.filter(db.or_(
+            Cliente.nome.ilike(like),
+            Cliente.nif.ilike(like),
+        ))
+    clientes = query.order_by(Cliente.nome).limit(30).all()
+    return render_template('mobile/clientes.html', clientes=clientes, q=q_str)
+
+@app.route('/mobile/clientes/<int:cid>')
+@login_required
+def mobile_cliente_detalhe(cid):
+    cliente = Cliente.query.get_or_404(cid)
+    return render_template('mobile/cliente_detalhe.html', cliente=cliente)
+
+@app.route('/mobile/chat')
+@login_required
+def mobile_chat():
+    cfg_ia = ConfigIA.query.first()
+    return render_template('mobile/chat.html', cfg_ia=cfg_ia)
 
 
 def init_db():

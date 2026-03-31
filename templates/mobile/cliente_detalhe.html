@@ -1,0 +1,60 @@
+{% extends "mobile/base.html" %}
+{% block title %}{{ cliente.nome }} · ComprasNet{% endblock %}
+{% block topbar %}
+  <a href="/mobile/clientes" class="topbar-back">‹</a>
+  <div class="topbar-title" style="font-size:15px">{{ cliente.nome }}</div>
+{% endblock %}
+{% block content %}
+<div class="card" style="margin-top:16px">
+  <div style="padding:20px 16px;text-align:center;border-bottom:1px solid var(--border)">
+    <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;margin:0 auto 12px">
+      {{ cliente.nome[0].upper() }}
+    </div>
+    <div style="font-size:18px;font-weight:700">{{ cliente.nome }}</div>
+    {% if cliente.nif %}<div style="font-size:13px;color:var(--muted);margin-top:4px">NIF {{ cliente.nif }}</div>{% endif %}
+  </div>
+  {% if cliente.telefone or cliente.email %}
+  <div class="card-item">
+    <span class="card-item-icon">📞</span>
+    <div class="card-item-text">
+      {% if cliente.telefone %}<div class="card-item-title">{{ cliente.telefone }}</div>{% endif %}
+      {% if cliente.email %}<div class="card-item-sub">{{ cliente.email }}</div>{% endif %}
+    </div>
+    {% if cliente.telefone %}<a href="tel:{{ cliente.telefone }}" class="topbar-action">Ligar</a>{% endif %}
+  </div>
+  {% endif %}
+  {% if cliente.morada %}
+  <div class="card-item">
+    <span class="card-item-icon">📍</span>
+    <div class="card-item-text">
+      <div class="card-item-title">{{ cliente.morada }}</div>
+      {% if cliente.localidade %}<div class="card-item-sub">{{ cliente.localidade }} {{ cliente.cod_postal or '' }}</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if cliente.embarcacoes %}
+<div class="section-header">Embarcações</div>
+<div class="card">
+{% for e in cliente.embarcacoes %}
+<a href="/clientes/{{ cliente.id }}/embarcacoes/{{ e.id }}" class="card-item" style="text-decoration:none;color:var(--text)">
+  <span class="card-item-icon">⚓</span>
+  <div class="card-item-text">
+    <div class="card-item-title">{{ e.nome }}</div>
+    <div class="card-item-sub">
+      {% if e.tipo %}{{ e.tipo }}{% endif %}
+      {% if e.matricula %} · {{ e.matricula }}{% endif %}
+      · {{ e.componentes|length }} componente(s)
+    </div>
+  </div>
+  <span class="card-item-right">›</span>
+</a>
+{% endfor %}
+</div>
+{% endif %}
+
+<div style="padding:16px">
+  <a href="/clientes/{{ cliente.id }}" class="btn btn-ghost" style="display:flex">Ver ficha completa no desktop →</a>
+</div>
+{% endblock %}

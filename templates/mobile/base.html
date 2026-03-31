@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ComprasNet">
+  <meta name="theme-color" content="#3b6ef0">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <title>{% block title %}ComprasNet{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #0f1117;
+      --surface: #171b25;
+      --surface2:#1e2330;
+      --border:  #2a3045;
+      --text:    #e8eaf0;
+      --muted:   #7a85a0;
+      --accent:  #3b6ef0;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger:  #ef4444;
+      --radius:  12px;
+      --bottom:  env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text);
+                 font-family: 'DM Sans', sans-serif; overflow-x: hidden; }
+
+    /* Top bar */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: env(safe-area-inset-top, 0) 16px 0;
+      height: calc(56px + env(safe-area-inset-top, 0));
+      display: flex; align-items: flex-end; padding-bottom: 10px;
+    }
+    .topbar-inner { display: flex; align-items: center; gap: 10px; width: 100%; }
+    .topbar-title { font-size: 17px; font-weight: 700; flex: 1; }
+    .topbar-back { color: var(--accent); font-size: 22px; cursor: pointer;
+                   background: none; border: none; padding: 4px; }
+    .topbar-action { color: var(--accent); font-size: 13px; font-weight: 600;
+                     background: none; border: none; cursor: pointer; }
+
+    /* Content */
+    .content {
+      padding-top: calc(56px + env(safe-area-inset-top, 0));
+      padding-bottom: calc(72px + var(--bottom));
+      min-height: 100vh;
+    }
+
+    /* Bottom nav */
+    .bottomnav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; padding-bottom: var(--bottom);
+    }
+    .bottomnav a {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 10px 4px 8px; text-decoration: none; color: var(--muted);
+      font-size: 10px; font-weight: 500; gap: 3px; transition: color .15s;
+    }
+    .bottomnav a.active { color: var(--accent); }
+    .bottomnav a span:first-child { font-size: 22px; }
+
+    /* Cards */
+    .card {
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border); margin: 12px 16px; overflow: hidden;
+    }
+    .card-item {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .card-item:last-child { border-bottom: none; }
+    .card-item-icon { font-size: 24px; flex-shrink: 0; }
+    .card-item-text { flex: 1; min-width: 0; }
+    .card-item-title { font-size: 14px; font-weight: 600;
+                       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .card-item-right { font-size: 20px; color: var(--border); flex-shrink: 0; }
+
+    /* Search */
+    .search-bar {
+      margin: 12px 16px; position: relative;
+    }
+    .search-bar input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 16px 12px 42px; color: var(--text);
+      font-size: 15px; font-family: inherit; outline: none;
+    }
+    .search-bar input:focus { border-color: var(--accent); }
+    .search-bar::before { content: '🔍'; position: absolute; left: 14px;
+                          top: 50%; transform: translateY(-50%); font-size: 16px; }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; padding: 3px 8px;
+             border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-blue   { background: rgba(59,110,240,.15);  color: var(--accent); }
+    .badge-green  { background: rgba(34,197,94,.15);   color: var(--success); }
+    .badge-yellow { background: rgba(245,158,11,.15);  color: var(--warning); }
+    .badge-red    { background: rgba(239,68,68,.15);   color: var(--danger); }
+
+    /* KPI tiles */
+    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr);
+                gap: 10px; margin: 12px 16px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border);
+           border-radius: var(--radius); padding: 14px 10px; text-align: center; }
+    .kpi-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .kpi-label { font-size: 10px; color: var(--muted); margin-top: 3px;
+                 text-transform: uppercase; letter-spacing: .5px; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; justify-content: center;
+           gap: 6px; padding: 12px 20px; border-radius: 10px; font-size: 15px;
+           font-weight: 600; cursor: pointer; border: none; text-decoration: none;
+           font-family: inherit; }
+    .btn-primary { background: var(--accent); color: white; width: 100%; }
+    .btn-ghost { background: var(--surface2); color: var(--text); }
+
+    /* Stock indicator */
+    .stock-high   { color: var(--success); }
+    .stock-medium { color: var(--warning); }
+    .stock-zero   { color: var(--danger); }
+
+    /* Section header */
+    .section-header { padding: 16px 16px 6px;
+                      font-size: 12px; font-weight: 600; color: var(--muted);
+                      text-transform: uppercase; letter-spacing: .5px; }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 48px 24px; color: var(--muted); }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { font-size: 15px; margin-bottom: 6px; color: var(--text); font-weight: 600; }
+    .empty-sub  { font-size: 13px; }
+
+    /* Mono */
+    .mono { font-family: monospace; }
+
+    /* Price */
+    .price { font-size: 20px; font-weight: 700; font-family: monospace; color: var(--text); }
+    .price-label { font-size: 11px; color: var(--muted); }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-inner">
+    {% block topbar %}
+    <div class="topbar-title">📦 ComprasNet</div>
+    {% endblock %}
+  </div>
+</div>
+
+<!-- Content -->
+<div class="content">
+  {% block content %}{% endblock %}
+</div>
+
+<!-- Bottom nav -->
+<nav class="bottomnav">
+  <a href="/mobile" class="{% if request.endpoint == 'mobile_home' %}active{% endif %}">
+    <span>🏠</span><span>Início</span>
+  </a>
+  <a href="/mobile/artigos" class="{% if request.endpoint in ['mobile_artigos','mobile_artigo_detalhe'] %}active{% endif %}">
+    <span>📦</span><span>Artigos</span>
+  </a>
+  <a href="/mobile/pedidos" class="{% if request.endpoint == 'mobile_pedidos' %}active{% endif %}">
+    <span>📋</span><span>Pedidos</span>
+  </a>
+  <a href="/mobile/clientes" class="{% if request.endpoint in ['mobile_clientes','mobile_cliente_detalhe'] %}active{% endif %}">
+    <span>👥</span><span>Clientes</span>
+  </a>
+  <a href="/mobile/chat" class="{% if request.endpoint == 'mobile_chat' %}active{% endif %}">
+    <span>🤖</span><span>Claude</span>
+  </a>
+</nav>
+
+<script>
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,109 @@
+{% extends "mobile/base.html" %}
+{% block title %}ComprasNet Mobile{% endblock %}
+
+{% block content %}
+<!-- Welcome -->
+<div style="padding:20px 16px 8px">
+  <div style="font-size:22px;font-weight:700">Olá, {{ current_user.nome.split()[0] }} 👋</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:4px">{{ now().strftime('%A, %d de %B') if now else '' }}</div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-value">{{ total_artigos }}</div>
+    <div class="kpi-label">Artigos PHC</div>
+  </div>
+  <div class="kpi" style="border-color:rgba(245,158,11,.3)">
+    <div class="kpi-value" style="color:var(--warning)">{{ pedidos_abertos }}</div>
+    <div class="kpi-label">Pedidos Abertos</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-value" style="color:var(--success)">{{ total_clientes }}</div>
+    <div class="kpi-label">Clientes</div>
+  </div>
+</div>
+
+<!-- Quick search -->
+<div class="section-header">Pesquisa Rápida</div>
+<div class="search-bar">
+  <input type="text" id="quickSearch" placeholder="Referência ou designação..."
+         oninput="pesquisarRapido(this.value)" autocomplete="off">
+</div>
+<div id="quickResults"></div>
+
+<!-- Quick actions -->
+<div class="section-header">Acções Rápidas</div>
+<div class="card">
+  <a href="/mobile/artigos" class="card-item" style="text-decoration:none;color:var(--text)">
+    <span class="card-item-icon">📦</span>
+    <div class="card-item-text">
+      <div class="card-item-title">Pesquisar Artigos</div>
+      <div class="card-item-sub">Stock, PVP, preço de custo</div>
+    </div>
+    <span class="card-item-right">›</span>
+  </a>
+  <a href="/mobile/pedidos" class="card-item" style="text-decoration:none;color:var(--text)">
+    <span class="card-item-icon">📋</span>
+    <div class="card-item-text">
+      <div class="card-item-title">Pedidos de Compra</div>
+      <div class="card-item-sub">{{ pedidos_abertos }} em aberto</div>
+    </div>
+    <span class="card-item-right">›</span>
+  </a>
+  <a href="/mobile/clientes" class="card-item" style="text-decoration:none;color:var(--text)">
+    <span class="card-item-icon">👥</span>
+    <div class="card-item-text">
+      <div class="card-item-title">Clientes</div>
+      <div class="card-item-sub">Fichas e embarcações</div>
+    </div>
+    <span class="card-item-right">›</span>
+  </a>
+  <a href="/mobile/chat" class="card-item" style="text-decoration:none;color:var(--text)">
+    <span class="card-item-icon">🤖</span>
+    <div class="card-item-text">
+      <div class="card-item-title">Chat Claude</div>
+      <div class="card-item-sub">Assistente técnico</div>
+    </div>
+    <span class="card-item-right">›</span>
+  </a>
+  <a href="/" class="card-item" style="text-decoration:none;color:var(--muted)">
+    <span class="card-item-icon">🖥️</span>
+    <div class="card-item-text">
+      <div class="card-item-title">Versão Desktop</div>
+      <div class="card-item-sub">Interface completa</div>
+    </div>
+    <span class="card-item-right">›</span>
+  </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let searchTimer = null;
+function pesquisarRapido(q) {
+  clearTimeout(searchTimer);
+  const box = document.getElementById('quickResults');
+  if (q.length < 2) { box.innerHTML = ''; return; }
+  searchTimer = setTimeout(() => {
+    fetch('/api/artigos?q=' + encodeURIComponent(q))
+      .then(r=>r.json()).then(data => {
+        if (!data.length) { box.innerHTML = '<div style="padding:12px 16px;color:var(--muted);font-size:13px">Sem resultados</div>'; return; }
+        box.innerHTML = '<div class="card">' + data.slice(0,5).map(a => `
+          <a href="/mobile/artigos/${encodeURIComponent(a.referencia)}"
+             class="card-item" style="text-decoration:none;color:var(--text)">
+            <span class="card-item-icon">📦</span>
+            <div class="card-item-text">
+              <div class="card-item-title mono" style="font-size:13px">${a.referencia}</div>
+              <div class="card-item-sub">${a.designacao || ''}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div class="mono" style="font-size:13px;${a.stock_atual<=0?'color:var(--danger)':a.stock_atual<5?'color:var(--warning)':'color:var(--success)'}">${a.stock_atual.toFixed(2)}</div>
+              <div style="font-size:10px;color:var(--muted)">${a.unidade}</div>
+            </div>
+          </a>`).join('') + '</div>';
+      });
+  }, 300);
+}
+</script>
+{% endblock %}

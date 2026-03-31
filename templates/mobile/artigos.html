@@ -1,0 +1,50 @@
+{% extends "mobile/base.html" %}
+{% block title %}Artigos · ComprasNet{% endblock %}
+{% block topbar %}<div class="topbar-title">📦 Artigos PHC</div>{% endblock %}
+
+{% block content %}
+<form method="GET" action="/mobile/artigos">
+  <div class="search-bar" style="margin-top:12px">
+    <input type="text" name="q" value="{{ q }}" placeholder="Referência ou designação..."
+           autocomplete="off" autofocus>
+  </div>
+</form>
+
+{% if q and not artigos %}
+<div class="empty">
+  <div class="empty-icon">🔍</div>
+  <div class="empty-text">Sem resultados</div>
+  <div class="empty-sub">Nenhum artigo encontrado para "{{ q }}"</div>
+</div>
+{% elif not q %}
+<div class="empty">
+  <div class="empty-icon">📦</div>
+  <div class="empty-text">Pesquisar artigos PHC</div>
+  <div class="empty-sub">Introduza referência ou designação</div>
+</div>
+{% else %}
+<div class="section-header">{{ artigos|length }} resultado(s) para "{{ q }}"</div>
+<div class="card">
+  {% for a in artigos %}
+  <a href="/mobile/artigos/{{ a.referencia | urlencode }}"
+     class="card-item" style="text-decoration:none;color:var(--text)">
+    <div class="card-item-text">
+      <div class="card-item-title mono">{{ a.referencia }}</div>
+      <div class="card-item-sub">{{ a.designacao or '—' }}</div>
+      {% if a.familia %}
+      <div style="font-size:11px;color:var(--accent);margin-top:2px">{{ a.familia }}</div>
+      {% endif %}
+    </div>
+    <div style="text-align:right;flex-shrink:0;margin-left:12px">
+      <div class="mono {% if a.stock_atual <= 0 %}stock-zero{% elif a.stock_atual < 5 %}stock-medium{% else %}stock-high{% endif %}"
+           style="font-size:15px;font-weight:700">
+        {{ '%.2f'|format(a.stock_atual) }}
+      </div>
+      <div style="font-size:10px;color:var(--muted)">{{ a.unidade }}</div>
+    </div>
+    <span class="card-item-right">›</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
