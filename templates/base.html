@@ -37,7 +37,7 @@
 
         /* ── Sidebar ── */
         .sidebar {
-            width: 220px; min-height: 100vh; background: var(--surface);
+            width: 240px; min-height: 100vh; background: var(--surface);
             border-right: 1px solid var(--border); display: flex; flex-direction: column;
             position: fixed; top: 0; left: 0; z-index: 100;
         }
@@ -59,13 +59,13 @@
         .nav-section { padding: 0 12px; margin-bottom: 4px; }
         .nav-label { font-size: 10px; font-weight: 600; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; padding: 8px 8px 4px; }
         .nav-item {
-            display: flex; align-items: center; gap: 10px; padding: 9px 10px;
-            border-radius: 6px; color: var(--text-muted); text-decoration: none;
-            font-size: 13px; font-weight: 500; transition: all 0.15s; cursor: pointer;
+            display: flex; align-items: center; gap: 12px; padding: 11px 12px;
+            border-radius: 8px; color: var(--text-muted); text-decoration: none;
+            font-size: 14px; font-weight: 500; transition: all 0.15s; cursor: pointer;
         }
         .nav-item:hover { background: var(--surface2); color: var(--text); }
         .nav-item.active { background: var(--accent-glow); color: var(--accent); }
-        .nav-item .icon { font-size: 15px; width: 18px; text-align: center; }
+        .nav-item .icon { font-size: 20px; width: 22px; text-align: center; }
         .sidebar-bottom { padding: 12px; border-top: 1px solid var(--border); }
         .user-info { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 6px; }
         .avatar {
@@ -83,7 +83,7 @@
         .logout-btn:hover { background: rgba(239,68,68,0.1); color: var(--danger); }
 
         /* ── Main ── */
-        .main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+        .main { margin-left: 240px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
         .topbar {
             background: var(--surface); border-bottom: 1px solid var(--border);
             padding: 0 28px; height: 56px; display: flex; align-items: center;
@@ -238,7 +238,7 @@
     <div class="sidebar-logo">
         <div class="logo-icon">📦</div>
         {% if cfg_geral and cfg_geral.empresa_logo_path %}
-            <img src="/uploads/{{ cfg_geral.empresa_logo_path }}" style="height:32px;object-fit:contain;max-width:120px">
+            <img src="/uploads/{{ cfg_geral.empresa_logo_path }}" style="height:44px;object-fit:contain;max-width:160px;margin:4px 0">
             {% else %}
             <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
             {% endif %}
@@ -255,6 +255,9 @@
             </a>
             <a href="{{ url_for('pedidos') }}" class="nav-item {% if 'pedido' in request.endpoint and 'reposicao' not in request.endpoint %}active{% endif %}">
                 <span class="icon">📋</span><span>Pedidos de Compra</span>
+            </a>
+            <a href="{{ url_for('stock') }}" class="nav-item {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
+                <span class="icon">📊</span><span>Stock</span>
             </a>
             <a href="{{ url_for('reposicao') }}" class="nav-item {% if request.endpoint == 'reposicao' or request.endpoint == 'analisar_artigo' %}active{% endif %}">
                 <span class="icon">📦</span><span>Reposição de Stock</span>

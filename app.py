@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
@@ -1678,6 +1678,89 @@ def mobile_cliente_detalhe(cid):
 def mobile_chat():
     cfg_ia = ConfigIA.query.first()
     return render_template('mobile/chat.html', cfg_ia=cfg_ia)
+
+
+# ══════════════════════════════════════════════════════════════
+#  STOCK
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/stock')
+@login_required
+def stock():
+    q = request.args.get('q', '').strip()
+    artigos = []
+    if q and len(q) >= 2:
+        like = f'%{q}%'
+        artigos = ArtigoPHC.query.filter(db.or_(
+            ArtigoPHC.referencia.ilike(like),
+            ArtigoPHC.designacao.ilike(like),
+            ArtigoPHC.familia.ilike(like),
+        )).order_by(ArtigoPHC.referencia).limit(50).all()
+    return render_template('stock.html', artigos=artigos, q=q)
+
+
+@app.route('/stock/<ref>')
+@login_required
+def stock_artigo(ref):
+    artigo = ArtigoPHC.query.filter_by(referencia=ref).first_or_404()
+    historico = []
+    vendas = []
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if cfg_phc and cfg_phc.ultima_sync:
+            from phc_sync import get_historico_compras, get_phc_connection
+            historico = get_historico_compras(cfg_phc, ref)
+            # Get sales history
+            try:
+                conn = get_phc_connection(cfg_phc)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT TOP 30 fl.preco, fl.qtt, ft.data, ec.nome
+                    FROM fl
+                    INNER JOIN ft ON ft.ftstamp=fl.ftstamp
+                    LEFT JOIN ec ON ec.no=ft.no
+                    WHERE fl.ref=? AND ft.anulado=0
+                    ORDER BY ft.data DESC
+                """, ref)
+                rows = cursor.fetchall()
+                conn.close()
+                vendas = [{'preco': float(r[0] or 0), 'qtt': float(r[1] or 0),
+                           'data': r[2].strftime('%Y-%m-%d') if r[2] else '',
+                           'cliente': r[3] or ''} for r in rows]
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # Get notes for this article
+    from models import NotaArtigo
+    notas = NotaArtigo.query.filter_by(artigo_ref=ref).order_by(NotaArtigo.criado_em.desc()).all()
+    return render_template('stock_artigo.html', artigo=artigo,
+                           historico=historico, vendas=vendas, notas=notas)
+
+
+@app.route('/stock/<ref>/nota', methods=['POST'])
+@login_required
+def stock_artigo_nota(ref):
+    artigo = ArtigoPHC.query.filter_by(referencia=ref).first_or_404()
+    from models import NotaArtigo
+    texto = request.form.get('texto', '').strip()
+    if texto:
+        nota = NotaArtigo(artigo_ref=ref, texto=texto,
+                          criado_por=current_user.id)
+        db.session.add(nota)
+        db.session.commit()
+        flash('Nota guardada.', 'success')
+    return redirect(url_for('stock_artigo', ref=ref))
+
+
+@app.route('/stock/<ref>/nota/<int:nid>/apagar', methods=['POST'])
+@login_required
+def stock_apagar_nota(ref, nid):
+    from models import NotaArtigo
+    nota = NotaArtigo.query.get_or_404(nid)
+    db.session.delete(nota); db.session.commit()
+    return jsonify({'ok': True})
 
 
 def init_db():

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}{{ artigo.referencia }} · Stock{% endblock %}
+{% block page_title %}{{ artigo.designacao or artigo.referencia }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('stock') }}" class="btn btn-ghost btn-sm">← Stock</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+
+<!-- LEFT: Info + Chart + Notes -->
+<div>
+
+  <!-- Key info -->
+  <div class="card mb-16">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:4px">
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Stock Actual</div>
+        <div style="font-size:32px;font-weight:700;font-family:monospace;
+          color:{% if artigo.stock_atual<=0 %}var(--danger){% elif artigo.stock_atual<5 %}var(--warning){% else %}var(--success){% endif %}">
+          {{ '%.2f'|format(artigo.stock_atual) }}
+        </div>
+        <div style="font-size:12px;color:var(--text-muted)">{{ artigo.unidade }}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Preço Custo</div>
+        <div style="font-size:22px;font-weight:700;font-family:monospace">{{ '%.4f'|format(artigo.preco_custo) }}</div>
+        <div style="font-size:12px;color:var(--text-muted)">€</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Custo Pond.</div>
+        <div style="font-size:22px;font-weight:700;font-family:monospace">{{ '%.4f'|format(artigo.preco_custo_ponderado) }}</div>
+        <div style="font-size:12px;color:var(--text-muted)">€</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">IVA</div>
+        <div style="font-size:22px;font-weight:700;font-family:monospace">{{ artigo.taxa_iva|int }}%</div>
+        <div style="font-size:12px;color:var(--text-muted)">taxa</div>
+      </div>
+    </div>
+    <hr class="divider">
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div><span style="font-size:11px;color:var(--text-muted)">Referência: </span><span class="mono">{{ artigo.referencia }}</span></div>
+      {% if artigo.familia %}<div><span style="font-size:11px;color:var(--text-muted)">Família: </span><span>{{ artigo.familia }}</span></div>{% endif %}
+    </div>
+  </div>
+
+  <!-- Price evolution chart -->
+  {% if historico %}
+  <div class="card mb-16">
+    <div class="card-title">📈 Evolução do Preço de Custo</div>
+    <canvas id="chartPrecos" height="200"></canvas>
+  </div>
+  {% endif %}
+
+  <!-- Notes -->
+  <div class="card mb-16">
+    <div class="card-title">📝 Notas do Artigo</div>
+    {% if notas %}
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      {% for nota in notas %}
+      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;position:relative">
+        <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">{{ nota.texto }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+          <span>{{ nota.criado_em.strftime('%d/%m/%Y %H:%M') }}</span>
+          <button onclick="apagarNota({{ nota.id }})" class="btn btn-ghost btn-sm"
+                  style="font-size:11px;padding:2px 8px;color:var(--danger)">✕ Apagar</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="color:var(--text-muted);font-size:13px;margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:8px">
+      Sem notas. Adicione informação relevante sobre este artigo.
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/stock/{{ artigo.referencia | urlencode }}/nota">
+      <div class="form-group">
+        <label>Nova Nota</label>
+        <textarea name="texto" rows="3" placeholder="Fornecedores alternativos, intervalos de substituição, observações técnicas..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Nota</button>
+    </form>
+  </div>
+
+  <!-- Sales history -->
+  {% if vendas %}
+  <div class="card">
+    <div class="card-title">💰 Histórico de Vendas (PHC)</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Cliente</th><th style="text-align:right">Qtd</th><th style="text-align:right">Preço</th></tr></thead>
+        <tbody>
+          {% for v in vendas %}
+          <tr>
+            <td style="font-size:12px">{{ v.data }}</td>
+            <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.cliente }}</td>
+            <td style="text-align:right;font-family:monospace">{{ '%.2f'|format(v.qtt) }}</td>
+            <td style="text-align:right;font-family:monospace">{{ '%.4f'|format(v.preco) }} €</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- RIGHT: Purchase history sidebar -->
+<div>
+  {% if historico %}
+  <div class="card">
+    <div class="card-title">🛒 Histórico de Compras (PHC)</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      {% for h in historico[:15] %}
+      <div style="background:var(--surface2);border-radius:8px;padding:10px 12px">
+        <div style="font-weight:600;font-size:13px">{{ h.fornecedor_nome }}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">{{ h.data_compra }}</div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;align-items:center">
+          <span style="font-family:monospace;font-weight:700;color:var(--accent)">{{ '%.4f'|format(h.preco) }} €</span>
+          <span style="font-size:11px;color:var(--text-muted)">Qtd: {{ h.quantidade }}</span>
+        </div>
+        {% if h.desconto > 0 %}
+        <div style="font-size:11px;color:var(--warning);margin-top:2px">Desconto: {{ '%.1f'|format(h.desconto) }}%</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="card">
+    <div class="card-title">🛒 Histórico de Compras</div>
+    <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
+      Sem histórico de compras no PHC para este artigo.
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+</div><!-- grid -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+{% if historico %}
+// Price evolution chart
+const hist = {{ historico | tojson }};
+const sorted = hist.filter(h => h.preco > 0)
+  .sort((a,b) => new Date(a.data_compra) - new Date(b.data_compra));
+
+if (sorted.length > 0) {
+  const ctx = document.getElementById('chartPrecos').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: sorted.map(h => h.data_compra),
+      datasets: [{
+        label: 'Preço de Custo (€)',
+        data: sorted.map(h => h.preco),
+        borderColor: '#3b6ef0',
+        backgroundColor: 'rgba(59,110,240,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#3b6ef0',
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#e8eaf0' } } },
+      scales: {
+        x: { ticks: { color: '#7a85a0', maxTicksLimit: 8 }, grid: { color: '#2a3045' } },
+        y: { ticks: { color: '#7a85a0', callback: v => v.toFixed(4) + ' €' }, grid: { color: '#2a3045' } }
+      }
+    }
+  });
+}
+{% endif %}
+
+function apagarNota(nid) {
+  if (!confirm('Apagar esta nota?')) return;
+  fetch(`/stock/{{ artigo.referencia | urlencode }}/nota/${nid}/apagar`, {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); });
+}
+</script>
+{% endblock %}

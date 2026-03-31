@@ -306,3 +306,14 @@ class ConfigGeral(db.Model):
     # Claude chat
     claude_chat_ativo     = db.Column(db.Boolean,     default=True)
     claude_chat_sistema   = db.Column(db.Text,        default='És um assistente técnico especializado em equipamentos navais e hidráulicos. Responde sempre em português.')
+
+
+class NotaArtigo(db.Model):
+    """Manual notes attached to a PHC article."""
+    __tablename__ = 'notas_artigo'
+    id          = db.Column(db.Integer, primary_key=True)
+    artigo_ref  = db.Column(db.String(50), nullable=False, index=True)
+    texto       = db.Column(db.Text, nullable=False)
+    criado_por  = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow)
