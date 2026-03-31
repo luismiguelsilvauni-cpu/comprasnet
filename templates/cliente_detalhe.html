@@ -8,10 +8,10 @@
 {% endblock %}
 
 {% block content %}
-<div style="display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start">
+<div style="display:flex;gap:0;align-items:start" class="resizable-grid">
 
 <!-- LEFT: Client profile -->
-<div>
+<div style="width:320px;min-width:180px;flex-shrink:0">
   <div class="card mb-16">
     <div style="text-align:center;padding:16px 0 20px">
       <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;margin:0 auto 12px">
@@ -47,9 +47,9 @@
     {% endif %}
   </div>
 </div>
-
+<div class="resize-handle" title="Arraste para redimensionar"></div>
 <!-- RIGHT: Vessels + Consumables -->
-<div>
+<div style="flex:1;min-width:300px">
 
   <!-- Vessels -->
   <div class="card mb-16">

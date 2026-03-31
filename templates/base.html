@@ -366,44 +366,45 @@
 {% endif %}
 
 <script>
-// Resizable panels
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.resize-handle').forEach(handle => {
-    let startX, startW1, startW2, panel1, panel2;
-
-    handle.addEventListener('mousedown', e => {
-      panel1 = handle.previousElementSibling;
-      panel2 = handle.nextElementSibling;
-      if (!panel1 || !panel2) return;
-      startX = e.clientX;
-      startW1 = panel1.offsetWidth;
-      startW2 = panel2.offsetWidth;
-      handle.classList.add('dragging');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-
-      const onMove = e => {
-        const dx = e.clientX - startX;
-        const newW1 = Math.max(200, startW1 + dx);
-        const newW2 = Math.max(200, startW2 - dx);
-        panel1.style.flex = 'none';
-        panel1.style.width = newW1 + 'px';
-        panel2.style.flex = 'none';
-        panel2.style.width = newW2 + 'px';
-      };
-      const onUp = () => {
-        handle.classList.remove('dragging');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-      };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-      e.preventDefault();
+// Resizable panels — drag the handle between any two panels
+(function() {
+  function initResize() {
+    document.querySelectorAll('.resize-handle').forEach(h => {
+      if (h._initDone) return;
+      h._initDone = true;
+      h.addEventListener('mousedown', function(e) {
+        const p1 = h.previousElementSibling;
+        const p2 = h.nextElementSibling;
+        if (!p1 || !p2) return;
+        const sx = e.clientX;
+        const sw1 = p1.getBoundingClientRect().width;
+        const sw2 = p2.getBoundingClientRect().width;
+        h.classList.add('dragging');
+        document.body.style.cssText += ';cursor:col-resize!important;user-select:none!important';
+        function onMove(e) {
+          const dx = e.clientX - sx;
+          const w1 = Math.max(180, sw1 + dx);
+          const w2 = Math.max(180, sw2 - dx);
+          p1.style.cssText += `;flex:0 0 ${w1}px;width:${w1}px;max-width:none`;
+          p2.style.cssText += `;flex:0 0 ${w2}px;width:${w2}px;max-width:none`;
+        }
+        function onUp() {
+          h.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        e.preventDefault();
+      });
     });
-  });
-});
+  }
+  document.addEventListener('DOMContentLoaded', initResize);
+  // Also run after any dynamic content
+  setTimeout(initResize, 500);
+})();
 </script>
 
 </body>

@@ -974,8 +974,12 @@ def admin_config():
                 logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logo_empresa.png')
                 logo.save(logo_path)
                 cfg.empresa_logo_path = 'logo_empresa.png'
-            db.session.commit()
-            flash('Configurações guardadas.', 'success')
+            try:
+                db.session.commit()
+                flash('Configurações guardadas com sucesso! ✅', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Erro ao guardar: {e}', 'error')
         elif action == 'backup':
             from backup_manager import fazer_backup
             ok, msg = fazer_backup(app, cfg)
@@ -1344,7 +1348,14 @@ def api_chat():
             return jsonify({'error': f'Provedor "{provider}" não suportado no chat.'}), 400
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        err = str(e)
+        # Friendlier error messages
+        if 'Connection refused' in err or 'recusou' in err.lower():
+            prov = cfg_ia.provider if cfg_ia else 'local'
+            return jsonify({'error': f'Não foi possível ligar ao servidor {prov.upper()}. Verifique se está a correr em {cfg_ia.lm_host}:{cfg_ia.lm_port}.'}), 500
+        if 'API_KEY_INVALID' in err or 'invalid' in err.lower():
+            return jsonify({'error': 'Chave API inválida. Verifique em Admin → Provedor IA.'}), 500
+        return jsonify({'error': err}), 500
 
 
 # ── AUTO-UPDATE ────────────────────────────────────────────────────────────────
