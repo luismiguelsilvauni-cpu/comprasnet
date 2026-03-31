@@ -1419,13 +1419,25 @@ def update_apply():
     ok, out = run([sys.executable, '-m', 'flask', 'db', 'upgrade'])
     steps.append({'passo': 'Migração base de dados', 'ok': ok, 'msg': 'OK' if ok else out[:200]})
 
-    # 5. Schedule restart
+    # 5. Restart — try service first, fallback to process restart
     steps.append({'passo': 'Reiniciar servidor', 'ok': True, 'msg': 'A reiniciar em 3 segundos...'})
 
     def restart():
-        import time, signal
+        import time, subprocess, sys
         time.sleep(3)
-        os.kill(os.getpid(), signal.SIGTERM)
+        # Try NSSM service restart first
+        nssm = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nssm.exe')
+        if os.path.exists(nssm):
+            subprocess.Popen([nssm, 'restart', 'ComprasNet'],
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            # Restart as standalone process
+            subprocess.Popen([sys.executable, os.path.abspath(__file__)],
+                           cwd=os.path.dirname(os.path.abspath(__file__)),
+                           creationflags=subprocess.CREATE_NO_WINDOW
+                           if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+            import signal
+            os.kill(os.getpid(), signal.SIGTERM)
 
     import threading
     threading.Thread(target=restart, daemon=True).start()
