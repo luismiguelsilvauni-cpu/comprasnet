@@ -15,16 +15,13 @@
             --accent:  {{ cfg_geral.cor_accent if cfg_geral and cfg_geral.cor_accent else '#3b6ef0' }};
             --bg:      {{ cfg_geral.cor_bg if cfg_geral and cfg_geral.cor_bg else '#0f1117' }};
             --surface: {{ cfg_geral.cor_surface if cfg_geral and cfg_geral.cor_surface else '#171b25' }};
-            --bg: #0f1117;
-            --surface: #171b25;
-            --surface2: #1e2330;
+            --surface2: {% if cfg_geral and cfg_geral.cor_surface %}{{ cfg_geral.cor_surface }}dd{% else %}#1e2330{% endif %};
             --border: #2a3045;
             --border-light: #3a4560;
             --text: #e8eaf0;
             --text-muted: #7a85a0;
             --text-dim: #4a5470;
-            --accent: #3b6ef0;
-            --accent-hover: #4f7ff5;
+            --accent-hover: {{ cfg_geral.cor_accent if cfg_geral and cfg_geral.cor_accent else '#4f7ff5' }};
             --accent-glow: rgba(59,110,240,0.15);
             --success: #22c55e;
             --warning: #f59e0b;
@@ -367,5 +364,47 @@
      title="Chat com Claude">🤖</a>
 </div>
 {% endif %}
+
+<script>
+// Resizable panels
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.resize-handle').forEach(handle => {
+    let startX, startW1, startW2, panel1, panel2;
+
+    handle.addEventListener('mousedown', e => {
+      panel1 = handle.previousElementSibling;
+      panel2 = handle.nextElementSibling;
+      if (!panel1 || !panel2) return;
+      startX = e.clientX;
+      startW1 = panel1.offsetWidth;
+      startW2 = panel2.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      const onMove = e => {
+        const dx = e.clientX - startX;
+        const newW1 = Math.max(200, startW1 + dx);
+        const newW2 = Math.max(200, startW2 - dx);
+        panel1.style.flex = 'none';
+        panel1.style.width = newW1 + 'px';
+        panel2.style.flex = 'none';
+        panel2.style.width = newW2 + 'px';
+      };
+      const onUp = () => {
+        handle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    });
+  });
+});
+</script>
+
 </body>
 </html>
