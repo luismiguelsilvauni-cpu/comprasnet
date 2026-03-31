@@ -302,6 +302,7 @@ class ConfigGeral(db.Model):
     backup_manter_dias    = db.Column(db.Integer,     default=30)
     backup_auto_ativo     = db.Column(db.Boolean,     default=True)
     ultimo_backup         = db.Column(db.DateTime)
+    dashboard_layouts     = db.Column(db.Text, default='{}')
     ultimo_backup_ok      = db.Column(db.Boolean)
     # Claude chat
     claude_chat_ativo     = db.Column(db.Boolean,     default=True)

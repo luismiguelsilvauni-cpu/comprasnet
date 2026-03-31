@@ -77,17 +77,24 @@ def logout():
 @app.route('/')
 @login_required
 def dashboard():
-    cfg = ConfigPHC.query.first()
+    total_pedidos    = PedidoCompra.query.count()
+    pedidos_abertos  = PedidoCompra.query.filter_by(estado='aberto').count()
+    pedidos_aprovados= PedidoCompra.query.filter_by(estado='aprovado').count()
+    total_orcamentos = Orcamento.query.count()
+    pedidos_recentes = PedidoCompra.query.order_by(PedidoCompra.data_criacao.desc()).limit(8).all()
+    # Stock baixo: stock actual <= 5 e > 0, or stock = 0
+    artigos_stock_baixo = ArtigoPHC.query.filter(
+        ArtigoPHC.stock_atual <= 5
+    ).order_by(ArtigoPHC.stock_atual).limit(10).all()
     return render_template('dashboard.html',
-        total_pedidos    = PedidoCompra.query.count(),
-        pedidos_abertos  = PedidoCompra.query.filter_by(estado='aberto').count(),
-        pedidos_aprovados= PedidoCompra.query.filter_by(estado='aprovado').count(),
-        total_orcamentos = Orcamento.query.count(),
-        total_artigos    = ArtigoPHC.query.count(),
-        ultima_sync      = cfg.ultima_sync if cfg else None,
-        pedidos_recentes = PedidoCompra.query.order_by(PedidoCompra.data_criacao.desc()).limit(8).all())
+        total_pedidos=total_pedidos,
+        pedidos_abertos=pedidos_abertos,
+        pedidos_aprovados=pedidos_aprovados,
+        total_orcamentos=total_orcamentos,
+        pedidos_recentes=pedidos_recentes,
+        artigos_stock_baixo=artigos_stock_baixo,
+    )
 
-# ── PEDIDOS ────────────────────────────────────────────────────────────────────
 
 @app.route('/pedidos')
 @login_required
@@ -1763,6 +1770,43 @@ def stock_apagar_nota(ref, nid):
     return jsonify({'ok': True})
 
 
+# ── DASHBOARD WIDGETS ─────────────────────────────────────────────────────────
+
+@app.route('/api/dashboard/layout', methods=['GET'])
+@login_required
+def get_dashboard_layout():
+    """Get saved widget layout for current user."""
+    from models import ConfigGeral
+    cfg = get_config_geral()
+    key = f'dashboard_layout_{current_user.id}'
+    layout_json = getattr(cfg, 'dashboard_layouts', None)
+    # Store per-user layouts in a simple JSON field
+    try:
+        import json as _json
+        layouts = _json.loads(cfg.dashboard_layouts or '{}') if hasattr(cfg, 'dashboard_layouts') else {}
+        return jsonify(layouts.get(str(current_user.id), []))
+    except Exception:
+        return jsonify([])
+
+@app.route('/api/dashboard/layout', methods=['POST'])
+@login_required
+def save_dashboard_layout():
+    """Save widget layout for current user."""
+    data = request.get_json()
+    try:
+        from models import ConfigGeral
+        cfg = get_config_geral()
+        if not hasattr(cfg, 'dashboard_layouts') or cfg.dashboard_layouts is None:
+            cfg.dashboard_layouts = '{}'
+        layouts = json.loads(cfg.dashboard_layouts)
+        layouts[str(current_user.id)] = data
+        cfg.dashboard_layouts = json.dumps(layouts)
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():
@@ -1850,4 +1894,4 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"⚠️  Backup scheduler não iniciado: {e}")
     print("🚀 ComprasNet em http://0.0.0.0:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

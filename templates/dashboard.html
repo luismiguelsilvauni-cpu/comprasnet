@@ -1,329 +1,303 @@
 {% extends "base.html" %}
-{% block title %}Dashboard · ComprasNet
-<!-- Mobile App QR Code -->
-<div class="card mt-16" style="max-width:400px">
-  <div class="card-title">📱 App Mobile</div>
-  <div style="display:flex;gap:20px;align-items:center">
-    <div id="qrDashboard" style="flex-shrink:0;width:120px;height:120px;background:white;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">
-      A carregar...
-    </div>
-    <div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Aceder no telemóvel</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px" id="qrUrlText">
-        A detectar URL do servidor...
-      </div>
-      <a href="/mobile" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:inline-flex">
-        📱 Abrir app mobile
-      </a><br>
-      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="display:inline-flex">
-        🌐 Acesso externo
-      </a>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-(function() {
-  function gerarQR(url) {
-    const box = document.getElementById('qrDashboard');
-    box.innerHTML = '';
-    new QRCode(box, {
-      text: url + '/mobile',
-      width: 120, height: 120,
-      colorDark: '#000000', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
-    document.getElementById('qrUrlText').textContent = url + '/mobile';
-  }
-
-  // Try to get tunnel URL first
-  fetch('/api/tunnel/url')
-    .then(r=>r.json())
-    .then(d => {
-      const url = d.url || (window.location.protocol + '//' + window.location.host);
-      gerarQR(url);
-    })
-    .catch(() => {
-      gerarQR(window.location.protocol + '//' + window.location.host);
-    });
-
-  // Refresh every 30s in case tunnel URL changes
-  setInterval(() => {
-    fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
-      if (d.url) gerarQR(d.url);
-    }).catch(()=>{});
-  }, 30000);
-})();
-</script>
-
-
-{% endblock %}
-{% block page_title %}Dashboard
-<!-- Mobile App QR Code -->
-<div class="card mt-16" style="max-width:400px">
-  <div class="card-title">📱 App Mobile</div>
-  <div style="display:flex;gap:20px;align-items:center">
-    <div id="qrDashboard" style="flex-shrink:0;width:120px;height:120px;background:white;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">
-      A carregar...
-    </div>
-    <div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Aceder no telemóvel</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px" id="qrUrlText">
-        A detectar URL do servidor...
-      </div>
-      <a href="/mobile" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:inline-flex">
-        📱 Abrir app mobile
-      </a><br>
-      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="display:inline-flex">
-        🌐 Acesso externo
-      </a>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-(function() {
-  function gerarQR(url) {
-    const box = document.getElementById('qrDashboard');
-    box.innerHTML = '';
-    new QRCode(box, {
-      text: url + '/mobile',
-      width: 120, height: 120,
-      colorDark: '#000000', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
-    document.getElementById('qrUrlText').textContent = url + '/mobile';
-  }
-
-  // Try to get tunnel URL first
-  fetch('/api/tunnel/url')
-    .then(r=>r.json())
-    .then(d => {
-      const url = d.url || (window.location.protocol + '//' + window.location.host);
-      gerarQR(url);
-    })
-    .catch(() => {
-      gerarQR(window.location.protocol + '//' + window.location.host);
-    });
-
-  // Refresh every 30s in case tunnel URL changes
-  setInterval(() => {
-    fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
-      if (d.url) gerarQR(d.url);
-    }).catch(()=>{});
-  }, 30000);
-})();
-</script>
-
-
-{% endblock %}
+{% block title %}Dashboard · ComprasNet{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 {% block topbar_actions %}
-    <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary">+ Novo Pedido</a>
-
-<!-- Mobile App QR Code -->
-<div class="card mt-16" style="max-width:400px">
-  <div class="card-title">📱 App Mobile</div>
-  <div style="display:flex;gap:20px;align-items:center">
-    <div id="qrDashboard" style="flex-shrink:0;width:120px;height:120px;background:white;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">
-      A carregar...
-    </div>
-    <div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Aceder no telemóvel</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px" id="qrUrlText">
-        A detectar URL do servidor...
-      </div>
-      <a href="/mobile" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:inline-flex">
-        📱 Abrir app mobile
-      </a><br>
-      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="display:inline-flex">
-        🌐 Acesso externo
-      </a>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-(function() {
-  function gerarQR(url) {
-    const box = document.getElementById('qrDashboard');
-    box.innerHTML = '';
-    new QRCode(box, {
-      text: url + '/mobile',
-      width: 120, height: 120,
-      colorDark: '#000000', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
-    document.getElementById('qrUrlText').textContent = url + '/mobile';
-  }
-
-  // Try to get tunnel URL first
-  fetch('/api/tunnel/url')
-    .then(r=>r.json())
-    .then(d => {
-      const url = d.url || (window.location.protocol + '//' + window.location.host);
-      gerarQR(url);
-    })
-    .catch(() => {
-      gerarQR(window.location.protocol + '//' + window.location.host);
-    });
-
-  // Refresh every 30s in case tunnel URL changes
-  setInterval(() => {
-    fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
-      if (d.url) gerarQR(d.url);
-    }).catch(()=>{});
-  }, 30000);
-})();
-</script>
-
-
+  <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
+  <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
 {% endblock %}
 
 {% block content %}
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Total de Pedidos</div>
-        <div class="stat-value">{{ total_pedidos }}</div>
-        <div class="stat-icon">📋</div>
-    </div>
-    <div class="stat-card warning">
-        <div class="stat-label">Pedidos Abertos</div>
-        <div class="stat-value">{{ pedidos_abertos }}</div>
-        <div class="stat-icon">⏳</div>
-    </div>
-    <div class="stat-card success">
-        <div class="stat-label">Aprovados</div>
-        <div class="stat-value">{{ pedidos_aprovados }}</div>
-        <div class="stat-icon">✅</div>
-    </div>
-    <div class="stat-card info">
-        <div class="stat-label">Orçamentos Carregados</div>
-        <div class="stat-value">{{ total_orcamentos }}</div>
-        <div class="stat-icon">📄</div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="flex items-center justify-between mb-16">
-        <div class="card-title" style="margin-bottom:0">Pedidos Recentes</div>
-        <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">Ver todos →</a>
-    </div>
-    
-    {% if pedidos_recentes %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Título</th>
-                    <th>Departamento</th>
-                    <th>Prioridade</th>
-                    <th>Estado</th>
-                    <th>Orçamentos</th>
-                    <th>Criado em</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for p in pedidos_recentes %}
-            <tr>
-                <td class="mono text-muted">PC-{{ '%04d' % p.id }}</td>
-                <td>{{ p.titulo }}</td>
-                <td class="text-muted">{{ p.departamento or '—' }}</td>
-                <td>
-                    {% if p.prioridade == 'urgente' %}<span class="badge badge-red">🔴 Urgente</span>
-                    {% elif p.prioridade == 'alta' %}<span class="badge badge-yellow">🟡 Alta</span>
-                    {% elif p.prioridade == 'baixa' %}<span class="badge badge-gray">⚪ Baixa</span>
-                    {% else %}<span class="badge badge-blue">🔵 Normal</span>{% endif %}
-                </td>
-                <td>
-                    {% if p.estado == 'aberto' %}<span class="badge badge-blue">Aberto</span>
-                    {% elif p.estado == 'em_analise' %}<span class="badge badge-yellow">Em análise</span>
-                    {% elif p.estado == 'aprovado' %}<span class="badge badge-green">✓ Aprovado</span>
-                    {% elif p.estado == 'cancelado' %}<span class="badge badge-gray">Cancelado</span>{% endif %}
-                </td>
-                <td>
-                    {% set n = p.orcamentos|length %}
-                    <span class="mono">{{ n }}/3</span>
-                    <div class="progress-bar" style="width:80px">
-                        <div class="progress-fill" style="width:{{ (n/3*100)|int }}%"></div>
-                    </div>
-                </td>
-                <td class="text-muted">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td>
-                <td><a href="{{ url_for('pedido_detalhe', pid=p.id) }}" class="btn btn-ghost btn-sm">Ver →</a></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div style="text-align:center; padding: 48px; color: var(--text-muted);">
-        <div style="font-size:32px; margin-bottom:12px">📭</div>
-        <div>Ainda não existem pedidos de compra.</div>
-        <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary" style="margin-top:16px; display:inline-flex">+ Criar Primeiro Pedido</a>
-    </div>
-    {% endif %}
-</div>
-
-<!-- Mobile App QR Code -->
-<div class="card mt-16" style="max-width:400px">
-  <div class="card-title">📱 App Mobile</div>
-  <div style="display:flex;gap:20px;align-items:center">
-    <div id="qrDashboard" style="flex-shrink:0;width:120px;height:120px;background:white;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">
-      A carregar...
-    </div>
-    <div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Aceder no telemóvel</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px" id="qrUrlText">
-        A detectar URL do servidor...
-      </div>
-      <a href="/mobile" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:inline-flex">
-        📱 Abrir app mobile
-      </a><br>
-      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="display:inline-flex">
-        🌐 Acesso externo
-      </a>
-    </div>
+<div id="editBar" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+  <span style="font-size:13px;font-weight:600;color:var(--accent)">✏️ Modo de edição</span>
+  <span style="font-size:12px;color:var(--text-muted)">Arraste widgets para reposicionar · Redimensione pelo canto inferior direito</span>
+  <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--text-muted)">Adicionar widget:</span>
+    {% for wid, label in [('kpis','📊 KPIs'),('pedidos_recentes','📋 Pedidos'),('qr_mobile','📱 QR Mobile'),('stock_baixo','⚠️ Stock Baixo'),('acesso_externo','🌐 Acesso Externo'),('chat_rapido','🤖 Chat Rápido')] %}
+    <button onclick="adicionarWidget('{{ wid }}')" class="btn btn-ghost btn-sm" style="font-size:11px">+ {{ label }}</button>
+    {% endfor %}
   </div>
+  <button onclick="guardarLayout()" class="btn btn-primary btn-sm">💾 Guardar</button>
+  <button onclick="resetarLayout()" class="btn btn-ghost btn-sm">↺ Repor</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Widget grid -->
+<div id="widgetGrid" style="display:grid;grid-template-columns:repeat(12,1fr);gap:12px;align-items:start">
+  <!-- Widgets rendered by JS -->
+</div>
+
+<!-- Widget data (passed to JS) -->
 <script>
-(function() {
-  function gerarQR(url) {
-    const box = document.getElementById('qrDashboard');
-    box.innerHTML = '';
-    new QRCode(box, {
-      text: url + '/mobile',
-      width: 120, height: 120,
-      colorDark: '#000000', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
+const WIDGET_DATA = {
+  kpis: {
+    label: '📊 KPIs',
+    cols: 12, rows: 1,
+    html: `<div class="stats-grid" style="margin:0">
+      <div class="stat-card"><div class="stat-label">Total Pedidos</div><div class="stat-value">{{ total_pedidos }}</div><div class="stat-icon">📋</div></div>
+      <div class="stat-card warning"><div class="stat-label">Abertos</div><div class="stat-value">{{ pedidos_abertos }}</div><div class="stat-icon">⏳</div></div>
+      <div class="stat-card success"><div class="stat-label">Aprovados</div><div class="stat-value">{{ pedidos_aprovados }}</div><div class="stat-icon">✅</div></div>
+      <div class="stat-card info"><div class="stat-label">Orçamentos</div><div class="stat-value">{{ total_orcamentos }}</div><div class="stat-icon">📄</div></div>
+    </div>`
+  },
+  pedidos_recentes: {
+    label: '📋 Pedidos Recentes',
+    cols: 8, rows: 2,
+    html: `{% if pedidos_recentes %}
+      <div class="table-wrap" style="margin:0">
+        <table>
+          <thead><tr><th>Título</th><th>Estado</th><th>Data</th><th></th></tr></thead>
+          <tbody>
+          {% for p in pedidos_recentes %}
+          <tr>
+            <td style="font-size:13px">{{ p.titulo[:40] }}</td>
+            <td><span class="badge {% if p.estado=='aberto' %}badge-blue{% elif p.estado=='aprovado' %}badge-green{% else %}badge-yellow{% endif %}" style="font-size:10px">{{ p.estado }}</span></td>
+            <td style="font-size:12px;color:var(--text-muted)">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td>
+            <td><a href="/pedidos/{{ p.id }}" class="btn btn-ghost btn-sm">→</a></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem pedidos recentes</div>{% endif %}`
+  },
+  qr_mobile: {
+    label: '📱 QR Mobile',
+    cols: 4, rows: 2,
+    html: `<div style="text-align:center;padding:8px">
+      <div id="qrWidget" style="display:inline-block;background:white;padding:8px;border-radius:8px;margin-bottom:10px"></div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px" id="qrWidgetUrl">A carregar URL...</div>
+      <a href="/mobile" class="btn btn-ghost btn-sm" style="display:inline-flex;margin-bottom:6px;width:100%;justify-content:center">📱 Abrir app mobile</a>
+      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="display:inline-flex;width:100%;justify-content:center">🌐 Acesso externo</a>
+    </div>`
+  },
+  stock_baixo: {
+    label: '⚠️ Stock Baixo',
+    cols: 6, rows: 2,
+    html: `{% set artigos_baixo = artigos_stock_baixo or [] %}
+    {% if artigos_baixo %}
+    <div class="table-wrap" style="margin:0">
+      <table>
+        <thead><tr><th>Referência</th><th>Designação</th><th style="text-align:right">Stock</th></tr></thead>
+        <tbody>
+        {% for a in artigos_baixo %}
+        <tr>
+          <td class="mono" style="font-size:11px;color:var(--accent)"><a href="/stock/{{ a.referencia }}">{{ a.referencia }}</a></td>
+          <td style="font-size:12px">{{ (a.designacao or '')[:30] }}</td>
+          <td style="text-align:right;font-weight:700;color:{% if a.stock_atual<=0 %}var(--danger){% else %}var(--warning){% endif %};font-family:monospace">{{ '%.1f'|format(a.stock_atual) }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div style="text-align:center;padding:32px;color:var(--success)">✅ Sem artigos com stock baixo</div>{% endif %}`
+  },
+  acesso_externo: {
+    label: '🌐 Acesso Externo',
+    cols: 6, rows: 1,
+    html: `<div style="display:flex;align-items:center;gap:16px;padding:4px">
+      <div id="tunnelStatusWidget" style="font-size:13px;color:var(--text-muted)">A verificar tunnel...</div>
+      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="margin-left:auto">Ver detalhes →</a>
+    </div>`
+  },
+  chat_rapido: {
+    label: '🤖 Chat Rápido',
+    cols: 6, rows: 2,
+    html: `<div style="display:flex;flex-direction:column;height:100%;min-height:180px">
+      <div id="chatWidgetMsgs" style="flex:1;overflow-y:auto;font-size:12px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px;max-height:150px"></div>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="chatWidgetInput" placeholder="Pergunta rápida..." style="flex:1;font-size:12px"
+               onkeydown="if(event.key==='Enter')enviarChatWidget()">
+        <button onclick="enviarChatWidget()" class="btn btn-primary btn-sm" style="flex-shrink:0">↑</button>
+      </div>
+    </div>`
+  }
+};
+
+// Default layout
+const DEFAULT_LAYOUT = [
+  {id:'kpis', cols:12, row:0},
+  {id:'pedidos_recentes', cols:8, row:1},
+  {id:'qr_mobile', cols:4, row:1},
+  {id:'stock_baixo', cols:6, row:2},
+  {id:'acesso_externo', cols:6, row:2},
+];
+
+let currentLayout = [...DEFAULT_LAYOUT];
+let editMode = false;
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+function renderGrid() {
+  const grid = document.getElementById('widgetGrid');
+  grid.innerHTML = '';
+
+  currentLayout.forEach((item, idx) => {
+    const def = WIDGET_DATA[item.id];
+    if (!def) return;
+
+    const widget = document.createElement('div');
+    widget.className = 'widget-card';
+    widget.dataset.id = item.id;
+    widget.dataset.idx = idx;
+    widget.style.cssText = `
+      grid-column: span ${item.cols || def.cols};
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden; position: relative;
+      ${editMode ? 'resize:both;min-width:200px;min-height:100px;' : ''}
+    `;
+
+    widget.innerHTML = `
+      <div class="widget-header" style="display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:8px;
+           ${editMode ? 'cursor:move;background:var(--surface2)' : ''}">
+        <span style="font-size:13px;font-weight:600;flex:1">${def.label}</span>
+        ${editMode ? `
+          <select onchange="resizeWidget(${idx}, this.value)" style="font-size:11px;padding:2px 4px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px">
+            ${[2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}" ${(item.cols||def.cols)==n?'selected':''}>${n} col${n>1?'s':''}</option>`).join('')}
+          </select>
+          <button onclick="removerWidget(${idx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0 4px" title="Remover">✕</button>
+        ` : ''}
+      </div>
+      <div class="widget-body" style="padding:14px">${def.html}</div>
+    `;
+
+    if (editMode) {
+      widget.draggable = true;
+      widget.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('idx', idx);
+        widget.style.opacity = '0.5';
+      });
+      widget.addEventListener('dragend', () => widget.style.opacity = '1');
+      widget.addEventListener('dragover', e => e.preventDefault());
+      widget.addEventListener('drop', e => {
+        e.preventDefault();
+        const fromIdx = parseInt(e.dataTransfer.getData('idx'));
+        const toIdx = idx;
+        if (fromIdx !== toIdx) {
+          const moved = currentLayout.splice(fromIdx, 1)[0];
+          currentLayout.splice(toIdx, 0, moved);
+          renderGrid();
+        }
+      });
+    }
+
+    grid.appendChild(widget);
+  });
+
+  // Post-render: init QR, tunnel status, etc.
+  initWidgets();
+}
+
+function resizeWidget(idx, cols) {
+  currentLayout[idx].cols = parseInt(cols);
+  renderGrid();
+}
+
+function removerWidget(idx) {
+  currentLayout.splice(idx, 1);
+  renderGrid();
+}
+
+function adicionarWidget(id) {
+  if (currentLayout.find(w => w.id === id)) {
+    alert('Widget já existe no dashboard.'); return;
+  }
+  const def = WIDGET_DATA[id];
+  currentLayout.push({id, cols: def.cols});
+  renderGrid();
+}
+
+function toggleEdit() {
+  editMode = !editMode;
+  document.getElementById('btnEdit').textContent = editMode ? '✅ Terminar edição' : '✏️ Editar layout';
+  document.getElementById('editBar').style.display = editMode ? 'flex' : 'none';
+  renderGrid();
+}
+
+function guardarLayout() {
+  fetch('/api/dashboard/layout', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(currentLayout)
+  }).then(r=>r.json()).then(d => {
+    if (d.ok) {
+      const btn = document.getElementById('btnEdit');
+      const orig = btn.textContent;
+      btn.textContent = '✅ Guardado!';
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+  });
+}
+
+function resetarLayout() {
+  if (!confirm('Repor layout padrão?')) return;
+  currentLayout = [...DEFAULT_LAYOUT];
+  renderGrid();
+}
+
+// ── Widget init callbacks ─────────────────────────────────────────────────────
+
+function initWidgets() {
+  // QR code
+  const qrBox = document.getElementById('qrWidget');
+  if (qrBox && qrBox.children.length === 0) {
+    fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
+      const url = (d.url || window.location.origin) + '/mobile';
+      document.getElementById('qrWidgetUrl').textContent = url;
+      if (window.QRCode) {
+        new QRCode(qrBox, {text: url, width:100, height:100, colorDark:'#000', colorLight:'#fff'});
+      }
+    }).catch(() => {
+      const url = window.location.origin + '/mobile';
+      if (window.QRCode) new QRCode(qrBox, {text:url, width:100, height:100, colorDark:'#000', colorLight:'#fff'});
     });
-    document.getElementById('qrUrlText').textContent = url + '/mobile';
   }
 
-  // Try to get tunnel URL first
-  fetch('/api/tunnel/url')
-    .then(r=>r.json())
-    .then(d => {
-      const url = d.url || (window.location.protocol + '//' + window.location.host);
-      gerarQR(url);
-    })
-    .catch(() => {
-      gerarQR(window.location.protocol + '//' + window.location.host);
-    });
-
-  // Refresh every 30s in case tunnel URL changes
-  setInterval(() => {
+  // Tunnel status
+  const ts = document.getElementById('tunnelStatusWidget');
+  if (ts) {
     fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
-      if (d.url) gerarQR(d.url);
-    }).catch(()=>{});
-  }, 30000);
-})();
+      if (d.url) {
+        ts.innerHTML = `🟢 Tunnel activo<br><span style="font-family:monospace;font-size:11px;color:var(--accent)">${d.url}</span>`;
+      } else {
+        ts.innerHTML = `🔴 Tunnel inactivo — <a href="/acesso-externo" style="color:var(--accent)">Configurar</a>`;
+      }
+    });
+  }
+
+  // Chat widget
+  const chatInput = document.getElementById('chatWidgetInput');
+  if (chatInput) chatInput._msgs = [];
+}
+
+function enviarChatWidget() {
+  const input = document.getElementById('chatWidgetInput');
+  const msgs = document.getElementById('chatWidgetMsgs');
+  const txt = input.value.trim();
+  if (!txt) return;
+  input._msgs = input._msgs || [];
+  input._msgs.push({role:'user', content:txt});
+  msgs.insertAdjacentHTML('beforeend', `<div style="align-self:flex-end;background:var(--accent);color:#fff;border-radius:8px;padding:5px 10px;max-width:90%">${txt}</div>`);
+  msgs.scrollTop = msgs.scrollHeight;
+  input.value = '';
+
+  fetch('/api/chat', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({messages: input._msgs})
+  }).then(r=>r.json()).then(d => {
+    const text = d.ok ? d.text : '❌ ' + (d.error||'Erro');
+    if (d.ok) input._msgs.push({role:'assistant', content:d.text});
+    msgs.insertAdjacentHTML('beforeend', `<div style="background:var(--surface2);border-radius:8px;padding:5px 10px;max-width:90%;font-size:11px">${text.replace(/\n/g,'<br>')}</div>`);
+    msgs.scrollTop = msgs.scrollHeight;
+  });
+}
+
+// ── Load saved layout ─────────────────────────────────────────────────────────
+
+fetch('/api/dashboard/layout').then(r=>r.json()).then(saved => {
+  if (saved && saved.length > 0) currentLayout = saved;
+  renderGrid();
+}).catch(() => renderGrid());
+
 </script>
 
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 {% endblock %}
