@@ -318,3 +318,23 @@ class NotaArtigo(db.Model):
     criado_por  = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class EventoCalendario(db.Model):
+    """Calendar events — purchases, deliveries, manual."""
+    __tablename__ = 'eventos_calendario'
+    id              = db.Column(db.Integer, primary_key=True)
+    titulo          = db.Column(db.String(200), nullable=False)
+    tipo            = db.Column(db.String(30), default='manual')
+    # manual | compra | entrega_prevista | entrega_real | manutencao
+    data_inicio     = db.Column(db.Date, nullable=False)
+    data_fim        = db.Column(db.Date, nullable=True)
+    hora            = db.Column(db.String(5), nullable=True)   # "HH:MM"
+    descricao       = db.Column(db.Text)
+    artigos_json    = db.Column(db.Text, default='[]')  # [{ref, design, qtt}]
+    pedido_id       = db.Column(db.Integer, db.ForeignKey('pedidos_compra.id'), nullable=True)
+    fornecedor      = db.Column(db.String(200))
+    concluido       = db.Column(db.Boolean, default=False)
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)

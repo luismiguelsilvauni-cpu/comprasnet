@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
@@ -1805,6 +1805,145 @@ def save_dashboard_layout():
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════
+#  CALENDÁRIO
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/api/calendario/eventos')
+@login_required
+def api_calendario_eventos():
+    """Return events for a given month/range."""
+    ano  = request.args.get('ano',  type=int, default=datetime.utcnow().year)
+    mes  = request.args.get('mes',  type=int, default=datetime.utcnow().month)
+    from datetime import date
+    inicio = date(ano, mes, 1)
+    # Last day of month
+    import calendar as cal
+    ultimo = cal.monthrange(ano, mes)[1]
+    fim    = date(ano, mes, ultimo)
+
+    eventos = EventoCalendario.query.filter(
+        EventoCalendario.data_inicio >= inicio,
+        EventoCalendario.data_inicio <= fim
+    ).order_by(EventoCalendario.data_inicio).all()
+
+    return jsonify([{
+        'id':          e.id,
+        'titulo':      e.titulo,
+        'tipo':        e.tipo,
+        'data_inicio': e.data_inicio.strftime('%Y-%m-%d'),
+        'data_fim':    e.data_fim.strftime('%Y-%m-%d') if e.data_fim else None,
+        'hora':        e.hora,
+        'descricao':   e.descricao,
+        'artigos':     json.loads(e.artigos_json or '[]'),
+        'pedido_id':   e.pedido_id,
+        'fornecedor':  e.fornecedor,
+        'concluido':   e.concluido,
+        'criado_por':  e.criado_por,
+    } for e in eventos])
+
+
+@app.route('/api/calendario/eventos', methods=['POST'])
+@login_required
+def api_criar_evento():
+    data = request.get_json()
+    from datetime import date
+    def parse_date(s):
+        return datetime.strptime(s, '%Y-%m-%d').date() if s else None
+
+    e = EventoCalendario(
+        titulo       = data.get('titulo','').strip() or 'Sem título',
+        tipo         = data.get('tipo','manual'),
+        data_inicio  = parse_date(data.get('data_inicio')),
+        data_fim     = parse_date(data.get('data_fim')),
+        hora         = data.get('hora','').strip() or None,
+        descricao    = data.get('descricao','').strip(),
+        artigos_json = json.dumps(data.get('artigos',[])),
+        pedido_id    = data.get('pedido_id'),
+        fornecedor   = data.get('fornecedor','').strip(),
+        concluido    = data.get('concluido', False),
+        criado_por   = current_user.id,
+    )
+    db.session.add(e)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': e.id})
+
+
+@app.route('/api/calendario/eventos/<int:eid>', methods=['PUT'])
+@login_required
+def api_atualizar_evento(eid):
+    e    = EventoCalendario.query.get_or_404(eid)
+    data = request.get_json()
+    from datetime import date
+    def parse_date(s):
+        return datetime.strptime(s, '%Y-%m-%d').date() if s else None
+
+    if 'titulo'      in data: e.titulo       = data['titulo']
+    if 'tipo'        in data: e.tipo         = data['tipo']
+    if 'data_inicio' in data: e.data_inicio  = parse_date(data['data_inicio'])
+    if 'data_fim'    in data: e.data_fim     = parse_date(data['data_fim'])
+    if 'hora'        in data: e.hora         = data['hora'] or None
+    if 'descricao'   in data: e.descricao    = data['descricao']
+    if 'artigos'     in data: e.artigos_json = json.dumps(data['artigos'])
+    if 'fornecedor'  in data: e.fornecedor   = data['fornecedor']
+    if 'concluido'   in data: e.concluido    = data['concluido']
+    if 'pedido_id'   in data: e.pedido_id    = data['pedido_id']
+    e.atualizado_em = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/calendario/eventos/<int:eid>', methods=['DELETE'])
+@login_required
+def api_apagar_evento(eid):
+    e = EventoCalendario.query.get_or_404(eid)
+    db.session.delete(e)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/calendario/pedido/<int:pid>/criar_eventos', methods=['POST'])
+@login_required
+def api_criar_eventos_pedido(pid):
+    """Create purchase + delivery events from an approved pedido."""
+    pedido = PedidoCompra.query.get_or_404(pid)
+    data   = request.get_json()
+    from datetime import date, timedelta
+
+    artigos = [{'ref': l.artigo_ref, 'design': l.designacao, 'qtt': l.quantidade}
+               for l in pedido.linhas if l.artigo_ref]
+
+    data_compra = datetime.strptime(data.get('data_compra', datetime.utcnow().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
+    dias_entrega = int(data.get('dias_entrega', 7))
+    data_entrega = data_compra + timedelta(days=dias_entrega)
+    fornecedor   = data.get('fornecedor', '')
+
+    # Create compra event
+    e1 = EventoCalendario(
+        titulo       = f'Compra: PC-{pid:04d} — {pedido.titulo[:40]}',
+        tipo         = 'compra',
+        data_inicio  = data_compra,
+        artigos_json = json.dumps(artigos),
+        pedido_id    = pid,
+        fornecedor   = fornecedor,
+        criado_por   = current_user.id,
+    )
+    # Create delivery event
+    e2 = EventoCalendario(
+        titulo       = f'Entrega prevista: PC-{pid:04d} — {pedido.titulo[:30]}',
+        tipo         = 'entrega_prevista',
+        data_inicio  = data_entrega,
+        artigos_json = json.dumps(artigos),
+        pedido_id    = pid,
+        fornecedor   = fornecedor,
+        criado_por   = current_user.id,
+    )
+    db.session.add(e1); db.session.add(e2)
+    db.session.commit()
+    return jsonify({'ok': True, 'id_compra': e1.id, 'id_entrega': e2.id,
+                    'data_entrega': data_entrega.strftime('%Y-%m-%d')})
 
 
 def init_db():

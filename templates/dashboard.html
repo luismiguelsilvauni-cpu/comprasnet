@@ -1,9 +1,309 @@
 {% extends "base.html" %}
-{% block title %}Dashboard · ComprasNet{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block title %}Dashboard · ComprasNet
+<!-- Event Modal -->
+<div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-16">
+      <h3 id="evModalTitle" style="font-size:15px;font-weight:600">Novo Evento</h3>
+      <button onclick="fecharEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <input type="hidden" id="evId">
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Título *</label>
+        <input type="text" id="evTitulo" placeholder="Ex: Chegada de filtros">
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="evTipo">
+          <option value="manual">📌 Evento manual</option>
+          <option value="compra">🛒 Data de compra</option>
+          <option value="entrega_prevista">📦 Entrega prevista</option>
+          <option value="entrega_real">✅ Entrega confirmada</option>
+          <option value="manutencao">🔧 Manutenção</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Data *</label>
+        <input type="date" id="evDataInicio">
+      </div>
+      <div class="form-group">
+        <label>Data fim (opcional)</label>
+        <input type="date" id="evDataFim">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Hora (opcional)</label>
+        <input type="time" id="evHora">
+      </div>
+      <div class="form-group">
+        <label>Fornecedor</label>
+        <input type="text" id="evFornecedor" placeholder="Nome do fornecedor">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Artigos (opcional)</label>
+      <input type="text" id="evArtigos" placeholder="Referências separadas por vírgula">
+    </div>
+    <div class="form-group">
+      <label>Descrição / Notas</label>
+      <textarea id="evDescricao" rows="2" placeholder="Informação adicional..."></textarea>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="evConcluido" style="width:auto">
+        Marcar como concluído
+      </label>
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button id="evBtnApagar" onclick="apagarEvento()" class="btn btn-ghost btn-sm" style="color:var(--danger);display:none">🗑️ Apagar</button>
+      <button onclick="fecharEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarEvento()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pedido → Events Modal -->
+<div id="pedidoEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:460px;max-width:95vw">
+    <div class="flex items-center justify-between mb-16">
+      <h3 style="font-size:15px;font-weight:600">📋 Criar eventos a partir de pedido</h3>
+      <button onclick="fecharPedidoEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div class="form-group">
+      <label>Nº do Pedido (PC-XXXX)</label>
+      <input type="number" id="pedEvPid" placeholder="Ex: 42" min="1">
+    </div>
+    <div class="form-group">
+      <label>Data de compra *</label>
+      <input type="date" id="pedEvDataCompra">
+    </div>
+    <div class="form-group">
+      <label>Prazo de entrega (dias)</label>
+      <input type="number" id="pedEvDias" value="7" min="1" max="365">
+    </div>
+    <div class="form-group">
+      <label>Fornecedor</label>
+      <input type="text" id="pedEvFornecedor" placeholder="Nome do fornecedor">
+    </div>
+    <div style="padding:10px 14px;background:rgba(59,110,240,.08);border-radius:6px;font-size:12px;color:var(--text-muted);margin-bottom:16px">
+      💡 Cria automaticamente dois eventos no calendário: <strong>Data de compra</strong> e <strong>Entrega prevista</strong> com todos os artigos do pedido.
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button onclick="fecharPedidoEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="criarEventosPedido()" class="btn btn-primary">📅 Criar Eventos</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block page_title %}Dashboard
+<!-- Event Modal -->
+<div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-16">
+      <h3 id="evModalTitle" style="font-size:15px;font-weight:600">Novo Evento</h3>
+      <button onclick="fecharEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <input type="hidden" id="evId">
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Título *</label>
+        <input type="text" id="evTitulo" placeholder="Ex: Chegada de filtros">
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="evTipo">
+          <option value="manual">📌 Evento manual</option>
+          <option value="compra">🛒 Data de compra</option>
+          <option value="entrega_prevista">📦 Entrega prevista</option>
+          <option value="entrega_real">✅ Entrega confirmada</option>
+          <option value="manutencao">🔧 Manutenção</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Data *</label>
+        <input type="date" id="evDataInicio">
+      </div>
+      <div class="form-group">
+        <label>Data fim (opcional)</label>
+        <input type="date" id="evDataFim">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Hora (opcional)</label>
+        <input type="time" id="evHora">
+      </div>
+      <div class="form-group">
+        <label>Fornecedor</label>
+        <input type="text" id="evFornecedor" placeholder="Nome do fornecedor">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Artigos (opcional)</label>
+      <input type="text" id="evArtigos" placeholder="Referências separadas por vírgula">
+    </div>
+    <div class="form-group">
+      <label>Descrição / Notas</label>
+      <textarea id="evDescricao" rows="2" placeholder="Informação adicional..."></textarea>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="evConcluido" style="width:auto">
+        Marcar como concluído
+      </label>
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button id="evBtnApagar" onclick="apagarEvento()" class="btn btn-ghost btn-sm" style="color:var(--danger);display:none">🗑️ Apagar</button>
+      <button onclick="fecharEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarEvento()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pedido → Events Modal -->
+<div id="pedidoEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:460px;max-width:95vw">
+    <div class="flex items-center justify-between mb-16">
+      <h3 style="font-size:15px;font-weight:600">📋 Criar eventos a partir de pedido</h3>
+      <button onclick="fecharPedidoEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div class="form-group">
+      <label>Nº do Pedido (PC-XXXX)</label>
+      <input type="number" id="pedEvPid" placeholder="Ex: 42" min="1">
+    </div>
+    <div class="form-group">
+      <label>Data de compra *</label>
+      <input type="date" id="pedEvDataCompra">
+    </div>
+    <div class="form-group">
+      <label>Prazo de entrega (dias)</label>
+      <input type="number" id="pedEvDias" value="7" min="1" max="365">
+    </div>
+    <div class="form-group">
+      <label>Fornecedor</label>
+      <input type="text" id="pedEvFornecedor" placeholder="Nome do fornecedor">
+    </div>
+    <div style="padding:10px 14px;background:rgba(59,110,240,.08);border-radius:6px;font-size:12px;color:var(--text-muted);margin-bottom:16px">
+      💡 Cria automaticamente dois eventos no calendário: <strong>Data de compra</strong> e <strong>Entrega prevista</strong> com todos os artigos do pedido.
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button onclick="fecharPedidoEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="criarEventosPedido()" class="btn btn-primary">📅 Criar Eventos</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
 {% block topbar_actions %}
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
   <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
+
+<!-- Event Modal -->
+<div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-16">
+      <h3 id="evModalTitle" style="font-size:15px;font-weight:600">Novo Evento</h3>
+      <button onclick="fecharEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <input type="hidden" id="evId">
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Título *</label>
+        <input type="text" id="evTitulo" placeholder="Ex: Chegada de filtros">
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="evTipo">
+          <option value="manual">📌 Evento manual</option>
+          <option value="compra">🛒 Data de compra</option>
+          <option value="entrega_prevista">📦 Entrega prevista</option>
+          <option value="entrega_real">✅ Entrega confirmada</option>
+          <option value="manutencao">🔧 Manutenção</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Data *</label>
+        <input type="date" id="evDataInicio">
+      </div>
+      <div class="form-group">
+        <label>Data fim (opcional)</label>
+        <input type="date" id="evDataFim">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Hora (opcional)</label>
+        <input type="time" id="evHora">
+      </div>
+      <div class="form-group">
+        <label>Fornecedor</label>
+        <input type="text" id="evFornecedor" placeholder="Nome do fornecedor">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Artigos (opcional)</label>
+      <input type="text" id="evArtigos" placeholder="Referências separadas por vírgula">
+    </div>
+    <div class="form-group">
+      <label>Descrição / Notas</label>
+      <textarea id="evDescricao" rows="2" placeholder="Informação adicional..."></textarea>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="evConcluido" style="width:auto">
+        Marcar como concluído
+      </label>
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button id="evBtnApagar" onclick="apagarEvento()" class="btn btn-ghost btn-sm" style="color:var(--danger);display:none">🗑️ Apagar</button>
+      <button onclick="fecharEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarEvento()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pedido → Events Modal -->
+<div id="pedidoEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:460px;max-width:95vw">
+    <div class="flex items-center justify-between mb-16">
+      <h3 style="font-size:15px;font-weight:600">📋 Criar eventos a partir de pedido</h3>
+      <button onclick="fecharPedidoEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div class="form-group">
+      <label>Nº do Pedido (PC-XXXX)</label>
+      <input type="number" id="pedEvPid" placeholder="Ex: 42" min="1">
+    </div>
+    <div class="form-group">
+      <label>Data de compra *</label>
+      <input type="date" id="pedEvDataCompra">
+    </div>
+    <div class="form-group">
+      <label>Prazo de entrega (dias)</label>
+      <input type="number" id="pedEvDias" value="7" min="1" max="365">
+    </div>
+    <div class="form-group">
+      <label>Fornecedor</label>
+      <input type="text" id="pedEvFornecedor" placeholder="Nome do fornecedor">
+    </div>
+    <div style="padding:10px 14px;background:rgba(59,110,240,.08);border-radius:6px;font-size:12px;color:var(--text-muted);margin-bottom:16px">
+      💡 Cria automaticamente dois eventos no calendário: <strong>Data de compra</strong> e <strong>Entrega prevista</strong> com todos os artigos do pedido.
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button onclick="fecharPedidoEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="criarEventosPedido()" class="btn btn-primary">📅 Criar Eventos</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block content %}
@@ -98,6 +398,28 @@ const WIDGET_DATA = {
       <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="margin-left:auto">Ver detalhes →</a>
     </div>`
   },
+  calendario: {
+    label: '📅 Calendário',
+    cols: 12, rows: 3,
+    html: `<div id="calWidget">
+      <!-- Calendar header -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <button onclick="calNav(-1)" class="btn btn-ghost btn-sm">‹</button>
+        <div id="calTitulo" style="font-size:15px;font-weight:700;flex:1;text-align:center"></div>
+        <button onclick="calNav(1)" class="btn btn-ghost btn-sm">›</button>
+        <button onclick="abrirNovoEvento()" class="btn btn-primary btn-sm">+ Evento</button>
+        <button onclick="abrirEventoPedido()" class="btn btn-ghost btn-sm" title="Criar eventos de compra a partir de pedido">📋 Pedido</button>
+      </div>
+      <!-- Day headers -->
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+        ${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>
+          \`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px">\${d}</div>\`
+        ).join('')}
+      </div>
+      <!-- Calendar grid -->
+      <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
+    </div>`
+  },
   chat_rapido: {
     label: '🤖 Chat Rápido',
     cols: 6, rows: 2,
@@ -119,6 +441,7 @@ const DEFAULT_LAYOUT = [
   {id:'qr_mobile', cols:4, row:1},
   {id:'stock_baixo', cols:6, row:2},
   {id:'acesso_externo', cols:6, row:2},
+  {id:'calendario', cols:12, row:3},
 ];
 
 let currentLayout = [...DEFAULT_LAYOUT];
@@ -290,6 +613,195 @@ function enviarChatWidget() {
   });
 }
 
+
+// ── Calendar Widget ────────────────────────────────────────────────────────────
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth() + 1;
+let calEventos = [];
+
+const TIPO_CORES = {
+  compra:           { bg:'rgba(59,110,240,.2)',  border:'#3b6ef0',  label:'Compra'           },
+  entrega_prevista: { bg:'rgba(245,158,11,.2)',  border:'#f59e0b',  label:'Entrega prevista'  },
+  entrega_real:     { bg:'rgba(34,197,94,.2)',   border:'#22c55e',  label:'Entrega confirmada'},
+  manutencao:       { bg:'rgba(239,68,68,.2)',   border:'#ef4444',  label:'Manutenção'        },
+  manual:           { bg:'rgba(148,163,184,.15)',border:'#94a3b8',  label:'Evento'            },
+};
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 12) { calMonth = 1;  calYear++; }
+  if (calMonth < 1)  { calMonth = 12; calYear--; }
+  carregarCalendario();
+}
+
+function carregarCalendario() {
+  const grid  = document.getElementById('calGrid');
+  const titulo = document.getElementById('calTitulo');
+  if (!grid) return;
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  if (titulo) titulo.textContent = meses[calMonth-1] + ' ' + calYear;
+
+  fetch(`/api/calendario/eventos?ano=${calYear}&mes=${calMonth}`)
+    .then(r=>r.json()).then(eventos => {
+      calEventos = eventos;
+      renderCalendario(eventos);
+    }).catch(() => renderCalendario([]));
+}
+
+function renderCalendario(eventos) {
+  const grid = document.getElementById('calGrid');
+  if (!grid) return;
+
+  const firstDay = new Date(calYear, calMonth-1, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+  const today = new Date().toISOString().split('T')[0];
+
+  // Group events by date
+  const byDate = {};
+  eventos.forEach(e => {
+    if (!byDate[e.data_inicio]) byDate[e.data_inicio] = [];
+    byDate[e.data_inicio].push(e);
+  });
+
+  grid.innerHTML = '';
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    grid.insertAdjacentHTML('beforeend', '<div style="min-height:60px"></div>');
+  }
+
+  // Days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = dateStr === today;
+    const dayEvents = byDate[dateStr] || [];
+
+    const cell = document.createElement('div');
+    cell.style.cssText = `min-height:60px;background:${isToday?'rgba(59,110,240,.1)':'var(--surface2)'};
+      border-radius:6px;padding:4px;border:1px solid ${isToday?'var(--accent)':'var(--border)'};
+      cursor:pointer;transition:border-color .15s`;
+    cell.onmouseover = () => cell.style.borderColor = 'var(--accent)';
+    cell.onmouseout  = () => cell.style.borderColor = isToday ? 'var(--accent)' : 'var(--border)';
+    cell.onclick = () => abrirNovoEvento(dateStr);
+
+    cell.innerHTML = `<div style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text-muted)'};margin-bottom:3px">${d}</div>`;
+
+    dayEvents.forEach(e => {
+      const cor = TIPO_CORES[e.tipo] || TIPO_CORES.manual;
+      const tag = document.createElement('div');
+      tag.style.cssText = `background:${cor.bg};border-left:2px solid ${cor.border};
+        border-radius:3px;padding:2px 5px;font-size:10px;margin-bottom:2px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
+        ${e.concluido?'opacity:.5;text-decoration:line-through':''}`;
+      tag.textContent = e.titulo;
+      tag.title = e.titulo + (e.fornecedor ? ' — ' + e.fornecedor : '');
+      tag.onclick = ev => { ev.stopPropagation(); abrirDetalheEvento(e); };
+      cell.appendChild(tag);
+    });
+
+    grid.appendChild(cell);
+  }
+}
+
+// ── Event modal ───────────────────────────────────────────────────────────────
+
+function abrirNovoEvento(date='') {
+  const today = date || new Date().toISOString().split('T')[0];
+  document.getElementById('evModalTitle').textContent = 'Novo Evento';
+  document.getElementById('evId').value       = '';
+  document.getElementById('evTitulo').value   = '';
+  document.getElementById('evTipo').value     = 'manual';
+  document.getElementById('evDataInicio').value = today;
+  document.getElementById('evDataFim').value  = '';
+  document.getElementById('evHora').value     = '';
+  document.getElementById('evDescricao').value= '';
+  document.getElementById('evFornecedor').value='';
+  document.getElementById('evArtigos').value  = '';
+  document.getElementById('evConcluido').checked = false;
+  document.getElementById('evModal').style.display = 'flex';
+  document.getElementById('evBtnApagar').style.display = 'none';
+}
+
+function abrirDetalheEvento(e) {
+  document.getElementById('evModalTitle').textContent = 'Editar Evento';
+  document.getElementById('evId').value       = e.id;
+  document.getElementById('evTitulo').value   = e.titulo;
+  document.getElementById('evTipo').value     = e.tipo;
+  document.getElementById('evDataInicio').value = e.data_inicio;
+  document.getElementById('evDataFim').value  = e.data_fim || '';
+  document.getElementById('evHora').value     = e.hora || '';
+  document.getElementById('evDescricao').value= e.descricao || '';
+  document.getElementById('evFornecedor').value= e.fornecedor || '';
+  document.getElementById('evArtigos').value  = (e.artigos||[]).map(a=>a.ref||a.design).join(', ');
+  document.getElementById('evConcluido').checked = e.concluido || false;
+  document.getElementById('evBtnApagar').style.display = 'inline-flex';
+  document.getElementById('evModal').style.display = 'flex';
+}
+
+function fecharEvModal() {
+  document.getElementById('evModal').style.display = 'none';
+}
+
+function guardarEvento() {
+  const id    = document.getElementById('evId').value;
+  const dados = {
+    titulo:      document.getElementById('evTitulo').value.trim() || 'Sem título',
+    tipo:        document.getElementById('evTipo').value,
+    data_inicio: document.getElementById('evDataInicio').value,
+    data_fim:    document.getElementById('evDataFim').value || null,
+    hora:        document.getElementById('evHora').value || null,
+    descricao:   document.getElementById('evDescricao').value,
+    fornecedor:  document.getElementById('evFornecedor').value,
+    concluido:   document.getElementById('evConcluido').checked,
+    artigos:     [],
+  };
+  const url    = id ? `/api/calendario/eventos/${id}` : '/api/calendario/eventos';
+  const method = id ? 'PUT' : 'POST';
+  fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados)})
+    .then(r=>r.json()).then(d=>{ if(d.ok){ fecharEvModal(); carregarCalendario(); }});
+}
+
+function apagarEvento() {
+  const id = document.getElementById('evId').value;
+  if (!id || !confirm('Apagar este evento?')) return;
+  fetch(`/api/calendario/eventos/${id}`, {method:'DELETE'})
+    .then(r=>r.json()).then(d=>{ if(d.ok){ fecharEvModal(); carregarCalendario(); }});
+}
+
+// ── Pedido → Events modal ─────────────────────────────────────────────────────
+
+function abrirEventoPedido() {
+  document.getElementById('pedidoEvModal').style.display = 'flex';
+}
+function fecharPedidoEvModal() {
+  document.getElementById('pedidoEvModal').style.display = 'none';
+}
+function criarEventosPedido() {
+  const pid   = document.getElementById('pedEvPid').value.trim();
+  const dc    = document.getElementById('pedEvDataCompra').value;
+  const dias  = document.getElementById('pedEvDias').value;
+  const forn  = document.getElementById('pedEvFornecedor').value;
+  if (!pid || !dc) { alert('Preencha o nº do pedido e a data de compra.'); return; }
+  fetch(`/api/calendario/pedido/${pid}/criar_eventos`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({data_compra:dc, dias_entrega:dias, fornecedor:forn})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok){
+      fecharPedidoEvModal();
+      carregarCalendario();
+      alert(`✅ Eventos criados!\nData de compra: ${dc}\nEntrega prevista: ${d.data_entrega}`);
+    } else alert('Erro: ' + (d.error||'desconhecido'));
+  });
+}
+
+// Init calendar when widget is rendered
+const _origInitWidgets = initWidgets;
+initWidgets = function() {
+  _origInitWidgets();
+  if (document.getElementById('calGrid')) carregarCalendario();
+};
+
 // ── Load saved layout ─────────────────────────────────────────────────────────
 
 fetch('/api/dashboard/layout').then(r=>r.json()).then(saved => {
@@ -300,4 +812,104 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved => {
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<!-- Event Modal -->
+<div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-16">
+      <h3 id="evModalTitle" style="font-size:15px;font-weight:600">Novo Evento</h3>
+      <button onclick="fecharEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <input type="hidden" id="evId">
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Título *</label>
+        <input type="text" id="evTitulo" placeholder="Ex: Chegada de filtros">
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="evTipo">
+          <option value="manual">📌 Evento manual</option>
+          <option value="compra">🛒 Data de compra</option>
+          <option value="entrega_prevista">📦 Entrega prevista</option>
+          <option value="entrega_real">✅ Entrega confirmada</option>
+          <option value="manutencao">🔧 Manutenção</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Data *</label>
+        <input type="date" id="evDataInicio">
+      </div>
+      <div class="form-group">
+        <label>Data fim (opcional)</label>
+        <input type="date" id="evDataFim">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Hora (opcional)</label>
+        <input type="time" id="evHora">
+      </div>
+      <div class="form-group">
+        <label>Fornecedor</label>
+        <input type="text" id="evFornecedor" placeholder="Nome do fornecedor">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Artigos (opcional)</label>
+      <input type="text" id="evArtigos" placeholder="Referências separadas por vírgula">
+    </div>
+    <div class="form-group">
+      <label>Descrição / Notas</label>
+      <textarea id="evDescricao" rows="2" placeholder="Informação adicional..."></textarea>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="evConcluido" style="width:auto">
+        Marcar como concluído
+      </label>
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button id="evBtnApagar" onclick="apagarEvento()" class="btn btn-ghost btn-sm" style="color:var(--danger);display:none">🗑️ Apagar</button>
+      <button onclick="fecharEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarEvento()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pedido → Events Modal -->
+<div id="pedidoEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:460px;max-width:95vw">
+    <div class="flex items-center justify-between mb-16">
+      <h3 style="font-size:15px;font-weight:600">📋 Criar eventos a partir de pedido</h3>
+      <button onclick="fecharPedidoEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div class="form-group">
+      <label>Nº do Pedido (PC-XXXX)</label>
+      <input type="number" id="pedEvPid" placeholder="Ex: 42" min="1">
+    </div>
+    <div class="form-group">
+      <label>Data de compra *</label>
+      <input type="date" id="pedEvDataCompra">
+    </div>
+    <div class="form-group">
+      <label>Prazo de entrega (dias)</label>
+      <input type="number" id="pedEvDias" value="7" min="1" max="365">
+    </div>
+    <div class="form-group">
+      <label>Fornecedor</label>
+      <input type="text" id="pedEvFornecedor" placeholder="Nome do fornecedor">
+    </div>
+    <div style="padding:10px 14px;background:rgba(59,110,240,.08);border-radius:6px;font-size:12px;color:var(--text-muted);margin-bottom:16px">
+      💡 Cria automaticamente dois eventos no calendário: <strong>Data de compra</strong> e <strong>Entrega prevista</strong> com todos os artigos do pedido.
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end">
+      <button onclick="fecharPedidoEvModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="criarEventosPedido()" class="btn btn-primary">📅 Criar Eventos</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
