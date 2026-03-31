@@ -12,9 +12,9 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --accent: {{ cfg_geral.cor_accent if cfg_geral else '#3b6ef0' }};
-            --bg:     {{ cfg_geral.cor_bg if cfg_geral else '#0f1117' }};
-            --surface:{{ cfg_geral.cor_surface if cfg_geral else '#171b25' }};
+            --accent:  {{ cfg_geral.cor_accent if cfg_geral and cfg_geral.cor_accent else '#3b6ef0' }};
+            --bg:      {{ cfg_geral.cor_bg if cfg_geral and cfg_geral.cor_bg else '#0f1117' }};
+            --surface: {{ cfg_geral.cor_surface if cfg_geral and cfg_geral.cor_surface else '#171b25' }};
             --bg: #0f1117;
             --surface: #171b25;
             --surface2: #1e2330;
@@ -240,7 +240,11 @@
 <nav class="sidebar">
     <div class="sidebar-logo">
         <div class="logo-icon">📦</div>
-        <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
+        {% if cfg_geral and cfg_geral.empresa_logo_path %}
+            <img src="/uploads/{{ cfg_geral.empresa_logo_path }}" style="height:32px;object-fit:contain;max-width:120px">
+            {% else %}
+            <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
+            {% endif %}
         <div class="app-sub">v1.0 · PHC Integration</div>
     </div>
     <div class="sidebar-nav">
@@ -300,10 +304,10 @@
             <span class="icon">💬</span><span>Chat Claude</span>
         </a>
         <a href="{{ url_for('admin_update') }}" class="nav-item {% if request.endpoint == 'admin_update' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">⬆️</span><span>Actualizações</span>
+            <span class="icon">⬆️</span><span>Actualizar Software</span>
         </a>
         <a href="{{ url_for('changelog') }}" class="nav-item {% if request.endpoint == 'changelog' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">📋</span><span>Actualizações</span>
+            <span class="icon">📋</span><span>Histórico Versões</span>
         </a>
         <a href="{{ url_for('logout') }}" class="logout-btn">
             <span>⎋</span><span>Sair</span>

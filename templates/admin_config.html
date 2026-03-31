@@ -9,7 +9,7 @@
 <!-- Company info -->
 <div class="card mb-16">
   <div class="card-title">🏢 Empresa</div>
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
     <input type="hidden" name="action" value="save">
     <div class="grid-2">
       <div class="form-group">
@@ -201,10 +201,38 @@ function aplicarTema(accent, bg, surface) {
   document.documentElement.style.setProperty('--accent', accent);
   document.documentElement.style.setProperty('--bg', bg);
   document.documentElement.style.setProperty('--surface', surface);
+  document.documentElement.style.setProperty('--surface2', bg === '#0f1117' ? '#1e2330' : surface);
   document.getElementById('accentHex').value = accent;
+  // Update all hex displays
+  document.querySelectorAll('[name=cor_bg] + input, [name=cor_surface] + input').forEach(el => {
+    if (el.previousElementSibling.name === 'cor_bg') el.value = bg;
+    if (el.previousElementSibling.name === 'cor_surface') el.value = surface;
+  });
 }
-document.querySelector('[name=cor_accent]').addEventListener('input', function() {
-  document.getElementById('accentHex').value = this.value;
+// Live preview as colour pickers change
+document.querySelectorAll('[name=cor_accent],[name=cor_bg],[name=cor_surface]').forEach(el => {
+  el.addEventListener('input', function() {
+    const varMap = {'cor_accent':'--accent','cor_bg':'--bg','cor_surface':'--surface'};
+    document.documentElement.style.setProperty(varMap[this.name], this.value);
+    if (this.name === 'cor_accent') document.getElementById('accentHex').value = this.value;
+  });
+});
+// Logo preview
+document.querySelector('[name=logo]')?.addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let prev = document.getElementById('logoPreview');
+    if (!prev) {
+      prev = document.createElement('img');
+      prev.id = 'logoPreview';
+      prev.style.cssText = 'max-width:200px;margin-top:8px;border-radius:6px;display:block';
+      this.parentElement.appendChild(prev);
+    }
+    prev.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 });
 </script>
 {% endblock %}

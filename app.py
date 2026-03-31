@@ -1396,11 +1396,19 @@ def update_apply():
     except Exception as e:
         steps.append({'passo': 'Backup', 'ok': False, 'msg': str(e)})
 
-    # 2. Git pull
-    ok, out = run(['git', 'pull', 'origin', 'main'])
-    steps.append({'passo': 'Download actualizações (git pull)', 'ok': ok, 'msg': out[:200]})
+    # 2. Git fetch
+    ok, out = run(['git', 'fetch', 'origin', 'main'])
+    steps.append({'passo': 'Verificar actualizações (git fetch)', 'ok': ok, 'msg': 'OK' if ok else out[:200]})
+
+    # Force checkout all tracked files from origin/main (no merge conflicts)
+    ok, out = run(['git', 'checkout', 'origin/main', '--', '.'])
+    steps.append({'passo': 'Aplicar ficheiros actualizados', 'ok': ok, 'msg': 'OK' if ok else out[:200]})
     if not ok:
-        return jsonify({'ok': False, 'steps': steps, 'msg': 'Falhou no git pull'})
+        # Fallback: try pull with unrelated histories
+        ok, out = run(['git', 'pull', 'origin', 'main', '--allow-unrelated-histories'])
+        steps.append({'passo': 'Download (fallback pull)', 'ok': ok, 'msg': out[:200]})
+        if not ok:
+            return jsonify({'ok': False, 'steps': steps, 'msg': 'Falhou na actualização'})
 
     # 3. pip install
     import sys
@@ -1436,33 +1444,32 @@ def set_tunnel_url(url: str):
     _tunnel_url = url
 
 def detect_tunnel_url() -> str | None:
-    """Try to get tunnel URL from cloudflared metrics endpoint."""
+    """Try to detect active Cloudflare Tunnel URL from cloudflared process."""
     global _tunnel_url
     if _tunnel_url:
         return _tunnel_url
     try:
-        import urllib.request
-        # cloudflared exposes metrics on port 20241
-        with urllib.request.urlopen('http://localhost:20241/metrics', timeout=2) as r:
-            text = r.read().decode()
-        # Look for tunnel URL in metrics
-        import re
-        match = re.search(r'tunnel_id="([^"]+)"', text)
-        if match:
-            # Try to get the hostname from cloudflared API
-            with urllib.request.urlopen('http://localhost:20241/', timeout=2) as r2:
-                pass
-    except Exception:
-        pass
-
-    # Try reading from cloudflared log output if saved
-    try:
         import subprocess, re
-        result = subprocess.run(
-            ['powershell', '-Command',
-             'Get-NetTCPConnection -LocalPort 20241 -ErrorAction SilentlyContinue'],
-            capture_output=True, text=True, timeout=3
-        )
+        # Try to read cloudflared log from temp file if arrancar_externo.bat writes it
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tunnel.log')
+        if os.path.exists(log_path):
+            with open(log_path, 'r', errors='ignore') as f:
+                content = f.read()
+            match = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com', content)
+            if match:
+                _tunnel_url = match.group(0)
+                return _tunnel_url
+        # Try cloudflared metrics API
+        import urllib.request
+        with urllib.request.urlopen('http://localhost:20241/metrics', timeout=2) as r:
+            metrics = r.read().decode()
+        # Parse hostname from metrics
+        match = re.search(r'cloudflared_tunnel_user_hostnames_counts\{[^}]*hostname="([^"]+)"', metrics)
+        if match:
+            hostname = match.group(1)
+            if hostname and '.' in hostname:
+                _tunnel_url = f'https://{hostname}'
+                return _tunnel_url
     except Exception:
         pass
     return _tunnel_url
