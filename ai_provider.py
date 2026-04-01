@@ -81,7 +81,7 @@ def _get_best_gemini_model(api_key: str) -> str:
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
         req = urllib.request.Request(url, method="GET")
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read())
         models = []
         for m in data.get('models', []):
@@ -102,7 +102,7 @@ def _get_best_gemini_model(api_key: str) -> str:
             payload = json.dumps({"contents": [{"parts": [{"text": "hi"}]}]}).encode()
             req = urllib.request.Request(url, data=payload,
                 headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=20) as resp:
                 json.loads(resp.read())
             return model
         except urllib.error.HTTPError as e:
@@ -258,7 +258,7 @@ def test_provider(cfg) -> tuple:
             payload = json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode()
             req = urllib.request.Request(url, data=payload,
                 headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read())
             if data.get("candidates"):
                 return True, f"✅ Gemini API OK! Modelo activo: {model} (gratuito)"

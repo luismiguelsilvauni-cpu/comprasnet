@@ -95,8 +95,15 @@
     <div id="claudeConfig" style="{% if cfg.provider != 'claude' %}display:none{% endif %}">
       <div class="form-group">
         <label>Chave API Anthropic</label>
-        <input type="password" name="claude_api_key"
-               placeholder="{% if cfg.claude_api_key %}••••••••••••••••{% else %}sk-ant-api03-...{% endif %}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="password" name="claude_api_key" style="flex:1"
+                 placeholder="{% if cfg.claude_api_key %}Chave guardada — deixe em branco para manter{% else %}sk-ant-api03-...{% endif %}">
+          {% if cfg.claude_api_key %}
+          <span title="Chave API guardada" style="color:var(--success);font-size:18px;flex-shrink:0">✅</span>
+          {% else %}
+          <span title="Sem chave API guardada" style="color:var(--danger);font-size:18px;flex-shrink:0">❌</span>
+          {% endif %}
+        </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
           Obtenha em <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a>
         </div>
@@ -107,8 +114,15 @@
     <div id="geminiConfig" style="{% if cfg.provider != 'gemini' %}display:none{% endif %}">
       <div class="form-group">
         <label>Chave API Google Gemini</label>
-        <input type="password" name="gemini_api_key"
-               placeholder="{% if cfg.gemini_api_key %}••••••••••••••••{% else %}AIzaSy...{% endif %}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="password" name="gemini_api_key" style="flex:1"
+                 placeholder="{% if cfg.gemini_api_key %}Chave guardada — deixe em branco para manter{% else %}AIzaSy...{% endif %}">
+          {% if cfg.gemini_api_key %}
+          <span title="Chave API guardada" style="color:var(--success);font-size:18px;flex-shrink:0">✅</span>
+          {% else %}
+          <span title="Sem chave API guardada" style="color:var(--danger);font-size:18px;flex-shrink:0">❌</span>
+          {% endif %}
+        </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
           Obtenha <strong style="color:var(--success)">gratuitamente</strong> em
           <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com</a>
