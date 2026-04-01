@@ -1371,10 +1371,12 @@ def api_chat():
         # Friendlier error messages
         if 'Connection refused' in err or 'recusou' in err.lower():
             prov = cfg_ia.provider if cfg_ia else 'local'
-            return jsonify({'error': f'Não foi possível ligar ao servidor {prov.upper()}. Verifique se está a correr em {cfg_ia.lm_host}:{cfg_ia.lm_port}.'}), 500
-        if 'API_KEY_INVALID' in err or 'invalid' in err.lower():
-            return jsonify({'error': 'Chave API inválida. Verifique em Admin → Provedor IA.'}), 500
-        return jsonify({'error': err}), 500
+            msg = f'Não foi possível ligar ao servidor {prov.upper()}. Verifique se está a correr em {cfg_ia.lm_host}:{cfg_ia.lm_port}.'
+        elif 'API_KEY_INVALID' in err or 'invalid' in err.lower():
+            msg = 'Chave API inválida. Verifique em Admin → Provedor IA.'
+        else:
+            msg = err
+        return jsonify({'ok': False, 'error': msg})
 
 
 # ── AUTO-UPDATE ────────────────────────────────────────────────────────────────
@@ -1467,10 +1469,17 @@ def update_apply():
     # 0. Init git if not present
     git_dir = os.path.join(cwd, '.git')
     if not os.path.exists(git_dir):
-        run(['git', 'init'])
+        ok0, out0 = run(['git', 'init'])
         run(['git', 'remote', 'add', 'origin',
              'https://github.com/luismiguelsilvauni-cpu/comprasnet.git'])
-        steps.append({'passo': 'Git inicializado', 'ok': True, 'msg': 'Repositório criado'})
+        steps.append({'passo': 'Git inicializado', 'ok': ok0, 'msg': 'Repositório Git criado'})
+    else:
+        # Ensure remote exists
+        ok_r, out_r = run(['git', 'remote', 'get-url', 'origin'])
+        if not ok_r:
+            run(['git', 'remote', 'add', 'origin',
+                 'https://github.com/luismiguelsilvauni-cpu/comprasnet.git'])
+            steps.append({'passo': 'Remote configurado', 'ok': True, 'msg': 'github.com/luismiguelsilvauni-cpu/comprasnet'})
 
     # 2. Git fetch
     ok, out = run(['git', 'fetch', 'origin', 'main'])
@@ -1966,6 +1975,18 @@ def api_criar_eventos_pedido(pid):
                     'data_entrega': data_entrega.strftime('%Y-%m-%d')})
 
 
+# ── HEALTH CHECK ──────────────────────────────────────────────────────────────
+
+@app.route('/admin/health')
+@login_required
+def admin_health():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    from health_check import startup_check
+    result = startup_check(app, auto_fix=True)
+    return render_template('admin_health.html', result=result)
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():
@@ -2046,6 +2067,12 @@ Subtotal: 300,00 €   IVA 23%: 69,00 €   TOTAL: 369,00 €"""
 
 if __name__ == '__main__':
     init_db()
+    # Run startup health check with auto-fix
+    try:
+        from health_check import startup_check
+        startup_check(app, auto_fix=True)
+    except Exception as e:
+        print(f"⚠️  Health check error: {e}")
     # Start backup scheduler
     try:
         from backup_manager import iniciar_scheduler

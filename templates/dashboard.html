@@ -2,13 +2,14 @@
 {% block title %}Dashboard · ComprasNet
 <!-- Event Modal -->
 <div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
-    <div class="flex items-center justify-between mb-16">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 id="evModalTitle" style="font-size:15px;font-weight:600">Novo Evento</h3>
       <button onclick="fecharEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
     </div>
     <input type="hidden" id="evId">
-    <div class="grid-2">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
         <label>Título *</label>
         <input type="text" id="evTitulo" placeholder="Ex: Chegada de filtros">
@@ -24,30 +25,39 @@
         </select>
       </div>
     </div>
-    <div class="grid-2">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
       <div class="form-group">
-        <label>Data *</label>
+        <label>Data início *</label>
         <input type="date" id="evDataInicio">
       </div>
       <div class="form-group">
-        <label>Data fim (opcional)</label>
+        <label>Data fim</label>
         <input type="date" id="evDataFim">
       </div>
-    </div>
-    <div class="grid-2">
       <div class="form-group">
-        <label>Hora (opcional)</label>
+        <label>Hora</label>
         <input type="time" id="evHora">
-      </div>
-      <div class="form-group">
-        <label>Fornecedor</label>
-        <input type="text" id="evFornecedor" placeholder="Nome do fornecedor">
       </div>
     </div>
     <div class="form-group">
-      <label>Artigos (opcional)</label>
-      <input type="text" id="evArtigos" placeholder="Referências separadas por vírgula">
+      <label>Fornecedor</label>
+      <input type="text" id="evFornecedor" placeholder="Nome do fornecedor">
     </div>
+
+    <!-- PHC Article search -->
+    <div class="form-group">
+      <label>Artigos PHC</label>
+      <div style="position:relative;margin-bottom:8px">
+        <input type="text" id="evArtigoSearch" placeholder="Pesquisar artigo por referência ou designação..."
+               oninput="pesquisarArtigoEv(this.value)" autocomplete="off">
+        <div id="evArtigoResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:600;
+             background:var(--surface);border:1px solid var(--border);border-radius:6px;
+             max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
+      </div>
+      <!-- Selected articles list -->
+      <div id="evArtigosList" style="display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+
     <div class="form-group">
       <label>Descrição / Notas</label>
       <textarea id="evDescricao" rows="2" placeholder="Informação adicional..."></textarea>
@@ -58,7 +68,7 @@
         Marcar como concluído
       </label>
     </div>
-    <div class="flex gap-8" style="justify-content:flex-end">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
       <button id="evBtnApagar" onclick="apagarEvento()" class="btn btn-ghost btn-sm" style="color:var(--danger);display:none">🗑️ Apagar</button>
       <button onclick="fecharEvModal()" class="btn btn-ghost">Cancelar</button>
       <button onclick="guardarEvento()" class="btn btn-primary">💾 Guardar</button>
@@ -66,6 +76,7 @@
   </div>
 </div>
 
+<!-- Pedido → Events Modal -->
 <!-- Pedido → Events Modal -->
 <div id="pedidoEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:460px;max-width:95vw">
@@ -710,6 +721,8 @@ function renderCalendario(eventos) {
 // ── Event modal ───────────────────────────────────────────────────────────────
 
 function abrirNovoEvento(date='') {
+  evArtigos = [];
+  renderArtigosEv();
   const today = date || new Date().toISOString().split('T')[0];
   document.getElementById('evModalTitle').textContent = 'Novo Evento';
   document.getElementById('evId').value       = '';
@@ -737,6 +750,9 @@ function abrirDetalheEvento(e) {
   document.getElementById('evDescricao').value= e.descricao || '';
   document.getElementById('evFornecedor').value= e.fornecedor || '';
   document.getElementById('evArtigos').value  = (e.artigos||[]).map(a=>a.ref||a.design).join(', ');
+  evArtigos = (e.artigos||[]).map(a => ({ref:a.ref||a.referencia||'', design:a.design||a.designacao||'', qtt:a.qtt||1, unidade:a.unidade||'un'}));
+  renderArtigosEv();
+  document.getElementById('evArtigoSearch').value = '';
   document.getElementById('evConcluido').checked = e.concluido || false;
   document.getElementById('evBtnApagar').style.display = 'inline-flex';
   document.getElementById('evModal').style.display = 'flex';
@@ -746,23 +762,88 @@ function fecharEvModal() {
   document.getElementById('evModal').style.display = 'none';
 }
 
+// Article search for event modal
+let evArtigos = [];
+let evArtigoTimer = null;
+
+function pesquisarArtigoEv(q) {
+  clearTimeout(evArtigoTimer);
+  const res = document.getElementById('evArtigoResults');
+  if (q.length < 2) { res.style.display='none'; return; }
+  evArtigoTimer = setTimeout(() => {
+    fetch('/api/artigos?q=' + encodeURIComponent(q))
+      .then(r=>r.json()).then(data => {
+        if (!data.length) { res.style.display='none'; return; }
+        res.style.display = 'block';
+        res.innerHTML = data.slice(0,8).map(a =>
+          `<div onclick="adicionarArtigoEv('${a.referencia}','${(a.designacao||'').replace(/'/g,"\'")}','${a.unidade||'un'}')"
+            style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px"
+            onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+            <span style="font-family:monospace;color:var(--accent)">${a.referencia}</span>
+            <span style="margin-left:8px">${a.designacao||''}</span>
+            <span style="float:right;color:${a.stock_atual<=0?'var(--danger)':a.stock_atual<5?'var(--warning)':'var(--success)'}">Stock: ${(a.stock_atual||0).toFixed(1)}</span>
+          </div>`
+        ).join('');
+      });
+  }, 250);
+}
+
+function adicionarArtigoEv(ref, design, unidade) {
+  if (evArtigos.find(a => a.ref === ref)) return; // already added
+  evArtigos.push({ref, design, qtt: 1, unidade});
+  renderArtigosEv();
+  document.getElementById('evArtigoSearch').value = '';
+  document.getElementById('evArtigoResults').style.display = 'none';
+}
+
+function renderArtigosEv() {
+  const box = document.getElementById('evArtigosList');
+  if (!evArtigos.length) { box.innerHTML = ''; return; }
+  box.innerHTML = evArtigos.map((a, i) =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border-radius:6px">
+      <span style="font-family:monospace;font-size:12px;color:var(--accent);flex-shrink:0">${a.ref}</span>
+      <span style="font-size:12px;flex:1">${a.design}</span>
+      <input type="number" value="${a.qtt}" min="0.01" step="0.01"
+             onchange="evArtigos[${i}].qtt=parseFloat(this.value)||1"
+             style="width:60px;font-size:12px;text-align:right">
+      <span style="font-size:11px;color:var(--text-muted)">${a.unidade}</span>
+      <button onclick="evArtigos.splice(${i},1);renderArtigosEv()"
+              style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px">✕</button>
+    </div>`
+  ).join('');
+}
+
 function guardarEvento() {
-  const id    = document.getElementById('evId').value;
+  const id = document.getElementById('evId').value;
+  const dataInicio = document.getElementById('evDataInicio').value;
+  if (!dataInicio) { alert('Preencha a data.'); return; }
+
   const dados = {
     titulo:      document.getElementById('evTitulo').value.trim() || 'Sem título',
     tipo:        document.getElementById('evTipo').value,
-    data_inicio: document.getElementById('evDataInicio').value,
+    data_inicio: dataInicio,
     data_fim:    document.getElementById('evDataFim').value || null,
     hora:        document.getElementById('evHora').value || null,
     descricao:   document.getElementById('evDescricao').value,
     fornecedor:  document.getElementById('evFornecedor').value,
     concluido:   document.getElementById('evConcluido').checked,
-    artigos:     [],
+    artigos:     evArtigos.map(a => ({ref:a.ref, design:a.design, qtt:a.qtt, unidade:a.unidade})),
   };
+
   const url    = id ? `/api/calendario/eventos/${id}` : '/api/calendario/eventos';
   const method = id ? 'PUT' : 'POST';
+
   fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados)})
-    .then(r=>r.json()).then(d=>{ if(d.ok){ fecharEvModal(); carregarCalendario(); }});
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.ok){
+        fecharEvModal();
+        carregarCalendario();
+      } else {
+        alert('Erro: ' + (d.error||'Desconhecido'));
+      }
+    })
+    .catch(e => alert('Erro de ligação: ' + e));
 }
 
 function apagarEvento() {

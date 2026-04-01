@@ -306,6 +306,9 @@
         <a href="{{ url_for('admin_update') }}" class="nav-item {% if request.endpoint == 'admin_update' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">⬆️</span><span>Actualizar Software</span>
         </a>
+        <a href="{{ url_for('admin_health') }}" class="nav-item {% if request.endpoint == 'admin_health' %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">🩺</span><span>Estado do Sistema</span>
+        </a>
         <a href="{{ url_for('changelog') }}" class="nav-item {% if request.endpoint == 'changelog' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">📋</span><span>Histórico Versões</span>
         </a>
