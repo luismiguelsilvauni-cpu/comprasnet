@@ -1397,15 +1397,29 @@ def update_check():
     if not current_user.is_admin:
         return jsonify({'error': 'Sem permissão'}), 403
     import subprocess
+    cwd = os.path.dirname(os.path.abspath(__file__))
+
+    def run(cmd):
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=30, cwd=cwd)
+
     try:
+        # Init git if not present
+        if not os.path.exists(os.path.join(cwd, '.git')):
+            run(['git', 'init'])
+            run(['git', 'remote', 'add', 'origin',
+                 'https://github.com/luismiguelsilvauni-cpu/comprasnet.git'])
+        else:
+            # Ensure remote exists
+            r = run(['git', 'remote', 'get-url', 'origin'])
+            if r.returncode != 0:
+                run(['git', 'remote', 'add', 'origin',
+                     'https://github.com/luismiguelsilvauni-cpu/comprasnet.git'])
+
         # Fetch remote without merging
-        result = subprocess.run(
-            ['git', 'fetch', 'origin', 'main'],
-            capture_output=True, text=True, timeout=15,
-            cwd=os.path.dirname(os.path.abspath(__file__))
-        )
+        result = run(['git', 'fetch', 'origin', 'main'])
         if result.returncode != 0:
-            return jsonify({'error': f'Erro ao verificar: {result.stderr}'}), 500
+            return jsonify({'error': f'Erro ao verificar: {result.stderr.strip()}'}), 500
 
         # Compare local vs remote
         local = subprocess.run(

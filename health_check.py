@@ -156,6 +156,80 @@ def check_backup_manager(app):
         return False, str(e)
 
 
+@check("Actualizações do GitHub")
+def check_github_updates(app):
+    """Check if there are newer commits on GitHub."""
+    import subprocess
+    cwd = os.path.dirname(os.path.abspath(app.root_path + "/.."))
+    cwd = app.root_path  # Use app root
+
+    git_dir = os.path.join(cwd, '.git')
+    if not os.path.exists(git_dir):
+        return False, "Sem repositório Git — use o menu Actualizar Software"
+
+    try:
+        # Fetch silently
+        r = subprocess.run(['git', 'fetch', 'origin', 'main', '--quiet'],
+                          capture_output=True, text=True, timeout=15, cwd=cwd)
+        if r.returncode != 0:
+            return False, f"Sem acesso ao GitHub: {r.stderr[:80]}"
+
+        # Compare
+        local  = subprocess.run(['git', 'rev-parse', 'HEAD'],
+                               capture_output=True, text=True, cwd=cwd).stdout.strip()
+        remote = subprocess.run(['git', 'rev-parse', 'origin/main'],
+                               capture_output=True, text=True, cwd=cwd).stdout.strip()
+
+        if local == remote:
+            return True, "Versão mais recente instalada ✅"
+        
+        # Count pending commits
+        log = subprocess.run(['git', 'log', 'HEAD..origin/main', '--oneline'],
+                            capture_output=True, text=True, cwd=cwd).stdout.strip()
+        n = len([l for l in log.split('\n') if l])
+        return False, f"{n} actualização(ões) disponível(eis) — vá a Actualizar Software"
+    except Exception as e:
+        return False, f"Erro: {e}"
+
+
+@fix("Aplicar actualizações do GitHub")
+def fix_github_updates(app):
+    """Auto-apply updates if available."""
+    import subprocess
+    cwd = app.root_path
+
+    git_dir = os.path.join(cwd, '.git')
+    if not os.path.exists(git_dir):
+        # Init git
+        subprocess.run(['git', 'init'], cwd=cwd, capture_output=True)
+        subprocess.run(['git', 'remote', 'add', 'origin',
+                       'https://github.com/luismiguelsilvauni-cpu/comprasnet.git'],
+                      cwd=cwd, capture_output=True)
+
+    # Fetch
+    r = subprocess.run(['git', 'fetch', 'origin', 'main', '--quiet'],
+                       capture_output=True, text=True, timeout=20, cwd=cwd)
+    if r.returncode != 0:
+        return False, f"Sem acesso ao GitHub: {r.stderr[:80]}"
+
+    # Check if updates needed
+    local  = subprocess.run(['git', 'rev-parse', 'HEAD'],
+                           capture_output=True, text=True, cwd=cwd).stdout.strip()
+    remote = subprocess.run(['git', 'rev-parse', 'origin/main'],
+                           capture_output=True, text=True, cwd=cwd).stdout.strip()
+
+    if local == remote:
+        return True, "Já na versão mais recente"
+
+    # Apply updates
+    r2 = subprocess.run(['git', 'checkout', 'origin/main', '--', '.'],
+                        capture_output=True, text=True, timeout=30, cwd=cwd)
+    if r2.returncode != 0:
+        return False, f"Erro ao aplicar: {r2.stderr[:100]}"
+
+    return True, f"✅ Actualizações aplicadas (local={local[:8]} → remoto={remote[:8]})"
+
+
 # ── Auto-fixes ─────────────────────────────────────────────────────────────────
 
 @fix("Criar pasta de uploads")
