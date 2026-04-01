@@ -401,24 +401,17 @@ const WIDGET_DATA = {
   calendario: {
     label: '📅 Calendário',
     cols: 12, rows: 3,
-    html: `<div id="calWidget">
-      <!-- Calendar header -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-        <button onclick="calNav(-1)" class="btn btn-ghost btn-sm">‹</button>
-        <div id="calTitulo" style="font-size:15px;font-weight:700;flex:1;text-align:center"></div>
-        <button onclick="calNav(1)" class="btn btn-ghost btn-sm">›</button>
-        <button onclick="abrirNovoEvento()" class="btn btn-primary btn-sm">+ Evento</button>
-        <button onclick="abrirEventoPedido()" class="btn btn-ghost btn-sm" title="Criar eventos de compra a partir de pedido">📋 Pedido</button>
-      </div>
-      <!-- Day headers -->
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
-        ${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>
-          \`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px">\${d}</div>\`
-        ).join('')}
-      </div>
-      <!-- Calendar grid -->
-      <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
-    </div>`
+    html: '<div id="calWidget">' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
+        '<button onclick="calNav(-1)" class="btn btn-ghost btn-sm">&#8249;</button>' +
+        '<div id="calTitulo" style="font-size:15px;font-weight:700;flex:1;text-align:center"></div>' +
+        '<button onclick="calNav(1)" class="btn btn-ghost btn-sm">&#8250;</button>' +
+        '<button onclick="abrirNovoEvento()" class="btn btn-primary btn-sm">+ Evento</button>' +
+        '<button onclick="abrirEventoPedido()" class="btn btn-ghost btn-sm">&#128203; Pedido</button>' +
+      '</div>' +
+      '<div id="calDayHeaders" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px"></div>' +
+      '<div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>' +
+    '</div>'
   },
   chat_rapido: {
     label: '🤖 Chat Rápido',
@@ -638,6 +631,16 @@ function carregarCalendario() {
   const grid  = document.getElementById('calGrid');
   const titulo = document.getElementById('calTitulo');
   if (!grid) return;
+
+  // Render day headers
+  const dhBox = document.getElementById('calDayHeaders');
+  if (dhBox && dhBox.children.length === 0) {
+    ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => {
+      dhBox.insertAdjacentHTML('beforeend',
+        '<div style="text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px">' + d + '</div>');
+    });
+  }
+
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   if (titulo) titulo.textContent = meses[calMonth-1] + ' ' + calYear;

@@ -955,6 +955,18 @@ def admin_config():
     if not current_user.is_admin:
         flash('Sem permissão.', 'error')
         return redirect(url_for('dashboard'))
+    # Ensure all columns exist (safe for older DBs)
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            for col, typ in [('dashboard_layouts','TEXT')]:
+                try:
+                    conn.execute(text(f"ALTER TABLE config_geral ADD COLUMN {col} {typ}"))
+                    conn.commit()
+                except Exception:
+                    pass
+    except Exception:
+        pass
     cfg = get_config_geral()
     if request.method == 'POST':
         action = request.form.get('action', 'save')
@@ -1451,6 +1463,14 @@ def update_apply():
         steps.append({'passo': 'Backup', 'ok': ok, 'msg': msg.split("\n")[0]})
     except Exception as e:
         steps.append({'passo': 'Backup', 'ok': False, 'msg': str(e)})
+
+    # 0. Init git if not present
+    git_dir = os.path.join(cwd, '.git')
+    if not os.path.exists(git_dir):
+        run(['git', 'init'])
+        run(['git', 'remote', 'add', 'origin',
+             'https://github.com/luismiguelsilvauni-cpu/comprasnet.git'])
+        steps.append({'passo': 'Git inicializado', 'ok': True, 'msg': 'Repositório criado'})
 
     # 2. Git fetch
     ok, out = run(['git', 'fetch', 'origin', 'main'])
