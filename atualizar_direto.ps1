@@ -40,7 +40,14 @@ $ficheiros = @(
     "templates/mobile/clientes.html",
     "templates/mobile/cliente_detalhe.html",
     "templates/mobile/chat.html",
-    "migrations/versions/0007_gemini_api_fields.py"
+    "migrations/versions/0007_gemini_api_fields.py",
+    "migrations/versions/0008_notas_artigo.py",
+    "migrations/versions/0009_dashboard_layouts.py",
+    "migrations/versions/0010_evento_calendario.py",
+    "health_check.py",
+    "templates/admin_health.html",
+    "templates/stock.html",
+    "templates/stock_artigo.html"
 )
 
 Write-Host ""
