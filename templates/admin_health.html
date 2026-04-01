@@ -1,38 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Health Check · ComprasNet{% endblock %}
+{% block title %}Estado do Sistema · ComprasNet{% endblock %}
 {% block page_title %}Estado do Sistema{% endblock %}
 {% block topbar_actions %}
-  <a href="{{ url_for('admin_health') }}" class="btn btn-ghost btn-sm">🔄 Re-verificar</a>
+  <a href="{{ url_for('admin_health') }}" class="btn btn-ghost btn-sm">🔄 Re-verificar e corrigir</a>
 {% endblock %}
 
 {% block content %}
-<div style="max-width:700px">
+<div style="max-width:800px">
 
-<!-- Summary -->
-<div class="card mb-16" style="border-color:{% if result.ok %}rgba(34,197,94,.4){% else %}rgba(239,68,68,.4){% endif %};background:{% if result.ok %}rgba(34,197,94,.04){% else %}rgba(239,68,68,.04){% endif %}">
-  <div style="display:flex;align-items:center;gap:16px;padding:4px">
-    <div style="font-size:36px">{% if result.ok %}✅{% else %}⚠️{% endif %}</div>
-    <div>
+<!-- Summary banner -->
+{% set n_errors = result.errors|length %}
+{% set n_total  = result.checks|length %}
+{% set n_ok     = n_total - n_errors %}
+<div class="card mb-16" style="border-color:{% if result.ok %}rgba(34,197,94,.4){% else %}rgba(239,68,68,.3){% endif %};background:{% if result.ok %}rgba(34,197,94,.04){% else %}rgba(239,68,68,.04){% endif %}">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div style="font-size:40px">{% if result.ok %}✅{% else %}⚠️{% endif %}</div>
+    <div style="flex:1">
       <div style="font-size:16px;font-weight:700;color:{% if result.ok %}var(--success){% else %}var(--danger){% endif %}">
-        {% if result.ok %}Sistema OK — todos os checks passaram{% else %}{{ result.errors|length }} problema(s) detectado(s){% endif %}
+        {% if result.ok %}Sistema completamente operacional{% else %}{{ n_errors }} problema(s) detectado(s){% endif %}
       </div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
-        Verificado em {{ result.timestamp[:19].replace('T',' ') }} UTC
+        {{ n_ok }}/{{ n_total }} verificações OK · {{ result.timestamp[:19].replace('T',' ') }} UTC
       </div>
+    </div>
+    <!-- Progress bar -->
+    <div style="flex-shrink:0;width:120px">
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:{{ (n_ok/n_total*100)|int }}%;background:{% if result.ok %}var(--success){% elif n_ok/n_total > 0.7 %}var(--warning){% else %}var(--danger){% endif %};border-radius:4px;transition:width .5s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-align:center">{{ (n_ok/n_total*100)|int }}% OK</div>
     </div>
   </div>
 </div>
 
-<!-- Auto-fixes applied -->
+<!-- Auto-fixes -->
 {% if result.fixes %}
 <div class="card mb-16">
-  <div class="card-title">🔧 Correcções Automáticas Aplicadas</div>
-  <div style="display:flex;flex-direction:column;gap:8px">
+  <div class="card-title">🔧 Correcções Automáticas</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
     {% for f in result.fixes %}
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:6px">
-      <span>{% if f.ok %}✅{% else %}❌{% endif %}</span>
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 12px;background:var(--surface2);border-radius:6px;border-left:3px solid {% if f.ok %}var(--success){% else %}var(--danger){% endif %}">
+      <span style="flex-shrink:0">{% if f.ok %}✅{% else %}❌{% endif %}</span>
       <div>
-        <div style="font-size:13px;font-weight:500">{{ f.fix }}</div>
+        <div style="font-size:12px;font-weight:600">{{ f.fix }}</div>
         <div style="font-size:11px;color:var(--text-muted)">{{ f.msg }}</div>
       </div>
     </div>
@@ -41,40 +51,65 @@
 </div>
 {% endif %}
 
-<!-- Check results -->
-<div class="card">
-  <div class="card-title">🔍 Verificações</div>
-  <div style="display:flex;flex-direction:column;gap:8px">
-    {% for c in result.checks %}
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-radius:8px;border-left:3px solid {% if c.ok %}var(--success){% else %}var(--danger){% endif %}">
-      <span style="font-size:18px">{% if c.ok %}✅{% else %}❌{% endif %}</span>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">{{ c.check }}</div>
-        <div style="font-size:12px;color:{% if c.ok %}var(--text-muted){% else %}var(--danger){% endif %};margin-top:2px">{{ c.msg }}</div>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
+<!-- Checks by category -->
+{% set categories = result.checks|map(attribute='category')|unique|list %}
+{% for cat in categories %}
+{% set cat_checks = result.checks|selectattr('category','eq',cat)|list %}
+{% set cat_errors = cat_checks|rejectattr('ok')|list %}
 
-{% if result.errors %}
-<div class="card mt-16" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)">
-  <div class="card-title" style="color:var(--warning)">⚠️ Acções Necessárias</div>
-  <div style="font-size:13px;color:var(--text-muted);line-height:1.8">
-    {% for e in result.errors %}
-    <div style="margin-bottom:8px">
-      <strong style="color:var(--text)">{{ e.check }}</strong><br>
-      {{ e.msg }}<br>
-      {% if 'ai_provider' in e.check %}
-        → Execute: <code>powershell -ExecutionPolicy Bypass -File atualizar_direto.ps1</code>
-      {% elif 'tabelas' in e.check.lower() %}
-        → Execute: <code>flask db upgrade</code>
+<div class="card mb-12">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700">
+      {% if cat == 'Base de Dados' %}🗄️
+      {% elif cat == 'Ficheiros' %}📁
+      {% elif cat == 'Rotas' %}🌐
+      {% elif cat == 'Integrações' %}🔌
+      {% else %}🔍{% endif %}
+      {{ cat }}
+    </div>
+    {% if cat_errors %}
+    <span class="badge badge-red" style="font-size:10px">{{ cat_errors|length }} erro(s)</span>
+    {% else %}
+    <span class="badge badge-green" style="font-size:10px">✓ OK</span>
+    {% endif %}
+    <div style="margin-left:auto;font-size:11px;color:var(--text-muted)">
+      {{ cat_checks|selectattr('ok')|list|length }}/{{ cat_checks|length }}
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px">
+    {% for c in cat_checks %}
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:6px;
+         border-left:3px solid {% if c.ok %}var(--success){% else %}var(--danger){% endif %}">
+      <span style="font-size:16px;flex-shrink:0">{% if c.ok %}✅{% else %}❌{% endif %}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500">{{ c.check }}</div>
+        <div style="font-size:11px;color:{% if c.ok %}var(--text-muted){% else %}var(--danger){% endif %};margin-top:1px">
+          {{ c.msg }}
+        </div>
+      </div>
+      {% if not c.ok %}
+      <div style="flex-shrink:0">
+        {% if 'atualizar_direto' in c.msg %}
+        <code style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:3px">atualizar_direto.ps1</code>
+        {% elif 'flask db upgrade' in c.msg %}
+        <code style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:3px">flask db upgrade</code>
+        {% elif 'Actualizar Software' in c.msg %}
+        <a href="{{ url_for('admin_update') }}" class="btn btn-ghost btn-sm" style="font-size:11px">→ Actualizar</a>
+        {% elif 'Admin → Provedor IA' in c.msg %}
+        <a href="{{ url_for('admin_ia') }}" class="btn btn-ghost btn-sm" style="font-size:11px">→ Configurar</a>
+        {% elif 'Admin → Configurações' in c.msg %}
+        <a href="{{ url_for('admin_config') }}" class="btn btn-ghost btn-sm" style="font-size:11px">→ Configurar</a>
+        {% elif 'Admin → PHC' in c.msg %}
+        <a href="{{ url_for('admin_phc') }}" class="btn btn-ghost btn-sm" style="font-size:11px">→ Configurar</a>
+        {% endif %}
+      </div>
       {% endif %}
     </div>
     {% endfor %}
   </div>
 </div>
-{% endif %}
+{% endfor %}
 
 </div>
 {% endblock %}
