@@ -25,6 +25,14 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Por favor faça login para aceder.'
 
+@login_manager.unauthorized_handler
+def handle_unauthorized():
+    """Return JSON for API calls, redirect for normal pages."""
+    if request.is_json or request.path.startswith('/api/'):
+        return jsonify({'error': 'Sessão expirada. Recarregue a página e faça login.'}), 401
+    from flask import redirect, url_for
+    return redirect(url_for('login'))
+
 
 @login_manager.user_loader
 def load_user(uid): return User.query.get(int(uid))
@@ -1812,6 +1820,8 @@ def stock_apagar_nota(ref, nid):
     nota = NotaArtigo.query.get_or_404(nid)
     db.session.delete(nota); db.session.commit()
     return jsonify({'ok': True})
+
+
 
 
 # ── DASHBOARD WIDGETS ─────────────────────────────────────────────────────────
