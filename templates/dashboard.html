@@ -3,648 +3,78 @@
 {% block page_title %}Dashboard{% endblock %}
 {% block topbar_actions %}
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
+  <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
 {% endblock %}
 
 {% block content %}
-<div id="editBar" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+
+<!-- Edit bar -->
+<div id="editBar" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:10px 16px;margin-bottom:16px;align-items:center;gap:12px;flex-wrap:wrap">
   <span style="font-size:13px;font-weight:600;color:var(--accent)">✏️ Modo de edição</span>
-  <span style="font-size:12px;color:var(--text-muted)">Arraste widgets para reposicionar · Redimensione pelo canto inferior direito</span>
+  <span style="font-size:12px;color:var(--text-muted)">Arraste para reposicionar · Selector de colunas para redimensionar</span>
   <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-    <span style="font-size:12px;color:var(--text-muted)">Adicionar widget:</span>
-    {% for wid, label in [('kpis','📊 KPIs'),('pedidos_recentes','📋 Pedidos'),('qr_mobile','📱 QR Mobile'),('stock_baixo','⚠️ Stock Baixo'),('acesso_externo','🌐 Acesso Externo'),('chat_rapido','🤖 Chat Rápido')] %}
-    <button onclick="adicionarWidget('{{ wid }}')" class="btn btn-ghost btn-sm" style="font-size:11px">+ {{ label }}</button>
-    {% endfor %}
+    <span style="font-size:12px;color:var(--text-muted)">Adicionar:</span>
+    <button onclick="adicionarWidget('kpis')"             class="btn btn-ghost btn-sm" style="font-size:11px">+ KPIs</button>
+    <button onclick="adicionarWidget('pedidos_recentes')" class="btn btn-ghost btn-sm" style="font-size:11px">+ Pedidos</button>
+    <button onclick="adicionarWidget('qr_mobile')"        class="btn btn-ghost btn-sm" style="font-size:11px">+ QR Mobile</button>
+    <button onclick="adicionarWidget('stock_baixo')"      class="btn btn-ghost btn-sm" style="font-size:11px">+ Stock Baixo</button>
+    <button onclick="adicionarWidget('acesso_externo')"   class="btn btn-ghost btn-sm" style="font-size:11px">+ Acesso Externo</button>
+    <button onclick="adicionarWidget('chat_rapido')"      class="btn btn-ghost btn-sm" style="font-size:11px">+ Chat</button>
+    <button onclick="adicionarWidget('calendario')"       class="btn btn-ghost btn-sm" style="font-size:11px">+ Calendário</button>
   </div>
   <button onclick="guardarLayout()" class="btn btn-primary btn-sm">💾 Guardar</button>
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm">↺ Repor</button>
 </div>
 
 <!-- Widget grid -->
-<div id="widgetGrid" style="display:grid;grid-template-columns:repeat(12,1fr);gap:12px;align-items:start">
-  <!-- Widgets rendered by JS -->
-</div>
+<div id="widgetGrid" style="display:grid;grid-template-columns:repeat(12,1fr);gap:12px;align-items:start"></div>
 
-<!-- Widget data (passed to JS) -->
-<script>
-const WIDGET_DATA = {
-  kpis: {
-    label: '📊 KPIs',
-    cols: 12, rows: 1,
-    html: `<div class="stats-grid" style="margin:0">
-      <div class="stat-card"><div class="stat-label">Total Pedidos</div><div class="stat-value">{{ total_pedidos }}</div><div class="stat-icon">📋</div></div>
-      <div class="stat-card warning"><div class="stat-label">Abertos</div><div class="stat-value">{{ pedidos_abertos }}</div><div class="stat-icon">⏳</div></div>
-      <div class="stat-card success"><div class="stat-label">Aprovados</div><div class="stat-value">{{ pedidos_aprovados }}</div><div class="stat-icon">✅</div></div>
-      <div class="stat-card info"><div class="stat-label">Orçamentos</div><div class="stat-value">{{ total_orcamentos }}</div><div class="stat-icon">📄</div></div>
-    </div>`
-  },
-  pedidos_recentes: {
-    label: '📋 Pedidos Recentes',
-    cols: 8, rows: 2,
-    html: `{% if pedidos_recentes %}
-      <div class="table-wrap" style="margin:0">
-        <table>
-          <thead><tr><th>Título</th><th>Estado</th><th>Data</th><th></th></tr></thead>
-          <tbody>
-          {% for p in pedidos_recentes %}
-          <tr>
-            <td style="font-size:13px">{{ p.titulo[:40] }}</td>
-            <td><span class="badge {% if p.estado=='aberto' %}badge-blue{% elif p.estado=='aprovado' %}badge-green{% else %}badge-yellow{% endif %}" style="font-size:10px">{{ p.estado }}</span></td>
-            <td style="font-size:12px;color:var(--text-muted)">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td>
-            <td><a href="/pedidos/{{ p.id }}" class="btn btn-ghost btn-sm">→</a></td>
-          </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem pedidos recentes</div>{% endif %}`
-  },
-  qr_mobile: {
-    label: '📱 QR Mobile',
-    cols: 4, rows: 2,
-    html: `<div style="text-align:center;padding:8px">
-      <div id="qrWidget" style="display:inline-block;background:white;padding:8px;border-radius:8px;margin-bottom:10px"></div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px" id="qrWidgetUrl">A carregar URL...</div>
-      <a href="/mobile" class="btn btn-ghost btn-sm" style="display:inline-flex;margin-bottom:6px;width:100%;justify-content:center">📱 Abrir app mobile</a>
-      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="display:inline-flex;width:100%;justify-content:center">🌐 Acesso externo</a>
-    </div>`
-  },
-  stock_baixo: {
-    label: '⚠️ Stock Baixo',
-    cols: 6, rows: 2,
-    html: `{% set artigos_baixo = artigos_stock_baixo or [] %}
-    {% if artigos_baixo %}
-    <div class="table-wrap" style="margin:0">
-      <table>
-        <thead><tr><th>Referência</th><th>Designação</th><th style="text-align:right">Stock</th></tr></thead>
-        <tbody>
-        {% for a in artigos_baixo %}
-        <tr>
-          <td class="mono" style="font-size:11px;color:var(--accent)"><a href="/stock/{{ a.referencia }}">{{ a.referencia }}</a></td>
-          <td style="font-size:12px">{{ (a.designacao or '')[:30] }}</td>
-          <td style="text-align:right;font-weight:700;color:{% if a.stock_atual<=0 %}var(--danger){% else %}var(--warning){% endif %};font-family:monospace">{{ '%.1f'|format(a.stock_atual) }}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}<div style="text-align:center;padding:32px;color:var(--success)">✅ Sem artigos com stock baixo</div>{% endif %}`
-  },
-  acesso_externo: {
-    label: '🌐 Acesso Externo',
-    cols: 6, rows: 1,
-    html: `<div style="display:flex;align-items:center;gap:16px;padding:4px">
-      <div id="tunnelStatusWidget" style="font-size:13px;color:var(--text-muted)">A verificar tunnel...</div>
-      <a href="/acesso-externo" class="btn btn-ghost btn-sm" style="margin-left:auto">Ver detalhes →</a>
-    </div>`
-  },
-  calendario: {
-    label: '📅 Calendário',
-    cols: 12, rows: 3,
-    html: '<div id="calWidget">' +
-      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
-        '<button onclick="calNav(-1)" class="btn btn-ghost btn-sm">&#8249;</button>' +
-        '<div id="calTitulo" style="font-size:15px;font-weight:700;flex:1;text-align:center"></div>' +
-        '<button onclick="calNav(1)" class="btn btn-ghost btn-sm">&#8250;</button>' +
-        '<button onclick="abrirNovoEvento()" class="btn btn-primary btn-sm">+ Evento</button>' +
-        '<button onclick="abrirEventoPedido()" class="btn btn-ghost btn-sm">&#128203; Pedido</button>' +
-      '</div>' +
-      '<div id="calDayHeaders" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px"></div>' +
-      '<div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>' +
-    '</div>'
-  },
-  chat_rapido: {
-    label: '🤖 Chat Rápido',
-    cols: 6, rows: 2,
-    html: `<div style="display:flex;flex-direction:column;height:100%;min-height:180px">
-      <div id="chatWidgetMsgs" style="flex:1;overflow-y:auto;font-size:12px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px;max-height:150px"></div>
-      <div style="display:flex;gap:6px">
-        <input type="text" id="chatWidgetInput" placeholder="Pergunta rápida..." style="flex:1;font-size:12px"
-               onkeydown="if(event.key==='Enter')enviarChatWidget()">
-        <button onclick="enviarChatWidget()" class="btn btn-primary btn-sm" style="flex-shrink:0">↑</button>
-      </div>
-    </div>`
-  }
-};
-
-// Default layout
-const DEFAULT_LAYOUT = [
-  {id:'kpis', cols:12, row:0},
-  {id:'pedidos_recentes', cols:8, row:1},
-  {id:'qr_mobile', cols:4, row:1},
-  {id:'stock_baixo', cols:6, row:2},
-  {id:'acesso_externo', cols:6, row:2},
-  {id:'calendario', cols:12, row:3},
-];
-
-let currentLayout = [...DEFAULT_LAYOUT];
-let editMode = false;
-
-// ── Render ────────────────────────────────────────────────────────────────────
-
-function renderGrid() {
-  const grid = document.getElementById('widgetGrid');
-  grid.innerHTML = '';
-
-  currentLayout.forEach((item, idx) => {
-    const def = WIDGET_DATA[item.id];
-    if (!def) return;
-
-    const widget = document.createElement('div');
-    widget.className = 'widget-card';
-    widget.dataset.id = item.id;
-    widget.dataset.idx = idx;
-    widget.style.cssText = `
-      grid-column: span ${item.cols || def.cols};
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; overflow: hidden; position: relative;
-      ${editMode ? 'resize:both;min-width:200px;min-height:100px;' : ''}
-    `;
-
-    widget.innerHTML = `
-      <div class="widget-header" style="display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:8px;
-           ${editMode ? 'cursor:move;background:var(--surface2)' : ''}">
-        <span style="font-size:13px;font-weight:600;flex:1">${def.label}</span>
-        ${editMode ? `
-          <select onchange="resizeWidget(${idx}, this.value)" style="font-size:11px;padding:2px 4px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px">
-            ${[2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}" ${(item.cols||def.cols)==n?'selected':''}>${n} col${n>1?'s':''}</option>`).join('')}
-          </select>
-          <button onclick="removerWidget(${idx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0 4px" title="Remover">✕</button>
-        ` : ''}
-      </div>
-      <div class="widget-body" style="padding:14px">${def.html}</div>
-    `;
-
-    if (editMode) {
-      widget.draggable = true;
-      widget.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('idx', idx);
-        widget.style.opacity = '0.5';
-      });
-      widget.addEventListener('dragend', () => widget.style.opacity = '1');
-      widget.addEventListener('dragover', e => e.preventDefault());
-      widget.addEventListener('drop', e => {
-        e.preventDefault();
-        const fromIdx = parseInt(e.dataTransfer.getData('idx'));
-        const toIdx = idx;
-        if (fromIdx !== toIdx) {
-          const moved = currentLayout.splice(fromIdx, 1)[0];
-          currentLayout.splice(toIdx, 0, moved);
-          renderGrid();
-        }
-      });
-    }
-
-    grid.appendChild(widget);
-  });
-
-  // Post-render: init QR, tunnel status, etc.
-  initWidgets();
-}
-
-function resizeWidget(idx, cols) {
-  currentLayout[idx].cols = parseInt(cols);
-  renderGrid();
-}
-
-function removerWidget(idx) {
-  currentLayout.splice(idx, 1);
-  renderGrid();
-}
-
-function adicionarWidget(id) {
-  if (currentLayout.find(w => w.id === id)) {
-    alert('Widget já existe no dashboard.'); return;
-  }
-  const def = WIDGET_DATA[id];
-  currentLayout.push({id, cols: def.cols});
-  renderGrid();
-}
-
-function toggleEdit() {
-  editMode = !editMode;
-  document.getElementById('btnEdit').textContent = editMode ? '✅ Terminar edição' : '✏️ Editar layout';
-  document.getElementById('editBar').style.display = editMode ? 'flex' : 'none';
-  renderGrid();
-}
-
-function guardarLayout() {
-  fetch('/api/dashboard/layout', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(currentLayout)
-  }).then(r=>r.json()).then(d => {
-    if (d.ok) {
-      const btn = document.getElementById('btnEdit');
-      const orig = btn.textContent;
-      btn.textContent = '✅ Guardado!';
-      setTimeout(() => btn.textContent = orig, 2000);
-    }
-  });
-}
-
-function resetarLayout() {
-  if (!confirm('Repor layout padrão?')) return;
-  currentLayout = [...DEFAULT_LAYOUT];
-  renderGrid();
-}
-
-// ── Widget init callbacks ─────────────────────────────────────────────────────
-
-function initWidgets() {
-  // QR code
-  const qrBox = document.getElementById('qrWidget');
-  if (qrBox && qrBox.children.length === 0) {
-    fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
-      const url = (d.url || window.location.origin) + '/mobile';
-      document.getElementById('qrWidgetUrl').textContent = url;
-      if (window.QRCode) {
-        new QRCode(qrBox, {text: url, width:100, height:100, colorDark:'#000', colorLight:'#fff'});
-      }
-    }).catch(() => {
-      const url = window.location.origin + '/mobile';
-      if (window.QRCode) new QRCode(qrBox, {text:url, width:100, height:100, colorDark:'#000', colorLight:'#fff'});
-    });
-  }
-
-  // Tunnel status
-  const ts = document.getElementById('tunnelStatusWidget');
-  if (ts) {
-    fetch('/api/tunnel/url').then(r=>r.json()).then(d => {
-      if (d.url) {
-        ts.innerHTML = `🟢 Tunnel activo<br><span style="font-family:monospace;font-size:11px;color:var(--accent)">${d.url}</span>`;
-      } else {
-        ts.innerHTML = `🔴 Tunnel inactivo — <a href="/acesso-externo" style="color:var(--accent)">Configurar</a>`;
-      }
-    });
-  }
-
-  // Chat widget
-  const chatInput = document.getElementById('chatWidgetInput');
-  if (chatInput) chatInput._msgs = [];
-}
-
-function enviarChatWidget() {
-  const input = document.getElementById('chatWidgetInput');
-  const msgs = document.getElementById('chatWidgetMsgs');
-  const txt = input.value.trim();
-  if (!txt) return;
-  input._msgs = input._msgs || [];
-  input._msgs.push({role:'user', content:txt});
-  msgs.insertAdjacentHTML('beforeend', `<div style="align-self:flex-end;background:var(--accent);color:#fff;border-radius:8px;padding:5px 10px;max-width:90%">${txt}</div>`);
-  msgs.scrollTop = msgs.scrollHeight;
-  input.value = '';
-
-  fetch('/api/chat', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({messages: input._msgs})
-  }).then(r=>r.json()).then(d => {
-    const text = d.ok ? d.text : '❌ ' + (d.error||'Erro');
-    if (d.ok) input._msgs.push({role:'assistant', content:d.text});
-    msgs.insertAdjacentHTML('beforeend', `<div style="background:var(--surface2);border-radius:8px;padding:5px 10px;max-width:90%;font-size:11px">${text.replace(/\n/g,'<br>')}</div>`);
-    msgs.scrollTop = msgs.scrollHeight;
-  });
-}
-
-
-// ── Calendar Widget ────────────────────────────────────────────────────────────
-let calYear  = new Date().getFullYear();
-let calMonth = new Date().getMonth() + 1;
-let calEventos = [];
-
-const TIPO_CORES = {
-  compra:           { bg:'rgba(59,110,240,.2)',  border:'#3b6ef0',  label:'Compra'           },
-  entrega_prevista: { bg:'rgba(245,158,11,.2)',  border:'#f59e0b',  label:'Entrega prevista'  },
-  entrega_real:     { bg:'rgba(34,197,94,.2)',   border:'#22c55e',  label:'Entrega confirmada'},
-  manutencao:       { bg:'rgba(239,68,68,.2)',   border:'#ef4444',  label:'Manutenção'        },
-  manual:           { bg:'rgba(148,163,184,.15)',border:'#94a3b8',  label:'Evento'            },
-};
-
-function calNav(dir) {
-  calMonth += dir;
-  if (calMonth > 12) { calMonth = 1;  calYear++; }
-  if (calMonth < 1)  { calMonth = 12; calYear--; }
-  carregarCalendario();
-}
-
-function carregarCalendario() {
-  const grid  = document.getElementById('calGrid');
-  const titulo = document.getElementById('calTitulo');
-  if (!grid) return;
-
-  // Render day headers
-  const dhBox = document.getElementById('calDayHeaders');
-  if (dhBox && dhBox.children.length === 0) {
-    ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => {
-      dhBox.insertAdjacentHTML('beforeend',
-        '<div style="text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px">' + d + '</div>');
-    });
-  }
-
-  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-                  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  if (titulo) titulo.textContent = meses[calMonth-1] + ' ' + calYear;
-
-  fetch(`/api/calendario/eventos?ano=${calYear}&mes=${calMonth}`)
-    .then(r=>r.json()).then(eventos => {
-      calEventos = eventos;
-      renderCalendario(eventos);
-    }).catch(() => renderCalendario([]));
-}
-
-function renderCalendario(eventos) {
-  const grid = document.getElementById('calGrid');
-  if (!grid) return;
-
-  const firstDay = new Date(calYear, calMonth-1, 1).getDay();
-  const daysInMonth = new Date(calYear, calMonth, 0).getDate();
-  const today = new Date().toISOString().split('T')[0];
-
-  // Group events by date
-  const byDate = {};
-  eventos.forEach(e => {
-    if (!byDate[e.data_inicio]) byDate[e.data_inicio] = [];
-    byDate[e.data_inicio].push(e);
-  });
-
-  grid.innerHTML = '';
-
-  // Empty cells before first day
-  for (let i = 0; i < firstDay; i++) {
-    grid.insertAdjacentHTML('beforeend', '<div style="min-height:60px"></div>');
-  }
-
-  // Days
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday = dateStr === today;
-    const dayEvents = byDate[dateStr] || [];
-
-    const cell = document.createElement('div');
-    cell.style.cssText = `min-height:60px;background:${isToday?'rgba(59,110,240,.1)':'var(--surface2)'};
-      border-radius:6px;padding:4px;border:1px solid ${isToday?'var(--accent)':'var(--border)'};
-      cursor:pointer;transition:border-color .15s`;
-    cell.onmouseover = () => cell.style.borderColor = 'var(--accent)';
-    cell.onmouseout  = () => cell.style.borderColor = isToday ? 'var(--accent)' : 'var(--border)';
-    cell.onclick = () => abrirNovoEvento(dateStr);
-
-    cell.innerHTML = `<div style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text-muted)'};margin-bottom:3px">${d}</div>`;
-
-    dayEvents.forEach(e => {
-      const cor = TIPO_CORES[e.tipo] || TIPO_CORES.manual;
-      const tag = document.createElement('div');
-      tag.style.cssText = `background:${cor.bg};border-left:2px solid ${cor.border};
-        border-radius:3px;padding:2px 5px;font-size:10px;margin-bottom:2px;
-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
-        ${e.concluido?'opacity:.5;text-decoration:line-through':''}`;
-      tag.textContent = e.titulo;
-      tag.title = e.titulo + (e.fornecedor ? ' — ' + e.fornecedor : '');
-      tag.onclick = ev => { ev.stopPropagation(); abrirDetalheEvento(e); };
-      cell.appendChild(tag);
-    });
-
-    grid.appendChild(cell);
-  }
-}
-
-// ── Event modal ───────────────────────────────────────────────────────────────
-
-function abrirNovoEvento(date='') {
-  evArtigos = [];
-  renderArtigosEv();
-  const today = date || new Date().toISOString().split('T')[0];
-  document.getElementById('evModalTitle').textContent = 'Novo Evento';
-  document.getElementById('evId').value       = '';
-  document.getElementById('evTitulo').value   = '';
-  document.getElementById('evTipo').value     = 'manual';
-  document.getElementById('evDataInicio').value = today;
-  document.getElementById('evDataFim').value  = '';
-  document.getElementById('evHora').value     = '';
-  document.getElementById('evDescricao').value= '';
-  document.getElementById('evFornecedor').value='';
-  document.getElementById('evArtigos').value  = '';
-  document.getElementById('evConcluido').checked = false;
-  document.getElementById('evModal').style.display = 'flex';
-  document.getElementById('evBtnApagar').style.display = 'none';
-}
-
-function abrirDetalheEvento(e) {
-  document.getElementById('evModalTitle').textContent = 'Editar Evento';
-  document.getElementById('evId').value       = e.id;
-  document.getElementById('evTitulo').value   = e.titulo;
-  document.getElementById('evTipo').value     = e.tipo;
-  document.getElementById('evDataInicio').value = e.data_inicio;
-  document.getElementById('evDataFim').value  = e.data_fim || '';
-  document.getElementById('evHora').value     = e.hora || '';
-  document.getElementById('evDescricao').value= e.descricao || '';
-  document.getElementById('evFornecedor').value= e.fornecedor || '';
-  document.getElementById('evArtigos').value  = (e.artigos||[]).map(a=>a.ref||a.design).join(', ');
-  evArtigos = (e.artigos||[]).map(a => ({ref:a.ref||a.referencia||'', design:a.design||a.designacao||'', qtt:a.qtt||1, unidade:a.unidade||'un'}));
-  renderArtigosEv();
-  document.getElementById('evArtigoSearch').value = '';
-  document.getElementById('evConcluido').checked = e.concluido || false;
-  document.getElementById('evBtnApagar').style.display = 'inline-flex';
-  document.getElementById('evModal').style.display = 'flex';
-}
-
-function fecharEvModal() {
-  document.getElementById('evModal').style.display = 'none';
-}
-
-// Article search for event modal
-let evArtigos = [];
-let evArtigoTimer = null;
-
-function pesquisarArtigoEv(q) {
-  clearTimeout(evArtigoTimer);
-  const res = document.getElementById('evArtigoResults');
-  if (q.length < 2) { res.style.display='none'; return; }
-  evArtigoTimer = setTimeout(() => {
-    fetch('/api/artigos?q=' + encodeURIComponent(q))
-      .then(r=>r.json()).then(data => {
-        if (!data.length) { res.style.display='none'; return; }
-        res.style.display = 'block';
-        res.innerHTML = data.slice(0,8).map(a =>
-          `<div onclick="adicionarArtigoEv('${a.referencia}','${(a.designacao||'').replace(/'/g,"\'")}','${a.unidade||'un'}')"
-            style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px"
-            onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-            <span style="font-family:monospace;color:var(--accent)">${a.referencia}</span>
-            <span style="margin-left:8px">${a.designacao||''}</span>
-            <span style="float:right;color:${a.stock_atual<=0?'var(--danger)':a.stock_atual<5?'var(--warning)':'var(--success)'}">Stock: ${(a.stock_atual||0).toFixed(1)}</span>
-          </div>`
-        ).join('');
-      });
-  }, 250);
-}
-
-function adicionarArtigoEv(ref, design, unidade) {
-  if (evArtigos.find(a => a.ref === ref)) return; // already added
-  evArtigos.push({ref, design, qtt: 1, unidade});
-  renderArtigosEv();
-  document.getElementById('evArtigoSearch').value = '';
-  document.getElementById('evArtigoResults').style.display = 'none';
-}
-
-function renderArtigosEv() {
-  const box = document.getElementById('evArtigosList');
-  if (!evArtigos.length) { box.innerHTML = ''; return; }
-  box.innerHTML = evArtigos.map((a, i) =>
-    `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border-radius:6px">
-      <span style="font-family:monospace;font-size:12px;color:var(--accent);flex-shrink:0">${a.ref}</span>
-      <span style="font-size:12px;flex:1">${a.design}</span>
-      <input type="number" value="${a.qtt}" min="0.01" step="0.01"
-             onchange="evArtigos[${i}].qtt=parseFloat(this.value)||1"
-             style="width:60px;font-size:12px;text-align:right">
-      <span style="font-size:11px;color:var(--text-muted)">${a.unidade}</span>
-      <button onclick="evArtigos.splice(${i},1);renderArtigosEv()"
-              style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px">✕</button>
-    </div>`
-  ).join('');
-}
-
-function guardarEvento() {
-  const id = document.getElementById('evId').value;
-  const dataInicio = document.getElementById('evDataInicio').value;
-  if (!dataInicio) { alert('Preencha a data.'); return; }
-
-  const dados = {
-    titulo:      document.getElementById('evTitulo').value.trim() || 'Sem título',
-    tipo:        document.getElementById('evTipo').value,
-    data_inicio: dataInicio,
-    data_fim:    document.getElementById('evDataFim').value || null,
-    hora:        document.getElementById('evHora').value || null,
-    descricao:   document.getElementById('evDescricao').value,
-    fornecedor:  document.getElementById('evFornecedor').value,
-    concluido:   document.getElementById('evConcluido').checked,
-    artigos:     evArtigos.map(a => ({ref:a.ref, design:a.design, qtt:a.qtt, unidade:a.unidade})),
-  };
-
-  const url    = id ? `/api/calendario/eventos/${id}` : '/api/calendario/eventos';
-  const method = id ? 'PUT' : 'POST';
-
-  fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados)})
-    .then(r=>r.json())
-    .then(d=>{
-      if(d.ok){
-        fecharEvModal();
-        carregarCalendario();
-      } else {
-        alert('Erro: ' + (d.error||'Desconhecido'));
-      }
-    })
-    .catch(e => alert('Erro de ligação: ' + e));
-}
-
-function apagarEvento() {
-  const id = document.getElementById('evId').value;
-  if (!id || !confirm('Apagar este evento?')) return;
-  fetch(`/api/calendario/eventos/${id}`, {method:'DELETE'})
-    .then(r=>r.json()).then(d=>{ if(d.ok){ fecharEvModal(); carregarCalendario(); }});
-}
-
-// ── Pedido → Events modal ─────────────────────────────────────────────────────
-
-function abrirEventoPedido() {
-  document.getElementById('pedidoEvModal').style.display = 'flex';
-}
-function fecharPedidoEvModal() {
-  document.getElementById('pedidoEvModal').style.display = 'none';
-}
-function criarEventosPedido() {
-  const pid   = document.getElementById('pedEvPid').value.trim();
-  const dc    = document.getElementById('pedEvDataCompra').value;
-  const dias  = document.getElementById('pedEvDias').value;
-  const forn  = document.getElementById('pedEvFornecedor').value;
-  if (!pid || !dc) { alert('Preencha o nº do pedido e a data de compra.'); return; }
-  fetch(`/api/calendario/pedido/${pid}/criar_eventos`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({data_compra:dc, dias_entrega:dias, fornecedor:forn})
-  }).then(r=>r.json()).then(d=>{
-    if(d.ok){
-      fecharPedidoEvModal();
-      carregarCalendario();
-      alert(`✅ Eventos criados!\nData de compra: ${dc}\nEntrega prevista: ${d.data_entrega}`);
-    } else alert('Erro: ' + (d.error||'desconhecido'));
-  });
-}
-
-// Init calendar when widget is rendered
-const _origInitWidgets = initWidgets;
-initWidgets = function() {
-  _origInitWidgets();
-  if (document.getElementById('calGrid')) carregarCalendario();
-};
-
-// ── Load saved layout ─────────────────────────────────────────────────────────
-
-fetch('/api/dashboard/layout').then(r=>r.json()).then(saved => {
-  if (saved && saved.length > 0) currentLayout = saved;
-  renderGrid();
-}).catch(() => renderGrid());
-
-</script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
-
-<!-- Event Modal -->
-<div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
-    <div class="flex items-center justify-between mb-16">
+<!-- MODAL: Novo/Editar Evento -->
+<div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 id="evModalTitle" style="font-size:15px;font-weight:600">Novo Evento</h3>
-      <button onclick="fecharEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+      <button onclick="fecharEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:24px;cursor:pointer;line-height:1">×</button>
     </div>
     <input type="hidden" id="evId">
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Título *</label>
-        <input type="text" id="evTitulo" placeholder="Ex: Chegada de filtros">
-      </div>
-      <div class="form-group">
-        <label>Tipo</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Título *</label>
+        <input type="text" id="evTitulo" placeholder="Ex: Chegada de filtros"></div>
+      <div class="form-group"><label>Tipo</label>
         <select id="evTipo">
           <option value="manual">📌 Evento manual</option>
           <option value="compra">🛒 Data de compra</option>
           <option value="entrega_prevista">📦 Entrega prevista</option>
           <option value="entrega_real">✅ Entrega confirmada</option>
           <option value="manutencao">🔧 Manutenção</option>
-        </select>
-      </div>
+        </select></div>
     </div>
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Data *</label>
-        <input type="date" id="evDataInicio">
-      </div>
-      <div class="form-group">
-        <label>Data fim (opcional)</label>
-        <input type="date" id="evDataFim">
-      </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="form-group"><label>Data *</label>
+        <input type="date" id="evDataInicio"></div>
+      <div class="form-group"><label>Data fim</label>
+        <input type="date" id="evDataFim"></div>
+      <div class="form-group"><label>Hora</label>
+        <input type="time" id="evHora"></div>
     </div>
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Hora (opcional)</label>
-        <input type="time" id="evHora">
-      </div>
-      <div class="form-group">
-        <label>Fornecedor</label>
-        <input type="text" id="evFornecedor" placeholder="Nome do fornecedor">
-      </div>
-    </div>
+    <div class="form-group"><label>Fornecedor</label>
+      <input type="text" id="evFornecedor" placeholder="Nome do fornecedor"></div>
     <div class="form-group">
-      <label>Artigos (opcional)</label>
-      <input type="text" id="evArtigos" placeholder="Referências separadas por vírgula">
+      <label>Artigos PHC</label>
+      <div style="position:relative">
+        <input type="text" id="evArtigoSearch" placeholder="Pesquisar artigo..." oninput="pesquisarArtigoEv(this.value)" autocomplete="off">
+        <div id="evArtigoResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.4)"></div>
+      </div>
+      <div id="evArtigosList" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
     </div>
-    <div class="form-group">
-      <label>Descrição / Notas</label>
-      <textarea id="evDescricao" rows="2" placeholder="Informação adicional..."></textarea>
-    </div>
+    <div class="form-group"><label>Notas</label>
+      <textarea id="evDescricao" rows="2" placeholder="Informação adicional..."></textarea></div>
     <div class="form-group">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="evConcluido" style="width:auto">
-        Marcar como concluído
+        <input type="checkbox" id="evConcluido" style="width:auto"> Marcar como concluído
       </label>
     </div>
-    <div class="flex gap-8" style="justify-content:flex-end">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
       <button id="evBtnApagar" onclick="apagarEvento()" class="btn btn-ghost btn-sm" style="color:var(--danger);display:none">🗑️ Apagar</button>
       <button onclick="fecharEvModal()" class="btn btn-ghost">Cancelar</button>
       <button onclick="guardarEvento()" class="btn btn-primary">💾 Guardar</button>
@@ -652,37 +82,352 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved => {
   </div>
 </div>
 
-<!-- Pedido → Events Modal -->
-<div id="pedidoEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:460px;max-width:95vw">
-    <div class="flex items-center justify-between mb-16">
-      <h3 style="font-size:15px;font-weight:600">📋 Criar eventos a partir de pedido</h3>
-      <button onclick="fecharPedidoEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+<!-- MODAL: Eventos de Pedido -->
+<div id="pedidoEvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:440px;max-width:95vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-size:15px;font-weight:600">📋 Eventos de Pedido de Compra</h3>
+      <button onclick="fecharPedidoEvModal()" style="background:none;border:none;color:var(--text-muted);font-size:24px;cursor:pointer">×</button>
     </div>
-    <div class="form-group">
-      <label>Nº do Pedido (PC-XXXX)</label>
-      <input type="number" id="pedEvPid" placeholder="Ex: 42" min="1">
-    </div>
-    <div class="form-group">
-      <label>Data de compra *</label>
-      <input type="date" id="pedEvDataCompra">
-    </div>
-    <div class="form-group">
-      <label>Prazo de entrega (dias)</label>
-      <input type="number" id="pedEvDias" value="7" min="1" max="365">
-    </div>
-    <div class="form-group">
-      <label>Fornecedor</label>
-      <input type="text" id="pedEvFornecedor" placeholder="Nome do fornecedor">
-    </div>
+    <div class="form-group"><label>Nº do Pedido *</label>
+      <input type="number" id="pedEvPid" placeholder="Ex: 42" min="1"></div>
+    <div class="form-group"><label>Data de compra *</label>
+      <input type="date" id="pedEvDataCompra"></div>
+    <div class="form-group"><label>Prazo de entrega (dias)</label>
+      <input type="number" id="pedEvDias" value="7" min="1"></div>
+    <div class="form-group"><label>Fornecedor</label>
+      <input type="text" id="pedEvFornecedor" placeholder="Nome do fornecedor"></div>
     <div style="padding:10px 14px;background:rgba(59,110,240,.08);border-radius:6px;font-size:12px;color:var(--text-muted);margin-bottom:16px">
-      💡 Cria automaticamente dois eventos no calendário: <strong>Data de compra</strong> e <strong>Entrega prevista</strong> com todos os artigos do pedido.
+      💡 Cria dois eventos: <strong>Data de compra</strong> e <strong>Entrega prevista</strong>.
     </div>
-    <div class="flex gap-8" style="justify-content:flex-end">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="fecharPedidoEvModal()" class="btn btn-ghost">Cancelar</button>
       <button onclick="criarEventosPedido()" class="btn btn-primary">📅 Criar Eventos</button>
     </div>
   </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// ── Widget data ───────────────────────────────────────────────────────────────
+const WIDGET_DATA = {
+  kpis: {
+    label: '📊 KPIs', cols: 12,
+    html: function() { return `<div class="stats-grid" style="margin:0">
+      <div class="stat-card"><div class="stat-label">Total Pedidos</div><div class="stat-value">{{ total_pedidos }}</div><div class="stat-icon">📋</div></div>
+      <div class="stat-card warning"><div class="stat-label">Abertos</div><div class="stat-value">{{ pedidos_abertos }}</div><div class="stat-icon">⏳</div></div>
+      <div class="stat-card success"><div class="stat-label">Aprovados</div><div class="stat-value">{{ pedidos_aprovados }}</div><div class="stat-icon">✅</div></div>
+      <div class="stat-card info"><div class="stat-label">Orçamentos</div><div class="stat-value">{{ total_orcamentos }}</div><div class="stat-icon">📄</div></div>
+    </div>`; }
+  },
+  pedidos_recentes: {
+    label: '📋 Pedidos Recentes', cols: 8,
+    html: function() { return `{% if pedidos_recentes %}<div class="table-wrap" style="margin:0"><table><thead><tr><th>Título</th><th>Estado</th><th>Data</th><th></th></tr></thead><tbody>{% for p in pedidos_recentes %}<tr><td style="font-size:13px">{{ p.titulo[:35] }}</td><td><span class="badge {% if p.estado=='aberto' %}badge-blue{% elif p.estado=='aprovado' %}badge-green{% else %}badge-yellow{% endif %}" style="font-size:10px">{{ p.estado }}</span></td><td style="font-size:12px;color:var(--text-muted)">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td><td><a href="/pedidos/{{ p.id }}" class="btn btn-ghost btn-sm">→</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem pedidos recentes</div>{% endif %}`; }
+  },
+  qr_mobile: {
+    label: '📱 QR Mobile', cols: 4,
+    html: function() { return `<div style="text-align:center;padding:8px"><div id="qrWidget" style="display:inline-block;background:white;padding:8px;border-radius:8px;margin-bottom:10px;min-height:100px"></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px" id="qrWidgetUrl">A carregar...</div><a href="/mobile" class="btn btn-ghost btn-sm" style="display:inline-flex;width:100%;justify-content:center;margin-bottom:6px">📱 App mobile</a><a href="/acesso-externo" class="btn btn-ghost btn-sm" style="display:inline-flex;width:100%;justify-content:center">🌐 Acesso externo</a></div>`; }
+  },
+  stock_baixo: {
+    label: '⚠️ Stock Baixo', cols: 6,
+    html: function() { return `{% if artigos_stock_baixo %}<div class="table-wrap" style="margin:0"><table><thead><tr><th>Ref.</th><th>Designação</th><th style="text-align:right">Stock</th></tr></thead><tbody>{% for a in artigos_stock_baixo %}<tr><td class="mono" style="font-size:11px;color:var(--accent)"><a href="/stock/{{ a.referencia }}">{{ a.referencia }}</a></td><td style="font-size:12px">{{ (a.designacao or '')[:28] }}</td><td style="text-align:right;font-weight:700;color:{% if a.stock_atual<=0 %}var(--danger){% else %}var(--warning){% endif %};font-family:monospace">{{ '%.1f'|format(a.stock_atual) }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div style="text-align:center;padding:32px;color:var(--success)">✅ Stock OK</div>{% endif %}`; }
+  },
+  acesso_externo: {
+    label: '🌐 Acesso Externo', cols: 6,
+    html: function() { return `<div style="display:flex;align-items:center;gap:12px;padding:4px"><div id="tunnelStatusWidget" style="font-size:13px;color:var(--text-muted);flex:1">A verificar...</div><a href="/acesso-externo" class="btn btn-ghost btn-sm">Ver →</a></div>`; }
+  },
+  chat_rapido: {
+    label: '🤖 Chat Rápido', cols: 6,
+    html: function() { return `<div style="display:flex;flex-direction:column;min-height:160px"><div id="chatWidgetMsgs" style="flex:1;overflow-y:auto;font-size:12px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px;max-height:140px"></div><div style="display:flex;gap:6px"><input type="text" id="chatWidgetInput" placeholder="Pergunta rápida..." style="flex:1;font-size:12px" onkeydown="if(event.key==='Enter')enviarChatWidget()"><button onclick="enviarChatWidget()" class="btn btn-primary btn-sm">↑</button></div></div>`; }
+  },
+  calendario: {
+    label: '📅 Calendário', cols: 12,
+    html: function() { return `<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><button onclick="calNav(-1)" class="btn btn-ghost btn-sm">‹</button><div id="calTitulo" style="font-size:15px;font-weight:700;flex:1;text-align:center"></div><button onclick="calNav(1)" class="btn btn-ghost btn-sm">›</button><button onclick="abrirNovoEvento()" class="btn btn-primary btn-sm">+ Evento</button><button onclick="abrirEventoPedido()" class="btn btn-ghost btn-sm">📋 Pedido</button></div><div id="calDayHeaders" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px"></div><div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div></div>`; }
+  }
+};
+
+const DEFAULT_LAYOUT = [
+  {id:'kpis', cols:12},
+  {id:'pedidos_recentes', cols:8},
+  {id:'qr_mobile', cols:4},
+  {id:'stock_baixo', cols:6},
+  {id:'acesso_externo', cols:6},
+  {id:'calendario', cols:12},
+];
+
+let currentLayout = [...DEFAULT_LAYOUT];
+let editMode = false;
+
+// ── Grid render ───────────────────────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById('widgetGrid');
+  grid.innerHTML = '';
+  currentLayout.forEach((item, idx) => {
+    const def = WIDGET_DATA[item.id];
+    if (!def) return;
+    const w = document.createElement('div');
+    w.dataset.id  = item.id;
+    w.dataset.idx = idx;
+    w.style.cssText = `grid-column:span ${item.cols||def.cols};background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:visible`;
+    w.innerHTML = `
+      <div style="display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:8px;${editMode?'cursor:move;background:var(--surface2)':''}">
+        <span style="font-size:13px;font-weight:600;flex:1">${def.label}</span>
+        ${editMode ? `
+          <select onchange="resizeWidget(${idx},this.value)" style="font-size:11px;padding:2px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px">
+            ${[2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}" ${(item.cols||def.cols)==n?'selected':''}>${n}col</option>`).join('')}
+          </select>
+          <button onclick="removerWidget(${idx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px">✕</button>
+        ` : ''}
+      </div>
+      <div style="padding:14px">${def.html()}</div>`;
+    if (editMode) {
+      w.draggable = true;
+      w.addEventListener('dragstart', e => { e.dataTransfer.setData('idx', idx); w.style.opacity='.5'; });
+      w.addEventListener('dragend',   () => w.style.opacity='1');
+      w.addEventListener('dragover',  e => e.preventDefault());
+      w.addEventListener('drop', e => {
+        e.preventDefault();
+        const from = parseInt(e.dataTransfer.getData('idx'));
+        if (from !== idx) { const m = currentLayout.splice(from,1)[0]; currentLayout.splice(idx,0,m); renderGrid(); }
+      });
+    }
+    grid.appendChild(w);
+  });
+  initWidgets();
+}
+
+function resizeWidget(idx, cols) { currentLayout[idx].cols = parseInt(cols); renderGrid(); }
+function removerWidget(idx)       { currentLayout.splice(idx,1); renderGrid(); }
+function adicionarWidget(id) {
+  if (currentLayout.find(w=>w.id===id)) { alert('Widget já no dashboard'); return; }
+  currentLayout.push({id, cols: WIDGET_DATA[id].cols});
+  renderGrid();
+}
+function toggleEdit() {
+  editMode = !editMode;
+  document.getElementById('btnEdit').textContent = editMode ? '✅ Terminar edição' : '✏️ Editar layout';
+  document.getElementById('editBar').style.display = editMode ? 'flex' : 'none';
+  renderGrid();
+}
+function guardarLayout() {
+  fetch('/api/dashboard/layout', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(currentLayout)})
+    .then(r=>r.json()).then(d=>{ if(d.ok) { const b=document.getElementById('btnEdit'); const o=b.textContent; b.textContent='✅ Guardado!'; setTimeout(()=>b.textContent=o,2000); }});
+}
+function resetarLayout() { if(confirm('Repor layout?')) { currentLayout=[...DEFAULT_LAYOUT]; renderGrid(); } }
+
+// ── Widget callbacks ──────────────────────────────────────────────────────────
+function initWidgets() {
+  // QR code
+  const qrBox = document.getElementById('qrWidget');
+  if (qrBox && !qrBox._done) {
+    qrBox._done = true;
+    fetch('/api/tunnel/url').then(r=>r.json()).then(d=>{
+      const url = (d.url||window.location.origin)+'/mobile';
+      document.getElementById('qrWidgetUrl').textContent = url;
+      if(window.QRCode) new QRCode(qrBox,{text:url,width:100,height:100,colorDark:'#000',colorLight:'#fff'});
+    }).catch(()=>{ if(window.QRCode) new QRCode(qrBox,{text:window.location.origin+'/mobile',width:100,height:100,colorDark:'#000',colorLight:'#fff'}); });
+  }
+  // Tunnel status
+  const ts = document.getElementById('tunnelStatusWidget');
+  if (ts && !ts._done) {
+    ts._done = true;
+    fetch('/api/tunnel/url').then(r=>r.json()).then(d=>{
+      ts.innerHTML = d.url ? '🟢 Activo<br><span style="font-family:monospace;font-size:11px;color:var(--accent)">'+d.url+'</span>' : '🔴 Inactivo';
+    });
+  }
+  // Calendar
+  if (document.getElementById('calGrid') && !window._calInit) {
+    window._calInit = true;
+    carregarCalendario();
+  }
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth()+1;
+const CORES = {
+  compra:           {bg:'rgba(59,110,240,.2)', border:'#3b6ef0'},
+  entrega_prevista: {bg:'rgba(245,158,11,.2)', border:'#f59e0b'},
+  entrega_real:     {bg:'rgba(34,197,94,.2)',  border:'#22c55e'},
+  manutencao:       {bg:'rgba(239,68,68,.2)',  border:'#ef4444'},
+  manual:           {bg:'rgba(148,163,184,.15)',border:'#94a3b8'},
+};
+
+function calNav(dir) { calMonth+=dir; if(calMonth>12){calMonth=1;calYear++;} if(calMonth<1){calMonth=12;calYear--;} window._calInit=false; carregarCalendario(); }
+
+function carregarCalendario() {
+  const grid = document.getElementById('calGrid');
+  const titulo = document.getElementById('calTitulo');
+  if (!grid) return;
+  const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  if (titulo) titulo.textContent = meses[calMonth-1]+' '+calYear;
+  const dh = document.getElementById('calDayHeaders');
+  if (dh && !dh.children.length) ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>{
+    dh.insertAdjacentHTML('beforeend',`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px">${d}</div>`);
+  });
+  fetch(`/api/calendario/eventos?ano=${calYear}&mes=${calMonth}`)
+    .then(r=>r.json()).then(ev=>renderCalendario(ev)).catch(()=>renderCalendario([]));
+}
+
+function renderCalendario(eventos) {
+  const grid = document.getElementById('calGrid');
+  if (!grid) return;
+  const first = new Date(calYear,calMonth-1,1).getDay();
+  const days  = new Date(calYear,calMonth,0).getDate();
+  const today = new Date().toISOString().split('T')[0];
+  const byDate = {};
+  eventos.forEach(e=>{ if(!byDate[e.data_inicio])byDate[e.data_inicio]=[]; byDate[e.data_inicio].push(e); });
+  grid.innerHTML = '';
+  for(let i=0;i<first;i++) grid.insertAdjacentHTML('beforeend','<div style="min-height:56px"></div>');
+  for(let d=1;d<=days;d++) {
+    const ds = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = ds===today;
+    const cell = document.createElement('div');
+    cell.style.cssText = `min-height:56px;background:${isToday?'rgba(59,110,240,.1)':'var(--surface2)'};border-radius:6px;padding:4px;border:1px solid ${isToday?'var(--accent)':'var(--border)'};cursor:pointer`;
+    cell.onclick = ()=>abrirNovoEvento(ds);
+    cell.innerHTML = `<div style="font-size:12px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':'var(--text-muted)'};margin-bottom:2px">${d}</div>`;
+    (byDate[ds]||[]).forEach(e=>{
+      const cor = CORES[e.tipo]||CORES.manual;
+      const tag = document.createElement('div');
+      tag.style.cssText=`background:${cor.bg};border-left:2px solid ${cor.border};border-radius:3px;padding:1px 4px;font-size:10px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;${e.concluido?'opacity:.4;text-decoration:line-through':''}`;
+      tag.textContent=e.titulo; tag.title=e.titulo;
+      tag.onclick=ev=>{ev.stopPropagation();abrirDetalheEvento(e);};
+      cell.appendChild(tag);
+    });
+    grid.appendChild(cell);
+  }
+}
+
+// ── Event modal ───────────────────────────────────────────────────────────────
+let evArtigos = [];
+let evSearchTimer = null;
+
+function abrirNovoEvento(date='') {
+  evArtigos = [];
+  renderArtigosEv();
+  document.getElementById('evId').value = '';
+  document.getElementById('evModalTitle').textContent = 'Novo Evento';
+  document.getElementById('evTitulo').value   = '';
+  document.getElementById('evTipo').value     = 'manual';
+  document.getElementById('evDataInicio').value = date || new Date().toISOString().split('T')[0];
+  document.getElementById('evDataFim').value  = '';
+  document.getElementById('evHora').value     = '';
+  document.getElementById('evFornecedor').value = '';
+  document.getElementById('evDescricao').value  = '';
+  document.getElementById('evArtigoSearch').value = '';
+  document.getElementById('evConcluido').checked  = false;
+  document.getElementById('evBtnApagar').style.display = 'none';
+  document.getElementById('evModal').style.display = 'flex';
+}
+
+function abrirDetalheEvento(e) {
+  evArtigos = (e.artigos||[]).map(a=>({ref:a.ref||'',design:a.design||'',qtt:a.qtt||1,unidade:a.unidade||'un'}));
+  renderArtigosEv();
+  document.getElementById('evId').value = e.id;
+  document.getElementById('evModalTitle').textContent = 'Editar Evento';
+  document.getElementById('evTitulo').value   = e.titulo||'';
+  document.getElementById('evTipo').value     = e.tipo||'manual';
+  document.getElementById('evDataInicio').value = e.data_inicio||'';
+  document.getElementById('evDataFim').value  = e.data_fim||'';
+  document.getElementById('evHora').value     = e.hora||'';
+  document.getElementById('evFornecedor').value = e.fornecedor||'';
+  document.getElementById('evDescricao').value  = e.descricao||'';
+  document.getElementById('evArtigoSearch').value = '';
+  document.getElementById('evConcluido').checked  = e.concluido||false;
+  document.getElementById('evBtnApagar').style.display = 'inline-flex';
+  document.getElementById('evModal').style.display = 'flex';
+}
+
+function fecharEvModal() { document.getElementById('evModal').style.display='none'; }
+
+function guardarEvento() {
+  const data_inicio = document.getElementById('evDataInicio').value;
+  if (!data_inicio) { alert('Preencha a data.'); return; }
+  const id = document.getElementById('evId').value;
+  const dados = {
+    titulo:      document.getElementById('evTitulo').value.trim()||'Sem título',
+    tipo:        document.getElementById('evTipo').value,
+    data_inicio, data_fim: document.getElementById('evDataFim').value||null,
+    hora:        document.getElementById('evHora').value||null,
+    descricao:   document.getElementById('evDescricao').value,
+    fornecedor:  document.getElementById('evFornecedor').value,
+    concluido:   document.getElementById('evConcluido').checked,
+    artigos:     evArtigos,
+  };
+  const url = id ? `/api/calendario/eventos/${id}` : '/api/calendario/eventos';
+  fetch(url, {method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados)})
+    .then(r=>r.json()).then(d=>{ if(d.ok){fecharEvModal();window._calInit=false;carregarCalendario();} else alert('Erro: '+(d.error||'?')); })
+    .catch(e=>alert('Erro: '+e));
+}
+
+function apagarEvento() {
+  const id = document.getElementById('evId').value;
+  if (!id||!confirm('Apagar?')) return;
+  fetch(`/api/calendario/eventos/${id}`,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.ok){fecharEvModal();window._calInit=false;carregarCalendario();}});
+}
+
+function pesquisarArtigoEv(q) {
+  clearTimeout(evSearchTimer);
+  const res = document.getElementById('evArtigoResults');
+  if (q.length<2){res.style.display='none';return;}
+  evSearchTimer = setTimeout(()=>{
+    fetch('/api/artigos?q='+encodeURIComponent(q)).then(r=>r.json()).then(data=>{
+      if(!data.length){res.style.display='none';return;}
+      res.style.display='block';
+      res.innerHTML=data.slice(0,8).map(a=>`<div onclick="adicionarArtigoEv('${a.referencia}','${(a.designacao||'').replace(/'/g,"\\'")}','${a.unidade||'un'}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><span style="font-family:monospace;color:var(--accent)">${a.referencia}</span> ${a.designacao||''}</div>`).join('');
+    });
+  },250);
+}
+
+function adicionarArtigoEv(ref,design,unidade) {
+  if(evArtigos.find(a=>a.ref===ref)) return;
+  evArtigos.push({ref,design,qtt:1,unidade});
+  renderArtigosEv();
+  document.getElementById('evArtigoSearch').value='';
+  document.getElementById('evArtigoResults').style.display='none';
+}
+
+function renderArtigosEv() {
+  const box = document.getElementById('evArtigosList');
+  if(!box) return;
+  box.innerHTML = evArtigos.map((a,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--surface2);border-radius:6px"><span style="font-family:monospace;font-size:12px;color:var(--accent)">${a.ref}</span><span style="flex:1;font-size:12px">${a.design}</span><input type="number" value="${a.qtt}" min="0.01" step="0.01" onchange="evArtigos[${i}].qtt=parseFloat(this.value)||1" style="width:55px;font-size:12px;text-align:right"><span style="font-size:11px;color:var(--text-muted)">${a.unidade}</span><button onclick="evArtigos.splice(${i},1);renderArtigosEv()" style="background:none;border:none;color:var(--danger);cursor:pointer">✕</button></div>`).join('');
+}
+
+// ── Pedido events ─────────────────────────────────────────────────────────────
+function abrirEventoPedido() { document.getElementById('pedidoEvModal').style.display='flex'; }
+function fecharPedidoEvModal() { document.getElementById('pedidoEvModal').style.display='none'; }
+function criarEventosPedido() {
+  const pid=document.getElementById('pedEvPid').value.trim();
+  const dc=document.getElementById('pedEvDataCompra').value;
+  if(!pid||!dc){alert('Preencha o pedido e a data.');return;}
+  fetch(`/api/calendario/pedido/${pid}/criar_eventos`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({data_compra:dc,dias_entrega:document.getElementById('pedEvDias').value,fornecedor:document.getElementById('pedEvFornecedor').value})})
+    .then(r=>r.json()).then(d=>{if(d.ok){fecharPedidoEvModal();window._calInit=false;carregarCalendario();alert('✅ Eventos criados! Entrega: '+d.data_entrega);}else alert('Erro: '+(d.error||'?'));});
+}
+
+// ── Chat widget ───────────────────────────────────────────────────────────────
+function enviarChatWidget() {
+  const input=document.getElementById('chatWidgetInput');
+  const msgs=document.getElementById('chatWidgetMsgs');
+  const txt=input.value.trim(); if(!txt) return;
+  if(!input._msgs) input._msgs=[];
+  input._msgs.push({role:'user',content:txt});
+  msgs.insertAdjacentHTML('beforeend',`<div style="align-self:flex-end;background:var(--accent);color:#fff;border-radius:8px;padding:4px 10px;max-width:90%;font-size:12px">${txt}</div>`);
+  msgs.scrollTop=msgs.scrollHeight; input.value='';
+  fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:input._msgs})})
+    .then(r=>r.json()).then(d=>{
+      const text=d.ok?d.text:'❌ '+(d.error||'Erro');
+      if(d.ok) input._msgs.push({role:'assistant',content:d.text});
+      msgs.insertAdjacentHTML('beforeend',`<div style="background:var(--surface2);border-radius:8px;padding:4px 10px;max-width:90%;font-size:11px">${text.replace(/\n/g,'<br>')}</div>`);
+      msgs.scrollTop=msgs.scrollHeight;
+    });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+fetch('/api/dashboard/layout').then(r=>r.json()).then(saved=>{
+  if(saved&&saved.length>0) currentLayout=saved;
+  renderGrid();
+}).catch(()=>renderGrid());
+</script>
 
 {% endblock %}
