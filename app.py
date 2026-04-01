@@ -9,6 +9,7 @@ import pdfplumber
 from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario
 
 app = Flask(__name__)
+app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///compras.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -1891,6 +1892,8 @@ def api_calendario_eventos():
 @app.route('/api/calendario/eventos', methods=['POST'])
 @login_required
 def api_criar_evento():
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Sessão expirada — recarregue a página'}), 401
     data = request.get_json()
     from datetime import date
     def parse_date(s):
