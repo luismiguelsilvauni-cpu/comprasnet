@@ -25,10 +25,16 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Por favor faça login para aceder.'
 
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
+
 @login_manager.unauthorized_handler
 def handle_unauthorized():
     """Return JSON for API calls, redirect for normal pages."""
-    if request.is_json or request.path.startswith('/api/'):
+    if (request.is_json or 
+        request.path.startswith('/api/') or
+        request.method == 'POST'):
         return jsonify({'error': 'Sessão expirada. Recarregue a página e faça login.'}), 401
     from flask import redirect, url_for
     return redirect(url_for('login'))
