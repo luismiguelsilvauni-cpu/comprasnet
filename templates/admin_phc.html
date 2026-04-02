@@ -137,43 +137,55 @@ function iniciarSync() {
   btn.textContent = '⏳ A sincronizar...';
   box.style.display = 'block';
   log.style.display = 'block';
-  bar.style.width = '0%';
-  bar.style.background = 'var(--accent)';
-  pct.textContent = '0%';
-  log.innerHTML = '';
-  msg.textContent = '';
+  log.innerHTML = '<div>→ A iniciar sincronização...</div>';
   title.textContent = '🔄 A sincronizar...';
   title.style.color = 'var(--text)';
+  msg.textContent = 'Este processo pode demorar alguns minutos...';
 
-  const es = new EventSource('/admin/phc/sync-progress');
+  // Animate progress bar while waiting
+  let fakePct = 0;
+  const interval = setInterval(() => {
+    if (fakePct < 90) { fakePct += 2; bar.style.width = fakePct + '%'; pct.textContent = fakePct + '%'; }
+  }, 1000);
 
-  es.onmessage = function(e) {
-    const d = JSON.parse(e.data);
-    bar.style.width = d.pct + '%';
-    bar.style.background = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
-    pct.textContent = d.pct + '%';
-    pct.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
-    msg.textContent = d.msg;
-    log.insertAdjacentHTML('beforeend', `<div style="padding:1px 0">→ ${d.msg}</div>`);
-    log.scrollTop = log.scrollHeight;
-
-    if (d.done || d.error) {
-      es.close();
+  fetch('/admin/phc/sync-progress', {method: 'POST', headers: {'Content-Type': 'application/json'}})
+    .then(r => r.json())
+    .then(d => {
+      clearInterval(interval);
+      if (d.ok) {
+        bar.style.width = '100%';
+        bar.style.background = 'var(--success)';
+        pct.textContent = '100%';
+        pct.style.color = 'var(--success)';
+        title.textContent = '✅ Sincronização concluída';
+        title.style.color = 'var(--success)';
+        msg.textContent = '';
+        log.insertAdjacentHTML('beforeend',
+          `<div>✅ Artigos: ${d.artigos.novos} novos / ${d.artigos.atualizados} actualizados</div>` +
+          `<div>✅ Fornecedores: ${d.fornecedores.novos} novos / ${d.fornecedores.atualizados} actualizados</div>` +
+          `<div>✅ Clientes: ${d.clientes.novos} novos / ${d.clientes.atualizados} actualizados</div>`
+        );
+        setTimeout(() => location.reload(), 3000);
+      } else {
+        bar.style.background = 'var(--danger)';
+        title.textContent = '❌ Erro';
+        title.style.color = 'var(--danger)';
+        msg.textContent = d.error || 'Erro desconhecido';
+        msg.style.color = 'var(--danger)';
+        log.insertAdjacentHTML('beforeend', `<div style="color:var(--danger)">❌ ${d.error}</div>`);
+      }
       btn.disabled = false;
       btn.textContent = '🔄 Sincronizar Novamente';
-      title.textContent = d.done ? '✅ Concluído' : '❌ Erro';
-      title.style.color = d.done ? 'var(--success)' : 'var(--danger)';
-      if (d.done) setTimeout(() => location.reload(), 2500);
-    }
-  };
-
-  es.onerror = function() {
-    es.close();
-    msg.textContent = '❌ Erro de ligação';
-    msg.style.color = 'var(--danger)';
-    btn.disabled = false;
-    btn.textContent = '🔄 Sincronizar Agora';
-  };
+    })
+    .catch(e => {
+      clearInterval(interval);
+      bar.style.background = 'var(--danger)';
+      title.textContent = '❌ Erro de ligação';
+      title.style.color = 'var(--danger)';
+      msg.textContent = String(e);
+      btn.disabled = false;
+      btn.textContent = '🔄 Sincronizar Agora';
+    });
 }
 </script>
 {% endblock %}

@@ -778,80 +778,6 @@ def admin_phc():
                            total_forn=total_forn,
                            total_clientes=total_clientes)
 
-@app.route('/admin/phc/sync-progress')
-@login_required
-def admin_phc_sync_progress():
-    """Server-Sent Events stream for sync progress."""
-    if not current_user.is_admin:
-        return jsonify({'error': 'Sem permissão'}), 403
-
-    cfg = ConfigPHC.query.first()
-    if not cfg:
-        return jsonify({'error': 'PHC não configurado'}), 400
-
-    def generate():
-        import json as _json
-
-        def emit(step, pct, msg, done=False, error=False):
-            data = _json.dumps({'step': step, 'pct': pct, 'msg': msg,
-                                'done': done, 'error': error})
-            return f"data: {data}\n\n"
-
-        try:
-            yield ': keepalive\n\n'
-            yield emit('start', 0, 'A verificar SQL Server...')
-            ensure_sqlserver_running()
-            yield ': keepalive\n\n'
-            yield emit('start', 5, 'A ligar ao SQL Server...')
-
-            from phc_sync import sync_artigos, sync_fornecedores, sync_clientes, test_connection
-            ok, msg = test_connection(cfg)
-            if not ok:
-                yield emit('error', 0, f'Erro de ligação: {msg}', error=True)
-                return
-
-            yield emit('artigos', 10, 'A sincronizar artigos...')
-            yield ': keepalive\n\n'
-            ins_a, upd_a, err_a = sync_artigos(cfg)
-            yield emit('artigos', 45, f'Artigos: {ins_a} novos, {upd_a} actualizados')
-
-            yield emit('fornecedores', 50, 'A sincronizar fornecedores...')
-            yield ': keepalive\n\n'
-            ins_f, upd_f, err_f = sync_fornecedores(cfg)
-            yield emit('fornecedores', 70, f'Fornecedores: {ins_f} novos, {upd_f} actualizados')
-
-            yield emit('clientes', 75, 'A sincronizar clientes...')
-            yield ': keepalive\n\n'
-            ins_c, upd_c, err_c = sync_clientes(cfg)
-            yield emit('clientes', 95, f'Clientes: {ins_c} novos, {upd_c} actualizados')
-
-            cfg.ultima_sync = datetime.utcnow()
-            db.session.commit()
-
-            total_errors = len(err_a) + len(err_f) + len(err_c)
-            msg_final = (f'✅ Sync completa — '
-                        f'Artigos: {ins_a}+{upd_a} | '
-                        f'Fornecedores: {ins_f}+{upd_f} | '
-                        f'Clientes: {ins_c}+{upd_c}')
-            if total_errors:
-                msg_final += f' | {total_errors} erros'
-            yield emit('done', 100, msg_final, done=True)
-
-        except Exception as e:
-            import traceback
-            logger.error(traceback.format_exc())
-            yield emit('error', 0, f'Erro: {str(e)}', error=True)
-
-    response = app.response_class(generate(), mimetype='text/event-stream')
-    response.headers['Cache-Control'] = 'no-cache'
-    response.headers['X-Accel-Buffering'] = 'no'
-    response.headers['Connection'] = 'keep-alive'
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    return response
-
-
-# ── ADMIN USERS ───────────────────────────────────────────────────────────────
-
 @app.route('/admin/utilizadores')
 @login_required
 def admin_utilizadores():
@@ -2224,3 +2150,86 @@ if __name__ == '__main__':
         print(f"⚠️  Backup scheduler não iniciado: {e}")
     print("🚀 ComprasNet em http://0.0.0.0:5000")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+import threading as _threading
+_sync_status = {'running': False, 'pct': 0, 'steps': [], 'done': False, 'error': None}
+
+@app.route('/admin/phc/sync-start', methods=['POST'])
+@login_required
+def admin_phc_sync_start():
+    global _sync_status
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+    if _sync_status['running']:
+        return jsonify({'error': 'Sync já em curso'}), 400
+
+    cfg = ConfigPHC.query.first()
+    if not cfg:
+        return jsonify({'error': 'PHC não configurado'}), 400
+
+    _sync_status = {'running': True, 'pct': 0, 'steps': [], 'done': False, 'error': None}
+
+    def run_sync():
+        global _sync_status
+        def step(pct, msg):
+            _sync_status['pct'] = pct
+            _sync_status['steps'].append(msg)
+
+        try:
+            step(0, 'A verificar SQL Server...')
+            ensure_sqlserver_running()
+            step(5, 'A ligar ao SQL Server...')
+
+            from phc_sync import sync_artigos, sync_fornecedores, sync_clientes, test_connection
+            ok, msg = test_connection(cfg)
+            if not ok:
+                _sync_status['error'] = f'Erro de ligação: {msg}'
+                _sync_status['running'] = False
+                return
+
+            step(10, 'A sincronizar artigos...')
+            with app.app_context():
+                ins_a, upd_a, err_a = sync_artigos(cfg)
+            step(45, f'Artigos: {ins_a} novos, {upd_a} actualizados')
+
+            step(50, 'A sincronizar fornecedores...')
+            with app.app_context():
+                ins_f, upd_f, err_f = sync_fornecedores(cfg)
+            step(70, f'Fornecedores: {ins_f} novos, {upd_f} actualizados')
+
+            step(75, 'A sincronizar clientes...')
+            with app.app_context():
+                ins_c, upd_c, err_c = sync_clientes(cfg)
+            step(95, f'Clientes: {ins_c} novos, {upd_c} actualizados')
+
+            with app.app_context():
+                cfg2 = ConfigPHC.query.first()
+                if cfg2:
+                    cfg2.ultima_sync = datetime.utcnow()
+                    db.session.commit()
+
+            errs = len(err_a) + len(err_f) + len(err_c)
+            msg = (f'Sync completa — Artigos: {ins_a}+{upd_a} | '
+                   f'Fornecedores: {ins_f}+{upd_f} | Clientes: {ins_c}+{upd_c}')
+            if errs: msg += f' | {errs} erros'
+            step(100, msg)
+            _sync_status['done'] = True
+
+        except Exception as e:
+            import traceback
+            _sync_status['error'] = str(e)
+            _sync_status['steps'].append(f'Erro: {e}')
+        finally:
+            _sync_status['running'] = False
+
+    t = _threading.Thread(target=run_sync, daemon=True)
+    t.start()
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/phc/sync-status')
+@login_required
+def admin_phc_sync_status():
+    return jsonify(_sync_status)
+
+
+
