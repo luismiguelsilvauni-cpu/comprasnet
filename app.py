@@ -720,7 +720,7 @@ def admin_phc():
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'save':
-            cfg.servidor     = request.form.get('servidor','localhost').strip()
+            cfg.servidor     = request.form.get('servidor', r'.\SQLEXPRESS').strip()
             cfg.porta        = int(request.form.get('porta', 1433))
             cfg.base_dados   = request.form.get('base_dados','PHC').strip()
             cfg.autenticacao = request.form.get('autenticacao','sql')
@@ -749,12 +749,21 @@ def admin_phc():
                 flash('Configure e guarde a ligação primeiro.','error')
             else:
                 try:
-                    from phc_sync import sync_all
-                    stats = sync_all(app, cfg)
-                    flash(f"Sync concluída — Artigos: {stats['artigos']['inseridos']} novos / {stats['artigos']['atualizados']} atualizados | "
-                          f"Fornecedores: {stats['fornecedores']['inseridos']} novos / {stats['fornecedores']['atualizados']} atualizados",'success')
+                    from phc_sync import sync_artigos, sync_fornecedores
+                    ins_a, upd_a, err_a = sync_artigos(cfg)
+                    ins_f, upd_f, err_f = sync_fornecedores(cfg)
+                    cfg.ultima_sync = datetime.utcnow()
+                    db.session.commit()
+                    msg = (f"✅ Sync concluída — "
+                           f"Artigos: {ins_a} novos / {upd_a} actualizados | "
+                           f"Fornecedores: {ins_f} novos / {upd_f} actualizados")
+                    if err_a or err_f:
+                        msg += f" | {len(err_a+err_f)} erros"
+                    flash(msg, 'success')
                 except Exception as e:
-                    flash(f'Erro na sincronização: {e}','error')
+                    import traceback
+                    flash(f'Erro na sincronização: {e}', 'error')
+                    logger.error(traceback.format_exc())
 
         return redirect(url_for('admin_phc'))
 

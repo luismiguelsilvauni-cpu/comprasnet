@@ -1,15 +1,14 @@
 """
 phc_sync.py
 ───────────
-Ligação ao SQL Server Express local onde o .bak do PHC CS é restaurado.
-Lê artigos, fornecedores e última compra em modo só-leitura.
-Sincroniza para tabelas locais SQLite usadas pelo ComprasNet.
+Ligação ao SQL Server Express local (BD PHC CS restaurada).
+Lê artigos, fornecedores e histórico em modo só-leitura.
 
-Tabelas PHC CS utilizadas (só leitura):
-  st   → Artigos (stock)
-  ec   → Entidades / Fornecedores
-  lc   → Linhas de compra (para último preço)
-  ft   → Cabeçalho de documentos de compra
+Estrutura desta BD PHC:
+  st   → Artigos (ref, design, stock, pcusto, pcpond, unidade, familia, tabiva)
+  cl   → Clientes/Fornecedores (no, nome, ncont, morada, local, codpost, telefone, email)
+  ft   → Cabeçalho documentos (ftstamp, no, anulado, tipodoc)
+  fi   → Linhas de documentos (ftstamp, ref, design, preco, qtt)
 """
 
 import pyodbc
@@ -19,7 +18,7 @@ from models import db, ArtigoPHC, FornecedorPHC, ConfigPHC
 
 logger = logging.getLogger(__name__)
 
-# ── Queries PHC CS ────────────────────────────────────────────────────────────
+# ── Queries ───────────────────────────────────────────────────────────────────
 
 SQL_ARTIGOS = """
 SELECT
@@ -27,12 +26,12 @@ SELECT
     st.design                       AS designacao,
     ISNULL(st.stock, 0)             AS stock_atual,
     ISNULL(st.pcusto, 0)            AS preco_custo,
-    ISNULL(st.pcusto, 0)            AS preco_custo_ponderado,
+    ISNULL(st.pcpond, 0)            AS preco_custo_ponderado,
     ISNULL(st.unidade, '')          AS unidade,
     ISNULL(st.familia, '')          AS familia,
-    ISNULL(st.iva, 23)              AS taxa_iva,
+    ISNULL(st.tabiva, 23)           AS taxa_iva,
     ISNULL(st.inactivo, 0)          AS inactivo,
-    st.stamp                        AS stamp
+    st.ststamp                      AS stamp
 FROM st
 WHERE ISNULL(st.inactivo, 0) = 0
   AND st.ref IS NOT NULL
@@ -42,244 +41,226 @@ ORDER BY st.ref
 
 SQL_FORNECEDORES = """
 SELECT
-    ec.no                           AS numero,
-    ec.nome                         AS nome,
-    ISNULL(ec.ncont, '')            AS nif,
-    ISNULL(ec.morada, '')           AS morada,
-    ISNULL(ec.local, '')            AS localidade,
-    ISNULL(ec.codpost, '')          AS cod_postal,
-    ISNULL(ec.telefone, '')         AS telefone,
-    ISNULL(ec.email, '')            AS email,
-    ISNULL(ec.vendedor, '')         AS vendedor,
-    ISNULL(ec.inactivo, 0)          AS inactivo,
-    ec.stamp                        AS stamp
-FROM ec
-WHERE ISNULL(ec.inactivo, 0) = 0
-  AND ec.fornecedor = 1
-ORDER BY ec.nome
+    cl.no                           AS numero,
+    cl.nome                         AS nome,
+    ISNULL(cl.ncont, '')            AS nif,
+    ISNULL(cl.morada, '')           AS morada,
+    ISNULL(cl.local, '')            AS localidade,
+    ISNULL(cl.codpost, '')          AS cod_postal,
+    ISNULL(cl.telefone, '')         AS telefone,
+    ISNULL(cl.email, '')            AS email,
+    ISNULL(cl.inactivo, 0)          AS inactivo,
+    cl.clstamp                      AS stamp
+FROM cl
+WHERE ISNULL(cl.inactivo, 0) = 0
+  AND cl.nome IS NOT NULL
+  AND LEN(LTRIM(RTRIM(cl.nome))) > 0
+ORDER BY cl.nome
 """
 
-SQL_ULTIMO_PRECO = """
-SELECT
-    lc.ref                          AS referencia,
-    ec.nome                         AS fornecedor_nome,
-    ec.no                           AS fornecedor_no,
-    lc.preco                        AS preco,
-    lc.desconto                     AS desconto,
-    lc.ettot                        AS total_linha,
+SQL_HISTORICO_COMPRAS = """
+SELECT TOP 20
+    fi.ref                          AS referencia,
+    cl.nome                         AS fornecedor_nome,
+    fi.no                           AS fornecedor_no,
+    ISNULL(fi.preco, 0)             AS preco,
+    ISNULL(fi.desconto, 0)          AS desconto,
+    ISNULL(fi.qtt, 0)               AS quantidade,
     ft.data                         AS data_compra,
-    ft.fno                          AS num_documento
-FROM lc
-INNER JOIN ft ON ft.ftstamp = lc.ftstamp
-INNER JOIN ec ON ec.no = ft.no
-WHERE lc.ref = ?
+    ft.no                           AS num_documento
+FROM fi
+INNER JOIN ft ON ft.ftstamp = fi.ftstamp
+LEFT  JOIN cl ON cl.no = ft.no
+WHERE fi.ref = ?
   AND ft.anulado = 0
-ORDER BY ft.data DESC, ft.fno DESC
+ORDER BY ft.data DESC
+"""
+
+SQL_VENDAS_CLIENTE = """
+SELECT TOP 100
+    fi.ref                          AS ref,
+    fi.design                       AS design,
+    ISNULL(fi.qtt, 0)               AS qtt,
+    ISNULL(fi.preco, 0)             AS preco,
+    ft.data                         AS data,
+    ft.no                           AS fno,
+    ft.serie                        AS serie
+FROM fi
+INNER JOIN ft ON ft.ftstamp = fi.ftstamp
+WHERE ft.no = ?
+  AND ft.anulado = 0
+  AND (fi.ref LIKE ? OR fi.design LIKE ?)
+  AND fi.ref IS NOT NULL AND fi.ref <> ''
+ORDER BY ft.data DESC
 """
 
 # ── Connection ────────────────────────────────────────────────────────────────
 
-def get_phc_connection(config: ConfigPHC):
-    """Create pyodbc connection to local SQL Server Express."""
-    drivers = [
-        'ODBC Driver 18 for SQL Server',
-        'ODBC Driver 17 for SQL Server',
-        'SQL Server Native Client 11.0',
-        'SQL Server',
-    ]
-    
-    last_error = None
-    for driver in drivers:
+def get_phc_connection(config):
+    """Create pyodbc connection using ConfigPHC settings."""
+    servidor   = (config.servidor or r'.\SQLEXPRESS').replace('localhost\\', '.\\')
+    base_dados = config.base_dados or 'PHC_Uniao'
+    driver     = config.driver or 'ODBC Driver 17 for SQL Server'
+
+    for drv in [driver, 'ODBC Driver 17 for SQL Server',
+                'ODBC Driver 13 for SQL Server', 'SQL Server']:
         try:
-            conn_str = (
-                f"DRIVER={{{driver}}};"
-                f"SERVER={config.servidor},{config.porta};"
-                f"DATABASE={config.base_dados};"
-            )
-            if config.autenticacao == 'windows':
-                conn_str += "Trusted_Connection=yes;"
-            else:
-                conn_str += f"UID={config.utilizador};PWD={config.password};"
-            
-            if driver == 'ODBC Driver 18 for SQL Server':
-                conn_str += "TrustServerCertificate=yes;"
-            
-            conn = pyodbc.connect(conn_str, timeout=10)
-            logger.info(f"PHC ligado via driver: {driver}")
-            return conn
-        except pyodbc.Error as e:
-            last_error = e
+            conn_str = (f'DRIVER={{{drv}}};SERVER={servidor};'
+                        f'DATABASE={base_dados};Trusted_Connection=yes;'
+                        f'Connection Timeout=10;')
+            return pyodbc.connect(conn_str)
+        except Exception:
             continue
-    
-    raise ConnectionError(f"Não foi possível ligar ao SQL Server. Último erro: {last_error}")
+    raise Exception(f"Não foi possível ligar a {servidor}/{base_dados}")
 
 
-def test_connection(config: ConfigPHC) -> tuple[bool, str]:
-    """Test PHC connection. Returns (success, message)."""
+def test_connection(config):
+    """Test connection and return (ok, message)."""
     try:
-        conn = get_phc_connection(config)
+        conn   = get_phc_connection(config)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM st WHERE ISNULL(inactivo,0)=0")
+        cursor.execute("SELECT COUNT(*) FROM st WHERE ISNULL(inactivo,0)=0 AND ref IS NOT NULL AND ref <> ''")
         count = cursor.fetchone()[0]
         conn.close()
-        return True, f"Ligação OK — {count} artigos ativos encontrados na base PHC."
-    except ConnectionError as e:
+        return True, f"Ligação OK — {count} artigos activos na BD PHC."
+    except Exception as e:
         return False, str(e)
-    except pyodbc.Error as e:
-        return False, f"Erro SQL: {str(e)}"
-    except Exception as e:
-        return False, f"Erro inesperado: {str(e)}"
 
 
-# ── Sync ──────────────────────────────────────────────────────────────────────
+# ── Sync functions ─────────────────────────────────────────────────────────────
 
-def sync_artigos(app, config: ConfigPHC) -> dict:
-    """Sync artigos from PHC to local SQLite. Returns stats dict."""
-    stats = {'inseridos': 0, 'atualizados': 0, 'erros': 0, 'total_phc': 0}
-    
-    try:
-        conn = get_phc_connection(config)
-        cursor = conn.cursor()
-        cursor.execute(SQL_ARTIGOS)
-        rows = cursor.fetchall()
-        conn.close()
-        stats['total_phc'] = len(rows)
-    except Exception as e:
-        raise RuntimeError(f"Erro ao ler artigos do PHC: {e}")
-    
-    with app.app_context():
-        for row in rows:
-            try:
-                ref = str(row.referencia).strip()
-                artigo = ArtigoPHC.query.filter_by(referencia=ref).first()
-                
-                if artigo:
-                    # Update
-                    artigo.designacao = str(row.designacao or '').strip()
-                    artigo.stock_atual = float(row.stock_atual or 0)
-                    artigo.preco_custo = float(row.preco_custo or 0)
-                    artigo.preco_custo_ponderado = float(row.preco_custo_ponderado or 0)
-                    artigo.unidade = str(row.unidade or 'un').strip()
-                    artigo.familia = str(row.familia or '').strip()
-                    artigo.taxa_iva = float(row.taxa_iva or 23)
-                    artigo.ultima_sync = datetime.utcnow()
-                    stats['atualizados'] += 1
-                else:
-                    # Insert
-                    artigo = ArtigoPHC(
-                        referencia=ref,
-                        designacao=str(row.designacao or '').strip(),
-                        stock_atual=float(row.stock_atual or 0),
-                        preco_custo=float(row.preco_custo or 0),
-                        preco_custo_ponderado=float(row.preco_custo_ponderado or 0),
-                        unidade=str(row.unidade or 'un').strip(),
-                        familia=str(row.familia or '').strip(),
-                        taxa_iva=float(row.taxa_iva or 23),
-                        ultima_sync=datetime.utcnow()
-                    )
-                    db.session.add(artigo)
-                    stats['inseridos'] += 1
-            except Exception as e:
-                logger.warning(f"Erro artigo {row.referencia}: {e}")
-                stats['erros'] += 1
+def sync_artigos(config) -> tuple[int, int, list]:
+    """Sync PHC articles to local SQLite. Returns (inserted, updated, errors)."""
+    conn   = get_phc_connection(config)
+    cursor = conn.cursor()
+    cursor.execute(SQL_ARTIGOS)
+    rows   = cursor.fetchall()
+    conn.close()
 
+    inserted = updated = 0
+    errors = []
+
+    for r in rows:
         try:
-            db.session.commit()
+            ref = str(r.referencia or '').strip()
+            if not ref:
+                continue
+            existing = ArtigoPHC.query.filter_by(referencia=ref).first()
+            if existing:
+                existing.designacao              = str(r.designacao or '')
+                existing.stock_atual             = float(r.stock_atual or 0)
+                existing.preco_custo             = float(r.preco_custo or 0)
+                existing.preco_custo_ponderado   = float(r.preco_custo_ponderado or 0)
+                existing.unidade                 = str(r.unidade or '')
+                existing.familia                 = str(r.familia or '')
+                existing.taxa_iva                = float(r.taxa_iva or 23)
+                updated += 1
+            else:
+                db.session.add(ArtigoPHC(
+                    referencia             = ref,
+                    designacao             = str(r.designacao or ''),
+                    stock_atual            = float(r.stock_atual or 0),
+                    preco_custo            = float(r.preco_custo or 0),
+                    preco_custo_ponderado  = float(r.preco_custo_ponderado or 0),
+                    unidade                = str(r.unidade or ''),
+                    familia                = str(r.familia or ''),
+                    taxa_iva               = float(r.taxa_iva or 23),
+                ))
+                inserted += 1
         except Exception as e:
-            db.session.rollback()
-            raise RuntimeError(f"Erro ao gravar artigos: {e}")
+            errors.append(f"{ref}: {e}")
 
-    return stats
+    if inserted or updated:
+        db.session.commit()
+    return inserted, updated, errors
 
 
-def sync_fornecedores(app, config: ConfigPHC) -> dict:
-    """Sync fornecedores from PHC to local SQLite."""
-    stats = {'inseridos': 0, 'atualizados': 0, 'erros': 0, 'total_phc': 0}
+def sync_fornecedores(config) -> tuple[int, int, list]:
+    """Sync PHC suppliers to local SQLite."""
+    conn   = get_phc_connection(config)
+    cursor = conn.cursor()
+    cursor.execute(SQL_FORNECEDORES)
+    rows   = cursor.fetchall()
+    conn.close()
 
-    try:
-        conn = get_phc_connection(config)
-        cursor = conn.cursor()
-        cursor.execute(SQL_FORNECEDORES)
-        rows = cursor.fetchall()
-        conn.close()
-        stats['total_phc'] = len(rows)
-    except Exception as e:
-        raise RuntimeError(f"Erro ao ler fornecedores do PHC: {e}")
+    inserted = updated = 0
+    errors = []
 
-    with app.app_context():
-        for row in rows:
-            try:
-                forn = FornecedorPHC.query.filter_by(numero=int(row.numero)).first()
-                if forn:
-                    forn.nome        = str(row.nome or '').strip()
-                    forn.nif         = str(row.nif or '').strip()
-                    forn.morada      = str(row.morada or '').strip()
-                    forn.localidade  = str(row.localidade or '').strip()
-                    forn.cod_postal  = str(row.cod_postal or '').strip()
-                    forn.telefone    = str(row.telefone or '').strip()
-                    forn.email       = str(row.email or '').strip()
-                    forn.ultima_sync = datetime.utcnow()
-                    stats['atualizados'] += 1
-                else:
-                    forn = FornecedorPHC(
-                        numero      = int(row.numero),
-                        nome        = str(row.nome or '').strip(),
-                        nif         = str(row.nif or '').strip(),
-                        morada      = str(row.morada or '').strip(),
-                        localidade  = str(row.localidade or '').strip(),
-                        cod_postal  = str(row.cod_postal or '').strip(),
-                        telefone    = str(row.telefone or '').strip(),
-                        email       = str(row.email or '').strip(),
-                        ultima_sync = datetime.utcnow()
-                    )
-                    db.session.add(forn)
-                    stats['inseridos'] += 1
-            except Exception as e:
-                logger.warning(f"Erro fornecedor {row.numero}: {e}")
-                stats['erros'] += 1
-
+    for r in rows:
         try:
-            db.session.commit()
+            no = int(r.numero or 0)
+            if not no:
+                continue
+            existing = FornecedorPHC.query.filter_by(numero=no).first()
+            nome = str(r.nome or '').strip()
+            if existing:
+                existing.nome       = nome
+                existing.nif        = str(r.nif or '')
+                existing.morada     = str(r.morada or '')
+                existing.localidade = str(r.localidade or '')
+                existing.cod_postal = str(r.cod_postal or '')
+                existing.telefone   = str(r.telefone or '')
+                existing.email      = str(r.email or '')
+                updated += 1
+            else:
+                db.session.add(FornecedorPHC(
+                    numero      = no,
+                    nome        = nome,
+                    nif         = str(r.nif or ''),
+                    morada      = str(r.morada or ''),
+                    localidade  = str(r.localidade or ''),
+                    cod_postal  = str(r.cod_postal or ''),
+                    telefone    = str(r.telefone or ''),
+                    email       = str(r.email or ''),
+                ))
+                inserted += 1
         except Exception as e:
-            db.session.rollback()
-            raise RuntimeError(f"Erro ao gravar fornecedores: {e}")
+            errors.append(str(e))
 
-    return stats
+    if inserted or updated:
+        db.session.commit()
+    return inserted, updated, errors
 
 
-def get_historico_compras(config: ConfigPHC, referencia: str) -> list[dict]:
-    """Return purchase history for a given article reference."""
+def get_historico_compras(config, ref: str) -> list:
+    """Get purchase history for an article."""
     try:
-        conn = get_phc_connection(config)
+        conn   = get_phc_connection(config)
         cursor = conn.cursor()
-        cursor.execute(SQL_ULTIMO_PRECO, referencia)
-        rows = cursor.fetchall()
+        cursor.execute(SQL_HISTORICO_COMPRAS, ref)
+        rows   = cursor.fetchall()
         conn.close()
-        result = []
-        for r in rows:
-            result.append({
-                'fornecedor_nome': r.fornecedor_nome,
-                'fornecedor_no':   r.fornecedor_no,
-                'preco':           float(r.preco or 0),
-                'desconto':        float(r.desconto or 0),
-                'total_linha':     float(r.total_linha or 0),
-                'data_compra':     r.data_compra.strftime('%d/%m/%Y') if r.data_compra else '—',
-                'num_documento':   r.num_documento,
-            })
-        return result
+        return [{
+            'fornecedor_nome': str(r.fornecedor_nome or ''),
+            'fornecedor_no':   r.fornecedor_no,
+            'preco':           float(r.preco or 0),
+            'desconto':        float(r.desconto or 0),
+            'quantidade':      float(r.quantidade or 0),
+            'data_compra':     r.data_compra.strftime('%d/%m/%Y') if r.data_compra else '',
+            'num_documento':   str(r.num_documento or ''),
+        } for r in rows]
     except Exception as e:
-        logger.warning(f"Erro histórico compras {referencia}: {e}")
+        logger.error(f"Erro historico compras {ref}: {e}")
         return []
 
 
-def sync_all(app, config: ConfigPHC) -> dict:
-    """Full sync: artigos + fornecedores. Returns combined stats."""
-    result = {'artigos': {}, 'fornecedores': {}, 'data_sync': datetime.utcnow().strftime('%d/%m/%Y %H:%M')}
-    result['artigos']      = sync_artigos(app, config)
-    result['fornecedores'] = sync_fornecedores(app, config)
-
-    with app.app_context():
-        config.ultima_sync = datetime.utcnow()
-        db.session.commit()
-
-    return result
+def get_vendas_cliente(config, cl_no: int, q: str = '') -> list:
+    """Get sales history for a client."""
+    try:
+        conn   = get_phc_connection(config)
+        cursor = conn.cursor()
+        like   = f'%{q}%' if q else '%'
+        cursor.execute(SQL_VENDAS_CLIENTE, cl_no, like, like)
+        rows   = cursor.fetchall()
+        conn.close()
+        return [{
+            'ref':    str(r.ref or ''),
+            'design': str(r.design or ''),
+            'qtt':    float(r.qtt or 0),
+            'preco':  float(r.preco or 0),
+            'data':   r.data.strftime('%d/%m/%Y') if r.data else '',
+            'doc':    f"{r.serie or ''}{r.fno or ''}",
+        } for r in rows]
+    except Exception as e:
+        logger.error(f"Erro vendas cliente {cl_no}: {e}")
+        return []
