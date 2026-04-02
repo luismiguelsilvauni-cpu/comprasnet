@@ -25,9 +25,9 @@ SQL_ARTIGOS = """
 SELECT
     st.ref                          AS referencia,
     st.design                       AS designacao,
-    ISNULL(st.qtt, 0)               AS stock_atual,
+    ISNULL(st.stock, 0)             AS stock_atual,
     ISNULL(st.pcusto, 0)            AS preco_custo,
-    ISNULL(st.pcp, 0)               AS preco_custo_ponderado,
+    ISNULL(st.pcusto, 0)            AS preco_custo_ponderado,
     ISNULL(st.unidade, '')          AS unidade,
     ISNULL(st.familia, '')          AS familia,
     ISNULL(st.iva, 23)              AS taxa_iva,
