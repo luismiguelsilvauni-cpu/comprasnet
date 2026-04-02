@@ -69,6 +69,7 @@ class ConfigPHC(db.Model):
     ultima_sync  = db.Column(db.DateTime)
     sync_auto    = db.Column(db.Boolean, default=False)
     sync_hora    = db.Column(db.String(5), default='06:00')
+    driver       = db.Column(db.String(100), default='ODBC Driver 17 for SQL Server')
 
 class PedidoCompra(db.Model):
     __tablename__ = 'pedidos_compra'

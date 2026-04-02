@@ -100,7 +100,7 @@ def get_phc_connection(config):
     """Create pyodbc connection using ConfigPHC settings."""
     servidor   = (config.servidor or r'.\SQLEXPRESS').replace('localhost\\', '.\\')
     base_dados = config.base_dados or 'PHC_Uniao'
-    driver     = config.driver or 'ODBC Driver 17 for SQL Server'
+    driver     = getattr(config, 'driver', None) or 'ODBC Driver 17 for SQL Server'
 
     for drv in [driver, 'ODBC Driver 17 for SQL Server',
                 'ODBC Driver 13 for SQL Server', 'SQL Server']:
