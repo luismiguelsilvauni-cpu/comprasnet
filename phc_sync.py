@@ -25,13 +25,19 @@ SELECT
     st.ref                          AS referencia,
     st.design                       AS designacao,
     ISNULL(st.stock, 0)             AS stock_atual,
-    COALESCE(NULLIF(st.epcusto,0), NULLIF(st.epcult,0), 0)   AS preco_custo,
+    COALESCE(NULLIF(st.epcusto,0),
+             (SELECT TOP 1 fi.ecusto FROM fi INNER JOIN ft ON ft.ftstamp=fi.ftstamp
+              WHERE fi.ref=st.ref AND ft.anulado=0 AND fi.ecusto>0 ORDER BY ft.fdata DESC),
+             0)                                                     AS preco_custo,
     COALESCE(NULLIF(st.epcpond,0), NULLIF(st.epcusto,0), NULLIF(st.epcult,0), 0) AS preco_custo_ponderado,
     ISNULL(st.unidade, '')          AS unidade,
     ISNULL(st.familia, '')          AS familia,
     ISNULL(st.tabiva, 23)           AS taxa_iva,
     ISNULL(st.epv1, 0)              AS pvp,
-    ISNULL(st.epcult, 0)            AS ultimo_preco_entrada,
+    (SELECT TOP 1 ISNULL(fi.ecusto,0)
+     FROM fi INNER JOIN ft ON ft.ftstamp=fi.ftstamp
+     WHERE fi.ref=st.ref AND ft.anulado=0 AND fi.ecusto>0
+     ORDER BY ft.fdata DESC)        AS ultimo_preco_entrada,
     ISNULL(st.inactivo, 0)          AS inactivo,
     st.ststamp                      AS stamp
 FROM st
