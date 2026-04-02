@@ -236,7 +236,7 @@ def sync_fornecedores(config) -> tuple[int, int, list]:
 
 
 SQL_CLIENTES = """
-SELECT DISTINCT
+SELECT
     cl.no                           AS numero,
     cl.nome                         AS nome,
     ISNULL(cl.ncont, '')            AS nif,
@@ -248,7 +248,6 @@ SELECT DISTINCT
     ISNULL(cl.inactivo, 0)          AS inactivo,
     cl.clstamp                      AS stamp
 FROM cl
-INNER JOIN ft ON ft.no = cl.no AND ft.anulado = 0 AND ft.tipodoc = 1
 WHERE ISNULL(cl.inactivo, 0) = 0
   AND cl.nome IS NOT NULL
   AND LEN(LTRIM(RTRIM(cl.nome))) > 0
