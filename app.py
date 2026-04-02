@@ -1053,10 +1053,10 @@ def sync_clientes_phc():
         conn = get_phc_connection(cfg_phc)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT no, nome, ISNULL(abrev,'') abrev, ISNULL(nipc,'') nipc,
+            SELECT no, nome, ISNULL(abrev,'') abrev, ISNULL(ncont,'') nipc,
                    ISNULL(morada,'') morada, ISNULL(local,'') local,
                    ISNULL(codpost,'') codpost, ISNULL(pais,'Portugal') pais,
-                   ISNULL(tel,'') tel, ISNULL(tlm,'') tlm,
+                   ISNULL(telefone,'') tel, ISNULL(tlm,'') tlm,
                    ISNULL(email,'') email, ISNULL(www,'') www
             FROM ec
             WHERE cliente=1 AND ISNULL(inactivo,0)=0

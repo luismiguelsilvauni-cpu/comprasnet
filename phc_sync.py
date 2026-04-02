@@ -44,11 +44,11 @@ SQL_FORNECEDORES = """
 SELECT
     ec.no                           AS numero,
     ec.nome                         AS nome,
-    ISNULL(ec.nipc, '')             AS nif,
+    ISNULL(ec.ncont, '')            AS nif,
     ISNULL(ec.morada, '')           AS morada,
     ISNULL(ec.local, '')            AS localidade,
     ISNULL(ec.codpost, '')          AS cod_postal,
-    ISNULL(ec.tel, '')              AS telefone,
+    ISNULL(ec.telefone, '')         AS telefone,
     ISNULL(ec.email, '')            AS email,
     ISNULL(ec.vendedor, '')         AS vendedor,
     ISNULL(ec.inactivo, 0)          AS inactivo,
