@@ -1,112 +1,13 @@
 {% extends "base.html" %}
-{% block title %}PHC CS · ComprasNet
-<!-- Progress -->
-<div id="syncProgress" style="display:none" class="card mt-16">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
-    <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
-  </div>
-  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:8px">
-    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%"></div>
-  </div>
-  <div id="syncMsg" style="font-size:12px;color:var(--text-muted)">A preparar...</div>
-</div>
-
-<script>
-function iniciarSync(form) {
-  const btn = document.getElementById('btnSync');
-  const box = document.getElementById('syncProgress');
-  const bar = document.getElementById('syncBar');
-  const pct = document.getElementById('syncPct');
-  const msg = document.getElementById('syncMsg');
-
-  btn.disabled = true;
-  btn.textContent = '⏳ A sincronizar...';
-  box.style.display = 'block';
-
-  // Animate bar while form submits
-  const steps = [
-    {pct:10, msg:'A verificar SQL Server...', delay:500},
-    {pct:20, msg:'A ligar à base de dados...', delay:1500},
-    {pct:35, msg:'A sincronizar artigos...', delay:3000},
-    {pct:65, msg:'A processar artigos...', delay:8000},
-    {pct:75, msg:'A sincronizar fornecedores...', delay:15000},
-    {pct:85, msg:'A sincronizar clientes...', delay:20000},
-    {pct:95, msg:'A finalizar...', delay:25000},
-  ];
-
-  steps.forEach(s => {
-    setTimeout(() => {
-      bar.style.width = s.pct + '%';
-      pct.textContent = s.pct + '%';
-      msg.textContent = s.msg;
-    }, s.delay);
-  });
-
-  // Let form submit normally
-  return true;
-}
-</script>
-
-{% endblock %}
-{% block page_title %}Integração PHC CS
-<!-- Progress -->
-<div id="syncProgress" style="display:none" class="card mt-16">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
-    <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
-  </div>
-  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:8px">
-    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%"></div>
-  </div>
-  <div id="syncMsg" style="font-size:12px;color:var(--text-muted)">A preparar...</div>
-</div>
-
-<script>
-function iniciarSync(form) {
-  const btn = document.getElementById('btnSync');
-  const box = document.getElementById('syncProgress');
-  const bar = document.getElementById('syncBar');
-  const pct = document.getElementById('syncPct');
-  const msg = document.getElementById('syncMsg');
-
-  btn.disabled = true;
-  btn.textContent = '⏳ A sincronizar...';
-  box.style.display = 'block';
-
-  // Animate bar while form submits
-  const steps = [
-    {pct:10, msg:'A verificar SQL Server...', delay:500},
-    {pct:20, msg:'A ligar à base de dados...', delay:1500},
-    {pct:35, msg:'A sincronizar artigos...', delay:3000},
-    {pct:65, msg:'A processar artigos...', delay:8000},
-    {pct:75, msg:'A sincronizar fornecedores...', delay:15000},
-    {pct:85, msg:'A sincronizar clientes...', delay:20000},
-    {pct:95, msg:'A finalizar...', delay:25000},
-  ];
-
-  steps.forEach(s => {
-    setTimeout(() => {
-      bar.style.width = s.pct + '%';
-      pct.textContent = s.pct + '%';
-      msg.textContent = s.msg;
-    }, s.delay);
-  });
-
-  // Let form submit normally
-  return true;
-}
-</script>
-
-{% endblock %}
+{% block title %}PHC CS · ComprasNet{% endblock %}
+{% block page_title %}Integração PHC CS{% endblock %}
 
 {% block content %}
-<div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start;max-width:900px">
+<div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start;max-width:900px">
 
-<!-- LEFT COLUMN -->
+<!-- LEFT -->
 <div>
 
-<!-- Connection config -->
 <div class="card mb-16">
   <div class="card-title">Ligação ao SQL Server Express</div>
   <form method="POST">
@@ -158,19 +59,16 @@ function iniciarSync(form) {
   </form>
 </div>
 
-<!-- Test + Sync -->
 <div class="card mb-16">
   <div class="card-title">Testar e Sincronizar</div>
-  <div style="display:flex;gap:8px;margin-bottom:12px">
+  <div style="display:flex;gap:8px;margin-bottom:{% if cfg.ultima_sync %}8px{% else %}0{% endif %}">
     <form method="POST" style="flex:1">
       <input type="hidden" name="action" value="test">
       <button type="submit" class="btn btn-ghost" style="width:100%">🔌 Testar Ligação</button>
     </form>
-    <form method="POST" style="flex:1" id="syncForm" onsubmit="iniciarSync(this)">
+    <form method="POST" style="flex:1" onsubmit="mostrarProgresso()">
       <input type="hidden" name="action" value="sync">
-      <button type="submit" class="btn btn-primary" style="width:100%" id="btnSync">
-        🔄 Sincronizar Agora
-      </button>
+      <button type="submit" class="btn btn-primary" style="width:100%" id="btnSync">🔄 Sincronizar Agora</button>
     </form>
   </div>
   {% if cfg.ultima_sync %}
@@ -180,26 +78,21 @@ function iniciarSync(form) {
   {% endif %}
 </div>
 
-<!-- Progress bar -->
-<div id="syncProgress" style="display:none" class="card mb-16">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
-    <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+<div class="card" style="border-style:dashed;background:var(--surface2)">
+  <div class="card-title">⚠️ Dados só-leitura</div>
+  <div style="font-size:12px;color:var(--text-muted);line-height:1.7">
+    O ComprasNet <strong>nunca escreve</strong> na BD do PHC.<br>
+    O .bak é restaurado num SQL Server <strong>local separado</strong>.
   </div>
-  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:10px">
-    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s ease;width:0%"></div>
-  </div>
-  <div id="syncMsg" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
-  <div id="syncLog" style="font-size:11px;font-family:monospace;color:var(--text-muted);max-height:120px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:8px;display:none"></div>
 </div>
 
 </div>
 
-<!-- RIGHT COLUMN: Stats -->
+<!-- RIGHT: Stats -->
 <div>
-  <div class="card mb-16">
+  <div class="card">
     <div class="card-title">Base PHC Local</div>
-    <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:10px">
       <div style="text-align:center;background:var(--surface2);border-radius:8px;padding:14px">
         <div style="font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px">ARTIGOS</div>
         <div style="font-size:28px;font-weight:700;font-family:monospace;color:var(--accent)">{{ total_artigos }}</div>
@@ -214,98 +107,24 @@ function iniciarSync(form) {
       </div>
     </div>
   </div>
-
-  <div class="card" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)">
-    <div style="font-size:12px;line-height:1.7;color:var(--text-muted)">
-      <strong style="color:var(--warning)">⚠ Dados só-leitura</strong><br>
-      O ComprasNet <strong>nunca escreve</strong> na BD do PHC.<br>
-      O .bak é restaurado num SQL Server <strong>local separado</strong>.
-    </div>
-  </div>
 </div>
 
 </div><!-- end grid -->
 
-<script>
-function iniciarSync() {
-  const btn   = document.getElementById('btnSync');
-  const box   = document.getElementById('syncProgress');
-  const bar   = document.getElementById('syncBar');
-  const pct   = document.getElementById('syncPct');
-  const msg   = document.getElementById('syncMsg');
-  const log   = document.getElementById('syncLog');
-  const title = document.getElementById('syncTitle');
-
-  btn.disabled = true;
-  btn.textContent = '⏳ A sincronizar...';
-  box.style.display = 'block';
-  log.style.display = 'block';
-  log.innerHTML = '<div>→ A iniciar sincronização...</div>';
-  title.textContent = '🔄 A sincronizar...';
-  title.style.color = 'var(--text)';
-  msg.textContent = 'Este processo pode demorar alguns minutos...';
-
-  // Animate progress bar while waiting
-  let fakePct = 0;
-  const interval = setInterval(() => {
-    if (fakePct < 90) { fakePct += 2; bar.style.width = fakePct + '%'; pct.textContent = fakePct + '%'; }
-  }, 1000);
-
-  fetch('/admin/phc/sync-progress', {method: 'POST', headers: {'Content-Type': 'application/json'}})
-    .then(r => r.json())
-    .then(d => {
-      clearInterval(interval);
-      if (d.ok) {
-        bar.style.width = '100%';
-        bar.style.background = 'var(--success)';
-        pct.textContent = '100%';
-        pct.style.color = 'var(--success)';
-        title.textContent = '✅ Sincronização concluída';
-        title.style.color = 'var(--success)';
-        msg.textContent = '';
-        log.insertAdjacentHTML('beforeend',
-          `<div>✅ Artigos: ${d.artigos.novos} novos / ${d.artigos.atualizados} actualizados</div>` +
-          `<div>✅ Fornecedores: ${d.fornecedores.novos} novos / ${d.fornecedores.atualizados} actualizados</div>` +
-          `<div>✅ Clientes: ${d.clientes.novos} novos / ${d.clientes.atualizados} actualizados</div>`
-        );
-        setTimeout(() => location.reload(), 3000);
-      } else {
-        bar.style.background = 'var(--danger)';
-        title.textContent = '❌ Erro';
-        title.style.color = 'var(--danger)';
-        msg.textContent = d.error || 'Erro desconhecido';
-        msg.style.color = 'var(--danger)';
-        log.insertAdjacentHTML('beforeend', `<div style="color:var(--danger)">❌ ${d.error}</div>`);
-      }
-      btn.disabled = false;
-      btn.textContent = '🔄 Sincronizar Novamente';
-    })
-    .catch(e => {
-      clearInterval(interval);
-      bar.style.background = 'var(--danger)';
-      title.textContent = '❌ Erro de ligação';
-      title.style.color = 'var(--danger)';
-      msg.textContent = String(e);
-      btn.disabled = false;
-      btn.textContent = '🔄 Sincronizar Agora';
-    });
-}
-</script>
-
-<!-- Progress -->
-<div id="syncProgress" style="display:none" class="card mt-16">
+<!-- Progress bar - BELOW the grid, not overlapping -->
+<div id="syncProgress" style="display:none;max-width:900px;margin-top:20px" class="card">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
+    <div style="font-size:13px;font-weight:600">🔄 A sincronizar PHC...</div>
     <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
   </div>
-  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:8px">
-    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%"></div>
+  <div style="background:var(--border);border-radius:8px;height:18px;overflow:hidden;margin-bottom:10px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s ease;width:0%"></div>
   </div>
   <div id="syncMsg" style="font-size:12px;color:var(--text-muted)">A preparar...</div>
 </div>
 
 <script>
-function iniciarSync(form) {
+function mostrarProgresso() {
   const btn = document.getElementById('btnSync');
   const box = document.getElementById('syncProgress');
   const bar = document.getElementById('syncBar');
@@ -315,29 +134,23 @@ function iniciarSync(form) {
   btn.disabled = true;
   btn.textContent = '⏳ A sincronizar...';
   box.style.display = 'block';
+  box.scrollIntoView({behavior:'smooth', block:'start'});
 
-  // Animate bar while form submits
   const steps = [
-    {pct:10, msg:'A verificar SQL Server...', delay:500},
-    {pct:20, msg:'A ligar à base de dados...', delay:1500},
-    {pct:35, msg:'A sincronizar artigos...', delay:3000},
-    {pct:65, msg:'A processar artigos...', delay:8000},
-    {pct:75, msg:'A sincronizar fornecedores...', delay:15000},
-    {pct:85, msg:'A sincronizar clientes...', delay:20000},
-    {pct:95, msg:'A finalizar...', delay:25000},
+    {p:8,  m:'A verificar SQL Server...', t:800},
+    {p:18, m:'A ligar à base de dados...', t:2000},
+    {p:30, m:'A sincronizar artigos (pode demorar)...', t:4000},
+    {p:55, m:'A processar artigos...', t:12000},
+    {p:70, m:'A calcular últimos preços...', t:20000},
+    {p:80, m:'A sincronizar fornecedores...', t:28000},
+    {p:88, m:'A sincronizar clientes...', t:35000},
+    {p:95, m:'A finalizar...', t:42000},
   ];
-
-  steps.forEach(s => {
-    setTimeout(() => {
-      bar.style.width = s.pct + '%';
-      pct.textContent = s.pct + '%';
-      msg.textContent = s.msg;
-    }, s.delay);
-  });
-
-  // Let form submit normally
-  return true;
+  steps.forEach(s => setTimeout(() => {
+    bar.style.width = s.p + '%';
+    pct.textContent = s.p + '%';
+    msg.textContent = s.m;
+  }, s.t));
 }
 </script>
-
 {% endblock %}
