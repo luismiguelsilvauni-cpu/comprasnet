@@ -798,7 +798,9 @@ def admin_phc_sync_progress():
             return f"data: {data}\n\n"
 
         try:
-            yield emit('start', 0, 'A ligar ao SQL Server...')
+            yield emit('start', 0, 'A verificar SQL Server...')
+            ensure_sqlserver_running()
+            yield emit('start', 5, 'A ligar ao SQL Server...')
 
             from phc_sync import sync_artigos, sync_fornecedores, sync_clientes, test_connection
             ok, msg = test_connection(cfg)
@@ -2170,7 +2172,34 @@ Subtotal: 300,00 €   IVA 23%: 69,00 €   TOTAL: 369,00 €"""
     return render_template('admin_ia.html', cfg=cfg,
                            modelos=RECOMMENDED_MODELS.get('lmstudio', []))
 
+def ensure_sqlserver_running():
+    """Start SQL Server Express if not running."""
+    import subprocess, time
+    SERVICE = 'MSSQL$SQLEXPRESS'
+    try:
+        r = subprocess.run(['sc', 'query', SERVICE],
+                          capture_output=True, text=True, timeout=5)
+        if 'RUNNING' in r.stdout:
+            logger.info("✅ SQL Server já está a correr")
+            return True
+        if 'STOPPED' in r.stdout:
+            logger.info("🔄 A iniciar SQL Server Express...")
+            start = subprocess.run(['net', 'start', SERVICE],
+                                  capture_output=True, text=True, timeout=30)
+            if start.returncode == 0:
+                time.sleep(3)
+                logger.info("✅ SQL Server iniciado com sucesso")
+                return True
+            else:
+                logger.warning(f"⚠️  Não foi possível iniciar SQL Server: {start.stdout}")
+                return False
+    except Exception as e:
+        logger.warning(f"⚠️  Erro ao verificar SQL Server: {e}")
+        return False
+
+
 if __name__ == '__main__':
+    ensure_sqlserver_running()
     init_db()
     # Run startup health check with auto-fix
     try:

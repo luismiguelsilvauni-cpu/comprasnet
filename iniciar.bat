@@ -61,5 +61,24 @@ echo  Login: admin / admin123
 echo.
 echo  Prima CTRL+C para parar.
 echo.
+
+REM Start SQL Server Express if not running
+echo A verificar SQL Server Express...
+sc query MSSQL$SQLEXPRESS | find "RUNNING" >nul 2>&1
+if errorlevel 1 (
+    echo A iniciar SQL Server Express...
+    net start MSSQL$SQLEXPRESS >nul 2>&1
+    if errorlevel 1 (
+        echo AVISO: Nao foi possivel iniciar o SQL Server automaticamente.
+        echo Execute manualmente: net start MSSQL$SQLEXPRESS
+    ) else (
+        echo SQL Server iniciado com sucesso.
+        timeout /t 2 /nobreak >nul
+    )
+) else (
+    echo SQL Server ja esta a correr.
+)
+echo.
+
 venv\Scripts\python.exe app.py
 pause
