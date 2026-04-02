@@ -25,10 +25,6 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Por favor faça login para aceder.'
 
-@app.before_request
-def make_session_permanent():
-    session.permanent = True
-
 @login_manager.unauthorized_handler
 def handle_unauthorized():
     """Return JSON for API calls, redirect for normal pages."""
