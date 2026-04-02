@@ -27,6 +27,8 @@ class ArtigoPHC(db.Model):
     unidade               = db.Column(db.String(20), default='un')
     familia               = db.Column(db.String(100))
     taxa_iva              = db.Column(db.Float, default=23)
+    pvp                   = db.Column(db.Float, default=0)
+    ultimo_preco_entrada  = db.Column(db.Float, default=0)
     ultima_sync           = db.Column(db.DateTime)
     aliases               = db.relationship('AliasArtigo', backref='artigo', lazy=True, cascade='all, delete-orphan')
 

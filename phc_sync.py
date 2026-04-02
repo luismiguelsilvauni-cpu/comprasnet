@@ -30,6 +30,8 @@ SELECT
     ISNULL(st.unidade, '')          AS unidade,
     ISNULL(st.familia, '')          AS familia,
     ISNULL(st.tabiva, 23)           AS taxa_iva,
+    ISNULL(st.epv1, 0)              AS pvp,
+    ISNULL(st.epcult, 0)            AS ultimo_preco_entrada,
     ISNULL(st.inactivo, 0)          AS inactivo,
     st.ststamp                      AS stamp
 FROM st
@@ -154,6 +156,8 @@ def sync_artigos(config) -> tuple[int, int, list]:
                 existing.unidade                 = str(r.unidade or '')
                 existing.familia                 = str(r.familia or '')
                 existing.taxa_iva                = float(r.taxa_iva or 23)
+                existing.pvp                     = float(r.pvp or 0)
+                existing.ultimo_preco_entrada    = float(r.ultimo_preco_entrada or 0)
                 updated += 1
             else:
                 db.session.add(ArtigoPHC(
@@ -165,6 +169,8 @@ def sync_artigos(config) -> tuple[int, int, list]:
                     unidade                = str(r.unidade or ''),
                     familia                = str(r.familia or ''),
                     taxa_iva               = float(r.taxa_iva or 23),
+                    pvp                    = float(r.pvp or 0),
+                    ultimo_preco_entrada   = float(r.ultimo_preco_entrada or 0),
                 ))
                 inserted += 1
         except Exception as e:
