@@ -798,8 +798,10 @@ def admin_phc_sync_progress():
             return f"data: {data}\n\n"
 
         try:
+            yield ': keepalive\n\n'
             yield emit('start', 0, 'A verificar SQL Server...')
             ensure_sqlserver_running()
+            yield ': keepalive\n\n'
             yield emit('start', 5, 'A ligar ao SQL Server...')
 
             from phc_sync import sync_artigos, sync_fornecedores, sync_clientes, test_connection
@@ -809,14 +811,17 @@ def admin_phc_sync_progress():
                 return
 
             yield emit('artigos', 10, 'A sincronizar artigos...')
+            yield ': keepalive\n\n'
             ins_a, upd_a, err_a = sync_artigos(cfg)
             yield emit('artigos', 45, f'Artigos: {ins_a} novos, {upd_a} actualizados')
 
             yield emit('fornecedores', 50, 'A sincronizar fornecedores...')
+            yield ': keepalive\n\n'
             ins_f, upd_f, err_f = sync_fornecedores(cfg)
             yield emit('fornecedores', 70, f'Fornecedores: {ins_f} novos, {upd_f} actualizados')
 
             yield emit('clientes', 75, 'A sincronizar clientes...')
+            yield ': keepalive\n\n'
             ins_c, upd_c, err_c = sync_clientes(cfg)
             yield emit('clientes', 95, f'Clientes: {ins_c} novos, {upd_c} actualizados')
 
@@ -837,9 +842,12 @@ def admin_phc_sync_progress():
             logger.error(traceback.format_exc())
             yield emit('error', 0, f'Erro: {str(e)}', error=True)
 
-    return app.response_class(generate(), mimetype='text/event-stream',
-                              headers={'Cache-Control': 'no-cache',
-                                       'X-Accel-Buffering': 'no'})
+    response = app.response_class(generate(), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['Connection'] = 'keep-alive'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 
 # ── ADMIN USERS ───────────────────────────────────────────────────────────────
@@ -2215,4 +2223,4 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"⚠️  Backup scheduler não iniciado: {e}")
     print("🚀 ComprasNet em http://0.0.0.0:5000")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
