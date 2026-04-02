@@ -4,45 +4,62 @@ echo    ComprasNet - Gestao de Orcamentos
 echo ============================================
 echo.
 
-REM Check Python
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo ERRO: Python nao encontrado.
-    echo Instale Python 3.10+ em https://python.org
-    pause
-    exit /b 1
+REM Try to find Python in common locations
+set PYTHON=
+if exist "venv\Scripts\python.exe" (
+    set PYTHON=venv\Scripts\python.exe
+    goto :found_python
 )
+python --version >nul 2>&1
+if not errorlevel 1 (
+    set PYTHON=python
+    goto :found_python
+)
+py --version >nul 2>&1
+if not errorlevel 1 (
+    set PYTHON=py
+    goto :found_python
+)
+if exist "C:\Python312\python.exe" set PYTHON=C:\Python312\python.exe
+if exist "C:\Python311\python.exe" set PYTHON=C:\Python311\python.exe
+if exist "C:\Python310\python.exe" set PYTHON=C:\Python310\python.exe
+if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set PYTHON=%LOCALAPPDATA%\Programs\Python\Python312\python.exe
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" set PYTHON=%LOCALAPPDATA%\Programs\Python\Python311\python.exe
+if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" set PYTHON=%LOCALAPPDATA%\Programs\Python\Python310\python.exe
+if defined PYTHON goto :found_python
+
+echo ERRO: Python nao encontrado.
+echo Instale Python 3.10+ em https://python.org
+pause
+exit /b 1
+
+:found_python
+echo Python encontrado: %PYTHON%
 
 REM Create venv if needed
 if not exist "venv" (
     echo A criar ambiente virtual...
-    python -m venv venv
+    %PYTHON% -m venv venv
 )
 
-call venv\Scripts\activate.bat
+REM Use venv python
+set PYTHON=venv\Scripts\python.exe
 
 REM Install / update dependencies
 echo A instalar dependencias...
-pip install -r requirements.txt -q
+venv\Scripts\pip.exe install -r requirements.txt -q
 
-REM Create uploads folder if missing
+REM Create folders if missing
 if not exist "uploads" mkdir uploads
 if not exist "instance" mkdir instance
 
-REM Claude API key (optional - configure in Admin > Provedor IA)
-REM set ANTHROPIC_API_KEY=sk-ant-api03-...
-
-echo.
-echo A iniciar servidor...
 echo.
 echo  Acesso local  : http://localhost:5000
 echo  Acesso na rede: http://%COMPUTERNAME%:5000
 echo.
 echo  Login: admin / admin123
-echo  (altere a password apos o primeiro login)
 echo.
 echo  Prima CTRL+C para parar.
 echo.
-
-python app.py
+venv\Scripts\python.exe app.py
 pause
