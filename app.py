@@ -2174,27 +2174,28 @@ Subtotal: 300,00 €   IVA 23%: 69,00 €   TOTAL: 369,00 €"""
 
 def ensure_sqlserver_running():
     """Start SQL Server Express if not running."""
-    import subprocess, time
+    import subprocess, time, logging
+    _log = logging.getLogger(__name__)
     SERVICE = 'MSSQL$SQLEXPRESS'
     try:
         r = subprocess.run(['sc', 'query', SERVICE],
                           capture_output=True, text=True, timeout=5)
         if 'RUNNING' in r.stdout:
-            logger.info("✅ SQL Server já está a correr")
+            _log.info("✅ SQL Server já está a correr")
             return True
         if 'STOPPED' in r.stdout:
-            logger.info("🔄 A iniciar SQL Server Express...")
+            _log.info("🔄 A iniciar SQL Server Express...")
             start = subprocess.run(['net', 'start', SERVICE],
                                   capture_output=True, text=True, timeout=30)
             if start.returncode == 0:
                 time.sleep(3)
-                logger.info("✅ SQL Server iniciado com sucesso")
+                _log.info("✅ SQL Server iniciado com sucesso")
                 return True
             else:
-                logger.warning(f"⚠️  Não foi possível iniciar SQL Server: {start.stdout}")
+                _log.warning(f"⚠️  Não foi possível iniciar SQL Server: {start.stdout}")
                 return False
     except Exception as e:
-        logger.warning(f"⚠️  Erro ao verificar SQL Server: {e}")
+        _log.warning(f"⚠️  Erro ao verificar SQL Server: {e}")
         return False
 
 
