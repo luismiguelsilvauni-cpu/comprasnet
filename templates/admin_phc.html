@@ -68,7 +68,13 @@
       <input type="hidden" name="action" value="test">
       <button type="submit" class="btn btn-ghost" style="width:100%">🔌 Testar Ligação</button>
     </form>
-    <button onclick="iniciarSync()" class="btn btn-primary" style="flex:1" id="btnSync">🔄 Sincronizar Agora</button>
+    <form method="POST" style="flex:1">
+      <input type="hidden" name="action" value="sync">
+      <button type="submit" class="btn btn-primary" style="width:100%"
+              onclick="this.textContent='⏳ A sincronizar...';this.disabled=true;this.form.submit()">
+        🔄 Sincronizar Agora
+      </button>
+    </form>
   </div>
   {% if cfg.ultima_sync %}
   <div style="font-size:12px;color:var(--text-muted);text-align:center">
@@ -77,7 +83,7 @@
   {% endif %}
 </div>
 
-<!-- Progress bar (hidden until sync starts) -->
+<!-- Progress bar removed - using form POST -->
 <div id="syncProgress" style="display:none" class="card mb-16">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
