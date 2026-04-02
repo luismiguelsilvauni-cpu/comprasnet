@@ -1762,10 +1762,10 @@ def stock():
             ArtigoPHC.referencia.ilike(like),
             ArtigoPHC.designacao.ilike(like),
             ArtigoPHC.familia.ilike(like),
-        )).order_by(ArtigoPHC.referencia).limit(200).all()
+        )).order_by(ArtigoPHC.referencia).limit(500).all()
     else:
         artigos = ArtigoPHC.query.order_by(ArtigoPHC.referencia).limit(200).all()
-    return render_template('stock.html', artigos=artigos, q=q)
+    return render_template('stock.html', artigos=artigos, q=q, total=ArtigoPHC.query.count())
 
 
 @app.route('/stock/<ref>')

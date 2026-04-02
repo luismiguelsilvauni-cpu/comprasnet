@@ -11,9 +11,16 @@
 <!-- Search bar -->
 <div class="card mb-16" style="padding:14px">
   <div style="display:flex;gap:10px;align-items:center">
-    <input type="text" id="searchInput" placeholder="Pesquisar por referência ou designação..."
-           style="flex:1" oninput="filtrar(this.value)" autofocus>
-    <span style="font-size:12px;color:var(--text-muted)" id="countLabel">{{ artigos|length }} artigos</span>
+    <input type="text" id="searchInput" placeholder="Pesquisar em {{ total }} artigos..."
+           style="flex:1" oninput="pesquisar(this.value)" autofocus
+           value="{{ q }}">
+    <span style="font-size:12px;color:var(--text-muted)" id="countLabel">
+      {{ artigos|length }}{% if artigos|length == 200 %}+{% endif %} artigos
+      {% if q %} para "{{ q }}"{% endif %}
+    </span>
+    {% if q %}
+    <a href="{{ url_for('stock') }}" class="btn btn-ghost btn-sm">✕ Limpar</a>
+    {% endif %}
   </div>
 </div>
 
@@ -24,22 +31,22 @@
       <thead id="stockHead"></thead>
       <tbody id="stockBody">
         {% for a in artigos %}
-        <tr data-ref="{{ a.referencia|lower }}" data-design="{{ (a.designacao or '')|lower }}">
-          <td class="mono" style="font-size:12px;color:var(--accent)">
+        <tr>
+          <td class="mono col-ref" style="font-size:12px;color:var(--accent)">
             <a href="{{ url_for('stock_artigo', ref=a.referencia) }}">{{ a.referencia }}</a>
           </td>
-          <td style="font-size:13px">{{ a.designacao or '' }}</td>
-          <td style="font-size:12px;color:var(--text-muted)" class="col-familia">{{ a.familia or '' }}</td>
-          <td style="text-align:right;font-weight:700;font-family:monospace;color:{% if a.stock_atual <= 0 %}var(--danger){% elif a.stock_atual < 5 %}var(--warning){% else %}var(--success){% endif %}">
+          <td class="col-design" style="font-size:13px">{{ a.designacao or '' }}</td>
+          <td class="col-familia" style="font-size:12px;color:var(--text-muted)">{{ a.familia or '' }}</td>
+          <td class="col-stock" style="text-align:right;font-weight:700;font-family:monospace;color:{% if a.stock_atual <= 0 %}var(--danger){% elif a.stock_atual < 5 %}var(--warning){% else %}var(--success){% endif %}">
             {{ '%.2f'|format(a.stock_atual) }}
           </td>
-          <td style="font-size:11px;color:var(--text-muted)" class="col-unidade">{{ a.unidade }}</td>
-          <td style="text-align:right;font-family:monospace;font-size:12px" class="col-pvp">{{ '%.2f'|format(a.pvp or 0) }} €</td>
-          <td style="text-align:right;font-family:monospace;font-size:12px;color:var(--accent)" class="col-ultimo_preco_entrada">{{ '%.2f'|format(a.ultimo_preco_entrada or 0) }} €</td>
-          <td style="text-align:right;font-family:monospace;font-size:12px" class="col-preco_custo">{{ '%.2f'|format(a.preco_custo or 0) }} €</td>
-          <td style="text-align:right;font-family:monospace;font-size:12px" class="col-preco_custo_ponderado">{{ '%.2f'|format(a.preco_custo_ponderado or 0) }} €</td>
-          <td style="text-align:right;font-size:12px" class="col-taxa_iva">{{ a.taxa_iva|int }}%</td>
-          <td><a href="{{ url_for('stock_artigo', ref=a.referencia) }}" class="btn btn-ghost btn-sm">→</a></td>
+          <td class="col-unidade" style="font-size:11px;color:var(--text-muted)">{{ a.unidade }}</td>
+          <td class="col-pvp" style="text-align:right;font-family:monospace;font-size:12px">{{ '%.2f'|format(a.pvp or 0) }} €</td>
+          <td class="col-ultimo_preco_entrada" style="text-align:right;font-family:monospace;font-size:12px;color:var(--accent)">{{ '%.2f'|format(a.ultimo_preco_entrada or 0) }} €</td>
+          <td class="col-preco_custo" style="text-align:right;font-family:monospace;font-size:12px">{{ '%.2f'|format(a.preco_custo or 0) }} €</td>
+          <td class="col-preco_custo_ponderado" style="text-align:right;font-family:monospace;font-size:12px">{{ '%.2f'|format(a.preco_custo_ponderado or 0) }} €</td>
+          <td class="col-taxa_iva" style="text-align:right;font-size:12px">{{ a.taxa_iva|int }}%</td>
+          <td class="col-accoes"><a href="{{ url_for('stock_artigo', ref=a.referencia) }}" class="btn btn-ghost btn-sm">→</a></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -54,8 +61,7 @@
       <h3 style="font-size:15px;font-weight:600">⚙️ Configurar Colunas</h3>
       <button onclick="fecharConfigColunas()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer">×</button>
     </div>
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Seleccione as colunas a mostrar na tabela de stock:</p>
-    <div id="checkboxColunas" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div id="checkboxColunas" style="display:flex;flex-direction:column;gap:8px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
       <button onclick="fecharConfigColunas()" class="btn btn-ghost">Cancelar</button>
       <button onclick="aplicarColunas()" class="btn btn-primary">✅ Aplicar</button>
@@ -64,76 +70,47 @@
 </div>
 
 <script>
-// ── Column definitions ────────────────────────────────────────
-const TODAS_COLUNAS = [
-  {key:'referencia',            label:'Referência',           fixo:true},
-  {key:'designacao',            label:'Designação',           fixo:true},
-  {key:'familia',               label:'Família',              fixo:false},
-  {key:'stock',                 label:'Stock',                fixo:true},
-  {key:'unidade',               label:'Unidade',              fixo:false},
-  {key:'pvp',                   label:'PVP (€)',              fixo:false},
-  {key:'ultimo_preco_entrada',  label:'Últ. Preço Entrada (€)', fixo:false},
-  {key:'preco_custo',           label:'Preço Custo (€)',      fixo:false},
-  {key:'preco_custo_ponderado', label:'P. Custo Ponderado (€)', fixo:false},
-  {key:'taxa_iva',              label:'IVA',                  fixo:false},
-  {key:'accoes',                label:'Acções',               fixo:true},
+const COLUNAS = [
+  {key:'ref',                   label:'Referência',              fixo:true},
+  {key:'design',                label:'Designação',              fixo:true},
+  {key:'familia',               label:'Família',                 fixo:false},
+  {key:'stock',                 label:'Stock',                   fixo:true},
+  {key:'unidade',               label:'Unidade',                 fixo:false},
+  {key:'pvp',                   label:'PVP (€)',                 fixo:false},
+  {key:'ultimo_preco_entrada',  label:'Últ. Preço Entrada (€)',  fixo:false},
+  {key:'preco_custo',           label:'Preço Custo (€)',         fixo:false},
+  {key:'preco_custo_ponderado', label:'P. Custo Ponderado (€)',  fixo:false},
+  {key:'taxa_iva',              label:'IVA',                     fixo:false},
+  {key:'accoes',                label:'Acções',                  fixo:true},
 ];
 
-// Default visible columns
-const DEFAULT_COLS = ['referencia','designacao','stock','unidade','pvp','ultimo_preco_entrada','accoes'];
-
-// Load saved or default
-let activeCols = JSON.parse(localStorage.getItem('stockColunas') || 'null') || DEFAULT_COLS;
+const ALIGN_RIGHT = ['stock','pvp','ultimo_preco_entrada','preco_custo','preco_custo_ponderado','taxa_iva'];
+const DEFAULT = ['ref','design','stock','unidade','pvp','ultimo_preco_entrada','accoes'];
+let activeCols = JSON.parse(localStorage.getItem('stockColunas2') || 'null') || DEFAULT;
 
 function renderHeader() {
-  const thead = document.getElementById('stockHead');
-  // Build header showing all fixed cols + active optional cols in order
-  const headerCols = TODAS_COLUNAS.filter(c => c.fixo || activeCols.includes(c.key));
-  thead.innerHTML = '<tr>' + headerCols.map(c => {
-    if (['stock','pvp','ultimo_preco_entrada','preco_custo','preco_custo_ponderado','taxa_iva'].includes(c.key))
-      return `<th style="text-align:right">${c.label}</th>`;
-    if (c.key === 'accoes') return '<th></th>';
-    return `<th>${c.label}</th>`;
-  }).join('') + '</tr>';
+  document.getElementById('stockHead').innerHTML = '<tr>' +
+    COLUNAS.filter(c => activeCols.includes(c.key)).map(c =>
+      `<th${ALIGN_RIGHT.includes(c.key) ? ' style="text-align:right"' : ''}>${c.label}</th>`
+    ).join('') + '</tr>';
 }
 
 function renderColunas() {
-  // Show/hide columns by class name
-  const optional = ['pvp','ultimo_preco_entrada','preco_custo','preco_custo_ponderado','taxa_iva','familia','unidade'];
-  optional.forEach(key => {
-    const show = activeCols.includes(key);
-    document.querySelectorAll('.col-' + key).forEach(el => {
+  COLUNAS.filter(c => !c.fixo).forEach(c => {
+    const show = activeCols.includes(c.key);
+    document.querySelectorAll('.col-' + c.key).forEach(el => {
       el.style.display = show ? '' : 'none';
     });
   });
 }
 
-function aplicarLayout() {
-  renderHeader();
-  renderColunas();
-}
-
-// ── Search ─────────────────────────────────────────────────────
-function filtrar(q) {
-  q = q.toLowerCase().trim();
-  let visible = 0;
-  document.querySelectorAll('#stockBody tr').forEach(tr => {
-    const match = !q || tr.dataset.ref.includes(q) || tr.dataset.design.includes(q);
-    tr.style.display = match ? '' : 'none';
-    if (match) visible++;
-  });
-  document.getElementById('countLabel').textContent = visible + ' artigos';
-}
-
-// ── Column config modal ────────────────────────────────────────
 function abrirConfigColunas() {
-  const box = document.getElementById('checkboxColunas');
-  box.innerHTML = TODAS_COLUNAS.filter(c => !c.fixo).map(c => `
-    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 10px;background:var(--surface2);border-radius:6px">
-      <input type="checkbox" id="chk_${c.key}" ${activeCols.includes(c.key)?'checked':''} style="width:auto;cursor:pointer">
+  document.getElementById('checkboxColunas').innerHTML = COLUNAS.filter(c => !c.fixo).map(c =>
+    `<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:7px 12px;background:var(--surface2);border-radius:6px">
+      <input type="checkbox" id="chk_${c.key}" ${activeCols.includes(c.key)?'checked':''} style="width:auto">
       <span style="font-size:13px">${c.label}</span>
-    </label>
-  `).join('');
+    </label>`
+  ).join('');
   document.getElementById('modalColunas').style.display = 'flex';
 }
 
@@ -142,17 +119,32 @@ function fecharConfigColunas() {
 }
 
 function aplicarColunas() {
-  const fixed = TODAS_COLUNAS.filter(c => c.fixo).map(c => c.key);
-  const selected = TODAS_COLUNAS.filter(c => !c.fixo && document.getElementById('chk_'+c.key)?.checked).map(c => c.key);
-  // Maintain order
-  activeCols = TODAS_COLUNAS.map(c => c.key).filter(k => fixed.includes(k) || selected.includes(k));
-  localStorage.setItem('stockColunas', JSON.stringify(activeCols));
+  activeCols = COLUNAS.map(c => c.key).filter(k =>
+    COLUNAS.find(c=>c.key===k)?.fixo || document.getElementById('chk_'+k)?.checked
+  );
+  localStorage.setItem('stockColunas2', JSON.stringify(activeCols));
   fecharConfigColunas();
-  aplicarLayout();
+  renderHeader();
+  renderColunas();
 }
 
-// ── Init ──────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", aplicarLayout);
+// Server-side search with debounce
+let searchTimer = null;
+function pesquisar(q) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    const url = q.length >= 2 ? `/stock?q=${encodeURIComponent(q)}` : '/stock';
+    window.location.href = url;
+  }, 400);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderHeader();
+  renderColunas();
+  // Focus search
+  const si = document.getElementById('searchInput');
+  if (si) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
+});
 </script>
 
 {% endblock %}
