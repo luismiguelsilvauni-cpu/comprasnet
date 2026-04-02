@@ -1,6 +1,104 @@
 {% extends "base.html" %}
-{% block title %}PHC CS · ComprasNet{% endblock %}
-{% block page_title %}Integração PHC CS{% endblock %}
+{% block title %}PHC CS · ComprasNet
+<!-- Progress -->
+<div id="syncProgress" style="display:none" class="card mt-16">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
+    <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+  </div>
+  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:8px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%"></div>
+  </div>
+  <div id="syncMsg" style="font-size:12px;color:var(--text-muted)">A preparar...</div>
+</div>
+
+<script>
+function iniciarSync(form) {
+  const btn = document.getElementById('btnSync');
+  const box = document.getElementById('syncProgress');
+  const bar = document.getElementById('syncBar');
+  const pct = document.getElementById('syncPct');
+  const msg = document.getElementById('syncMsg');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ A sincronizar...';
+  box.style.display = 'block';
+
+  // Animate bar while form submits
+  const steps = [
+    {pct:10, msg:'A verificar SQL Server...', delay:500},
+    {pct:20, msg:'A ligar à base de dados...', delay:1500},
+    {pct:35, msg:'A sincronizar artigos...', delay:3000},
+    {pct:65, msg:'A processar artigos...', delay:8000},
+    {pct:75, msg:'A sincronizar fornecedores...', delay:15000},
+    {pct:85, msg:'A sincronizar clientes...', delay:20000},
+    {pct:95, msg:'A finalizar...', delay:25000},
+  ];
+
+  steps.forEach(s => {
+    setTimeout(() => {
+      bar.style.width = s.pct + '%';
+      pct.textContent = s.pct + '%';
+      msg.textContent = s.msg;
+    }, s.delay);
+  });
+
+  // Let form submit normally
+  return true;
+}
+</script>
+
+{% endblock %}
+{% block page_title %}Integração PHC CS
+<!-- Progress -->
+<div id="syncProgress" style="display:none" class="card mt-16">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
+    <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+  </div>
+  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:8px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%"></div>
+  </div>
+  <div id="syncMsg" style="font-size:12px;color:var(--text-muted)">A preparar...</div>
+</div>
+
+<script>
+function iniciarSync(form) {
+  const btn = document.getElementById('btnSync');
+  const box = document.getElementById('syncProgress');
+  const bar = document.getElementById('syncBar');
+  const pct = document.getElementById('syncPct');
+  const msg = document.getElementById('syncMsg');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ A sincronizar...';
+  box.style.display = 'block';
+
+  // Animate bar while form submits
+  const steps = [
+    {pct:10, msg:'A verificar SQL Server...', delay:500},
+    {pct:20, msg:'A ligar à base de dados...', delay:1500},
+    {pct:35, msg:'A sincronizar artigos...', delay:3000},
+    {pct:65, msg:'A processar artigos...', delay:8000},
+    {pct:75, msg:'A sincronizar fornecedores...', delay:15000},
+    {pct:85, msg:'A sincronizar clientes...', delay:20000},
+    {pct:95, msg:'A finalizar...', delay:25000},
+  ];
+
+  steps.forEach(s => {
+    setTimeout(() => {
+      bar.style.width = s.pct + '%';
+      pct.textContent = s.pct + '%';
+      msg.textContent = s.msg;
+    }, s.delay);
+  });
+
+  // Let form submit normally
+  return true;
+}
+</script>
+
+{% endblock %}
 
 {% block content %}
 <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start;max-width:900px">
@@ -68,10 +166,9 @@
       <input type="hidden" name="action" value="test">
       <button type="submit" class="btn btn-ghost" style="width:100%">🔌 Testar Ligação</button>
     </form>
-    <form method="POST" style="flex:1">
+    <form method="POST" style="flex:1" id="syncForm" onsubmit="iniciarSync(this)">
       <input type="hidden" name="action" value="sync">
-      <button type="submit" class="btn btn-primary" style="width:100%"
-              onclick="this.textContent='⏳ A sincronizar...';this.disabled=true;this.form.submit()">
+      <button type="submit" class="btn btn-primary" style="width:100%" id="btnSync">
         🔄 Sincronizar Agora
       </button>
     </form>
@@ -83,7 +180,7 @@
   {% endif %}
 </div>
 
-<!-- Progress bar removed - using form POST -->
+<!-- Progress bar -->
 <div id="syncProgress" style="display:none" class="card mb-16">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
@@ -194,4 +291,53 @@ function iniciarSync() {
     });
 }
 </script>
+
+<!-- Progress -->
+<div id="syncProgress" style="display:none" class="card mt-16">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
+    <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+  </div>
+  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:8px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%"></div>
+  </div>
+  <div id="syncMsg" style="font-size:12px;color:var(--text-muted)">A preparar...</div>
+</div>
+
+<script>
+function iniciarSync(form) {
+  const btn = document.getElementById('btnSync');
+  const box = document.getElementById('syncProgress');
+  const bar = document.getElementById('syncBar');
+  const pct = document.getElementById('syncPct');
+  const msg = document.getElementById('syncMsg');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ A sincronizar...';
+  box.style.display = 'block';
+
+  // Animate bar while form submits
+  const steps = [
+    {pct:10, msg:'A verificar SQL Server...', delay:500},
+    {pct:20, msg:'A ligar à base de dados...', delay:1500},
+    {pct:35, msg:'A sincronizar artigos...', delay:3000},
+    {pct:65, msg:'A processar artigos...', delay:8000},
+    {pct:75, msg:'A sincronizar fornecedores...', delay:15000},
+    {pct:85, msg:'A sincronizar clientes...', delay:20000},
+    {pct:95, msg:'A finalizar...', delay:25000},
+  ];
+
+  steps.forEach(s => {
+    setTimeout(() => {
+      bar.style.width = s.pct + '%';
+      pct.textContent = s.pct + '%';
+      msg.textContent = s.msg;
+    }, s.delay);
+  });
+
+  // Let form submit normally
+  return true;
+}
+</script>
+
 {% endblock %}
