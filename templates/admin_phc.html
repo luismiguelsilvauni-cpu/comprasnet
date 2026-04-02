@@ -1,178 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Configuração PHC · ComprasNet
-<!-- Sync Progress -->
-<div id="syncProgress" style="display:none" class="card mt-16">
-  <div class="card-title" id="syncTitle">🔄 A sincronizar...</div>
-  <div style="background:var(--border);border-radius:8px;height:20px;overflow:hidden;margin-bottom:12px">
-    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .4s;width:0%"></div>
-  </div>
-  <div id="syncMsg" style="font-size:13px;color:var(--text-muted)">A preparar...</div>
-  <div id="syncLog" style="margin-top:12px;font-size:12px;font-family:monospace;color:var(--text-muted);max-height:150px;overflow-y:auto"></div>
-</div>
-
-<script>
-function iniciarSync() {
-  const btn   = document.getElementById('btnSync');
-  const box   = document.getElementById('syncProgress');
-  const bar   = document.getElementById('syncBar');
-  const msg   = document.getElementById('syncMsg');
-  const log   = document.getElementById('syncLog');
-  const title = document.getElementById('syncTitle');
-
-  btn.disabled = true;
-  btn.textContent = '⏳ A sincronizar...';
-  box.style.display = 'block';
-  bar.style.width = '0%';
-  log.innerHTML = '';
-  msg.textContent = 'A ligar...';
-
-  const es = new EventSource('/admin/phc/sync-progress');
-
-  es.onmessage = function(e) {
-    const d = JSON.parse(e.data);
-    bar.style.width = d.pct + '%';
-    bar.style.background = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
-    msg.textContent = d.msg;
-    msg.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--text-muted)';
-    log.insertAdjacentHTML('beforeend', `<div>${d.msg}</div>`);
-    log.scrollTop = log.scrollHeight;
-
-    if (d.done || d.error) {
-      es.close();
-      btn.disabled = false;
-      btn.textContent = '🔄 Sincronizar Novamente';
-      title.textContent = d.done ? '✅ Sincronização completa' : '❌ Erro na sincronização';
-      if (d.done) setTimeout(() => location.reload(), 2000);
-    }
-  };
-
-  es.onerror = function() {
-    es.close();
-    msg.textContent = '❌ Erro de ligação ao servidor';
-    msg.style.color = 'var(--danger)';
-    btn.disabled = false;
-    btn.textContent = '🔄 Sincronizar Agora';
-  };
-}
-</script>
-
-{% endblock %}
-{% block page_title %}Integração PHC CS
-<!-- Sync Progress -->
-<div id="syncProgress" style="display:none" class="card mt-16">
-  <div class="card-title" id="syncTitle">🔄 A sincronizar...</div>
-  <div style="background:var(--border);border-radius:8px;height:20px;overflow:hidden;margin-bottom:12px">
-    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .4s;width:0%"></div>
-  </div>
-  <div id="syncMsg" style="font-size:13px;color:var(--text-muted)">A preparar...</div>
-  <div id="syncLog" style="margin-top:12px;font-size:12px;font-family:monospace;color:var(--text-muted);max-height:150px;overflow-y:auto"></div>
-</div>
-
-<script>
-function iniciarSync() {
-  const btn   = document.getElementById('btnSync');
-  const box   = document.getElementById('syncProgress');
-  const bar   = document.getElementById('syncBar');
-  const msg   = document.getElementById('syncMsg');
-  const log   = document.getElementById('syncLog');
-  const title = document.getElementById('syncTitle');
-
-  btn.disabled = true;
-  btn.textContent = '⏳ A sincronizar...';
-  box.style.display = 'block';
-  bar.style.width = '0%';
-  log.innerHTML = '';
-  msg.textContent = 'A ligar...';
-
-  const es = new EventSource('/admin/phc/sync-progress');
-
-  es.onmessage = function(e) {
-    const d = JSON.parse(e.data);
-    bar.style.width = d.pct + '%';
-    bar.style.background = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
-    msg.textContent = d.msg;
-    msg.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--text-muted)';
-    log.insertAdjacentHTML('beforeend', `<div>${d.msg}</div>`);
-    log.scrollTop = log.scrollHeight;
-
-    if (d.done || d.error) {
-      es.close();
-      btn.disabled = false;
-      btn.textContent = '🔄 Sincronizar Novamente';
-      title.textContent = d.done ? '✅ Sincronização completa' : '❌ Erro na sincronização';
-      if (d.done) setTimeout(() => location.reload(), 2000);
-    }
-  };
-
-  es.onerror = function() {
-    es.close();
-    msg.textContent = '❌ Erro de ligação ao servidor';
-    msg.style.color = 'var(--danger)';
-    btn.disabled = false;
-    btn.textContent = '🔄 Sincronizar Agora';
-  };
-}
-</script>
-
-{% endblock %}
+{% block title %}PHC CS · ComprasNet{% endblock %}
+{% block page_title %}Integração PHC CS{% endblock %}
 
 {% block content %}
 <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start;max-width:900px">
 
+<!-- LEFT COLUMN -->
 <div>
+
 <!-- Connection config -->
 <div class="card mb-16">
-  <div class="card-title">Ligação ao SQL Server Express (local)</div>
+  <div class="card-title">Ligação ao SQL Server Express</div>
   <form method="POST">
     <input type="hidden" name="action" value="save">
     <div class="grid-2">
       <div class="form-group">
-        <label>Servidor / IP</label>
-        <input type="text" name="servidor" value="{{ cfg.servidor or 'localhost' }}" placeholder="localhost ou 192.168.1.x">
+        <label>Servidor</label>
+        <input type="text" name="servidor" value="{{ cfg.servidor or '.\\SQLEXPRESS' }}" placeholder=".\SQLEXPRESS">
       </div>
       <div class="form-group">
-        <label>Porta</label>
-        <input type="number" name="porta" value="{{ cfg.porta or 1433 }}" placeholder="1433">
+        <label>Base de Dados</label>
+        <input type="text" name="base_dados" value="{{ cfg.base_dados or 'PHC_Uniao' }}" placeholder="PHC_Uniao">
       </div>
-    </div>
-    <div class="form-group">
-      <label>Nome da Base de Dados (restaurada do .bak)</label>
-      <input type="text" name="base_dados" value="{{ cfg.base_dados or 'PHC' }}" placeholder="PHC">
     </div>
     <div class="form-group">
       <label>Autenticação</label>
-      <select name="autenticacao" id="authSelect" onchange="toggleAuth(this.value)">
-        <option value="sql" {% if not cfg.autenticacao or cfg.autenticacao=='sql' %}selected{% endif %}>SQL Server (user/password)</option>
-        <option value="windows" {% if cfg.autenticacao=='windows' %}selected{% endif %}>Windows Authentication</option>
+      <select name="autenticacao" onchange="document.getElementById('sqlAuth').style.display=this.value=='windows'?'none':'block'">
+        <option value="windows" {% if cfg.autenticacao=='windows' or not cfg.autenticacao %}selected{% endif %}>Windows Authentication</option>
+        <option value="sql" {% if cfg.autenticacao=='sql' %}selected{% endif %}>SQL Server (user/password)</option>
       </select>
     </div>
-    <div id="sqlAuthFields" style="{% if cfg.autenticacao=='windows' %}display:none{% endif %}">
+    <div id="sqlAuth" style="{% if not cfg.autenticacao or cfg.autenticacao=='windows' %}display:none{% endif %}">
       <div class="grid-2">
         <div class="form-group">
-          <label>Utilizador SQL</label>
-          <input type="text" name="utilizador" value="{{ cfg.utilizador or 'sa' }}" placeholder="sa">
+          <label>Utilizador</label>
+          <input type="text" name="utilizador" value="{{ cfg.utilizador or 'sa' }}">
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="password" name="password" placeholder="{% if cfg.password %}••••••••{% else %}Introduza a password{% endif %}">
+          <input type="password" name="password" placeholder="{% if cfg.password %}••••••••{% else %}Password{% endif %}">
         </div>
       </div>
     </div>
-    <hr class="divider">
     <div class="grid-2">
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
           <input type="checkbox" name="sync_auto" {% if cfg.sync_auto %}checked{% endif %} style="width:auto">
-          Sincronização automática diária
+          Sync automática diária
         </label>
       </div>
       <div class="form-group">
-        <label>Hora da sync automática</label>
+        <label>Hora</label>
         <input type="time" name="sync_hora" value="{{ cfg.sync_hora or '06:00' }}">
       </div>
     </div>
-    <div class="flex gap-8" style="justify-content:flex-end">
-      <button type="submit" class="btn btn-primary">💾 Guardar Configuração</button>
+    <div style="display:flex;justify-content:flex-end">
+      <button type="submit" class="btn btn-primary">💾 Guardar</button>
     </div>
   </form>
 </div>
@@ -180,7 +63,7 @@ function iniciarSync() {
 <!-- Test + Sync -->
 <div class="card mb-16">
   <div class="card-title">Testar e Sincronizar</div>
-  <div class="flex gap-8">
+  <div style="display:flex;gap:8px;margin-bottom:12px">
     <form method="POST" style="flex:1">
       <input type="hidden" name="action" value="test">
       <button type="submit" class="btn btn-ghost" style="width:100%">🔌 Testar Ligação</button>
@@ -188,56 +71,43 @@ function iniciarSync() {
     <button onclick="iniciarSync()" class="btn btn-primary" style="flex:1" id="btnSync">🔄 Sincronizar Agora</button>
   </div>
   {% if cfg.ultima_sync %}
-  <div style="font-size:12px;color:var(--text-muted);margin-top:12px;text-align:center">
+  <div style="font-size:12px;color:var(--text-muted);text-align:center">
     Última sync: <strong>{{ cfg.ultima_sync.strftime('%d/%m/%Y às %H:%M') }}</strong>
   </div>
   {% endif %}
 </div>
 
-<!-- Instructions -->
-<div class="card" style="border-style:dashed;background:var(--surface2)">
-  <div class="card-title">📖 Como restaurar o .bak do PHC</div>
-  <div style="font-size:13px;line-height:1.8;color:var(--text-muted)">
-    <strong style="color:var(--text)">1. Instalar SQL Server Express 2022</strong><br>
-    Descarregar grátis em <code style="color:var(--accent)">aka.ms/sqlserver2022express</code><br>
-    Escolher instalação <em>Basic</em> — corre em background no Windows.<br><br>
-
-    <strong style="color:var(--text)">2. Instalar SQL Server Management Studio (SSMS)</strong><br>
-    Descarregar em <code style="color:var(--accent)">aka.ms/ssmsfullsetup</code><br>
-    Ferramenta gráfica para gerir a base de dados.<br><br>
-
-    <strong style="color:var(--text)">3. Restaurar o ficheiro .bak</strong><br>
-    Abrir SSMS → ligar a <code>localhost\SQLEXPRESS</code><br>
-    Clicar direito em <em>Databases</em> → <em>Restore Database…</em><br>
-    Escolher <em>Device</em> → selecionar o ficheiro <code>.bak</code><br>
-    Definir nome da BD (ex: <code>PHC</code>) → OK.<br><br>
-
-    <strong style="color:var(--text)">4. Criar utilizador SQL só-leitura (recomendado)</strong><br>
-    No SSMS → Security → Logins → New Login…<br>
-    Nome: <code>comprasnet_ro</code> | Password à escolha<br>
-    Em <em>User Mapping</em>: selecionar BD PHC → role <code>db_datareader</code><br><br>
-
-    <strong style="color:var(--text)">5. Instalar driver ODBC</strong><br>
-    Descarregar <em>ODBC Driver 18 for SQL Server</em> da Microsoft.<br>
-    Executar o instalador e reiniciar o ComprasNet.<br><br>
-
-    <strong style="color:var(--text)">6. Configurar acima e clicar "Testar Ligação"</strong>
+<!-- Progress bar (hidden until sync starts) -->
+<div id="syncProgress" style="display:none" class="card mb-16">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div id="syncTitle" style="font-size:13px;font-weight:600">🔄 A sincronizar...</div>
+    <div id="syncPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
   </div>
-</div>
+  <div style="background:var(--border);border-radius:8px;height:16px;overflow:hidden;margin-bottom:10px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s ease;width:0%"></div>
+  </div>
+  <div id="syncMsg" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
+  <div id="syncLog" style="font-size:11px;font-family:monospace;color:var(--text-muted);max-height:120px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:8px;display:none"></div>
 </div>
 
-<!-- Stats sidebar -->
+</div>
+
+<!-- RIGHT COLUMN: Stats -->
 <div>
   <div class="card mb-16">
     <div class="card-title">Base PHC Local</div>
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div style="text-align:center;background:var(--surface2);border-radius:8px;padding:16px">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">ARTIGOS SINCRONIZADOS</div>
-        <div style="font-size:32px;font-weight:700;font-family:monospace;color:var(--accent)">{{ total_artigos }}</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="text-align:center;background:var(--surface2);border-radius:8px;padding:14px">
+        <div style="font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px">ARTIGOS</div>
+        <div style="font-size:28px;font-weight:700;font-family:monospace;color:var(--accent)">{{ total_artigos }}</div>
       </div>
-      <div style="text-align:center;background:var(--surface2);border-radius:8px;padding:16px">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">FORNECEDORES</div>
-        <div style="font-size:32px;font-weight:700;font-family:monospace;color:var(--info)">{{ total_forn }}</div>
+      <div style="text-align:center;background:var(--surface2);border-radius:8px;padding:14px">
+        <div style="font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px">FORNECEDORES</div>
+        <div style="font-size:28px;font-weight:700;font-family:monospace;color:var(--info, #38bdf8)">{{ total_forn }}</div>
+      </div>
+      <div style="text-align:center;background:var(--surface2);border-radius:8px;padding:14px">
+        <div style="font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px">CLIENTES</div>
+        <div style="font-size:28px;font-weight:700;font-family:monospace;color:var(--success)">{{ total_clientes }}</div>
       </div>
     </div>
   </div>
@@ -245,35 +115,20 @@ function iniciarSync() {
   <div class="card" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)">
     <div style="font-size:12px;line-height:1.7;color:var(--text-muted)">
       <strong style="color:var(--warning)">⚠ Dados só-leitura</strong><br>
-      O ComprasNet <strong>nunca escreve</strong> na base de dados do PHC.<br>
-      Apenas lê artigos, fornecedores e histórico de compras.<br><br>
-      O ficheiro <code>.bak</code> é restaurado num SQL Server <strong>separado e local</strong>, sem qualquer ligação ao PHC de produção.
+      O ComprasNet <strong>nunca escreve</strong> na BD do PHC.<br>
+      O .bak é restaurado num SQL Server <strong>local separado</strong>.
     </div>
   </div>
 </div>
-</div>
 
-<script>
-function toggleAuth(v){
-  document.getElementById('sqlAuthFields').style.display = v==='windows'?'none':'block';
-}
-</script>
-
-<!-- Sync Progress -->
-<div id="syncProgress" style="display:none" class="card mt-16">
-  <div class="card-title" id="syncTitle">🔄 A sincronizar...</div>
-  <div style="background:var(--border);border-radius:8px;height:20px;overflow:hidden;margin-bottom:12px">
-    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .4s;width:0%"></div>
-  </div>
-  <div id="syncMsg" style="font-size:13px;color:var(--text-muted)">A preparar...</div>
-  <div id="syncLog" style="margin-top:12px;font-size:12px;font-family:monospace;color:var(--text-muted);max-height:150px;overflow-y:auto"></div>
-</div>
+</div><!-- end grid -->
 
 <script>
 function iniciarSync() {
   const btn   = document.getElementById('btnSync');
   const box   = document.getElementById('syncProgress');
   const bar   = document.getElementById('syncBar');
+  const pct   = document.getElementById('syncPct');
   const msg   = document.getElementById('syncMsg');
   const log   = document.getElementById('syncLog');
   const title = document.getElementById('syncTitle');
@@ -281,9 +136,14 @@ function iniciarSync() {
   btn.disabled = true;
   btn.textContent = '⏳ A sincronizar...';
   box.style.display = 'block';
+  log.style.display = 'block';
   bar.style.width = '0%';
+  bar.style.background = 'var(--accent)';
+  pct.textContent = '0%';
   log.innerHTML = '';
-  msg.textContent = 'A ligar...';
+  msg.textContent = '';
+  title.textContent = '🔄 A sincronizar...';
+  title.style.color = 'var(--text)';
 
   const es = new EventSource('/admin/phc/sync-progress');
 
@@ -291,28 +151,29 @@ function iniciarSync() {
     const d = JSON.parse(e.data);
     bar.style.width = d.pct + '%';
     bar.style.background = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
+    pct.textContent = d.pct + '%';
+    pct.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
     msg.textContent = d.msg;
-    msg.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--text-muted)';
-    log.insertAdjacentHTML('beforeend', `<div>${d.msg}</div>`);
+    log.insertAdjacentHTML('beforeend', `<div style="padding:1px 0">→ ${d.msg}</div>`);
     log.scrollTop = log.scrollHeight;
 
     if (d.done || d.error) {
       es.close();
       btn.disabled = false;
       btn.textContent = '🔄 Sincronizar Novamente';
-      title.textContent = d.done ? '✅ Sincronização completa' : '❌ Erro na sincronização';
-      if (d.done) setTimeout(() => location.reload(), 2000);
+      title.textContent = d.done ? '✅ Concluído' : '❌ Erro';
+      title.style.color = d.done ? 'var(--success)' : 'var(--danger)';
+      if (d.done) setTimeout(() => location.reload(), 2500);
     }
   };
 
   es.onerror = function() {
     es.close();
-    msg.textContent = '❌ Erro de ligação ao servidor';
+    msg.textContent = '❌ Erro de ligação';
     msg.style.color = 'var(--danger)';
     btn.disabled = false;
     btn.textContent = '🔄 Sincronizar Agora';
   };
 }
 </script>
-
 {% endblock %}

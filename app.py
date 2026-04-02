@@ -770,10 +770,13 @@ def admin_phc():
 
         return redirect(url_for('admin_phc'))
 
-    total_artigos = ArtigoPHC.query.count()
-    total_forn    = FornecedorPHC.query.count()
+    total_artigos  = ArtigoPHC.query.count()
+    total_forn     = FornecedorPHC.query.count()
+    total_clientes = Cliente.query.count()
     return render_template('admin_phc.html', cfg=cfg,
-                           total_artigos=total_artigos, total_forn=total_forn)
+                           total_artigos=total_artigos,
+                           total_forn=total_forn,
+                           total_clientes=total_clientes)
 
 @app.route('/admin/phc/sync-progress')
 @login_required

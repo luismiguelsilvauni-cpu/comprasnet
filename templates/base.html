@@ -50,6 +50,14 @@
         .sidebar-logo .app-sub {
             font-size: 11px; color: var(--text-muted); margin-top: 2px; font-family: 'DM Mono', monospace;
         }
+        .sidebar-logo img {
+            height: 48px;
+            max-width: 180px;
+            object-fit: contain;
+            mix-blend-mode: luminosity;
+            filter: brightness(1.2) contrast(1.1);
+            border-radius: 6px;
+        }
         .sidebar-logo .logo-icon {
             width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
             display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
@@ -238,7 +246,7 @@
     <div class="sidebar-logo">
         <div class="logo-icon">📦</div>
         {% if cfg_geral and cfg_geral.empresa_logo_path %}
-            <img src="/uploads/{{ cfg_geral.empresa_logo_path }}" style="height:44px;object-fit:contain;max-width:160px;margin:4px 0">
+            <img src="/uploads/{{ cfg_geral.empresa_logo_path }}" alt="Logo">
             {% else %}
             <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
             {% endif %}
