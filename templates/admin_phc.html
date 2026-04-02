@@ -1,6 +1,120 @@
 {% extends "base.html" %}
-{% block title %}Configuração PHC · ComprasNet{% endblock %}
-{% block page_title %}Integração PHC CS{% endblock %}
+{% block title %}Configuração PHC · ComprasNet
+<!-- Sync Progress -->
+<div id="syncProgress" style="display:none" class="card mt-16">
+  <div class="card-title" id="syncTitle">🔄 A sincronizar...</div>
+  <div style="background:var(--border);border-radius:8px;height:20px;overflow:hidden;margin-bottom:12px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .4s;width:0%"></div>
+  </div>
+  <div id="syncMsg" style="font-size:13px;color:var(--text-muted)">A preparar...</div>
+  <div id="syncLog" style="margin-top:12px;font-size:12px;font-family:monospace;color:var(--text-muted);max-height:150px;overflow-y:auto"></div>
+</div>
+
+<script>
+function iniciarSync() {
+  const btn   = document.getElementById('btnSync');
+  const box   = document.getElementById('syncProgress');
+  const bar   = document.getElementById('syncBar');
+  const msg   = document.getElementById('syncMsg');
+  const log   = document.getElementById('syncLog');
+  const title = document.getElementById('syncTitle');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ A sincronizar...';
+  box.style.display = 'block';
+  bar.style.width = '0%';
+  log.innerHTML = '';
+  msg.textContent = 'A ligar...';
+
+  const es = new EventSource('/admin/phc/sync-progress');
+
+  es.onmessage = function(e) {
+    const d = JSON.parse(e.data);
+    bar.style.width = d.pct + '%';
+    bar.style.background = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
+    msg.textContent = d.msg;
+    msg.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--text-muted)';
+    log.insertAdjacentHTML('beforeend', `<div>${d.msg}</div>`);
+    log.scrollTop = log.scrollHeight;
+
+    if (d.done || d.error) {
+      es.close();
+      btn.disabled = false;
+      btn.textContent = '🔄 Sincronizar Novamente';
+      title.textContent = d.done ? '✅ Sincronização completa' : '❌ Erro na sincronização';
+      if (d.done) setTimeout(() => location.reload(), 2000);
+    }
+  };
+
+  es.onerror = function() {
+    es.close();
+    msg.textContent = '❌ Erro de ligação ao servidor';
+    msg.style.color = 'var(--danger)';
+    btn.disabled = false;
+    btn.textContent = '🔄 Sincronizar Agora';
+  };
+}
+</script>
+
+{% endblock %}
+{% block page_title %}Integração PHC CS
+<!-- Sync Progress -->
+<div id="syncProgress" style="display:none" class="card mt-16">
+  <div class="card-title" id="syncTitle">🔄 A sincronizar...</div>
+  <div style="background:var(--border);border-radius:8px;height:20px;overflow:hidden;margin-bottom:12px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .4s;width:0%"></div>
+  </div>
+  <div id="syncMsg" style="font-size:13px;color:var(--text-muted)">A preparar...</div>
+  <div id="syncLog" style="margin-top:12px;font-size:12px;font-family:monospace;color:var(--text-muted);max-height:150px;overflow-y:auto"></div>
+</div>
+
+<script>
+function iniciarSync() {
+  const btn   = document.getElementById('btnSync');
+  const box   = document.getElementById('syncProgress');
+  const bar   = document.getElementById('syncBar');
+  const msg   = document.getElementById('syncMsg');
+  const log   = document.getElementById('syncLog');
+  const title = document.getElementById('syncTitle');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ A sincronizar...';
+  box.style.display = 'block';
+  bar.style.width = '0%';
+  log.innerHTML = '';
+  msg.textContent = 'A ligar...';
+
+  const es = new EventSource('/admin/phc/sync-progress');
+
+  es.onmessage = function(e) {
+    const d = JSON.parse(e.data);
+    bar.style.width = d.pct + '%';
+    bar.style.background = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
+    msg.textContent = d.msg;
+    msg.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--text-muted)';
+    log.insertAdjacentHTML('beforeend', `<div>${d.msg}</div>`);
+    log.scrollTop = log.scrollHeight;
+
+    if (d.done || d.error) {
+      es.close();
+      btn.disabled = false;
+      btn.textContent = '🔄 Sincronizar Novamente';
+      title.textContent = d.done ? '✅ Sincronização completa' : '❌ Erro na sincronização';
+      if (d.done) setTimeout(() => location.reload(), 2000);
+    }
+  };
+
+  es.onerror = function() {
+    es.close();
+    msg.textContent = '❌ Erro de ligação ao servidor';
+    msg.style.color = 'var(--danger)';
+    btn.disabled = false;
+    btn.textContent = '🔄 Sincronizar Agora';
+  };
+}
+</script>
+
+{% endblock %}
 
 {% block content %}
 <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start;max-width:900px">
@@ -71,10 +185,7 @@
       <input type="hidden" name="action" value="test">
       <button type="submit" class="btn btn-ghost" style="width:100%">🔌 Testar Ligação</button>
     </form>
-    <form method="POST" style="flex:1">
-      <input type="hidden" name="action" value="sync">
-      <button type="submit" class="btn btn-primary" style="width:100%" onclick="return confirm('Iniciar sincronização? Pode demorar alguns segundos.')">🔄 Sincronizar Agora</button>
-    </form>
+    <button onclick="iniciarSync()" class="btn btn-primary" style="flex:1" id="btnSync">🔄 Sincronizar Agora</button>
   </div>
   {% if cfg.ultima_sync %}
   <div style="font-size:12px;color:var(--text-muted);margin-top:12px;text-align:center">
@@ -147,4 +258,61 @@ function toggleAuth(v){
   document.getElementById('sqlAuthFields').style.display = v==='windows'?'none':'block';
 }
 </script>
+
+<!-- Sync Progress -->
+<div id="syncProgress" style="display:none" class="card mt-16">
+  <div class="card-title" id="syncTitle">🔄 A sincronizar...</div>
+  <div style="background:var(--border);border-radius:8px;height:20px;overflow:hidden;margin-bottom:12px">
+    <div id="syncBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .4s;width:0%"></div>
+  </div>
+  <div id="syncMsg" style="font-size:13px;color:var(--text-muted)">A preparar...</div>
+  <div id="syncLog" style="margin-top:12px;font-size:12px;font-family:monospace;color:var(--text-muted);max-height:150px;overflow-y:auto"></div>
+</div>
+
+<script>
+function iniciarSync() {
+  const btn   = document.getElementById('btnSync');
+  const box   = document.getElementById('syncProgress');
+  const bar   = document.getElementById('syncBar');
+  const msg   = document.getElementById('syncMsg');
+  const log   = document.getElementById('syncLog');
+  const title = document.getElementById('syncTitle');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ A sincronizar...';
+  box.style.display = 'block';
+  bar.style.width = '0%';
+  log.innerHTML = '';
+  msg.textContent = 'A ligar...';
+
+  const es = new EventSource('/admin/phc/sync-progress');
+
+  es.onmessage = function(e) {
+    const d = JSON.parse(e.data);
+    bar.style.width = d.pct + '%';
+    bar.style.background = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--accent)';
+    msg.textContent = d.msg;
+    msg.style.color = d.error ? 'var(--danger)' : d.done ? 'var(--success)' : 'var(--text-muted)';
+    log.insertAdjacentHTML('beforeend', `<div>${d.msg}</div>`);
+    log.scrollTop = log.scrollHeight;
+
+    if (d.done || d.error) {
+      es.close();
+      btn.disabled = false;
+      btn.textContent = '🔄 Sincronizar Novamente';
+      title.textContent = d.done ? '✅ Sincronização completa' : '❌ Erro na sincronização';
+      if (d.done) setTimeout(() => location.reload(), 2000);
+    }
+  };
+
+  es.onerror = function() {
+    es.close();
+    msg.textContent = '❌ Erro de ligação ao servidor';
+    msg.style.color = 'var(--danger)';
+    btn.disabled = false;
+    btn.textContent = '🔄 Sincronizar Agora';
+  };
+}
+</script>
+
 {% endblock %}

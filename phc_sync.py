@@ -234,6 +234,74 @@ def sync_fornecedores(config) -> tuple[int, int, list]:
     return inserted, updated, errors
 
 
+SQL_CLIENTES = """
+SELECT
+    cl.no                           AS numero,
+    cl.nome                         AS nome,
+    ISNULL(cl.ncont, '')            AS nif,
+    ISNULL(cl.morada, '')           AS morada,
+    ISNULL(cl.local, '')            AS localidade,
+    ISNULL(cl.codpost, '')          AS cod_postal,
+    ISNULL(cl.telefone, '')         AS telefone,
+    ISNULL(cl.email, '')            AS email,
+    ISNULL(cl.inactivo, 0)          AS inactivo,
+    cl.clstamp                      AS stamp
+FROM cl
+WHERE ISNULL(cl.inactivo, 0) = 0
+  AND cl.nome IS NOT NULL
+  AND LEN(LTRIM(RTRIM(cl.nome))) > 0
+ORDER BY cl.nome
+"""
+
+
+def sync_clientes(config) -> tuple[int, int, list]:
+    """Sync PHC clients to local SQLite Cliente table."""
+    from models import Cliente
+    conn   = get_phc_connection(config)
+    cursor = conn.cursor()
+    cursor.execute(SQL_CLIENTES)
+    rows   = cursor.fetchall()
+    conn.close()
+
+    inserted = updated = 0
+    errors = []
+
+    for r in rows:
+        try:
+            no = int(r.numero or 0)
+            if not no:
+                continue
+            nome = str(r.nome or '').strip()
+            existing = Cliente.query.filter_by(phc_no=no).first()
+            if existing:
+                existing.nome       = nome
+                existing.nif        = str(r.nif or '')
+                existing.morada     = str(r.morada or '')
+                existing.localidade = str(r.localidade or '')
+                existing.cod_postal = str(r.cod_postal or '')
+                existing.telefone   = str(r.telefone or '')
+                existing.email      = str(r.email or '')
+                updated += 1
+            else:
+                db.session.add(Cliente(
+                    phc_no      = no,
+                    nome        = nome,
+                    nif         = str(r.nif or ''),
+                    morada      = str(r.morada or ''),
+                    localidade  = str(r.localidade or ''),
+                    cod_postal  = str(r.cod_postal or ''),
+                    telefone    = str(r.telefone or ''),
+                    email       = str(r.email or ''),
+                ))
+                inserted += 1
+        except Exception as e:
+            errors.append(str(e))
+
+    if inserted or updated:
+        db.session.commit()
+    return inserted, updated, errors
+
+
 def get_historico_compras(config, ref: str) -> list:
     """Get purchase history for an article."""
     try:

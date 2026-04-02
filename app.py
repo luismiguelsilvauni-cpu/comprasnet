@@ -752,13 +752,16 @@ def admin_phc():
                     from phc_sync import sync_artigos, sync_fornecedores
                     ins_a, upd_a, err_a = sync_artigos(cfg)
                     ins_f, upd_f, err_f = sync_fornecedores(cfg)
+                    from phc_sync import sync_clientes
+                    ins_c, upd_c, err_c = sync_clientes(cfg)
                     cfg.ultima_sync = datetime.utcnow()
                     db.session.commit()
                     msg = (f"✅ Sync concluída — "
-                           f"Artigos: {ins_a} novos / {upd_a} actualizados | "
-                           f"Fornecedores: {ins_f} novos / {upd_f} actualizados")
-                    if err_a or err_f:
-                        msg += f" | {len(err_a+err_f)} erros"
+                           f"Artigos: {ins_a}+{upd_a} | "
+                           f"Fornecedores: {ins_f}+{upd_f} | "
+                           f"Clientes: {ins_c}+{upd_c}")
+                    if err_a or err_f or err_c:
+                        msg += f" | {len(err_a+err_f+err_c)} erros"
                     flash(msg, 'success')
                 except Exception as e:
                     import traceback
@@ -771,6 +774,68 @@ def admin_phc():
     total_forn    = FornecedorPHC.query.count()
     return render_template('admin_phc.html', cfg=cfg,
                            total_artigos=total_artigos, total_forn=total_forn)
+
+@app.route('/admin/phc/sync-progress')
+@login_required
+def admin_phc_sync_progress():
+    """Server-Sent Events stream for sync progress."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+
+    cfg = ConfigPHC.query.first()
+    if not cfg:
+        return jsonify({'error': 'PHC não configurado'}), 400
+
+    def generate():
+        import json as _json
+
+        def emit(step, pct, msg, done=False, error=False):
+            data = _json.dumps({'step': step, 'pct': pct, 'msg': msg,
+                                'done': done, 'error': error})
+            return f"data: {data}\n\n"
+
+        try:
+            yield emit('start', 0, 'A ligar ao SQL Server...')
+
+            from phc_sync import sync_artigos, sync_fornecedores, sync_clientes, test_connection
+            ok, msg = test_connection(cfg)
+            if not ok:
+                yield emit('error', 0, f'Erro de ligação: {msg}', error=True)
+                return
+
+            yield emit('artigos', 10, 'A sincronizar artigos...')
+            ins_a, upd_a, err_a = sync_artigos(cfg)
+            yield emit('artigos', 45, f'Artigos: {ins_a} novos, {upd_a} actualizados')
+
+            yield emit('fornecedores', 50, 'A sincronizar fornecedores...')
+            ins_f, upd_f, err_f = sync_fornecedores(cfg)
+            yield emit('fornecedores', 70, f'Fornecedores: {ins_f} novos, {upd_f} actualizados')
+
+            yield emit('clientes', 75, 'A sincronizar clientes...')
+            ins_c, upd_c, err_c = sync_clientes(cfg)
+            yield emit('clientes', 95, f'Clientes: {ins_c} novos, {upd_c} actualizados')
+
+            cfg.ultima_sync = datetime.utcnow()
+            db.session.commit()
+
+            total_errors = len(err_a) + len(err_f) + len(err_c)
+            msg_final = (f'✅ Sync completa — '
+                        f'Artigos: {ins_a}+{upd_a} | '
+                        f'Fornecedores: {ins_f}+{upd_f} | '
+                        f'Clientes: {ins_c}+{upd_c}')
+            if total_errors:
+                msg_final += f' | {total_errors} erros'
+            yield emit('done', 100, msg_final, done=True)
+
+        except Exception as e:
+            import traceback
+            logger.error(traceback.format_exc())
+            yield emit('error', 0, f'Erro: {str(e)}', error=True)
+
+    return app.response_class(generate(), mimetype='text/event-stream',
+                              headers={'Cache-Control': 'no-cache',
+                                       'X-Accel-Buffering': 'no'})
+
 
 # ── ADMIN USERS ───────────────────────────────────────────────────────────────
 
