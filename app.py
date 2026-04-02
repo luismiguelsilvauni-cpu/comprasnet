@@ -1756,14 +1756,15 @@ def mobile_chat():
 @login_required
 def stock():
     q = request.args.get('q', '').strip()
-    artigos = []
     if q and len(q) >= 2:
         like = f'%{q}%'
         artigos = ArtigoPHC.query.filter(db.or_(
             ArtigoPHC.referencia.ilike(like),
             ArtigoPHC.designacao.ilike(like),
             ArtigoPHC.familia.ilike(like),
-        )).order_by(ArtigoPHC.referencia).limit(50).all()
+        )).order_by(ArtigoPHC.referencia).limit(200).all()
+    else:
+        artigos = ArtigoPHC.query.order_by(ArtigoPHC.referencia).limit(200).all()
     return render_template('stock.html', artigos=artigos, q=q)
 
 
