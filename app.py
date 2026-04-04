@@ -2203,6 +2203,145 @@ def remove_logo():
     return jsonify({'ok': True})
 
 
+@app.route('/reposicao/por-fornecedor')
+@login_required
+def reposicao_por_fornecedor():
+    """Group articles needing replenishment by their usual supplier."""
+    from reposicao import CONFIG_PADRAO, analisar_todos, SQL_TODAS_VENDAS, SQL_DIVERSIDADE_TODAS
+    import json as _json
+
+    cfg_phc    = ConfigPHC.query.first()
+    cfg_global = ConfigReposicao.query.filter_by(artigo_ref=None).first()
+
+    config = dict(CONFIG_PADRAO)
+    if cfg_global:
+        config.update({
+            'meses_historico':             cfg_global.meses_historico or 60,
+            'lead_time_dias':              cfg_global.lead_time_dias or 7,
+            'fator_seguranca':             cfg_global.fator_seguranca or 1.5,
+            'meses_cobertura':             cfg_global.meses_cobertura or 2,
+            'custo_encomenda':             cfg_global.custo_encomenda or 25,
+            'taxa_posse_anual':            cfg_global.taxa_posse_anual or 0.20,
+            'quantidade_minima_encomenda': cfg_global.quantidade_minima_encomenda or 1,
+            'alertar_dias_cobertura':      cfg_global.alertar_dias_cobertura or 30,
+            'min_anos_historico':          getattr(cfg_global,'min_anos_historico',2) or 2,
+            'min_meses_com_venda':         getattr(cfg_global,'min_meses_com_venda',3) or 3,
+            'min_total_vendido':           getattr(cfg_global,'min_total_vendido',3) or 3,
+            'ignorar_sem_movimento_anos':  getattr(cfg_global,'ignorar_sem_movimento_anos',3) or 3,
+            'min_facturas_sugerir':        getattr(cfg_global,'min_facturas_sugerir',8) or 8,
+        })
+
+    # SQL: for each article, find most frequent supplier from purchase invoices (fo table)
+    SQL_FORNECEDOR_ARTIGO = """
+        SELECT fi.ref, fo.nome AS fornecedor, fo.no AS fornecedor_no,
+               COUNT(*) AS n_compras
+        FROM fi
+        INNER JOIN ft ON ft.ftstamp = fi.ftstamp
+        INNER JOIN fo ON fo.no = ft.no
+        WHERE fi.ref IS NOT NULL AND fi.ref <> ''
+          AND fi.qtt > 0
+        GROUP BY fi.ref, fo.nome, fo.no
+    """
+
+    # Run bulk analysis
+    artigos = ArtigoPHC.query.filter(ArtigoPHC.stock_atual >= 0).all()
+    resultados = analisar_todos(cfg_phc, config, artigos)
+
+    # Only keep articles that need ordering
+    precisam = [r for r in resultados if r.get('quantidade_sugerida', 0) > 0
+                and r.get('recomendacao') != 'nao_fazer_stock']
+
+    # Fetch supplier per article from PHC
+    fornecedor_por_ref = {}
+    if cfg_phc and cfg_phc.ultima_sync:
+        try:
+            from phc_sync import get_phc_connection
+            conn   = get_phc_connection(cfg_phc)
+            cursor = conn.cursor()
+            cursor.execute(SQL_FORNECEDOR_ARTIGO)
+            # Keep most frequent supplier per article
+            contagens = {}
+            for ref, forn_nome, forn_no, n in cursor.fetchall():
+                if ref not in contagens or n > contagens[ref][2]:
+                    contagens[ref] = (forn_nome, forn_no, n)
+            fornecedor_por_ref = {ref: {'nome': v[0], 'no': v[1]}
+                                  for ref, v in contagens.items()}
+            conn.close()
+        except Exception as e:
+            logger.warning(f"PHC supplier fetch error: {e}")
+
+    # Group by supplier
+    por_fornecedor = {}
+    sem_fornecedor = []
+    for r in precisam:
+        forn = fornecedor_por_ref.get(r['referencia'])
+        if forn:
+            key = forn['nome']
+            if key not in por_fornecedor:
+                por_fornecedor[key] = {'nome': key, 'no': forn['no'], 'artigos': []}
+            por_fornecedor[key]['artigos'].append(r)
+        else:
+            sem_fornecedor.append(r)
+
+    # Sort by supplier name
+    fornecedores = sorted(por_fornecedor.values(), key=lambda x: x['nome'])
+    if sem_fornecedor:
+        fornecedores.append({'nome': 'Sem fornecedor identificado', 'no': None,
+                             'artigos': sem_fornecedor})
+
+    return render_template('reposicao_fornecedor.html',
+        fornecedores=fornecedores,
+        total_artigos=sum(len(f['artigos']) for f in fornecedores),
+        config=config)
+
+
+@app.route('/reposicao/criar-pedido', methods=['POST'])
+@login_required
+def reposicao_criar_pedido():
+    """Create purchase order from replenishment suggestions for one supplier."""
+    data         = request.get_json()
+    fornecedor   = data.get('fornecedor', 'Fornecedor')
+    artigos      = data.get('artigos', [])
+
+    if not artigos:
+        return jsonify({'error': 'Sem artigos seleccionados'}), 400
+
+    titulo = f"Reposicao - {fornecedor} - {datetime.now().strftime('%d/%m/%Y')}"
+    p = PedidoCompra(
+        titulo       = titulo,
+        descricao    = f"Pedido gerado automaticamente pela analise de reposicao de stock.",
+        prioridade   = 'normal',
+        estado       = 'aberto',
+        criado_por   = current_user.id,
+        data_criacao = datetime.now(),
+    )
+    db.session.add(p)
+    db.session.flush()
+
+    for i, a in enumerate(artigos):
+        ref    = a.get('referencia', '')
+        artigo = ArtigoPHC.query.filter_by(referencia=ref).first()
+        linha  = LinhaPedido(
+            pedido_id       = p.id,
+            ordem           = i,
+            artigo_ref      = ref,
+            referencia      = ref,
+            designacao      = a.get('designacao', ''),
+            unidade         = a.get('unidade', 'un'),
+            quantidade      = int(a.get('quantidade_sugerida', 1)),
+            stock_atual     = a.get('stock_atual', 0),
+            preco_custo_ref = artigo.preco_custo if artigo else 0,
+            preco_pcp_ref   = artigo.preco_custo_ponderado if artigo else 0,
+            fornecedor_hab  = fornecedor,
+            observacoes     = f"EOQ sugerido pela analise de reposicao. Score: {a.get('score','-')}",
+        )
+        db.session.add(linha)
+
+    db.session.commit()
+    return jsonify({'ok': True, 'pedido_id': p.id,
+                    'url': url_for('pedido_detalhe', pid=p.id)})
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Reposicao por Fornecedor{% endblock %}
+{% block page_title %}Reposicao por Fornecedor{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-ghost btn-sm">← Lista Geral</a>
+  <button onclick="criarTodosPedidos()" class="btn btn-primary btn-sm">📋 Criar Todos os Pedidos</button>
+{% endblock %}
+
+{% block content %}
+
+{% if not fornecedores %}
+<div class="card" style="text-align:center;padding:40px;border-style:dashed">
+  <div style="font-size:32px;margin-bottom:12px">✅</div>
+  <div style="font-weight:600">Sem artigos para encomendar</div>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:6px">Nenhum artigo cumpre os criterios de reposicao com os parametros actuais.</div>
+  <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-ghost btn-sm" style="margin-top:16px">Ver analise completa</a>
+</div>
+
+{% else %}
+
+<!-- Summary -->
+<div class="stats-grid mb-16">
+  <div class="stat-card">
+    <div class="stat-label">Fornecedores</div>
+    <div class="stat-value">{{ fornecedores|length }}</div>
+    <div class="stat-icon">🏭</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-label">Artigos a Encomendar</div>
+    <div class="stat-value">{{ total_artigos }}</div>
+    <div class="stat-icon">📦</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Valor Total Estimado</div>
+    <div class="stat-value" style="font-size:16px">
+      {{ '%.0f'|format(fornecedores|sum(attribute='artigos')|map(attribute='preco_custo')|list|sum) }}€
+    </div>
+    <div class="stat-icon">💶</div>
+  </div>
+</div>
+
+<!-- Per supplier cards -->
+{% for forn in fornecedores %}
+<div class="card mb-16" id="card-{{ loop.index }}">
+  <!-- Supplier header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-size:15px;font-weight:700">🏭 {{ forn.nome }}</div>
+      <div style="font-size:12px;color:var(--text-muted)">{{ forn.artigos|length }} artigo(s) para encomendar</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="selecionarTodos({{ loop.index }})" class="btn btn-ghost btn-sm">☑ Todos</button>
+      <button onclick="criarPedido('{{ forn.nome }}', {{ loop.index }})" class="btn btn-primary btn-sm">
+        📋 Criar Pedido de Compra
+      </button>
+    </div>
+  </div>
+
+  <!-- Articles table -->
+  <div class="table-wrap" style="margin:0">
+    <table id="table-{{ loop.index }}">
+      <thead>
+        <tr>
+          <th style="width:32px"><input type="checkbox" onchange="toggleAll(this, {{ loop.index }})" checked></th>
+          <th>Referencia</th>
+          <th>Designacao</th>
+          <th style="text-align:right">Stock</th>
+          <th style="text-align:right">Media/Ano</th>
+          <th style="text-align:right">EOQ (un)</th>
+          <th style="text-align:right">Preco Custo</th>
+          <th style="text-align:right">Valor Est.</th>
+          <th style="text-align:center">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in forn.artigos %}
+        <tr data-ref="{{ a.referencia }}" data-json='{{ a | tojson }}'>
+          <td><input type="checkbox" class="check-{{ loop.index }}" checked></td>
+          <td class="mono" style="font-size:12px;color:var(--accent)">
+            <a href="{{ url_for('analisar_artigo', ref=a.referencia) }}" target="_blank">{{ a.referencia }}</a>
+          </td>
+          <td style="font-size:12px">{{ (a.designacao or '')[:40] }}</td>
+          <td style="text-align:right;font-family:monospace;color:{% if a.stock_atual <= 0 %}var(--danger){% else %}var(--warning){% endif %}">
+            {{ '%.1f'|format(a.stock_atual) }}
+          </td>
+          <td style="text-align:right;font-family:monospace;font-size:12px">
+            {{ '%.1f'|format(a.consumo_medio_mensal * 12) }}
+          </td>
+          <td style="text-align:right;font-weight:700;color:var(--warning)">
+            <input type="number" value="{{ a.quantidade_sugerida|int }}" min="1"
+                   class="qty-input" data-ref="{{ a.referencia }}"
+                   style="width:60px;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-weight:700">
+          </td>
+          <td style="text-align:right;font-size:12px;font-family:monospace">
+            {% if a.preco_custo %}{{ '%.2f'|format(a.preco_custo) }}€{% else %}-{% endif %}
+          </td>
+          <td style="text-align:right;font-size:12px;font-family:monospace;color:var(--accent)">
+            {% if a.preco_custo and a.quantidade_sugerida %}
+            {{ '%.2f'|format(a.preco_custo * a.quantidade_sugerida) }}€
+            {% else %}-{% endif %}
+          </td>
+          <td style="text-align:center">
+            {% if a.score is defined %}
+            <span style="font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;
+              background:{% if a.score>=70 %}rgba(34,197,94,.2){% elif a.score>=45 %}rgba(245,158,11,.2){% else %}rgba(239,68,68,.2){% endif %};
+              color:{% if a.score>=70 %}var(--success){% elif a.score>=45 %}var(--warning){% else %}var(--danger){% endif %}">
+              {{ a.score }}
+            </span>
+            {% else %}-{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:700;border-top:2px solid var(--border)">
+          <td colspan="7" style="text-align:right;padding-top:8px;font-size:12px;color:var(--text-muted)">Total estimado:</td>
+          <td style="text-align:right;padding-top:8px;color:var(--accent)">
+            {{ '%.2f'|format(forn.artigos|sum(attribute='preco_custo') or 0) }}€
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+<div id="toast" style="display:none;position:fixed;bottom:24px;right:24px;background:var(--success);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.3)"></div>
+
+<script>
+function toggleAll(cb, idx) {
+  document.querySelectorAll(`.check-${idx}`).forEach(c => c.checked = cb.checked);
+}
+
+function selecionarTodos(idx) {
+  document.querySelectorAll(`.check-${idx}`).forEach(c => c.checked = true);
+  document.querySelectorAll(`#table-${idx} thead input[type=checkbox]`).forEach(c => c.checked = true);
+}
+
+function getArtigos(idx) {
+  const rows = document.querySelectorAll(`#table-${idx} tbody tr`);
+  const artigos = [];
+  rows.forEach(row => {
+    const cb = row.querySelector('input[type=checkbox]');
+    if (!cb || !cb.checked) return;
+    const data = JSON.parse(row.dataset.json);
+    // Override with edited quantity
+    const qtyInput = row.querySelector('.qty-input');
+    if (qtyInput) data.quantidade_sugerida = parseInt(qtyInput.value) || 1;
+    artigos.push(data);
+  });
+  return artigos;
+}
+
+function showToast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = ok ? 'var(--success)' : 'var(--danger)';
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 4000);
+}
+
+function criarPedido(fornecedor, idx) {
+  const artigos = getArtigos(idx);
+  if (!artigos.length) { showToast('Seleccione pelo menos um artigo', false); return; }
+
+  fetch('/reposicao/criar-pedido', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({fornecedor, artigos})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      showToast(`Pedido criado com ${artigos.length} artigo(s)!`);
+      setTimeout(() => window.open(d.url, '_blank'), 1000);
+    } else {
+      showToast(d.error || 'Erro ao criar pedido', false);
+    }
+  })
+  .catch(e => showToast('Erro: ' + e, false));
+}
+
+function criarTodosPedidos() {
+  {% for forn in fornecedores %}
+  setTimeout(() => criarPedido('{{ forn.nome }}', {{ loop.index }}), {{ (loop.index0) * 800 }});
+  {% endfor %}
+}
+</script>
+{% endblock %}

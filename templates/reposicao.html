@@ -111,6 +111,7 @@ function mostrarProgresso() {
 {% endblock %}
 {% block topbar_actions %}
   <button onclick="iniciarAnalise()" class="btn btn-primary btn-sm" id="btnAnalisar">🔍 Analisar Todos os Artigos</button>
+  <a href="{{ url_for('reposicao_por_fornecedor') }}" class="btn btn-ghost btn-sm">🏭 Por Fornecedor</a>
 
 <!-- Progress modal -->
 <div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
