@@ -31,6 +31,11 @@ else:
         ('config_geral', 'logo_filtro',          "VARCHAR(100) DEFAULT ''"),
         ('artigos_phc',  'pvp',                  'REAL DEFAULT 0'),
         ('artigos_phc',  'ultimo_preco_entrada', 'REAL DEFAULT 0'),
+        ('config_reposicao', 'min_anos_historico',         'FLOAT DEFAULT 2.0'),
+        ('config_reposicao', 'min_meses_com_venda',        'INTEGER DEFAULT 3'),
+        ('config_reposicao', 'min_total_vendido',          'FLOAT DEFAULT 3.0'),
+        ('config_reposicao', 'ignorar_sem_movimento_anos', 'FLOAT DEFAULT 3.0'),
+        ('config_reposicao', 'min_facturas_sugerir',       'INTEGER DEFAULT 8'),
     ]
 
     fixed = 0
@@ -48,7 +53,7 @@ else:
 
     conn.commit()
     c.execute("DELETE FROM alembic_version")
-    c.execute("INSERT INTO alembic_version VALUES ('0013')")
+    c.execute("INSERT INTO alembic_version VALUES ('0015')")
     conn.commit()
     conn.close()
     print(f"✅ BD corrigida ({fixed} colunas novas). Versão: 0013")

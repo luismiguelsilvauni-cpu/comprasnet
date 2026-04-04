@@ -129,7 +129,7 @@ def novo_pedido():
             prioridade=request.form.get('prioridade','normal'),
             departamento=request.form.get('departamento','').strip(),
             estado='aberto', criado_por=current_user.id,
-            data_criacao=datetime.utcnow())
+            data_criacao=datetime.now())
         db.session.add(p); db.session.commit()
         flash('Pedido criado!','success')
         return redirect(url_for('pedido_detalhe', pid=p.id))
@@ -281,7 +281,7 @@ def upload_orcamento(pid):
     if not file.filename or not allowed_file(file.filename):
         return jsonify({'error':'Apenas PDFs são aceites.'}), 400
 
-    fname = secure_filename(f"pc{pid}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
+    fname = secure_filename(f"pc{pid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
     fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
     file.save(fpath)
 
@@ -311,7 +311,7 @@ def upload_orcamento(pid):
         observacoes=dados.get('observacoes'),
         ficheiro_pdf=fname,
         carregado_por=current_user.id,
-        data_upload=datetime.utcnow(),
+        data_upload=datetime.now(),
         dados_brutos=json.dumps(dados))
     db.session.add(orc); db.session.flush()
 
@@ -444,7 +444,7 @@ def aprovar_pedido(pid):
         for o in p.orcamentos: o.selecionado = False
         o2 = Orcamento.query.get(oid)
         if o2: o2.selecionado = True
-    p.estado = 'aprovado'; p.aprovado_por = current_user.id; p.data_aprovacao = datetime.utcnow()
+    p.estado = 'aprovado'; p.aprovado_por = current_user.id; p.data_aprovacao = datetime.now()
     db.session.commit(); flash('Pedido aprovado!','success')
     return redirect(url_for('pedido_detalhe', pid=pid))
 
@@ -569,7 +569,7 @@ def salvar_config_reposicao():
     cfg.ignorar_sem_movimento_anos  = float(request.form.get('ignorar_sem_movimento_anos', 3) or 3)
     cfg.min_facturas_sugerir        = int(request.form.get('min_facturas_sugerir', 8) or 8)
     cfg.min_facturas_sugerir        = int(request.form.get('min_facturas_sugerir', 5) or 5)
-    cfg.atualizado_em               = datetime.utcnow()
+    cfg.atualizado_em               = datetime.now()
     cfg.atualizado_por              = current_user.id
     db.session.commit()
 
@@ -749,7 +749,7 @@ def gerar_pedido_reposicao():
         prioridade='normal',
         estado='aberto',
         criado_por=current_user.id,
-        data_criacao=datetime.utcnow()
+        data_criacao=datetime.now()
     )
     db.session.add(p)
     db.session.flush()
@@ -882,7 +882,7 @@ def admin_phc():
                     ins_f, upd_f, err_f = sync_fornecedores(cfg)
                     from phc_sync import sync_clientes
                     ins_c, upd_c, err_c = sync_clientes(cfg)
-                    cfg.ultima_sync = datetime.utcnow()
+                    cfg.ultima_sync = datetime.now()
                     db.session.commit()
                     msg = (f"✅ Sync concluída — "
                            f"Artigos: {ins_a}+{upd_a} | "
@@ -1035,7 +1035,7 @@ def confirmar_match(pm_id):
     pm.confirmado        = True
     pm.artigo_ref_final  = artigo_ref
     pm.confirmado_por    = current_user.id
-    pm.data_confirmacao  = datetime.utcnow()
+    pm.data_confirmacao  = datetime.now()
 
     # Update the item
     from models import ItemOrcamento
@@ -1063,7 +1063,7 @@ def ignorar_match(pm_id):
     pm.confirmado       = True
     pm.artigo_ref_final = None
     pm.confirmado_por   = current_user.id
-    pm.data_confirmacao = datetime.utcnow()
+    pm.data_confirmacao = datetime.now()
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -1237,12 +1237,12 @@ def sync_clientes_phc():
                 c.nome=r[1];c.abreviatura=r[2];c.nif=r[3];c.morada=r[4]
                 c.localidade=r[5];c.cod_postal=r[6];c.pais=r[7]
                 c.telefone=r[8];c.telemovel=r[9];c.email=r[10];c.website=r[11]
-                c.ultima_sync_phc=datetime.utcnow(); atualizados+=1
+                c.ultima_sync_phc=datetime.now(); atualizados+=1
             else:
                 db.session.add(Cliente(phc_no=int(r[0]),nome=r[1],abreviatura=r[2],
                     nif=r[3],morada=r[4],localidade=r[5],cod_postal=r[6],pais=r[7],
                     telefone=r[8],telemovel=r[9],email=r[10],website=r[11],
-                    ultima_sync_phc=datetime.utcnow())); inseridos+=1
+                    ultima_sync_phc=datetime.now())); inseridos+=1
         db.session.commit()
         return jsonify({'ok':True,'inseridos':inseridos,'atualizados':atualizados})
     except Exception as e:
@@ -1326,7 +1326,7 @@ def editar_cliente(cid):
         c.email=request.form.get('email','').strip()
         c.website=request.form.get('website','').strip()
         c.notas=request.form.get('notas','').strip()
-        c.atualizado_em=datetime.utcnow()
+        c.atualizado_em=datetime.now()
         db.session.commit()
         flash('Cliente atualizado.','success')
         return redirect(url_for('cliente_detalhe', cid=cid))
@@ -1389,7 +1389,7 @@ def salvar_componente(cid, eid):
     comp.ano         = data.get('ano') or None
     comp.campos_extra= json.dumps(data.get('campos_extra', []))
     comp.notas       = data.get('notas','').strip()
-    comp.atualizado_em = datetime.utcnow()
+    comp.atualizado_em = datetime.now()
     db.session.commit()
     return jsonify({'ok': True, 'id': comp.id})
 
@@ -2036,8 +2036,8 @@ def save_dashboard_layout():
 @login_required
 def api_calendario_eventos():
     """Return events for a given month/range."""
-    ano  = request.args.get('ano',  type=int, default=datetime.utcnow().year)
-    mes  = request.args.get('mes',  type=int, default=datetime.utcnow().month)
+    ano  = request.args.get('ano',  type=int, default=datetime.now().year)
+    mes  = request.args.get('mes',  type=int, default=datetime.now().month)
     from datetime import date
     inicio = date(ano, mes, 1)
     # Last day of month
@@ -2115,7 +2115,7 @@ def api_atualizar_evento(eid):
     if 'fornecedor'  in data: e.fornecedor   = data['fornecedor']
     if 'concluido'   in data: e.concluido    = data['concluido']
     if 'pedido_id'   in data: e.pedido_id    = data['pedido_id']
-    e.atualizado_em = datetime.utcnow()
+    e.atualizado_em = datetime.now()
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -2140,7 +2140,7 @@ def api_criar_eventos_pedido(pid):
     artigos = [{'ref': l.artigo_ref, 'design': l.designacao, 'qtt': l.quantidade}
                for l in pedido.linhas if l.artigo_ref]
 
-    data_compra = datetime.strptime(data.get('data_compra', datetime.utcnow().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
+    data_compra = datetime.strptime(data.get('data_compra', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
     dias_entrega = int(data.get('dias_entrega', 7))
     data_entrega = data_compra + timedelta(days=dias_entrega)
     fornecedor   = data.get('fornecedor', '')
@@ -2257,7 +2257,7 @@ def admin_ia():
         elif action == 'test':
             ok, msg = test_provider(cfg)
             cfg.teste_ok = ok
-            cfg.ultimo_teste = datetime.utcnow()
+            cfg.ultimo_teste = datetime.now()
             db.session.commit()
             flash(msg, 'success' if ok else 'error')
 
@@ -2377,7 +2377,7 @@ def admin_phc_sync_start():
             with app.app_context():
                 cfg2 = ConfigPHC.query.first()
                 if cfg2:
-                    cfg2.ultima_sync = datetime.utcnow()
+                    cfg2.ultima_sync = datetime.now()
                     db.session.commit()
 
             errs = len(err_a) + len(err_f) + len(err_c)
