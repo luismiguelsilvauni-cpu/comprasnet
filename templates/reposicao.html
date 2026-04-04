@@ -154,7 +154,9 @@ function mostrarProgresso() {
 {% endblock %}
 {% block topbar_actions %}
   <button onclick="iniciarAnalise()" class="btn btn-primary btn-sm" id="btnAnalisar">🔍 Analisar Todos os Artigos</button>
-  <button onclick="irParaFornecedor()" class="btn btn-ghost btn-sm" id="btnFornecedor">🏭 Por Fornecedor</button>
+  <button class="btn btn-ghost btn-sm" id="btnFornecedor"
+    onclick="document.getElementById('modalFornecedor').style.display='flex';setTimeout(()=>{window.location.href='{{ url_for('reposicao_por_fornecedor') }}'},300)">
+    🏭 Por Fornecedor</button>
 
 <!-- Progress modal -->
 <div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
