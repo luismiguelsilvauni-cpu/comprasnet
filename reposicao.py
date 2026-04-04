@@ -40,6 +40,40 @@ CONFIG_PADRAO = {
 }
 
 # ── SQL ───────────────────────────────────────────────────────────────────────
+SQL_DIVERSIDADE_ARTIGO = """
+SELECT
+    COUNT(DISTINCT ft.no)           AS num_clientes,
+    COUNT(DISTINCT ft.ftstamp)      AS num_facturas,
+    SUM(ABS(ISNULL(fi.qtt,0)))      AS total_vendido,
+    MIN(ft.fdata)                   AS primeira_venda,
+    MAX(ft.fdata)                   AS ultima_venda,
+    AVG(ISNULL(fi.epv,0))           AS preco_venda_medio
+FROM fi
+INNER JOIN ft ON ft.ftstamp = fi.ftstamp
+WHERE fi.ref = ?
+  AND ft.anulado = 0
+  AND ft.tipodoc = 1
+  AND fi.qtt IS NOT NULL AND fi.qtt > 0
+"""
+
+SQL_DIVERSIDADE_TODAS = """
+SELECT
+    fi.ref,
+    COUNT(DISTINCT ft.no)           AS num_clientes,
+    COUNT(DISTINCT ft.ftstamp)      AS num_facturas,
+    SUM(ABS(ISNULL(fi.qtt,0)))      AS total_vendido,
+    AVG(ISNULL(fi.epv,0))           AS preco_venda_medio
+FROM fi
+INNER JOIN ft ON ft.ftstamp = fi.ftstamp
+WHERE ft.anulado = 0
+  AND ft.tipodoc = 1
+  AND ft.fdata >= DATEADD(month, -?, GETDATE())
+  AND fi.qtt IS NOT NULL AND fi.qtt > 0
+  AND fi.ref IS NOT NULL AND fi.ref <> ''
+GROUP BY fi.ref
+"""
+
+
 
 SQL_VENDAS_ARTIGO = """
 SELECT
@@ -81,6 +115,94 @@ ORDER BY fi.ref, ano, mes
 
 
 # ── Engine ────────────────────────────────────────────────────────────────────
+
+
+def score_relevancia(total_vendido: float, num_clientes: int, num_facturas: int,
+                     meses_periodo: int, preco_custo: float, config: dict) -> dict:
+    """
+    Score 0-100 que determina se vale a pena fazer stock.
+    
+    Factores negativos (reduzem score):
+      - Poucos clientes (mono-cliente = risco)
+      - Poucas facturas (compra/venda isolada)
+      - Preço de custo elevado (capital imobilizado)
+      - Baixa rotatividade (consumo anual baixo)
+    
+    Factores positivos (aumentam score):
+      - Múltiplos clientes
+      - Muitas facturas distribuídas no tempo
+      - Preço baixo (fácil de ter em stock)
+      - Alta rotatividade
+    """
+    score = 100
+    razoes = []
+    
+    # Factor 1: Diversidade de clientes
+    if num_clientes == 1:
+        score -= 40
+        razoes.append(f"⚠️ Vendido a apenas 1 cliente — risco de dependência")
+    elif num_clientes == 2:
+        score -= 20
+        razoes.append(f"⚠️ Vendido a apenas 2 clientes")
+    elif num_clientes >= 5:
+        razoes.append(f"✅ {num_clientes} clientes distintos — boa diversidade")
+    
+    # Factor 2: Frequência de facturas
+    if num_facturas <= 2:
+        score -= 35
+        razoes.append(f"⚠️ Apenas {num_facturas} factura(s) — venda isolada")
+    elif num_facturas <= 5:
+        score -= 15
+        razoes.append(f"⚠️ Apenas {num_facturas} facturas no período")
+    elif num_facturas >= 10:
+        razoes.append(f"✅ {num_facturas} facturas — rotatividade consistente")
+    
+    # Factor 3: Custo de aquisição
+    if preco_custo > 500:
+        score -= 25
+        razoes.append(f"⚠️ Preço elevado ({preco_custo:.0f}€) — capital imobilizado alto")
+    elif preco_custo > 200:
+        score -= 10
+        razoes.append(f"⚠️ Preço médio-alto ({preco_custo:.0f}€)")
+    elif preco_custo > 0 and preco_custo < 50:
+        score += 5
+        razoes.append(f"✅ Preço baixo — económico manter em stock")
+    
+    # Factor 4: Consumo anual (rotatividade)
+    consumo_anual = (total_vendido / meses_periodo * 12) if meses_periodo > 0 else 0
+    if consumo_anual < 1:
+        score -= 20
+        razoes.append(f"⚠️ Consumo muito baixo ({consumo_anual:.1f}/ano)")
+    elif consumo_anual < 3:
+        score -= 10
+        razoes.append(f"⚠️ Baixo consumo anual ({consumo_anual:.1f}/ano)")
+    elif consumo_anual >= 10:
+        score += 10
+        razoes.append(f"✅ Alto consumo anual ({consumo_anual:.0f}/ano)")
+    
+    score = max(0, min(100, score))
+    
+    # Recomendação
+    if score >= 70:
+        recomendacao = 'manter_stock'
+        rec_label = '✅ Vale a pena manter em stock'
+    elif score >= 45:
+        recomendacao = 'stock_cauteloso'
+        rec_label = '⚠️ Stock cauteloso — avaliar caso a caso'
+    else:
+        recomendacao = 'nao_fazer_stock'
+        rec_label = '❌ Não recomendado fazer stock'
+    
+    return {
+        'score': score,
+        'recomendacao': recomendacao,
+        'rec_label': rec_label,
+        'razoes': razoes,
+        'num_clientes': num_clientes,
+        'num_facturas': num_facturas,
+        'consumo_anual': round(consumo_anual, 2),
+    }
+
 
 def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
                       preco_custo: float, config: dict) -> dict:
@@ -255,6 +377,7 @@ def analisar_todos(cfg_phc, config: dict, artigos_local: list) -> list:
     local = {a.referencia: a for a in artigos_local}
 
     vendas = defaultdict(dict)  # ref -> {(ano,mes): qty}
+    diversidade = {}  # ref -> {num_clientes, num_facturas, total_vendido}
 
     if cfg_phc and cfg_phc.ultima_sync:
         try:
@@ -262,11 +385,23 @@ def analisar_todos(cfg_phc, config: dict, artigos_local: list) -> list:
             conn   = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
             meses  = config.get('meses_historico', 60)
+
+            # Fetch monthly sales
             cursor.execute(SQL_TODAS_VENDAS, meses)
             for ref, ano, mes, total, _ in cursor.fetchall():
                 vendas[ref][(ano, mes)] = float(total)
+
+            # Fetch diversity data
+            cursor.execute(SQL_DIVERSIDADE_TODAS, meses)
+            for ref, nc, nf, tv, pv in cursor.fetchall():
+                diversidade[ref] = {
+                    'num_clientes': int(nc or 0),
+                    'num_facturas': int(nf or 0),
+                    'total_vendido': float(tv or 0),
+                }
+
             conn.close()
-            logger.info(f"Vendas carregadas: {len(vendas)} artigos com histórico")
+            logger.info(f"Vendas: {len(vendas)} artigos, Diversidade: {len(diversidade)} artigos")
         except Exception as e:
             logger.error(f"PHC bulk error: {e}")
 
@@ -287,10 +422,38 @@ def analisar_todos(cfg_phc, config: dict, artigos_local: list) -> list:
         m['preco_custo'] = preco
         m['unidade']     = artigo.unidade or 'un'
         m['familia']     = artigo.familia or ''
+
+        # Add relevance score
+        div = diversidade.get(ref, {})
+        meses_per = m.get('meses_periodo', config.get('meses_historico', 60))
+        tot_vend  = m.get('total_vendido', div.get('total_vendido', 0))
+        sc = score_relevancia(
+            total_vendido  = tot_vend,
+            num_clientes   = div.get('num_clientes', 0),
+            num_facturas   = div.get('num_facturas', 0),
+            meses_periodo  = meses_per,
+            preco_custo    = preco,
+            config         = config,
+        )
+        m.update({
+            'score':          sc['score'],
+            'recomendacao':   sc['recomendacao'],
+            'rec_label':      sc['rec_label'],
+            'razoes':         sc['razoes'],
+            'num_clientes':   sc['num_clientes'],
+            'num_facturas':   sc['num_facturas'],
+        })
+
+        # Override suggestion if score is low
+        if sc['recomendacao'] == 'nao_fazer_stock' and m.get('quantidade_sugerida', 0) > 0:
+            m['quantidade_sugerida'] = 0
+            m['urgencia'] = 'nao_recomendado'
+
         resultados.append(m)
 
     # Sort: critico > urgente > necessario > ok > irrelevante > sem_dados
     ordem = {'critico': 0, 'urgente': 1, 'necessario': 2, 'ok': 3,
-              'irrelevante': 4, 'sem_dados': 5}
+              'nao_recomendado': 4, 'irrelevante': 5, 'parado': 6,
+              'pouco_historico': 7, 'sem_dados': 8}
     resultados.sort(key=lambda x: ordem.get(x.get('urgencia', 'sem_dados'), 5))
     return resultados

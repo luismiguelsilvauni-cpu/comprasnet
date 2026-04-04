@@ -596,13 +596,15 @@ def analisar_artigo(ref):
             if v is not None:
                 config[k] = v
 
-    # Fetch per-month sales from PHC
+    # Fetch per-month sales and diversity from PHC
     vendas_por_mes = {}
-    vendas_lista   = []  # for table display
+    vendas_lista   = []
+    diversidade    = {}
 
     if cfg_phc and cfg_phc.ultima_sync:
         try:
             from phc_sync import get_phc_connection
+            from reposicao import SQL_DIVERSIDADE_ARTIGO
             conn   = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
             meses  = config.get('meses_historico', 60)
@@ -611,6 +613,12 @@ def analisar_artigo(ref):
                 ano, mes, total, nfat = row[0], row[1], float(row[2]), row[3]
                 vendas_por_mes[(ano, mes)] = total
                 vendas_lista.append({'ano':ano,'mes':mes,'total':total,'nfat':nfat})
+            # Diversity
+            cursor.execute(SQL_DIVERSIDADE_ARTIGO, ref)
+            row = cursor.fetchone()
+            if row:
+                diversidade = {'num_clientes': int(row[0] or 0),
+                               'num_facturas': int(row[1] or 0)}
             conn.close()
         except Exception as e:
             logger.warning(f"PHC error: {e}")
@@ -647,9 +655,23 @@ def analisar_artigo(ref):
     # Sort vendas_lista by date
     vendas_lista.sort(key=lambda x: (x['ano'], x['mes']))
 
+    # Compute relevance score
+    score_info = {}
+    if periodo:
+        from reposicao import score_relevancia
+        score_info = score_relevancia(
+            total_vendido = periodo.get('total_vendido', 0),
+            num_clientes  = diversidade.get('num_clientes', 0),
+            num_facturas  = diversidade.get('num_facturas', 0),
+            meses_periodo = periodo.get('meses_periodo', 1),
+            preco_custo   = preco,
+            config        = config,
+        )
+
     return render_template('reposicao_artigo.html',
         artigo=artigo, result=result, vendas_lista=vendas_lista,
-        periodo=periodo, config=config)
+        periodo=periodo, config=config, score_info=score_info,
+        diversidade=diversidade)
 
 
 @app.route('/reposicao/lista')

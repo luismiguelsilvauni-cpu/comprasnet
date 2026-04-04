@@ -36,6 +36,40 @@
   </div>
 </div>
 
+
+{% if score_info %}
+<!-- Score de relevância -->
+<div class="card mb-16" style="border-color:{% if score_info.score>=70 %}rgba(34,197,94,.4){% elif score_info.score>=45 %}rgba(245,158,11,.4){% else %}rgba(239,68,68,.4){% endif %}">
+  <div style="display:flex;align-items:center;gap:20px">
+    <!-- Score circle -->
+    <div style="flex-shrink:0;text-align:center;width:80px">
+      <div style="font-size:36px;font-weight:700;color:{% if score_info.score>=70 %}var(--success){% elif score_info.score>=45 %}var(--warning){% else %}var(--danger){% endif %}">
+        {{ score_info.score }}
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);letter-spacing:1px">/ 100</div>
+      <div style="background:var(--border);border-radius:4px;height:6px;margin-top:6px">
+        <div style="width:{{ score_info.score }}%;height:100%;background:{% if score_info.score>=70 %}var(--success){% elif score_info.score>=45 %}var(--warning){% else %}var(--danger){% endif %};border-radius:4px"></div>
+      </div>
+    </div>
+    <!-- Recommendation -->
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px">{{ score_info.rec_label }}</div>
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);margin-bottom:8px">
+        <span>👥 {{ diversidade.num_clientes or 0 }} cliente(s) distintos</span>
+        <span>📄 {{ diversidade.num_facturas or 0 }} factura(s)</span>
+        <span>📦 {{ '%.2f'|format(result.preco_custo) }}€/un</span>
+        <span>📈 {{ '%.1f'|format(score_info.consumo_anual) }}/ano</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        {% for r in score_info.razoes %}
+        <div style="font-size:12px">{{ r }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if not result.tem_dados %}
 <div class="card mb-16" style="text-align:center;padding:32px;border-style:dashed">
   <div style="font-size:32px;margin-bottom:8px">📭</div>
