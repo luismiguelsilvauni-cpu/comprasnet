@@ -2264,24 +2264,31 @@ def reposicao_por_fornecedor():
         try:
             from phc_sync import get_phc_connection
             conn = get_phc_connection(cfg_phc)
-            conn.timeout = 10
             cursor = conn.cursor()
-            cursor.execute(SQL_FORNECEDOR_ARTIGO)
+            cursor.timeout = 30
+            # Simpler query: last purchase invoice per article
+            SQL_FORN_SIMPLES = (
+                "SELECT fi.ref, fo.nome, fo.no"
+                " FROM fi"
+                " INNER JOIN fo ON fo.fostamp = fi.ftstamp"
+                " WHERE fi.ref IS NOT NULL AND fi.ref <> ''"
+                " AND fi.qtt > 0"
+            )
+            cursor.execute(SQL_FORN_SIMPLES)
             contagens = {}
-            for ref, forn_nome, forn_no, n in cursor.fetchall():
-                if ref not in contagens or n > contagens[ref][2]:
-                    contagens[ref] = (forn_nome, forn_no, n)
-            fornecedor_por_ref = {ref: {'nome': v[0], 'no': v[1]}
-                                  for ref, v in contagens.items()}
+            for ref, forn_nome, forn_no in cursor.fetchall():
+                if ref not in contagens:
+                    contagens[ref] = {}
+                key = str(forn_no)
+                contagens[ref][key] = contagens[ref].get(key, {'nome': forn_nome, 'no': forn_no, 'n': 0})
+                contagens[ref][key]['n'] += 1
+            # Pick most frequent supplier per article
+            for ref, forns in contagens.items():
+                best = max(forns.values(), key=lambda x: x['n'])
+                fornecedor_por_ref[ref] = {'nome': best['nome'], 'no': best['no']}
             conn.close()
         except Exception as e:
-            logger.warning(f"PHC supplier fetch error: {e}")
-            # Fall back to FornecedorPHC table in local DB
-            try:
-                forn_local = FornecedorPHC.query.all()
-                logger.info(f"Using {len(forn_local)} local suppliers as fallback")
-            except Exception:
-                pass
+            app.logger.warning(f"PHC supplier fetch error: {e}")
 
     # Group by supplier
     por_fornecedor = {}
