@@ -2259,10 +2259,10 @@ def reposicao_por_fornecedor():
                 and r.get('recomendacao') != 'nao_fazer_stock']
     app.logger.info(f"Precisam encomendar: {len(precisam)}")
 
-    # Fetch supplier per article from PHC
+    # Fetch supplier per article from PHC - always try regardless of analysis
     fornecedor_por_ref = {}
-    app.logger.info(f'A buscar fornecedores, precisam={len(precisam)}')
-    if cfg_phc and cfg_phc.ultima_sync:
+    print(f"[DEBUG] A buscar fornecedores PHC, precisam={len(precisam)}, cfg_phc={cfg_phc is not None}")
+    if cfg_phc:
         try:
             from phc_sync import get_phc_connection
             conn = get_phc_connection(cfg_phc)
