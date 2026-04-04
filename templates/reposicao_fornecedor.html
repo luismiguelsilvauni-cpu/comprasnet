@@ -31,10 +31,8 @@
     <div class="stat-icon">📦</div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">Valor Total Estimado</div>
-    <div class="stat-value" style="font-size:16px">
-      {{ '%.0f'|format(fornecedores|sum(attribute='artigos')|map(attribute='preco_custo')|list|sum) }}€
-    </div>
+    <div class="stat-label">Artigos Identificados</div>
+    <div class="stat-value" style="font-size:16px">{{ total_artigos }}</div>
     <div class="stat-icon">💶</div>
   </div>
 </div>
