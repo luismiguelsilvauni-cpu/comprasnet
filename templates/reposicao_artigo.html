@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Reposição · {{ artigo.referencia }}{% endblock %}
+{% block page_title %}Análise de Reposição{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-ghost btn-sm">← Voltar</a>
+  <a href="{{ url_for('stock_artigo', ref=artigo.referencia) }}" class="btn btn-ghost btn-sm">📦 Ficha Stock</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header do artigo -->
+<div class="card mb-16">
+  <div style="display:flex;align-items:flex-start;gap:16px">
+    <div style="flex:1">
+      <div class="mono" style="font-size:13px;color:var(--accent);margin-bottom:4px">{{ artigo.referencia }}</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px">{{ artigo.designacao }}</div>
+      <div style="display:flex;gap:16px;font-size:13px;color:var(--text-muted)">
+        <span>Família: <strong style="color:var(--text)">{{ artigo.familia or '-' }}</strong></span>
+        <span>Unidade: <strong style="color:var(--text)">{{ artigo.unidade or 'un' }}</strong></span>
+        <span>P. Custo: <strong style="color:var(--text)">{{ '%.2f'|format(result.preco_custo) }}€</strong></span>
+      </div>
+    </div>
+    <div style="text-align:center;background:{% if result.urgencia=='critico' %}rgba(239,68,68,.1){% elif result.urgencia=='urgente' %}rgba(245,158,11,.1){% elif result.urgencia=='necessario' %}rgba(59,110,240,.1){% elif result.urgencia=='ok' %}rgba(34,197,94,.1){% else %}var(--surface2){% endif %};border-radius:10px;padding:16px 24px">
+      <div style="font-size:32px">
+        {% if result.urgencia=='critico' %}🔴{% elif result.urgencia=='urgente' %}🟡{% elif result.urgencia=='necessario' %}🔵{% elif result.urgencia=='ok' %}✅{% else %}⚪{% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px">
+        {% if result.urgencia=='critico' %}CRÍTICO{% elif result.urgencia=='urgente' %}URGENTE{% elif result.urgencia=='necessario' %}NECESSÁRIO{% elif result.urgencia=='ok' %}OK{% elif result.urgencia=='parado' %}PARADO{% else %}SEM DADOS{% endif %}
+      </div>
+      {% if result.quantidade_sugerida > 0 %}
+      <div style="margin-top:8px;font-size:18px;font-weight:700;color:var(--warning)">
+        Encomendar {{ '%.0f'|format(result.quantidade_sugerida) }} {{ result.unidade }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if not result.tem_dados %}
+<div class="card mb-16" style="text-align:center;padding:32px;border-style:dashed">
+  <div style="font-size:32px;margin-bottom:8px">📭</div>
+  <div style="font-size:14px;font-weight:600;margin-bottom:4px">Sem histórico de vendas</div>
+  <div style="font-size:13px;color:var(--text-muted)">
+    {% if not result.relevante %}
+    Este artigo não cumpre os critérios mínimos de relevância:<br>
+    vendido em {{ result.meses_com_venda or 0 }} meses distintos (mínimo: {{ config.min_meses_com_venda }}),
+    total: {{ result.total_vendido or 0 }} unidades (mínimo: {{ config.min_total_vendido }}).
+    {% else %}
+    Não foram encontradas vendas deste artigo no PHC nos últimos {{ config.meses_historico }} meses.
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+
+<!-- KPIs principais -->
+<div class="stats-grid mb-16">
+  <div class="stat-card {% if result.stock_atual <= 0 %}danger{% elif result.precisa_encomendar %}warning{% else %}success{% endif %}">
+    <div class="stat-label">Stock Actual</div>
+    <div class="stat-value">{{ '%.1f'|format(result.stock_atual) }}</div>
+    <div class="stat-icon">📦</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Cobertura Actual</div>
+    <div class="stat-value">{{ result.dias_cobertura_atual or 0 }}d</div>
+    <div class="stat-icon">📅</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-label">Ponto de Reorder</div>
+    <div class="stat-value">{{ '%.1f'|format(result.ponto_reorder) }}</div>
+    <div class="stat-icon">⚠️</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-label">Qtd. Económica (EOQ)</div>
+    <div class="stat-value">{{ '%.1f'|format(result.eoq) }}</div>
+    <div class="stat-icon">🧮</div>
+  </div>
+</div>
+
+<!-- Explicação dos cálculos -->
+<div class="card mb-16">
+  <div class="card-title">🧮 Como foram calculados os valores</div>
+
+  {% if periodo %}
+  <!-- Secção 1: Período e dados base -->
+  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">1. Período de análise e dados base</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+      <div>
+        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">PRIMEIRA VENDA REGISTADA</div>
+        <div style="font-weight:600">{{ periodo.primeiro_mes }}</div>
+      </div>
+      <div>
+        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">ÚLTIMA VENDA REGISTADA</div>
+        <div style="font-weight:600">{{ periodo.ultimo_mes }}</div>
+      </div>
+      <div>
+        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">PERÍODO TOTAL</div>
+        <div style="font-weight:600">{{ periodo.meses_periodo }} meses ({{ periodo.anos_periodo }} anos)</div>
+      </div>
+      <div>
+        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">MESES COM VENDAS</div>
+        <div style="font-weight:600">{{ periodo.meses_com_venda }} de {{ periodo.meses_periodo }}</div>
+      </div>
+      <div>
+        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">TOTAL VENDIDO</div>
+        <div style="font-weight:600">{{ '%.1f'|format(periodo.total_vendido) }} {{ result.unidade }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Secção 2: Média -->
+  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">2. Cálculo da média de consumo</div>
+    <div style="font-size:13px;line-height:2;font-family:monospace">
+      <div style="color:var(--text-muted)">Média mensal = Total vendido ÷ Período total</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text)">
+        {{ '%.3f'|format(periodo.media_mensal) }} {{ result.unidade }}/mês
+        = {{ '%.1f'|format(periodo.total_vendido) }} ÷ {{ periodo.meses_periodo }} meses
+      </div>
+      <div style="color:var(--text-muted);margin-top:8px">Média anual = Média mensal × 12</div>
+      <div style="font-size:15px;font-weight:700;color:var(--accent)">
+        {{ '%.2f'|format(periodo.media_anual) }} {{ result.unidade }}/ano
+        = {{ '%.3f'|format(periodo.media_mensal) }} × 12
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:8px;background:rgba(59,110,240,.08);border-radius:6px">
+      💡 A média usa o <strong>período total desde a 1ª venda</strong> (não apenas os meses com vendas),
+      para reflectir a procura real incluindo meses sem venda.
+      Um artigo vendido 10 unidades há 5 anos tem média de 2/ano, não 10/ano.
+    </div>
+  </div>
+
+  <!-- Secção 3: Stock de segurança -->
+  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">3. Stock de segurança</div>
+    <div style="font-size:13px;line-height:2;font-family:monospace">
+      <div style="color:var(--text-muted)">Consumo diário = Média mensal ÷ 30</div>
+      <div>= {{ '%.3f'|format(result.consumo_medio_diario) }} {{ result.unidade }}/dia</div>
+      <div style="color:var(--text-muted);margin-top:4px">Stock segurança = Factor segurança × Consumo diário × Lead time</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text)">
+        {{ '%.2f'|format(result.stock_seguranca) }} {{ result.unidade }}
+        = {{ config.fator_seguranca }} × {{ '%.4f'|format(result.consumo_medio_diario) }} × {{ config.lead_time_dias }} dias
+      </div>
+    </div>
+  </div>
+
+  <!-- Secção 4: Ponto de reorder -->
+  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--warning)">4. Ponto de Reorder (ROP)</div>
+    <div style="font-size:13px;line-height:2;font-family:monospace">
+      <div style="color:var(--text-muted)">ROP = (Consumo diário × Lead time) + Stock segurança</div>
+      <div style="font-size:15px;font-weight:700;color:var(--warning)">
+        {{ '%.2f'|format(result.ponto_reorder) }} {{ result.unidade }}
+        = ({{ '%.4f'|format(result.consumo_medio_diario) }} × {{ config.lead_time_dias }}) + {{ '%.2f'|format(result.stock_seguranca) }}
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:8px;background:rgba(245,158,11,.08);border-radius:6px">
+      ⚠️ Quando o stock desce abaixo de <strong>{{ '%.2f'|format(result.ponto_reorder) }} {{ result.unidade }}</strong>,
+      deve ser feita uma encomenda. Stock actual: <strong>{{ '%.1f'|format(result.stock_atual) }}</strong>
+      → {% if result.precisa_encomendar %}<span style="color:var(--danger)">Abaixo do ROP — encomendar!</span>{% else %}<span style="color:var(--success)">Acima do ROP — OK</span>{% endif %}
+    </div>
+  </div>
+
+  <!-- Secção 5: EOQ -->
+  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">5. Quantidade Económica de Encomenda (EOQ)</div>
+    <div style="font-size:13px;line-height:2;font-family:monospace">
+      <div style="color:var(--text-muted)">D = Consumo anual = {{ '%.2f'|format(result.consumo_medio_mensal * 12) }} {{ result.unidade }}/ano</div>
+      <div style="color:var(--text-muted)">S = Custo por encomenda = {{ config.custo_encomenda }}€</div>
+      <div style="color:var(--text-muted)">H = Custo posse unitário = P. Custo × Taxa posse = {{ '%.2f'|format(result.preco_custo) }}€ × {{ (config.taxa_posse_anual * 100)|round(1) }}% = {{ '%.2f'|format(result.preco_custo * config.taxa_posse_anual) }}€/ano</div>
+      <div style="color:var(--text-muted);margin-top:4px">EOQ = √(2 × D × S ÷ H)</div>
+      <div style="font-size:15px;font-weight:700;color:var(--accent)">
+        {{ '%.1f'|format(result.eoq) }} {{ result.unidade }}
+        = √(2 × {{ '%.1f'|format(result.consumo_medio_mensal * 12) }} × {{ config.custo_encomenda }} ÷ {{ '%.4f'|format(result.preco_custo * config.taxa_posse_anual) }})
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:8px;background:rgba(59,110,240,.08);border-radius:6px">
+      💡 O EOQ é a quantidade que minimiza o custo total (encomenda + armazenamento).
+      Encomendar menos vezes com mais quantidade, ou mais vezes com menos?
+      O EOQ dá o equilíbrio óptimo.
+    </div>
+  </div>
+
+  <!-- Secção 6: Parâmetros usados -->
+  <div style="background:var(--surface2);border-radius:8px;padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-muted)">6. Parâmetros utilizados neste cálculo</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+      <div>Lead time: <strong>{{ config.lead_time_dias }} dias</strong></div>
+      <div>Factor segurança: <strong>{{ config.fator_seguranca }}</strong></div>
+      <div>Meses cobertura: <strong>{{ config.meses_cobertura }}</strong></div>
+      <div>Custo encomenda: <strong>{{ config.custo_encomenda }}€</strong></div>
+      <div>Taxa posse: <strong>{{ (config.taxa_posse_anual * 100)|round(1) }}%/ano</strong></div>
+      <div>Histórico: <strong>{{ config.meses_historico }} meses</strong></div>
+    </div>
+    <div style="margin-top:8px">
+      <a href="{{ url_for('reposicao') }}" class="btn btn-ghost btn-sm" style="font-size:11px">⚙️ Alterar parâmetros</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Histórico de vendas por mês -->
+{% if vendas_lista %}
+<div class="card mb-16">
+  <div class="card-title">📈 Histórico de Vendas por Mês</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+    {{ vendas_lista|length }} meses com vendas registadas nos últimos {{ config.meses_historico }} meses
+  </div>
+  <div class="table-wrap" style="margin:0;max-height:400px;overflow-y:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Mês</th>
+          <th style="text-align:right">Total Vendido</th>
+          <th style="text-align:right">Nº Facturas</th>
+          <th style="text-align:right">vs. Média Mensal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set media_m = result.consumo_medio_mensal %}
+        {% for v in vendas_lista|reverse %}
+        <tr>
+          <td style="font-family:monospace;font-size:12px">{{ '%02d'|format(v.mes) }}/{{ v.ano }}</td>
+          <td style="text-align:right;font-weight:600;font-family:monospace">{{ '%.2f'|format(v.total) }} {{ result.unidade }}</td>
+          <td style="text-align:right;color:var(--text-muted)">{{ v.nfat }}</td>
+          <td style="text-align:right">
+            {% if media_m > 0 %}
+            {% set ratio = v.total / media_m %}
+            <span style="color:{% if ratio > 1.5 %}var(--warning){% elif ratio < 0.5 %}var(--text-muted){% else %}var(--success){% endif %}">
+              {{ '%+.0f'|format((ratio-1)*100) }}%
+            </span>
+            {% else %}-{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}

@@ -329,7 +329,7 @@ function mostrarProgresso() {
             {% else %}❓{% endif %}
           </td>
           <td class="mono" style="font-size:12px;color:var(--accent)">
-            <a href="{{ url_for('stock_artigo', ref=r.referencia) }}">{{ r.referencia }}</a>
+            <a href="{{ url_for('analisar_artigo', ref=r.referencia) }}" title="Ver análise detalhada">{{ r.referencia }}</a>
           </td>
           <td style="font-size:12px">{{ (r.designacao or '')[:45] }}</td>
           <td style="text-align:right;font-family:monospace;font-weight:700;color:{% if r.stock_atual <= 0 %}var(--danger){% elif r.precisa_encomendar %}var(--warning){% else %}var(--success){% endif %}">

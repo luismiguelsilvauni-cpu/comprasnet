@@ -581,28 +581,75 @@ def salvar_config_reposicao():
 @app.route('/reposicao/analisar/<ref>')
 @login_required
 def analisar_artigo(ref):
-    """Analyse one article and return replenishment suggestion as JSON."""
-    from reposicao import analisar_artigo as _analisar, CONFIG_PADRAO
+    """Analyse one article and show detailed breakdown page."""
+    from reposicao import CONFIG_PADRAO, calcular_metricas, SQL_VENDAS_ARTIGO
 
     cfg_phc    = ConfigPHC.query.first()
-    cfg_artigo = ConfigReposicao.query.filter_by(artigo_ref=ref).first()
     cfg_global = ConfigReposicao.query.filter_by(artigo_ref=None).first()
+    artigo     = ArtigoPHC.query.filter_by(referencia=ref).first_or_404()
 
-    # Build config dict: defaults → global override → per-article override
     config = dict(CONFIG_PADRAO)
     if cfg_global:
-        for k in CONFIG_PADRAO:
+        for k in list(CONFIG_PADRAO.keys()) + ['min_anos_historico','min_meses_com_venda',
+                                                'min_total_vendido','ignorar_sem_movimento_anos']:
             v = getattr(cfg_global, k, None)
             if v is not None:
                 config[k] = v
-    if cfg_artigo:
-        for k in CONFIG_PADRAO:
-            v = getattr(cfg_artigo, k, None)
-            if v is not None:
-                config[k] = v
 
-    resultado = _analisar(cfg_phc, config, ref)
-    return jsonify(resultado)
+    # Fetch per-month sales from PHC
+    vendas_por_mes = {}
+    vendas_lista   = []  # for table display
+
+    if cfg_phc and cfg_phc.ultima_sync:
+        try:
+            from phc_sync import get_phc_connection
+            conn   = get_phc_connection(cfg_phc)
+            cursor = conn.cursor()
+            meses  = config.get('meses_historico', 60)
+            cursor.execute(SQL_VENDAS_ARTIGO, ref, meses)
+            for row in cursor.fetchall():
+                ano, mes, total, nfat = row[0], row[1], float(row[2]), row[3]
+                vendas_por_mes[(ano, mes)] = total
+                vendas_lista.append({'ano':ano,'mes':mes,'total':total,'nfat':nfat})
+            conn.close()
+        except Exception as e:
+            logger.warning(f"PHC error: {e}")
+
+    stock  = artigo.stock_atual or 0
+    preco  = artigo.preco_custo_ponderado or artigo.preco_custo or 0
+    result = calcular_metricas(vendas_por_mes, stock, preco, config)
+    result['referencia'] = ref
+    result['designacao'] = artigo.designacao or ''
+    result['stock_atual'] = stock
+    result['preco_custo'] = preco
+    result['unidade']    = artigo.unidade or 'un'
+
+    # Compute period info for display
+    periodo = {}
+    if vendas_por_mes:
+        chaves = sorted(vendas_por_mes.keys())
+        primeiro = chaves[0]
+        ultimo   = chaves[-1]
+        from datetime import datetime as _dt
+        meses_periodo = (_dt.now().year - primeiro[0])*12 + (_dt.now().month - primeiro[1]) + 1
+        total_vendido = sum(vendas_por_mes.values())
+        periodo = {
+            'primeiro_mes': f"{primeiro[1]:02d}/{primeiro[0]}",
+            'ultimo_mes':   f"{ultimo[1]:02d}/{ultimo[0]}",
+            'meses_periodo': meses_periodo,
+            'anos_periodo':  round(meses_periodo/12, 1),
+            'total_vendido': total_vendido,
+            'meses_com_venda': len([v for v in vendas_por_mes.values() if v>0]),
+            'media_mensal':  round(total_vendido/meses_periodo, 3),
+            'media_anual':   round(total_vendido/meses_periodo*12, 2),
+        }
+
+    # Sort vendas_lista by date
+    vendas_lista.sort(key=lambda x: (x['ano'], x['mes']))
+
+    return render_template('reposicao_artigo.html',
+        artigo=artigo, result=result, vendas_lista=vendas_lista,
+        periodo=periodo, config=config)
 
 
 @app.route('/reposicao/lista')
