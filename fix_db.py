@@ -53,7 +53,7 @@ else:
 
     conn.commit()
     c.execute("DELETE FROM alembic_version")
-    c.execute("INSERT INTO alembic_version VALUES ('0015')")
+    c.execute("INSERT INTO alembic_version VALUES ('0014')")
     conn.commit()
     conn.close()
     print(f"✅ BD corrigida ({fixed} colunas novas). Versão: 0013")
