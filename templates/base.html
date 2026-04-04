@@ -245,17 +245,15 @@
 <nav class="sidebar">
     <div class="sidebar-logo">
         {% if cfg_geral and cfg_geral.empresa_logo_path %}
-            <a href="{{ url_for('admin_config') }}" title="Editar logotipo">
+            <a href="{{ url_for('admin_config') }}" title="Editar logotipo" style="display:block">
             <img src="/uploads/{{ cfg_geral.empresa_logo_path }}" alt="Logo"
-                 style="height:{{ cfg_geral.logo_altura or 48 }}px;max-width:{{ cfg_geral.logo_largura or 180 }}px;object-fit:contain;filter:{{ cfg_geral.logo_filtro or '' }};display:block;margin-bottom:4px">
+                 style="height:{{ cfg_geral.logo_altura or 48 }}px;max-width:{{ cfg_geral.logo_largura or 180 }}px;object-fit:contain;filter:{{ cfg_geral.logo_filtro or 'none' }};display:block">
             </a>
-            <div class="app-sub">{{ cfg_geral.empresa_nome or "ComprasNet" }}</div>
         {% else %}
             <div class="logo-icon">📦</div>
             <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
+            <div class="app-sub">v1.0 · PHC Integration</div>
         {% endif %}
-        <div class="app-sub">v1.0 · PHC Integration</div>
-        <div class="app-sub">v1.0 · PHC Integration</div>
     </div>
     <div class="sidebar-nav">
         <div class="nav-section">

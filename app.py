@@ -1012,9 +1012,27 @@ def admin_config():
             cfg.backup_auto_ativo  = request.form.get('backup_auto_ativo') == 'on'
             cfg.claude_chat_ativo  = request.form.get('claude_chat_ativo') == 'on'
             cfg.claude_chat_sistema= request.form.get('claude_chat_sistema', '').strip()
-            cfg.logo_altura        = int(request.form.get('logo_altura', 48) or 48)
-            cfg.logo_largura       = int(request.form.get('logo_largura', 180) or 180)
-            cfg.logo_filtro        = request.form.get('logo_filtro', '').strip()
+            try:
+                cfg.logo_altura    = int(request.form.get('logo_altura', 48) or 48)
+                cfg.logo_largura   = int(request.form.get('logo_largura', 180) or 180)
+                cfg.logo_filtro    = request.form.get('logo_filtro', '').strip()
+            except Exception:
+                # Columns may not exist yet - run fix_db.py
+                from sqlalchemy import text
+                with db.engine.connect() as conn:
+                    for col, typ, default in [
+                        ('logo_altura','INTEGER','48'),
+                        ('logo_largura','INTEGER','180'),
+                        ('logo_filtro','VARCHAR(100)',"''"),
+                    ]:
+                        try:
+                            conn.execute(text(f"ALTER TABLE config_geral ADD COLUMN {col} {typ} DEFAULT {default}"))
+                            conn.commit()
+                        except Exception:
+                            pass
+                cfg.logo_altura    = int(request.form.get('logo_altura', 48) or 48)
+                cfg.logo_largura   = int(request.form.get('logo_largura', 180) or 180)
+                cfg.logo_filtro    = request.form.get('logo_filtro', '').strip()
             # Logo upload
             if 'logo' in request.files and request.files['logo'].filename:
                 logo = request.files['logo']
