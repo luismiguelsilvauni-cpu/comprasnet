@@ -99,8 +99,20 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     if meses_com_venda < min_meses or total_vendido < min_total:
         return _sem_relevancia(stock_atual, total_vendido, meses_com_venda)
 
-    # Consumo médio mensal (sobre meses activos)
-    cmm = total_vendido / max(meses_com_venda, 1)
+    # Período total: desde o primeiro mês com venda até hoje
+    # Isto dá a média real anual sem inflar artigos de venda esporádica
+    if vendas_por_mes:
+        chaves = sorted(vendas_por_mes.keys())  # list of (ano, mes)
+        primeiro_ano, primeiro_mes = chaves[0]
+        hoje = datetime.now()
+        # Months elapsed from first sale to now
+        meses_periodo = (hoje.year - primeiro_ano) * 12 + (hoje.month - primeiro_mes) + 1
+        meses_periodo = max(meses_periodo, 1)
+    else:
+        meses_periodo = config.get('meses_historico', 60)
+
+    # Média mensal = total vendido / meses desde primeira venda
+    cmm = total_vendido / meses_periodo
     cmd = cmm / 30.0
 
     # Lead time
@@ -155,6 +167,7 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
         'dias_cobertura_atual':   int(dias_cobertura),
         'total_vendido':          round(total_vendido, 2),
         'meses_com_venda':        meses_com_venda,
+        'meses_periodo':          meses_periodo,
         'lead_time_dias':         lt,
     }
 

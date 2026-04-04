@@ -118,11 +118,11 @@
           <th>Referência</th>
           <th>Designação</th>
           <th style="text-align:right">Stock</th>
-          <th style="text-align:right">Venda/Mês</th>
+          <th style="text-align:right">Média/Ano</th>
           <th style="text-align:right">Dias Cob.</th>
           <th style="text-align:right">ROP</th>
           <th style="text-align:right">Qtd. Sugerida</th>
-          <th style="text-align:right">Meses Venda</th>
+          <th style="text-align:right" title="Meses com vendas / Período total">Meses Venda / Período</th>
         </tr>
       </thead>
       <tbody>
@@ -144,7 +144,7 @@
             {{ '%.1f'|format(r.stock_atual) }} {{ r.unidade }}
           </td>
           <td style="text-align:right;font-family:monospace;font-size:12px">
-            {% if r.consumo_medio_mensal > 0 %}{{ '%.1f'|format(r.consumo_medio_mensal) }}{% else %}-{% endif %}
+            {% if r.consumo_medio_mensal > 0 %}{{ '%.1f'|format(r.consumo_medio_mensal * 12) }}{% else %}-{% endif %}
           </td>
           <td style="text-align:right;font-family:monospace;font-size:12px;color:{% if r.dias_cobertura_atual is not none and r.dias_cobertura_atual < 30 %}var(--danger){% elif r.dias_cobertura_atual is not none and r.dias_cobertura_atual < 60 %}var(--warning){% else %}var(--text-muted){% endif %}">
             {% if r.dias_cobertura_atual is not none and r.tem_dados %}{{ r.dias_cobertura_atual }}d{% else %}-{% endif %}
@@ -156,7 +156,7 @@
             {% if r.quantidade_sugerida > 0 %}{{ '%.1f'|format(r.quantidade_sugerida) }} {{ r.unidade }}{% else %}-{% endif %}
           </td>
           <td style="text-align:right;font-size:12px;color:var(--text-muted)">
-            {% if r.meses_com_venda %}{{ r.meses_com_venda }}{% else %}-{% endif %}
+            {% if r.meses_com_venda %}{{ r.meses_com_venda }} / {{ r.meses_periodo or '-' }}{% else %}-{% endif %}
           </td>
         </tr>
         {% endfor %}
