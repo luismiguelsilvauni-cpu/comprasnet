@@ -2311,7 +2311,9 @@ def reposicao_por_fornecedor():
     por_fornecedor = {}
     sem_fornecedor = []
     for r in precisam:
-        forn = fornecedor_por_ref.get(r['referencia'])
+        ref_key = r['referencia'].strip()
+        forn = fornecedor_por_ref.get(ref_key) or fornecedor_por_ref.get(r['referencia'])
+        forn = forn  # use stripped lookup
         if forn:
             key = forn['nome']
             if key not in por_fornecedor:
