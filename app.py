@@ -2243,9 +2243,16 @@ def reposicao_por_fornecedor():
         " GROUP BY fi.ref, fo.nome, fo.no"
     )
 
-    # Run bulk analysis
+    # Run bulk analysis using local DB only (no PHC connection needed here)
     artigos = ArtigoPHC.query.filter(ArtigoPHC.stock_atual >= 0).all()
-    resultados = analisar_todos(cfg_phc, config, artigos)
+    erro = None
+    try:
+        resultados = analisar_todos(cfg_phc, config, artigos)
+    except Exception as e:
+        import traceback
+        erro = str(e)
+        logger.error(traceback.format_exc())
+        resultados = []
 
     # Only keep articles that need ordering
     precisam = [r for r in resultados if r.get('quantidade_sugerida', 0) > 0
@@ -2256,10 +2263,10 @@ def reposicao_por_fornecedor():
     if cfg_phc and cfg_phc.ultima_sync:
         try:
             from phc_sync import get_phc_connection
-            conn   = get_phc_connection(cfg_phc)
+            conn = get_phc_connection(cfg_phc)
+            conn.timeout = 10
             cursor = conn.cursor()
             cursor.execute(SQL_FORNECEDOR_ARTIGO)
-            # Keep most frequent supplier per article
             contagens = {}
             for ref, forn_nome, forn_no, n in cursor.fetchall():
                 if ref not in contagens or n > contagens[ref][2]:
@@ -2269,6 +2276,12 @@ def reposicao_por_fornecedor():
             conn.close()
         except Exception as e:
             logger.warning(f"PHC supplier fetch error: {e}")
+            # Fall back to FornecedorPHC table in local DB
+            try:
+                forn_local = FornecedorPHC.query.all()
+                logger.info(f"Using {len(forn_local)} local suppliers as fallback")
+            except Exception:
+                pass
 
     # Group by supplier
     por_fornecedor = {}
@@ -2292,7 +2305,7 @@ def reposicao_por_fornecedor():
     return render_template('reposicao_fornecedor.html',
         fornecedores=fornecedores,
         total_artigos=sum(len(f['artigos']) for f in fornecedores),
-        config=config)
+        config=config, erro=erro if 'erro' in dir() else None)
 
 
 @app.route('/reposicao/criar-pedido', methods=['POST'])
