@@ -49,22 +49,20 @@ ORDER BY st.ref
 
 SQL_FORNECEDORES = """
 SELECT DISTINCT
-    cl.no                           AS numero,
-    cl.nome                         AS nome,
-    ISNULL(cl.ncont, '')            AS nif,
-    ISNULL(cl.morada, '')           AS morada,
-    ISNULL(cl.local, '')            AS localidade,
-    ISNULL(cl.codpost, '')          AS cod_postal,
-    ISNULL(cl.telefone, '')         AS telefone,
-    ISNULL(cl.email, '')            AS email,
-    ISNULL(cl.inactivo, 0)          AS inactivo,
-    cl.clstamp                      AS stamp
-FROM cl
-INNER JOIN fo ON fo.no = cl.no
-WHERE ISNULL(cl.inactivo, 0) = 0
-  AND cl.nome IS NOT NULL
-  AND LEN(LTRIM(RTRIM(cl.nome))) > 0
-ORDER BY cl.nome
+    fo.no                           AS numero,
+    fo.nome                         AS nome,
+    ISNULL(fo.ncont, '')            AS nif,
+    ISNULL(fo.morada, '')           AS morada,
+    ISNULL(fo.local, '')            AS localidade,
+    ISNULL(fo.codpost, '')          AS cod_postal,
+    ''                              AS telefone,
+    ''                              AS email,
+    0                               AS inactivo,
+    fo.fostamp                      AS stamp
+FROM fo
+WHERE fo.nome IS NOT NULL
+  AND LEN(LTRIM(RTRIM(fo.nome))) > 0
+ORDER BY fo.nome
 """
 
 SQL_HISTORICO_COMPRAS = """
