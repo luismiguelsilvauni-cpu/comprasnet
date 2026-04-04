@@ -30,7 +30,7 @@
                 <td class="text-muted" style="font-size:12px">{{ u.data_criacao.strftime('%d/%m/%Y') }}</td>
                 <td>
                     {% if u.id != current_user.id %}
-                    <form method="POST" action="{{ url_for('apagar_utilizador', user_id=u.id) }}" onsubmit="return confirm('Remover utilizador {{ u.nome }}?')">
+                    <form method="POST" action="{{ url_for('apagar_utilizador', uid=u.id) }}" onsubmit="return confirm('Remover utilizador {{ u.nome }}?')">
                         <button type="submit" class="btn btn-danger btn-sm">Remover</button>
                     </form>
                     {% else %}
