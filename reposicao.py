@@ -276,10 +276,17 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     precisa = stock_atual <= rop
 
     # Quantidade sugerida
-    meses_cob = config.get('meses_cobertura', 2)
-    qtd_base  = cmm * meses_cob
-    qtd_min   = config.get('quantidade_minima_encomenda', 1)
-    qtd       = round(max(qtd_base, eoq, qtd_min), 2) if precisa else 0
+    meses_cob    = config.get('meses_cobertura', 2)
+    qtd_base     = cmm * meses_cob
+    qtd_min      = config.get('quantidade_minima_encomenda', 1)
+    consumo_anual = cmm * 12
+
+    # For very slow articles (< 1/year), don't use EOQ - just use base coverage
+    # EOQ formula breaks down with near-zero consumption
+    if consumo_anual < 1:
+        qtd = round(max(qtd_base, qtd_min), 2) if precisa else 0
+    else:
+        qtd = round(max(qtd_base, eoq, qtd_min), 2) if precisa else 0
 
     # Urgência
     if stock_atual <= 0:

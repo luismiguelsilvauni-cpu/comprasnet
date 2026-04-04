@@ -309,13 +309,13 @@ function mostrarProgresso() {
           <th>Designação</th>
           <th style="text-align:right">Stock</th>
           <th style="text-align:right">Média/Ano</th>
+          <th style="text-align:right">Clientes</th>
+          <th style="text-align:right" title="Score de relevância para fazer stock (0-100)">Score</th>
           <th style="text-align:right">Dias Cob.</th>
           <th style="text-align:right">ROP</th>
-          <th style="text-align:right">Clientes</th>
-          <th style="text-align:right">Score</th>
           <th style="text-align:right">C. Posse/un</th>
           <th style="text-align:right">Qtd. Sugerida</th>
-          <th style="text-align:right" title="Meses com vendas / Período total">Meses Venda / Período</th>
+          <th style="text-align:right" title="Meses com vendas / Período total">Meses/Período</th>
         </tr>
       </thead>
       <tbody>
@@ -355,7 +355,7 @@ function mostrarProgresso() {
             {% else %}-{% endif %}
           </td>
           <td style="text-align:right;font-family:monospace;font-size:12px;color:{% if r.dias_cobertura_atual is not none and r.dias_cobertura_atual < 30 %}var(--danger){% elif r.dias_cobertura_atual is not none and r.dias_cobertura_atual < 60 %}var(--warning){% else %}var(--text-muted){% endif %}">
-            {% if r.dias_cobertura_atual is not none and r.tem_dados %}{{ r.dias_cobertura_atual }}d{% else %}-{% endif %}
+            {% if r.stock_atual <= 0 %}0d{% elif r.dias_cobertura_atual is not none and r.tem_dados %}{{ r.dias_cobertura_atual }}d{% else %}-{% endif %}
           </td>
           <td style="text-align:right;font-family:monospace;font-size:12px">
             {% if r.ponto_reorder > 0 %}{{ '%.1f'|format(r.ponto_reorder) }}{% else %}-{% endif %}
