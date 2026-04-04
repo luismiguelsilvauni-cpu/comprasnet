@@ -180,6 +180,10 @@ class ConfigReposicao(db.Model):
     quantidade_minima_encomenda = db.Column(db.Float, default=1)
     alertar_dias_cobertura      = db.Column(db.Integer, default=30)
     ignorar_parados_dias        = db.Column(db.Integer, default=365)
+    min_anos_historico          = db.Column(db.Float,   default=2.0)
+    min_meses_com_venda         = db.Column(db.Integer, default=3)
+    min_total_vendido           = db.Column(db.Float,   default=3.0)
+    ignorar_sem_movimento_anos  = db.Column(db.Float,   default=3.0)
     atualizado_em               = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_por              = db.Column(db.Integer, db.ForeignKey('users.id'))
 

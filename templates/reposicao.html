@@ -46,6 +46,32 @@
         <input type="number" name="alertar_dias_cobertura" value="{{ cfg.alertar_dias_cobertura or 30 }}" min="1" max="365">
       </div>
     </div>
+    <!-- Filtros de relevância -->
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px">🔍 Filtros de Relevância</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div class="form-group">
+          <label>Mín. anos histórico</label>
+          <input type="number" name="min_anos_historico" value="{{ cfg.min_anos_historico or 2 }}" min="0.5" max="10" step="0.5">
+          <div style="font-size:11px;color:var(--text-muted)">Ignorar se < N anos desde 1ª venda</div>
+        </div>
+        <div class="form-group">
+          <label>Mín. meses com venda</label>
+          <input type="number" name="min_meses_com_venda" value="{{ cfg.min_meses_com_venda or 3 }}" min="1" max="24">
+          <div style="font-size:11px;color:var(--text-muted)">Ignorar se vendeu em < N meses distintos</div>
+        </div>
+        <div class="form-group">
+          <label>Mín. total vendido</label>
+          <input type="number" name="min_total_vendido" value="{{ cfg.min_total_vendido or 3 }}" min="1" max="100" step="0.5">
+          <div style="font-size:11px;color:var(--text-muted)">Ignorar se total vendido < N unidades</div>
+        </div>
+        <div class="form-group">
+          <label>Ignorar parados (anos)</label>
+          <input type="number" name="ignorar_sem_movimento_anos" value="{{ cfg.ignorar_sem_movimento_anos or 3 }}" min="0.5" max="10" step="0.5">
+          <div style="font-size:11px;color:var(--text-muted)">Ignorar se última venda > N anos atrás</div>
+        </div>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button type="submit" class="btn btn-ghost">💾 Guardar Parâmetros</button>
       <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-primary">🔍 Guardar e Analisar</a>
@@ -106,7 +132,9 @@
   <button onclick="filtrarTabela('urgente')"     class="btn btn-ghost btn-sm" id="tab-urgente" style="color:var(--warning)">🟡 Urgentes</button>
   <button onclick="filtrarTabela('necessario')"  class="btn btn-ghost btn-sm" id="tab-necessario" style="color:var(--accent)">🔵 Necessários</button>
   <button onclick="filtrarTabela('ok')"          class="btn btn-ghost btn-sm" id="tab-ok" style="color:var(--success)">✅ OK</button>
-  <button onclick="filtrarTabela('irrelevante')" class="btn btn-ghost btn-sm" id="tab-irrelevante">⚪ Irrelevantes</button>
+  <button onclick="filtrarTabela('irrelevante')"     class="btn btn-ghost btn-sm" id="tab-irrelevante">⚪ Irrelevantes</button>
+  <button onclick="filtrarTabela('parado')"          class="btn btn-ghost btn-sm" id="tab-parado">💤 Parados (+{{ config_padrao.ignorar_sem_movimento_anos|int }}a)</button>
+  <button onclick="filtrarTabela('pouco_historico')" class="btn btn-ghost btn-sm" id="tab-pouco_historico">📉 Pouco histórico</button>
 </div>
 
 <div class="card" style="padding:0;overflow:hidden">
@@ -134,6 +162,8 @@
             {% elif r.urgencia == 'necessario' %}🔵
             {% elif r.urgencia == 'ok' %}✅
             {% elif r.urgencia == 'irrelevante' %}⚪
+            {% elif r.urgencia == 'parado' %}💤
+            {% elif r.urgencia == 'pouco_historico' %}📉
             {% else %}❓{% endif %}
           </td>
           <td class="mono" style="font-size:12px;color:var(--accent)">

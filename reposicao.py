@@ -33,8 +33,10 @@ CONFIG_PADRAO = {
     'quantidade_minima_encomenda': 1,
     'alertar_dias_cobertura':      30,
     'ignorar_parados_dias':       365,
-    'min_meses_com_venda':          2,    # ignorar se só vendeu em <2 meses distintos
-    'min_total_vendido':            2,    # ignorar se total vendido < 2 unidades
+    'min_anos_historico':           2,    # ignorar se < 2 anos desde 1a venda
+    'min_meses_com_venda':          3,    # ignorar se vendeu em < 3 meses distintos
+    'min_total_vendido':            3,    # ignorar se total vendido < 3 unidades
+    'ignorar_sem_movimento_anos':   3,    # ignorar se > 3 anos sem qualquer venda
 }
 
 # ── SQL ───────────────────────────────────────────────────────────────────────
@@ -92,12 +94,20 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     total_vendido    = sum(vendas_por_mes.values())
     meses_com_venda  = len([v for v in vendas_por_mes.values() if v > 0])
 
-    # Filtrar artigos sem relevância
-    min_meses = config.get('min_meses_com_venda', 2)
-    min_total = config.get('min_total_vendido', 2)
+    # Check last sale - ignore if no movement for X years
+    ignorar_anos = config.get('ignorar_sem_movimento_anos', 3)
+    if vendas_por_mes:
+        ultimo = sorted(vendas_por_mes.keys())[-1]
+        from datetime import datetime as _dt2
+        meses_parado = (_dt2.now().year - ultimo[0]) * 12 + (_dt2.now().month - ultimo[1])
+        if meses_parado > ignorar_anos * 12:
+            return _sem_relevancia(stock_atual, total_vendido, meses_com_venda, 'parado')
 
+    # Filtrar artigos sem relevância
+    min_meses = config.get('min_meses_com_venda', 3)
+    min_total = config.get('min_total_vendido', 3)
     if meses_com_venda < min_meses or total_vendido < min_total:
-        return _sem_relevancia(stock_atual, total_vendido, meses_com_venda)
+        return _sem_relevancia(stock_atual, total_vendido, meses_com_venda, 'pouco_historico')
 
     # Período total: desde o primeiro mês com venda até hoje
     # Isto dá a média real anual sem inflar artigos de venda esporádica
@@ -110,6 +120,12 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
         meses_periodo = max(meses_periodo, 1)
     else:
         meses_periodo = config.get('meses_historico', 60)
+
+    # Ignorar se histórico < N anos desde 1ª venda
+    anos_historico = meses_periodo / 12
+    min_anos = config.get('min_anos_historico', 2)
+    if anos_historico < min_anos:
+        return _sem_relevancia(stock_atual, total_vendido, meses_com_venda, 'pouco_historico')
 
     # Média mensal = total vendido / meses desde primeira venda
     cmm = total_vendido / meses_periodo
@@ -183,10 +199,10 @@ def _sem_dados(stock_atual):
     }
 
 
-def _sem_relevancia(stock_atual, total_vendido, meses_com_venda):
+def _sem_relevancia(stock_atual, total_vendido, meses_com_venda, motivo='irrelevante'):
     return {
         **_sem_dados(stock_atual),
-        'relevante': False, 'urgencia': 'irrelevante',
+        'relevante': False, 'urgencia': motivo,
         'total_vendido': round(total_vendido, 2),
         'meses_com_venda': meses_com_venda,
     }

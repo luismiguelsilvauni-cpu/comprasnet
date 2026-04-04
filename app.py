@@ -503,6 +503,10 @@ def reposicao():
             'taxa_posse_anual':            cfg_global.taxa_posse_anual or 0.20,
             'quantidade_minima_encomenda': cfg_global.quantidade_minima_encomenda or 1,
             'alertar_dias_cobertura':      cfg_global.alertar_dias_cobertura or 30,
+            'min_anos_historico':          getattr(cfg_global, 'min_anos_historico', 2) or 2,
+            'min_meses_com_venda':         getattr(cfg_global, 'min_meses_com_venda', 3) or 3,
+            'min_total_vendido':           getattr(cfg_global, 'min_total_vendido', 3) or 3,
+            'ignorar_sem_movimento_anos':  getattr(cfg_global, 'ignorar_sem_movimento_anos', 3) or 3,
         })
 
     # Run analysis only if requested
@@ -557,6 +561,10 @@ def salvar_config_reposicao():
     cfg.quantidade_minima_encomenda = float(request.form.get('quantidade_minima_encomenda', 1))
     cfg.alertar_dias_cobertura      = int(request.form.get('alertar_dias_cobertura', 30))
     cfg.ignorar_parados_dias        = int(request.form.get('ignorar_parados_dias', 365))
+    cfg.min_anos_historico          = float(request.form.get('min_anos_historico', 2) or 2)
+    cfg.min_meses_com_venda         = int(request.form.get('min_meses_com_venda', 3) or 3)
+    cfg.min_total_vendido           = float(request.form.get('min_total_vendido', 3) or 3)
+    cfg.ignorar_sem_movimento_anos  = float(request.form.get('ignorar_sem_movimento_anos', 3) or 3)
     cfg.atualizado_em               = datetime.utcnow()
     cfg.atualizado_por              = current_user.id
     db.session.commit()
