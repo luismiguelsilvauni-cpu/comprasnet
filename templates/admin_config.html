@@ -217,7 +217,23 @@ function aplicarTema(accent, bg, surface) {
   });
 });
 
+// Live preview for logo filter and size
+function updateLogoPreview() {
+  const img = document.getElementById('logoPreview');
+  if (!img || img.tagName !== 'IMG') return;
+  const h = document.querySelector('[name=logo_altura]')?.value || 48;
+  const w = document.querySelector('[name=logo_largura]')?.value || 180;
+  const f = document.querySelector('[name=logo_filtro]')?.value || 'none';
+  img.style.height = h + 'px';
+  img.style.maxWidth = w + 'px';
+  img.style.filter = f || 'none';
+}
+document.querySelector('[name=logo_altura]')?.addEventListener('input', updateLogoPreview);
+document.querySelector('[name=logo_largura]')?.addEventListener('input', updateLogoPreview);
+document.querySelector('[name=logo_filtro]')?.addEventListener('change', updateLogoPreview);
+
 document.querySelector('[name=logo]')?.addEventListener('change', function() {
+  const r = new FileReader();
   const r = new FileReader();
   r.onload = e => { const img = document.getElementById('logoPreview'); img.src = e.target.result; img.style.display='block'; };
   r.readAsDataURL(this.files[0]);

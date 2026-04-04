@@ -512,7 +512,9 @@ def salvar_config_reposicao():
     cfg.fator_seguranca             = float(request.form.get('fator_seguranca', 1.5))
     cfg.meses_cobertura             = int(request.form.get('meses_cobertura', 2))
     cfg.custo_encomenda             = float(request.form.get('custo_encomenda', 25))
-    cfg.taxa_posse_anual            = float(request.form.get('taxa_posse_anual', 0.20))
+    taxa_raw = float(request.form.get('taxa_posse_anual', 20))
+    # Accept both 0.20 and 20 (percent) - if > 1, treat as percentage
+    cfg.taxa_posse_anual = taxa_raw / 100 if taxa_raw > 1 else taxa_raw
     cfg.quantidade_minima_encomenda = float(request.form.get('quantidade_minima_encomenda', 1))
     cfg.alertar_dias_cobertura      = int(request.form.get('alertar_dias_cobertura', 30))
     cfg.ignorar_parados_dias        = int(request.form.get('ignorar_parados_dias', 365))
@@ -969,9 +971,13 @@ def inject_config():
     """Make ConfigGeral and datetime available in all templates."""
     from datetime import datetime as _dt
     try:
-        return {'cfg_geral': get_config_geral(), 'now': _dt.now}
+        return {
+            'cfg_geral': get_config_geral(),
+            'cfg_ia': ConfigIA.query.first(),
+            'now': _dt.now
+        }
     except Exception:
-        return {'cfg_geral': None, 'now': _dt.now}
+        return {'cfg_geral': None, 'cfg_ia': None, 'now': _dt.now}
 
 
 @app.route('/admin/config', methods=['GET', 'POST'])
