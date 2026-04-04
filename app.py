@@ -483,18 +483,57 @@ def download_pdf(filename):
 @app.route('/reposicao')
 @login_required
 def reposicao():
-    """Replenishment suggestions dashboard."""
-    from reposicao import CONFIG_PADRAO
+    from reposicao import CONFIG_PADRAO, analisar_todos
+    cfg_phc    = ConfigPHC.query.first()
     cfg_global = ConfigReposicao.query.filter_by(artigo_ref=None).first()
     if not cfg_global:
         cfg_global = ConfigReposicao()
         db.session.add(cfg_global)
         db.session.commit()
-    artigos = ArtigoPHC.query.order_by(ArtigoPHC.referencia).all()
+
+    # Build config dict
+    config = dict(CONFIG_PADRAO)
+    if cfg_global:
+        config.update({
+            'meses_historico':             cfg_global.meses_historico or 60,
+            'lead_time_dias':              cfg_global.lead_time_dias or 7,
+            'fator_seguranca':             cfg_global.fator_seguranca or 1.5,
+            'meses_cobertura':             cfg_global.meses_cobertura or 2,
+            'custo_encomenda':             cfg_global.custo_encomenda or 25,
+            'taxa_posse_anual':            cfg_global.taxa_posse_anual or 0.20,
+            'quantidade_minima_encomenda': cfg_global.quantidade_minima_encomenda or 1,
+            'alertar_dias_cobertura':      cfg_global.alertar_dias_cobertura or 30,
+        })
+
+    # Run analysis only if requested
+    analise = request.args.get('analise') == '1'
+    resultados = []
+    erro = None
+    if analise:
+        try:
+            artigos = ArtigoPHC.query.filter(ArtigoPHC.stock_atual >= 0).all()
+            resultados = analisar_todos(cfg_phc, config, artigos)
+        except Exception as e:
+            import traceback
+            erro = str(e)
+            logger.error(traceback.format_exc())
+
+    total_artigos    = ArtigoPHC.query.count()
+    precisam         = [r for r in resultados if r.get('precisa_encomendar')]
+    criticos         = [r for r in resultados if r.get('urgencia') == 'critico']
+    sem_dados        = [r for r in resultados if not r.get('tem_dados')]
+
     return render_template('reposicao.html',
-        cfg=cfg_global, artigos=artigos,
-        total_artigos=len(artigos),
-        config_padrao=CONFIG_PADRAO)
+        cfg=cfg_global,
+        config_padrao=config,
+        total_artigos=total_artigos,
+        resultados=resultados,
+        analise_feita=analise,
+        precisam=precisam,
+        criticos=criticos,
+        sem_dados=sem_dados,
+        erro=erro,
+    )
 
 
 @app.route('/reposicao/config', methods=['POST'])
