@@ -2254,12 +2254,14 @@ def reposicao_por_fornecedor():
         logger.error(traceback.format_exc())
         resultados = []
 
-    # Only keep articles that need ordering
+    app.logger.info(f"Total resultados: {len(resultados)}")
     precisam = [r for r in resultados if r.get('quantidade_sugerida', 0) > 0
                 and r.get('recomendacao') != 'nao_fazer_stock']
+    app.logger.info(f"Precisam encomendar: {len(precisam)}")
 
     # Fetch supplier per article from PHC
     fornecedor_por_ref = {}
+    app.logger.info(f'A buscar fornecedores, precisam={len(precisam)}')
     if cfg_phc and cfg_phc.ultima_sync:
         try:
             from phc_sync import get_phc_connection
