@@ -311,6 +311,7 @@ function mostrarProgresso() {
           <th style="text-align:right">Média/Ano</th>
           <th style="text-align:right">Dias Cob.</th>
           <th style="text-align:right">ROP</th>
+          <th style="text-align:right">C. Posse/un</th>
           <th style="text-align:right">Qtd. Sugerida</th>
           <th style="text-align:right" title="Meses com vendas / Período total">Meses Venda / Período</th>
         </tr>
@@ -343,6 +344,9 @@ function mostrarProgresso() {
           </td>
           <td style="text-align:right;font-family:monospace;font-size:12px">
             {% if r.ponto_reorder > 0 %}{{ '%.1f'|format(r.ponto_reorder) }}{% else %}-{% endif %}
+          </td>
+          <td style="text-align:right;font-family:monospace;font-size:12px;color:var(--text-muted)">
+            {% if r.preco_custo > 0 %}{{ '%.2f'|format(r.preco_custo * config_padrao.taxa_posse_anual) }}€{% else %}-{% endif %}
           </td>
           <td style="text-align:right;font-weight:700;color:{% if r.quantidade_sugerida > 0 %}var(--warning){% else %}var(--text-muted){% endif %}">
             {% if r.quantidade_sugerida > 0 %}{{ '%.1f'|format(r.quantidade_sugerida) }} {{ r.unidade }}{% else %}-{% endif %}
