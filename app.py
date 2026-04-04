@@ -2265,7 +2265,6 @@ def reposicao_por_fornecedor():
             from phc_sync import get_phc_connection
             conn = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
-            cursor.timeout = 30
             # Simpler query: last purchase invoice per article
             SQL_FORN_SIMPLES = (
                 "SELECT fn.ref, fo.nome, fo.no"
