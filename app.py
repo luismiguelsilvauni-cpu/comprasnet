@@ -2269,10 +2269,10 @@ def reposicao_por_fornecedor():
             cursor = conn.cursor()
             # Simpler query: last purchase invoice per article
             SQL_FORN_SIMPLES = (
-                "SELECT fn.ref, fo.nome, fo.no"
+                "SELECT RTRIM(fn.ref) AS ref, fo.nome, fo.no"
                 " FROM fn"
                 " INNER JOIN fo ON fo.fostamp = fn.fostamp"
-                " WHERE fn.ref IS NOT NULL AND fn.ref <> ''"
+                " WHERE fn.ref IS NOT NULL AND RTRIM(fn.ref) <> ''"
                 " AND fn.qtt > 0"
             )
             cursor.execute(SQL_FORN_SIMPLES)
