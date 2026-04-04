@@ -2268,11 +2268,11 @@ def reposicao_por_fornecedor():
             cursor.timeout = 30
             # Simpler query: last purchase invoice per article
             SQL_FORN_SIMPLES = (
-                "SELECT fi.ref, fo.nome, fo.no"
-                " FROM fi"
-                " INNER JOIN fo ON fo.fostamp = fi.ftstamp"
-                " WHERE fi.ref IS NOT NULL AND fi.ref <> ''"
-                " AND fi.qtt > 0"
+                "SELECT fn.ref, fo.nome, fo.no"
+                " FROM fn"
+                " INNER JOIN fo ON fo.fostamp = fn.fostamp"
+                " WHERE fn.ref IS NOT NULL AND fn.ref <> ''"
+                " AND fn.qtt > 0"
             )
             cursor.execute(SQL_FORN_SIMPLES)
             contagens = {}
