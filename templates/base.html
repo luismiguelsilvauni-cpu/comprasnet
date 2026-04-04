@@ -424,5 +424,38 @@
 })();
 </script>
 
+
+<!-- Generic loading modal -->
+<div id="loadingModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;width:440px;max-width:92vw;text-align:center">
+    <div id="loadingIcon" style="font-size:36px;margin-bottom:14px">⏳</div>
+    <div id="loadingTitle" style="font-size:15px;font-weight:700;margin-bottom:6px">A processar...</div>
+    <div id="loadingMsg" style="font-size:12px;color:var(--text-muted);margin-bottom:20px">Aguarde...</div>
+    <div style="background:var(--border);border-radius:8px;height:10px;overflow:hidden;margin-bottom:8px">
+      <div id="loadingBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .6s ease;width:0%"></div>
+    </div>
+    <div id="loadingPct" style="font-size:12px;font-weight:700;color:var(--accent)">0%</div>
+  </div>
+</div>
+
+<script>
+function showLoading(icon, title, steps) {
+  var m = document.getElementById('loadingModal');
+  var bar = document.getElementById('loadingBar');
+  var pct = document.getElementById('loadingPct');
+  var msg = document.getElementById('loadingMsg');
+  document.getElementById('loadingIcon').textContent = icon || '⏳';
+  document.getElementById('loadingTitle').textContent = title || 'A processar...';
+  m.style.display = 'flex';
+  steps.forEach(function(s) {
+    setTimeout(function() {
+      bar.style.width = s.p + '%';
+      pct.textContent = s.p + '%';
+      msg.textContent = s.m;
+    }, s.t);
+  });
+}
+</script>
+
 </body>
 </html>

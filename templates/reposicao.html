@@ -16,7 +16,7 @@
 
 <script>
 function iniciarAnalise() {
-  mostrarProgresso();
+  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
   window.location.href = '{{ url_for("reposicao") }}?analise=1';
 }
 
@@ -127,7 +127,7 @@ document.getElementById('btnFornecedor').addEventListener('click', function(e) {
 
 <script>
 function iniciarAnalise() {
-  mostrarProgresso();
+  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
   window.location.href = '{{ url_for("reposicao") }}?analise=1';
 }
 
@@ -166,8 +166,10 @@ function mostrarProgresso() {
 
 {% endblock %}
 {% block topbar_actions %}
-  <button onclick="iniciarAnalise()" class="btn btn-primary btn-sm" id="btnAnalisar">🔍 Analisar Todos os Artigos</button>
-  <a href="{{ url_for('reposicao_por_fornecedor') }}" class="btn btn-ghost btn-sm" id="btnFornecedor" onclick="var m=document.getElementById('modalFornecedor');if(m){m.style.display='flex'}">🏭 Por Fornecedor</a>
+  <button onclick="iniciarAnalise()" class="btn btn-primary btn-sm" id="btnAnalisar">🔍 Analisar</button>
+  <a href="{{ url_for('reposicao_por_fornecedor') }}" class="btn btn-ghost btn-sm"
+     onclick="showLoading('🏭','A analisar por fornecedor...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:1500},{p:35,m:'A calcular metricas...',t:5000},{p:55,m:'A aplicar filtros...',t:10000},{p:70,m:'A identificar fornecedores...',t:15000},{p:85,m:'A agrupar artigos...',t:20000},{p:95,m:'A preparar resultados...',t:25000}])">
+     🏭 Por Fornecedor</a>
 
 <!-- Progress modal -->
 <div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
@@ -185,7 +187,7 @@ function mostrarProgresso() {
 
 <script>
 function iniciarAnalise() {
-  mostrarProgresso();
+  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
   window.location.href = '{{ url_for("reposicao") }}?analise=1';
 }
 
@@ -484,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
 function iniciarAnalise() {
-  mostrarProgresso();
+  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
   window.location.href = '{{ url_for("reposicao") }}?analise=1';
 }
 
