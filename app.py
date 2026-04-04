@@ -2290,6 +2290,13 @@ def reposicao_por_fornecedor():
                 best = max(forns.values(), key=lambda x: x['n'])
                 fornecedor_por_ref[ref] = {'nome': best['nome'], 'no': best['no']}
             print(f'[DEBUG] Suppliers identified: {len(fornecedor_por_ref)}')
+            # Debug: check if precisam refs match
+            if precisam:
+                sample = [r['referencia'] for r in precisam[:5]]
+                print(f'[DEBUG] Sample precisam refs: {sample}')
+                for ref in sample:
+                    forn = fornecedor_por_ref.get(ref)
+                    print(f'[DEBUG]   {ref} -> {forn}')
             conn.close()
         except Exception as e:
             app.logger.warning(f"PHC supplier fetch error: {e}")
