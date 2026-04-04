@@ -48,7 +48,7 @@ ORDER BY st.ref
 """
 
 SQL_FORNECEDORES = """
-SELECT
+SELECT DISTINCT
     cl.no                           AS numero,
     cl.nome                         AS nome,
     ISNULL(cl.ncont, '')            AS nif,
@@ -60,6 +60,7 @@ SELECT
     ISNULL(cl.inactivo, 0)          AS inactivo,
     cl.clstamp                      AS stamp
 FROM cl
+INNER JOIN fo ON fo.no = cl.no
 WHERE ISNULL(cl.inactivo, 0) = 0
   AND cl.nome IS NOT NULL
   AND LEN(LTRIM(RTRIM(cl.nome))) > 0
