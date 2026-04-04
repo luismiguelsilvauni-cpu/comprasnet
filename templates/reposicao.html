@@ -55,45 +55,58 @@ function mostrarProgresso() {
 
 
 <!-- Progress modal for fornecedor analysis -->
-<div id="modalFornecedor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+<div id="modalFornecedor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:460px;max-width:95vw;text-align:center">
     <div style="font-size:32px;margin-bottom:12px">🏭</div>
     <div style="font-size:15px;font-weight:600;margin-bottom:6px">A analisar por fornecedor...</div>
-    <div id="msgFornecedor" style="font-size:12px;color:var(--text-muted);margin-bottom:20px">A carregar historico de vendas PHC...</div>
-    <div style="background:var(--border);border-radius:8px;height:10px;overflow:hidden;margin-bottom:10px">
-      <div id="barFornecedor" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
+    <div id="msgFornecedor" style="font-size:12px;color:var(--text-muted);margin-bottom:20px">A iniciar...</div>
+    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:10px">
+      <div id="barFornecedor" style="height:100%;background:var(--accent);border-radius:8px;width:0%;transition:width 1s ease"></div>
     </div>
-    <div id="pctFornecedor" style="font-size:12px;font-weight:700;color:var(--accent)">0%</div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:10px">Pode demorar alguns minutos dependendo do volume de dados.</div>
+    <div id="pctFornecedor" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:10px">Pode demorar alguns minutos.</div>
   </div>
 </div>
 
 <script>
-function irParaFornecedor() {
+document.getElementById('btnFornecedor').addEventListener('click', function(e) {
+  e.preventDefault();
+  const url  = this.href;
   const modal = document.getElementById('modalFornecedor');
   const bar   = document.getElementById('barFornecedor');
   const pct   = document.getElementById('pctFornecedor');
   const msg   = document.getElementById('msgFornecedor');
+
   modal.style.display = 'flex';
 
   const steps = [
-    {p:5,  m:'A ligar ao SQL Server...',                    t:500},
-    {p:15, m:'A carregar historico de vendas PHC...',       t:2000},
-    {p:35, m:'A calcular metricas por artigo...',           t:6000},
-    {p:55, m:'A aplicar filtros de relevancia...',          t:12000},
-    {p:70, m:'A identificar fornecedores habituais...',     t:18000},
-    {p:85, m:'A agrupar artigos por fornecedor...',         t:22000},
-    {p:95, m:'A preparar resultados...',                    t:26000},
+    {p: 8,  m: 'A ligar ao SQL Server...',               delay: 200},
+    {p: 18, m: 'A carregar vendas PHC...',               delay: 1500},
+    {p: 38, m: 'A calcular metricas por artigo...',      delay: 4000},
+    {p: 58, m: 'A aplicar filtros de relevancia...',     delay: 8000},
+    {p: 72, m: 'A identificar fornecedores...',          delay: 14000},
+    {p: 88, m: 'A agrupar por fornecedor...',            delay: 20000},
+    {p: 96, m: 'A preparar resultados...',               delay: 26000},
   ];
 
-  steps.forEach(s => setTimeout(() => {
-    bar.style.width = s.p + '%';
-    pct.textContent = s.p + '%';
-    msg.textContent = s.m;
-  }, s.t));
+  // Animate first step immediately
+  requestAnimationFrame(() => {
+    bar.style.width = '5%';
+    pct.textContent = '5%';
+    msg.textContent = 'A iniciar analise...';
+  });
 
-  window.location.href = '{{ url_for("reposicao_por_fornecedor") }}';
-}
+  steps.forEach(s => {
+    setTimeout(() => {
+      bar.style.width = s.p + '%';
+      pct.textContent = s.p + '%';
+      msg.textContent = s.m;
+    }, s.delay);
+  });
+
+  // Navigate after short delay so modal is visible
+  setTimeout(() => { window.location.href = url; }, 400);
+});
 </script>
 
 {% endblock %}
