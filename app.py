@@ -572,6 +572,9 @@ def salvar_config_reposicao():
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'ok': True})
     flash('Configuração de reposição guardada.', 'success')
+    # If requested, redirect to analysis
+    if request.args.get('redirect_analise') == '1':
+        return redirect(url_for('reposicao') + '?analise=1')
     return redirect(url_for('reposicao'))
 
 

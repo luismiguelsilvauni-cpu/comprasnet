@@ -1,8 +1,170 @@
 {% extends "base.html" %}
-{% block title %}Reposição de Stock · ComprasNet{% endblock %}
-{% block page_title %}Reposição de Stock{% endblock %}
+{% block title %}Reposição de Stock · ComprasNet
+<!-- Progress modal -->
+<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
+    <div style="font-size:32px;margin-bottom:16px">📊</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
+    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
+      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
+    </div>
+    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
+  </div>
+</div>
+
+<script>
+function iniciarAnalise() {
+  mostrarProgresso();
+  window.location.href = '{{ url_for("reposicao") }}?analise=1';
+}
+
+function guardarEAnalisar(e) {
+  e.preventDefault();
+  const form = e.target.closest('form');
+  mostrarProgresso();
+  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
+  form.submit();
+}
+
+function mostrarProgresso() {
+  const modal = document.getElementById('progressModal');
+  const bar   = document.getElementById('progressBar');
+  const pct   = document.getElementById('progressPct');
+  const msg   = document.getElementById('progressMsg');
+  modal.style.display = 'flex';
+
+  const steps = [
+    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
+    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
+    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
+    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
+    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
+    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
+    {pct: 95, msg: 'A preparar resultados...', t: 25000},
+  ];
+
+  steps.forEach(s => setTimeout(() => {
+    bar.style.width = s.pct + '%';
+    pct.textContent = s.pct + '%';
+    msg.textContent = s.msg;
+  }, s.t));
+}
+</script>
+
+{% endblock %}
+{% block page_title %}Reposição de Stock
+<!-- Progress modal -->
+<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
+    <div style="font-size:32px;margin-bottom:16px">📊</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
+    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
+      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
+    </div>
+    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
+  </div>
+</div>
+
+<script>
+function iniciarAnalise() {
+  mostrarProgresso();
+  window.location.href = '{{ url_for("reposicao") }}?analise=1';
+}
+
+function guardarEAnalisar(e) {
+  e.preventDefault();
+  const form = e.target.closest('form');
+  mostrarProgresso();
+  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
+  form.submit();
+}
+
+function mostrarProgresso() {
+  const modal = document.getElementById('progressModal');
+  const bar   = document.getElementById('progressBar');
+  const pct   = document.getElementById('progressPct');
+  const msg   = document.getElementById('progressMsg');
+  modal.style.display = 'flex';
+
+  const steps = [
+    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
+    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
+    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
+    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
+    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
+    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
+    {pct: 95, msg: 'A preparar resultados...', t: 25000},
+  ];
+
+  steps.forEach(s => setTimeout(() => {
+    bar.style.width = s.pct + '%';
+    pct.textContent = s.pct + '%';
+    msg.textContent = s.msg;
+  }, s.t));
+}
+</script>
+
+{% endblock %}
 {% block topbar_actions %}
-  <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-primary btn-sm">🔍 Analisar Todos os Artigos</a>
+  <button onclick="iniciarAnalise()" class="btn btn-primary btn-sm" id="btnAnalisar">🔍 Analisar Todos os Artigos</button>
+
+<!-- Progress modal -->
+<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
+    <div style="font-size:32px;margin-bottom:16px">📊</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
+    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
+      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
+    </div>
+    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
+  </div>
+</div>
+
+<script>
+function iniciarAnalise() {
+  mostrarProgresso();
+  window.location.href = '{{ url_for("reposicao") }}?analise=1';
+}
+
+function guardarEAnalisar(e) {
+  e.preventDefault();
+  const form = e.target.closest('form');
+  mostrarProgresso();
+  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
+  form.submit();
+}
+
+function mostrarProgresso() {
+  const modal = document.getElementById('progressModal');
+  const bar   = document.getElementById('progressBar');
+  const pct   = document.getElementById('progressPct');
+  const msg   = document.getElementById('progressMsg');
+  modal.style.display = 'flex';
+
+  const steps = [
+    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
+    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
+    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
+    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
+    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
+    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
+    {pct: 95, msg: 'A preparar resultados...', t: 25000},
+  ];
+
+  steps.forEach(s => setTimeout(() => {
+    bar.style.width = s.pct + '%';
+    pct.textContent = s.pct + '%';
+    msg.textContent = s.msg;
+  }, s.t));
+}
+</script>
+
 {% endblock %}
 
 {% block content %}
@@ -74,7 +236,7 @@
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button type="submit" class="btn btn-ghost">💾 Guardar Parâmetros</button>
-      <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-primary">🔍 Guardar e Analisar</a>
+      <button type="submit" onclick="guardarEAnalisar(event)" class="btn btn-primary">🔍 Guardar e Analisar</button>
     </div>
   </form>
 </div>
@@ -199,8 +361,16 @@
 
 <script>
 function filtrarTabela(urgencia) {
+  const sem_relevancia = ['parado','pouco_historico','irrelevante','sem_dados'];
+  const precisam = ['critico','urgente','necessario'];
   document.querySelectorAll('#tabelaReposicao tbody tr').forEach(tr => {
-    tr.style.display = (urgencia === 'todos' || tr.dataset.urgencia === urgencia) ? '' : 'none';
+    const urg = tr.dataset.urgencia;
+    let show = false;
+    if (urgencia === 'todos') show = true;
+    else if (urgencia === 'necessarios') show = precisam.includes(urg);
+    else if (urgencia === 'sem_relevancia') show = sem_relevancia.includes(urg);
+    else show = urg === urgencia;
+    tr.style.display = show ? '' : 'none';
   });
   document.querySelectorAll('[id^="tab-"]').forEach(b => b.classList.remove('btn-primary'));
   const btn = document.getElementById('tab-' + urgencia);
@@ -208,11 +378,61 @@ function filtrarTabela(urgencia) {
 }
 // Default: show only items that need ordering
 document.addEventListener('DOMContentLoaded', () => {
-  {% if analise_feita and precisam|length > 0 %}
-  filtrarTabela('critico');
-  {% else %}
-  filtrarTabela('todos');
-  {% endif %}
+  filtrarTabela('necessarios');
 });
 </script>
+
+<!-- Progress modal -->
+<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
+    <div style="font-size:32px;margin-bottom:16px">📊</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
+    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
+      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
+    </div>
+    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
+  </div>
+</div>
+
+<script>
+function iniciarAnalise() {
+  mostrarProgresso();
+  window.location.href = '{{ url_for("reposicao") }}?analise=1';
+}
+
+function guardarEAnalisar(e) {
+  e.preventDefault();
+  const form = e.target.closest('form');
+  mostrarProgresso();
+  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
+  form.submit();
+}
+
+function mostrarProgresso() {
+  const modal = document.getElementById('progressModal');
+  const bar   = document.getElementById('progressBar');
+  const pct   = document.getElementById('progressPct');
+  const msg   = document.getElementById('progressMsg');
+  modal.style.display = 'flex';
+
+  const steps = [
+    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
+    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
+    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
+    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
+    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
+    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
+    {pct: 95, msg: 'A preparar resultados...', t: 25000},
+  ];
+
+  steps.forEach(s => setTimeout(() => {
+    bar.style.width = s.pct + '%';
+    pct.textContent = s.pct + '%';
+    msg.textContent = s.msg;
+  }, s.t));
+}
+</script>
+
 {% endblock %}
