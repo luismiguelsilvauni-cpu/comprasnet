@@ -37,6 +37,7 @@ CONFIG_PADRAO = {
     'min_meses_com_venda':          3,    # ignorar se vendeu em < 3 meses distintos
     'min_total_vendido':            3,    # ignorar se total vendido < 3 unidades
     'ignorar_sem_movimento_anos':   3,    # ignorar se > 3 anos sem qualquer venda
+    'min_facturas_sugerir':         5,    # min facturas para sugerir compra
 }
 
 # ── SQL ───────────────────────────────────────────────────────────────────────
@@ -147,15 +148,21 @@ def score_relevancia(total_vendido: float, num_clientes: int, num_facturas: int,
     elif num_clientes >= 5:
         razoes.append(f"✅ {num_clientes} clientes distintos — boa diversidade")
     
-    # Factor 2: Frequência de facturas
+    # Factor 2: Frequência de facturas (peso alto — indica procura consistente)
     if num_facturas <= 2:
-        score -= 35
-        razoes.append(f"⚠️ Apenas {num_facturas} factura(s) — venda isolada")
-    elif num_facturas <= 5:
+        score -= 45
+        razoes.append(f"❌ Apenas {num_facturas} factura(s) — procura isolada, não fazer stock")
+    elif num_facturas <= 4:
+        score -= 30
+        razoes.append(f"⚠️ Apenas {num_facturas} facturas — procura muito esporádica")
+    elif num_facturas <= 7:
         score -= 15
-        razoes.append(f"⚠️ Apenas {num_facturas} facturas no período")
-    elif num_facturas >= 10:
-        razoes.append(f"✅ {num_facturas} facturas — rotatividade consistente")
+        razoes.append(f"⚠️ {num_facturas} facturas — procura limitada")
+    elif num_facturas <= 10:
+        razoes.append(f"✅ {num_facturas} facturas — procura razoável")
+    else:
+        score += 10
+        razoes.append(f"✅ {num_facturas} facturas — procura consistente e regular")
     
     # Factor 3: Custo de aquisição
     if preco_custo > 500:
@@ -205,7 +212,8 @@ def score_relevancia(total_vendido: float, num_clientes: int, num_facturas: int,
 
 
 def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
-                      preco_custo: float, config: dict) -> dict:
+                      preco_custo: float, config: dict,
+                      num_facturas: int = 0) -> dict:
     """
     Given monthly sales dict {(ano,mes): qty}, compute all metrics.
     """
@@ -294,6 +302,12 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     import math as _math
     qtd = int(_math.ceil(qtd_raw)) if precisa else 0
 
+    # Suppress suggestion if not enough invoice history
+    min_fat = config.get('min_facturas_sugerir', 8)
+    if num_facturas < min_fat and qtd > 0:
+        qtd = 0
+        precisa = False
+
     # Urgência
     if stock_atual <= 0:
         urgencia = 'critico'
@@ -319,6 +333,7 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
         'total_vendido':          round(total_vendido, 2),
         'meses_com_venda':        meses_com_venda,
         'meses_periodo':          meses_periodo,
+        'num_facturas_calc':      num_facturas,
         'lead_time_dias':         lt,
     }
 
@@ -428,7 +443,9 @@ def analisar_todos(cfg_phc, config: dict, artigos_local: list) -> list:
         if stock < 0:
             continue
 
-        m = calcular_metricas(vendas.get(ref, {}), stock, preco, config)
+        div = diversidade.get(ref, {})
+        nfat = div.get('num_facturas', 0)
+        m = calcular_metricas(vendas.get(ref, {}), stock, preco, config, num_facturas=nfat)
         m['referencia']  = ref
         m['designacao']  = artigo.designacao or ''
         m['stock_atual'] = stock
@@ -437,7 +454,6 @@ def analisar_todos(cfg_phc, config: dict, artigos_local: list) -> list:
         m['familia']     = artigo.familia or ''
 
         # Add relevance score
-        div = diversidade.get(ref, {})
         meses_per = m.get('meses_periodo', config.get('meses_historico', 60))
         tot_vend  = m.get('total_vendido', div.get('total_vendido', 0))
         sc = score_relevancia(
@@ -457,10 +473,19 @@ def analisar_todos(cfg_phc, config: dict, artigos_local: list) -> list:
             'num_facturas':   sc['num_facturas'],
         })
 
-        # Override suggestion if score is low
-        if sc['recomendacao'] == 'nao_fazer_stock' and m.get('quantidade_sugerida', 0) > 0:
+        # Override suggestion based on score AND transaction count
+        min_facturas_stock = int(config.get('min_facturas_sugerir', 5))
+        nf = div.get('num_facturas', 0)
+
+        if sc['recomendacao'] == 'nao_fazer_stock':
             m['quantidade_sugerida'] = 0
             m['urgencia'] = 'nao_recomendado'
+        elif nf > 0 and nf < min_facturas_stock:
+            # Too few transactions to recommend stock regardless of other metrics
+            m['quantidade_sugerida'] = 0
+            m['urgencia'] = 'nao_recomendado'
+            if 'razoes' in m:
+                m['razoes'] = [f"❌ Apenas {nf} factura(s) no histórico — mínimo {min_facturas_stock} para sugerir compra"] + m.get('razoes', [])
 
         resultados.append(m)
 

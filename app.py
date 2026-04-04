@@ -507,6 +507,8 @@ def reposicao():
             'min_meses_com_venda':         getattr(cfg_global, 'min_meses_com_venda', 3) or 3,
             'min_total_vendido':           getattr(cfg_global, 'min_total_vendido', 3) or 3,
             'ignorar_sem_movimento_anos':  getattr(cfg_global, 'ignorar_sem_movimento_anos', 3) or 3,
+            'min_facturas_sugerir':        getattr(cfg_global, 'min_facturas_sugerir', 8) or 8,
+            'min_facturas_sugerir':        getattr(cfg_global, 'min_facturas_sugerir', 5) or 5,
         })
 
     # Run analysis only if requested
@@ -565,6 +567,8 @@ def salvar_config_reposicao():
     cfg.min_meses_com_venda         = int(request.form.get('min_meses_com_venda', 3) or 3)
     cfg.min_total_vendido           = float(request.form.get('min_total_vendido', 3) or 3)
     cfg.ignorar_sem_movimento_anos  = float(request.form.get('ignorar_sem_movimento_anos', 3) or 3)
+    cfg.min_facturas_sugerir        = int(request.form.get('min_facturas_sugerir', 8) or 8)
+    cfg.min_facturas_sugerir        = int(request.form.get('min_facturas_sugerir', 5) or 5)
     cfg.atualizado_em               = datetime.utcnow()
     cfg.atualizado_por              = current_user.id
     db.session.commit()

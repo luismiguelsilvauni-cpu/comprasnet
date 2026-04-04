@@ -184,6 +184,8 @@ class ConfigReposicao(db.Model):
     min_meses_com_venda         = db.Column(db.Integer, default=3)
     min_total_vendido           = db.Column(db.Float,   default=3.0)
     ignorar_sem_movimento_anos  = db.Column(db.Float,   default=3.0)
+    min_facturas_sugerir        = db.Column(db.Integer, default=8)
+    min_facturas_sugerir        = db.Column(db.Integer, default=5)
     atualizado_em               = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_por              = db.Column(db.Integer, db.ForeignKey('users.id'))
 

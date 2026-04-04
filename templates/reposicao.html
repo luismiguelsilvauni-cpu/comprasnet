@@ -232,6 +232,16 @@ function mostrarProgresso() {
           <input type="number" name="ignorar_sem_movimento_anos" value="{{ cfg.ignorar_sem_movimento_anos or 3 }}" min="0.5" max="10" step="0.5">
           <div style="font-size:11px;color:var(--text-muted)">Ignorar se última venda > N anos atrás</div>
         </div>
+        <div class="form-group">
+          <label>Mín. facturas p/ sugerir compra</label>
+          <input type="number" name="min_facturas_sugerir" value="{{ cfg.min_facturas_sugerir or 8 }}" min="1" max="50">
+          <div style="font-size:11px;color:var(--text-muted)">Só sugere compra se ≥ N facturas no histórico</div>
+        </div>
+        <div class="form-group">
+          <label>Mín. facturas para sugerir compra</label>
+          <input type="number" name="min_facturas_sugerir" value="{{ cfg.min_facturas_sugerir or 5 }}" min="1" max="50">
+          <div style="font-size:11px;color:var(--text-muted)">Não sugerir compra com menos de N facturas no histórico</div>
+        </div>
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
