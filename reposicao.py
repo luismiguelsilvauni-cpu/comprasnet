@@ -1,19 +1,19 @@
 """
 reposicao.py
-────────────
-Motor de reposição baseado em vendas reais do PHC CS.
+------------
+Motor de reposicao baseado em vendas reais do PHC CS.
 
-Tabelas usadas (só leitura):
-  fi   → linhas de documentos (ref, qtt, preco, ftstamp)
-  ft   → cabeçalho documentos (ftstamp, no, fdata, anulado, tipodoc)
-  st   → artigos (ref, stock, epcusto, epcpond)
+Tabelas usadas (so leitura):
+  fi   -> linhas de documentos (ref, qtt, preco, ftstamp)
+  ft   -> cabecalho documentos (ftstamp, no, fdata, anulado, tipodoc)
+  st   -> artigos (ref, stock, epcusto, epcpond)
 
-Lógica:
+Logica:
   - Vendas = linhas fi com ft.tipodoc=1 (facturas de venda)
-  - Calcula venda média mensal nos últimos N anos
+  - Calcula venda media mensal nos ultimos N anos
   - Filtra artigos sem movimento relevante (comprados e vendidos 1x)
   - Compara com stock actual
-  - Calcula dias de cobertura, ROP, EOQ, sugestão de encomenda
+  - Calcula dias de cobertura, ROP, EOQ, sugestao de encomenda
 """
 
 import math
@@ -40,7 +40,7 @@ CONFIG_PADRAO = {
     'min_facturas_sugerir':         5,    # min facturas para sugerir compra
 }
 
-# ── SQL ───────────────────────────────────────────────────────────────────────
+# -- SQL -----------------------------------------------------------------------
 SQL_DIVERSIDADE_ARTIGO = """
 SELECT
     COUNT(DISTINCT ft.no)           AS num_clientes,
@@ -115,8 +115,120 @@ ORDER BY fi.ref, ano, mes
 """
 
 
-# ── Engine ────────────────────────────────────────────────────────────────────
+# -- Engine --------------------------------------------------------------------
 
+
+
+
+# -- Forecasting methods --
+
+def _vendas_por_ano(vendas_por_mes):
+    por_ano = {}
+    for (ano, mes), qty in vendas_por_mes.items():
+        por_ano[ano] = por_ano.get(ano, 0) + qty
+    return dict(sorted(por_ano.items()))
+
+
+def metodo_media_simples(vendas_por_mes, meses_periodo):
+    total = sum(vendas_por_mes.values())
+    cmm   = total / max(meses_periodo, 1)
+    return {
+        'nome':      'Media Historica',
+        'descricao': 'Total vendido / periodo total desde 1a venda',
+        'cmm':       round(cmm, 4),
+        'anual':     round(cmm * 12, 2),
+        'confianca': 'alta' if meses_periodo > 24 else 'media',
+        'tendencia': 'estavel', 'slope': 0,
+    }
+
+
+def metodo_media_recente(vendas_por_mes, meses=24):
+    from datetime import datetime as _dt
+    hoje = _dt.now()
+    recentes = {k: v for k, v in vendas_por_mes.items()
+                if (hoje.year - k[0]) * 12 + (hoje.month - k[1]) <= meses}
+    if not recentes:
+        return {'nome': f'Media {meses}m', 'cmm': 0, 'anual': 0,
+                'confianca': 'baixa', 'tendencia': 'estavel', 'slope': 0,
+                'descricao': f'Sem vendas nos ultimos {meses} meses'}
+    total = sum(recentes.values())
+    cmm   = total / meses
+    return {
+        'nome':      f'Media {meses} Meses',
+        'descricao': f'Total vendido nos ultimos {meses} meses / {meses}',
+        'cmm':       round(cmm, 4),
+        'anual':     round(cmm * 12, 2),
+        'confianca': 'alta' if len(recentes) >= 6 else 'media',
+        'tendencia': 'estavel', 'slope': 0,
+    }
+
+
+def metodo_tendencia_linear(vendas_por_mes):
+    por_ano = _vendas_por_ano(vendas_por_mes)
+    if len(por_ano) < 2:
+        return {'nome': 'Tendencia Linear', 'cmm': 0, 'anual': 0,
+                'confianca': 'baixa', 'tendencia': 'indefinida', 'slope': 0,
+                'descricao': 'Dados insuficientes para calcular tendencia',
+                'pct_change': 0, 'anos': [], 'vendas_ano': [], 'proj_ano': 0}
+    anos  = sorted(por_ano.keys())
+    xs    = list(range(len(anos)))
+    ys    = [por_ano[a] for a in anos]
+    n     = len(xs)
+    sx    = sum(xs); sy = sum(ys)
+    sxy   = sum(x*y for x,y in zip(xs,ys))
+    sx2   = sum(x*x for x in xs)
+    denom = n * sx2 - sx * sx
+    slope = (n * sxy - sx * sy) / denom if denom else 0
+    inter = (sy - slope * sx) / n
+    proj  = max(inter + slope * len(anos), 0)
+    avg   = sy / n if n else 1
+    pct   = (slope / avg) * 100 if avg else 0
+    if pct > 15:    tend = 'crescente'
+    elif pct < -15: tend = 'decrescente'
+    else:           tend = 'estavel'
+    return {
+        'nome':       'Tendencia Linear',
+        'descricao':  f'Regressao linear sobre {len(anos)} anos. Tendencia: {pct:+.0f}%/ano',
+        'cmm':        round(proj / 12, 4),
+        'anual':      round(proj, 2),
+        'confianca':  'alta' if len(anos) >= 4 else 'media',
+        'tendencia':  tend,
+        'slope':      round(slope, 2),
+        'pct_change': round(pct, 1),
+        'anos':       anos,
+        'vendas_ano': ys,
+        'proj_ano':   round(proj, 2),
+    }
+
+
+def metodo_media_ponderada(vendas_por_mes):
+    por_ano = _vendas_por_ano(vendas_por_mes)
+    if not por_ano:
+        return {'nome': 'Media Ponderada', 'cmm': 0, 'anual': 0,
+                'confianca': 'baixa', 'tendencia': 'estavel', 'slope': 0,
+                'descricao': 'Sem dados'}
+    anos    = sorted(por_ano.keys())
+    pesos   = list(range(1, len(anos)+1))
+    total_p = sum(pesos)
+    media_p = sum(por_ano[a]*p for a,p in zip(anos,pesos)) / total_p
+    return {
+        'nome':      'Media Ponderada',
+        'descricao': f'Anos recentes com maior peso ({len(anos)} anos)',
+        'cmm':       round(media_p / 12, 4),
+        'anual':     round(media_p, 2),
+        'confianca': 'alta' if len(anos) >= 3 else 'media',
+        'tendencia': 'estavel', 'slope': 0,
+    }
+
+
+def calcular_todos_metodos(vendas_por_mes, meses_periodo):
+    return {
+        'media_simples':    metodo_media_simples(vendas_por_mes, meses_periodo),
+        'media_recente_24': metodo_media_recente(vendas_por_mes, 24),
+        'media_recente_12': metodo_media_recente(vendas_por_mes, 12),
+        'tendencia':        metodo_tendencia_linear(vendas_por_mes),
+        'ponderada':        metodo_media_ponderada(vendas_por_mes),
+    }
 
 def score_relevancia(total_vendido: float, num_clientes: int, num_facturas: int,
                      meses_periodo: int, preco_custo: float, config: dict) -> dict:
@@ -126,13 +238,13 @@ def score_relevancia(total_vendido: float, num_clientes: int, num_facturas: int,
     Factores negativos (reduzem score):
       - Poucos clientes (mono-cliente = risco)
       - Poucas facturas (compra/venda isolada)
-      - Preço de custo elevado (capital imobilizado)
+      - Preco de custo elevado (capital imobilizado)
       - Baixa rotatividade (consumo anual baixo)
     
     Factores positivos (aumentam score):
-      - Múltiplos clientes
-      - Muitas facturas distribuídas no tempo
-      - Preço baixo (fácil de ter em stock)
+      - Multiplos clientes
+      - Muitas facturas distribuidas no tempo
+      - Preco baixo (facil de ter em stock)
       - Alta rotatividade
     """
     score = 100
@@ -141,64 +253,64 @@ def score_relevancia(total_vendido: float, num_clientes: int, num_facturas: int,
     # Factor 1: Diversidade de clientes
     if num_clientes == 1:
         score -= 40
-        razoes.append(f"⚠️ Vendido a apenas 1 cliente — risco de dependência")
+        razoes.append(f"AVISO Vendido a apenas 1 cliente - risco de dependencia")
     elif num_clientes == 2:
         score -= 20
-        razoes.append(f"⚠️ Vendido a apenas 2 clientes")
+        razoes.append(f"AVISO Vendido a apenas 2 clientes")
     elif num_clientes >= 5:
-        razoes.append(f"✅ {num_clientes} clientes distintos — boa diversidade")
+        razoes.append(f"OK {num_clientes} clientes distintos - boa diversidade")
     
-    # Factor 2: Frequência de facturas (peso alto — indica procura consistente)
+    # Factor 2: Frequencia de facturas (peso alto - indica procura consistente)
     if num_facturas <= 2:
         score -= 45
-        razoes.append(f"❌ Apenas {num_facturas} factura(s) — procura isolada, não fazer stock")
+        razoes.append(f"ERRO Apenas {num_facturas} factura(s) - procura isolada, nao fazer stock")
     elif num_facturas <= 4:
         score -= 30
-        razoes.append(f"⚠️ Apenas {num_facturas} facturas — procura muito esporádica")
+        razoes.append(f"AVISO Apenas {num_facturas} facturas - procura muito esporadica")
     elif num_facturas <= 7:
         score -= 15
-        razoes.append(f"⚠️ {num_facturas} facturas — procura limitada")
+        razoes.append(f"AVISO {num_facturas} facturas - procura limitada")
     elif num_facturas <= 10:
-        razoes.append(f"✅ {num_facturas} facturas — procura razoável")
+        razoes.append(f"OK {num_facturas} facturas - procura razoavel")
     else:
         score += 10
-        razoes.append(f"✅ {num_facturas} facturas — procura consistente e regular")
+        razoes.append(f"OK {num_facturas} facturas - procura consistente e regular")
     
-    # Factor 3: Custo de aquisição
+    # Factor 3: Custo de aquisicao
     if preco_custo > 500:
         score -= 25
-        razoes.append(f"⚠️ Preço elevado ({preco_custo:.0f}€) — capital imobilizado alto")
+        razoes.append(f"AVISO Preco elevado ({preco_custo:.0f}EUR) - capital imobilizado alto")
     elif preco_custo > 200:
         score -= 10
-        razoes.append(f"⚠️ Preço médio-alto ({preco_custo:.0f}€)")
+        razoes.append(f"AVISO Preco medio-alto ({preco_custo:.0f}EUR)")
     elif preco_custo > 0 and preco_custo < 50:
         score += 5
-        razoes.append(f"✅ Preço baixo — económico manter em stock")
+        razoes.append(f"OK Preco baixo - economico manter em stock")
     
     # Factor 4: Consumo anual (rotatividade)
     consumo_anual = (total_vendido / meses_periodo * 12) if meses_periodo > 0 else 0
     if consumo_anual < 1:
         score -= 20
-        razoes.append(f"⚠️ Consumo muito baixo ({consumo_anual:.1f}/ano)")
+        razoes.append(f"AVISO Consumo muito baixo ({consumo_anual:.1f}/ano)")
     elif consumo_anual < 3:
         score -= 10
-        razoes.append(f"⚠️ Baixo consumo anual ({consumo_anual:.1f}/ano)")
+        razoes.append(f"AVISO Baixo consumo anual ({consumo_anual:.1f}/ano)")
     elif consumo_anual >= 10:
         score += 10
-        razoes.append(f"✅ Alto consumo anual ({consumo_anual:.0f}/ano)")
+        razoes.append(f"OK Alto consumo anual ({consumo_anual:.0f}/ano)")
     
     score = max(0, min(100, score))
     
-    # Recomendação
+    # Recomendacao
     if score >= 70:
         recomendacao = 'manter_stock'
-        rec_label = '✅ Vale a pena manter em stock'
+        rec_label = 'OK Vale a pena manter em stock'
     elif score >= 45:
         recomendacao = 'stock_cauteloso'
-        rec_label = '⚠️ Stock cauteloso — avaliar caso a caso'
+        rec_label = 'AVISO Stock cauteloso - avaliar caso a caso'
     else:
         recomendacao = 'nao_fazer_stock'
-        rec_label = '❌ Não recomendado fazer stock'
+        rec_label = 'ERRO Nao recomendado fazer stock'
     
     return {
         'score': score,
@@ -233,14 +345,14 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
         if meses_parado > ignorar_anos * 12:
             return _sem_relevancia(stock_atual, total_vendido, meses_com_venda, 'parado')
 
-    # Filtrar artigos sem relevância
+    # Filtrar artigos sem relevancia
     min_meses = config.get('min_meses_com_venda', 3)
     min_total = config.get('min_total_vendido', 3)
     if meses_com_venda < min_meses or total_vendido < min_total:
         return _sem_relevancia(stock_atual, total_vendido, meses_com_venda, 'pouco_historico')
 
-    # Período total: desde o primeiro mês com venda até hoje
-    # Isto dá a média real anual sem inflar artigos de venda esporádica
+    # Periodo total: desde o primeiro mes com venda ate hoje
+    # Isto da a media real anual sem inflar artigos de venda esporadica
     if vendas_por_mes:
         chaves = sorted(vendas_por_mes.keys())  # list of (ano, mes)
         primeiro_ano, primeiro_mes = chaves[0]
@@ -251,20 +363,20 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     else:
         meses_periodo = config.get('meses_historico', 60)
 
-    # Ignorar se histórico < N anos desde 1ª venda
+    # Ignorar se historico < N anos desde 1a venda
     anos_historico = meses_periodo / 12
     min_anos = config.get('min_anos_historico', 2)
     if anos_historico < min_anos:
         return _sem_relevancia(stock_atual, total_vendido, meses_com_venda, 'pouco_historico')
 
-    # Média mensal = total vendido / meses desde primeira venda
+    # Media mensal = total vendido / meses desde primeira venda
     cmm = total_vendido / meses_periodo
     cmd = cmm / 30.0
 
     # Lead time
     lt = float(config.get('lead_time_dias', 7))
 
-    # Stock de segurança
+    # Stock de seguranca
     ss = round(config.get('fator_seguranca', 1.5) * cmd * lt, 2)
 
     # ROP
@@ -308,7 +420,7 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
         qtd = 0
         precisa = False
 
-    # Urgência
+    # Urgencia
     if stock_atual <= 0:
         urgencia = 'critico'
     elif dias_cobertura < config.get('alertar_dias_cobertura', 30):
@@ -358,7 +470,7 @@ def _sem_relevancia(stock_atual, total_vendido, meses_com_venda, motivo='irrelev
     }
 
 
-# ── PHC fetchers ──────────────────────────────────────────────────────────────
+# -- PHC fetchers --------------------------------------------------------------
 
 def analisar_artigo(cfg_phc, config: dict, referencia: str,
                     stock_atual: float = None, preco_custo: float = None) -> dict:
@@ -485,7 +597,7 @@ def analisar_todos(cfg_phc, config: dict, artigos_local: list) -> list:
             m['quantidade_sugerida'] = 0
             m['urgencia'] = 'nao_recomendado'
             if 'razoes' in m:
-                m['razoes'] = [f"❌ Apenas {nf} factura(s) no histórico — mínimo {min_facturas_stock} para sugerir compra"] + m.get('razoes', [])
+                m['razoes'] = [f"ERRO Apenas {nf} factura(s) no historico - minimo {min_facturas_stock} para sugerir compra"] + m.get('razoes', [])
 
         resultados.append(m)
 
