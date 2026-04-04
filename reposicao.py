@@ -267,7 +267,8 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     S = float(config.get('custo_encomenda', 25))
     taxa = float(config.get('taxa_posse_anual', 0.20))
     H = preco_custo * taxa if preco_custo > 0 else 1.0
-    eoq = round(math.sqrt(2 * D * S / H), 2) if D > 0 and H > 0 else 1
+    import math as _m
+    eoq = int(_m.ceil(_m.sqrt(2 * D * S / H))) if D > 0 and H > 0 else 1
 
     # Cobertura actual
     dias_cobertura = round(stock_atual / cmd) if cmd > 0 and stock_atual > 0 else 0
@@ -282,11 +283,16 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     consumo_anual = cmm * 12
 
     # For very slow articles (< 1/year), don't use EOQ - just use base coverage
-    # EOQ formula breaks down with near-zero consumption
     if consumo_anual < 1:
-        qtd = round(max(qtd_base, qtd_min), 2) if precisa else 0
+        qtd_raw = max(qtd_base, qtd_min)
     else:
-        qtd = round(max(qtd_base, eoq, qtd_min), 2) if precisa else 0
+        # Cap EOQ at 12 months of consumption to avoid absurd suggestions
+        eoq_capped = min(eoq, cmm * 12)
+        qtd_raw = max(qtd_base, eoq_capped, qtd_min)
+
+    # Always round UP to integers (can't order 1.4 units)
+    import math as _math
+    qtd = int(_math.ceil(qtd_raw)) if precisa else 0
 
     # Urgência
     if stock_atual <= 0:

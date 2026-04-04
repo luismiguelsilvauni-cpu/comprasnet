@@ -364,7 +364,7 @@ function mostrarProgresso() {
             {% if r.preco_custo > 0 %}{{ '%.2f'|format(r.preco_custo * config_padrao.taxa_posse_anual) }}€{% else %}-{% endif %}
           </td>
           <td style="text-align:right;font-weight:700;color:{% if r.quantidade_sugerida > 0 %}var(--warning){% else %}var(--text-muted){% endif %}">
-            {% if r.quantidade_sugerida > 0 %}{{ '%.1f'|format(r.quantidade_sugerida) }} {{ r.unidade }}{% else %}-{% endif %}
+            {% if r.quantidade_sugerida > 0 %}{{ r.quantidade_sugerida|int }} {{ r.unidade }}{% else %}-{% endif %}
           </td>
           <td style="text-align:right;font-size:12px;color:var(--text-muted)">
             {% if r.meses_com_venda %}{{ r.meses_com_venda }} / {{ r.meses_periodo or '-' }}{% else %}-{% endif %}
