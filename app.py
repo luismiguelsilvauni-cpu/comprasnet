@@ -2276,7 +2276,9 @@ def reposicao_por_fornecedor():
             )
             cursor.execute(SQL_FORN_SIMPLES)
             contagens = {}
-            for ref, forn_nome, forn_no in cursor.fetchall():
+            rows = cursor.fetchall()
+            app.logger.info(f"Supplier rows fetched: {len(rows)}")
+            for ref, forn_nome, forn_no in rows:
                 if ref not in contagens:
                     contagens[ref] = {}
                 key = str(forn_no)
@@ -2286,6 +2288,7 @@ def reposicao_por_fornecedor():
             for ref, forns in contagens.items():
                 best = max(forns.values(), key=lambda x: x['n'])
                 fornecedor_por_ref[ref] = {'nome': best['nome'], 'no': best['no']}
+            app.logger.info(f"Suppliers identified: {len(fornecedor_por_ref)}")
             conn.close()
         except Exception as e:
             app.logger.warning(f"PHC supplier fetch error: {e}")
