@@ -26,12 +26,48 @@
   <div class="grid-2">
     <div class="form-group"><label>Email</label>
       <input type="email" name="empresa_email" value="{{ cfg.empresa_email or '' }}"></div>
-    <div class="form-group"><label>Logo (PNG/JPG)</label>
-      <input type="file" name="logo" accept="image/*" style="font-size:12px">
-      {% if cfg.empresa_logo_path %}
-      <img src="/uploads/{{ cfg.empresa_logo_path }}" id="logoPreview"
-           style="height:32px;margin-top:6px;border-radius:4px" onerror="this.style.display='none'">
-      {% else %}<img id="logoPreview" style="height:32px;margin-top:6px;border-radius:4px;display:none">{% endif %}
+    <div class="form-group">
+      <label>Logotipo</label>
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <!-- Current logo preview -->
+        <div style="flex-shrink:0">
+          {% if cfg.empresa_logo_path %}
+          <img src="/uploads/{{ cfg.empresa_logo_path }}" id="logoPreview"
+               style="height:80px;max-width:200px;object-fit:contain;background:var(--surface2);border-radius:8px;padding:8px;border:1px solid var(--border)">
+          {% else %}
+          <div id="logoPreview" style="height:80px;width:160px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;border:1px dashed var(--border)">Sem logotipo</div>
+          {% endif %}
+        </div>
+        <!-- Controls -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+          <input type="file" name="logo" accept="image/*" style="font-size:12px">
+          <div style="font-size:11px;color:var(--text-muted)">PNG/JPG/SVG — O fundo branco/preto é removido automaticamente</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div class="form-group" style="margin:0;flex:1;min-width:100px">
+              <label style="font-size:11px">Altura (px)</label>
+              <input type="number" name="logo_altura" value="{{ cfg.logo_altura or 48 }}" min="24" max="120" style="font-size:12px">
+            </div>
+            <div class="form-group" style="margin:0;flex:1;min-width:100px">
+              <label style="font-size:11px">Largura máx (px)</label>
+              <input type="number" name="logo_largura" value="{{ cfg.logo_largura or 180 }}" min="60" max="300" style="font-size:12px">
+            </div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:11px">Brilho / Contraste</label>
+            <select name="logo_filtro" style="font-size:12px">
+              <option value="" {% if not cfg.logo_filtro %}selected{% endif %}>Normal</option>
+              <option value="brightness(1.3)" {% if cfg.logo_filtro=='brightness(1.3)' %}selected{% endif %}>Mais brilhante</option>
+              <option value="brightness(0.8)" {% if cfg.logo_filtro=='brightness(0.8)' %}selected{% endif %}>Mais escuro</option>
+              <option value="invert(1)" {% if cfg.logo_filtro=='invert(1)' %}selected{% endif %}>Invertido (fundo escuro)</option>
+              <option value="grayscale(1)" {% if cfg.logo_filtro=='grayscale(1)' %}selected{% endif %}>Preto e branco</option>
+              <option value="brightness(1.5) contrast(1.2)" {% if cfg.logo_filtro=='brightness(1.5) contrast(1.2)' %}selected{% endif %}>Alto contraste</option>
+            </select>
+          </div>
+          {% if cfg.empresa_logo_path %}
+          <button type="button" onclick="removerLogo()" class="btn btn-ghost btn-sm" style="color:var(--danger);align-self:flex-start">🗑️ Remover logotipo</button>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
   <div class="form-group"><label>Morada</label>

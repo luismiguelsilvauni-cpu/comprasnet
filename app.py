@@ -93,9 +93,10 @@ def dashboard():
     pedidos_aprovados= PedidoCompra.query.filter_by(estado='aprovado').count()
     total_orcamentos = Orcamento.query.count()
     pedidos_recentes = PedidoCompra.query.order_by(PedidoCompra.data_criacao.desc()).limit(8).all()
-    # Stock baixo: stock actual <= 5 e > 0, or stock = 0
+    # Stock baixo: stock > 0 mas abaixo de threshold (excluir negativos)
     artigos_stock_baixo = ArtigoPHC.query.filter(
-        ArtigoPHC.stock_atual <= 5
+        ArtigoPHC.stock_atual > 0,
+        ArtigoPHC.stock_atual <= 3
     ).order_by(ArtigoPHC.stock_atual).limit(10).all()
     return render_template('dashboard.html',
         total_pedidos=total_pedidos,
@@ -1011,6 +1012,9 @@ def admin_config():
             cfg.backup_auto_ativo  = request.form.get('backup_auto_ativo') == 'on'
             cfg.claude_chat_ativo  = request.form.get('claude_chat_ativo') == 'on'
             cfg.claude_chat_sistema= request.form.get('claude_chat_sistema', '').strip()
+            cfg.logo_altura        = int(request.form.get('logo_altura', 48) or 48)
+            cfg.logo_largura       = int(request.form.get('logo_largura', 180) or 180)
+            cfg.logo_filtro        = request.form.get('logo_filtro', '').strip()
             # Logo upload
             if 'logo' in request.files and request.files['logo'].filename:
                 logo = request.files['logo']
@@ -1919,6 +1923,8 @@ def api_calendario_eventos():
 @login_required
 def api_criar_evento():
     if not current_user.is_authenticated:
+        return jsonify({'error': 'Sessão expirada'}), 401
+    if not current_user.is_authenticated:
         return jsonify({'error': 'Sessão expirada — recarregue a página'}), 401
     data = request.get_json()
     from datetime import date
@@ -2028,6 +2034,24 @@ def admin_health():
     from health_check import startup_check
     result = startup_check(app, auto_fix=True)
     return render_template('admin_health.html', result=result)
+
+
+@app.route('/admin/config/remove-logo', methods=['POST'])
+@login_required
+def remove_logo():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Sem permissão'}), 403
+    cfg = get_config_geral()
+    if cfg.empresa_logo_path:
+        logo_path = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
+        try:
+            if os.path.exists(logo_path):
+                os.remove(logo_path)
+        except Exception:
+            pass
+        cfg.empresa_logo_path = None
+        db.session.commit()
+    return jsonify({'ok': True})
 
 
 def init_db():
