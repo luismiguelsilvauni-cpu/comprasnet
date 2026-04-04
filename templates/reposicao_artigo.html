@@ -1,269 +1,240 @@
 {% extends "base.html" %}
-{% block title %}Reposição · {{ artigo.referencia }}{% endblock %}
+{% block title %}Análise · {{ artigo.referencia }}{% endblock %}
 {% block page_title %}Análise de Reposição{% endblock %}
 {% block topbar_actions %}
-  <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-ghost btn-sm">← Voltar</a>
-  <a href="{{ url_for('stock_artigo', ref=artigo.referencia) }}" class="btn btn-ghost btn-sm">📦 Ficha Stock</a>
+  <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-ghost btn-sm">← Voltar à Lista</a>
+  <a href="{{ url_for('stock_artigo', ref=artigo.referencia) }}" class="btn btn-ghost btn-sm">📦 Ficha</a>
 {% endblock %}
 
 {% block content %}
 
-<!-- Header do artigo -->
+<!-- Header -->
 <div class="card mb-16">
-  <div style="display:flex;align-items:flex-start;gap:16px">
-    <div style="flex:1">
-      <div class="mono" style="font-size:13px;color:var(--accent);margin-bottom:4px">{{ artigo.referencia }}</div>
-      <div style="font-size:16px;font-weight:700;margin-bottom:8px">{{ artigo.designacao }}</div>
-      <div style="display:flex;gap:16px;font-size:13px;color:var(--text-muted)">
+  <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <div class="mono" style="font-size:12px;color:var(--accent);margin-bottom:4px">{{ artigo.referencia }}</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px">{{ artigo.designacao }}</div>
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);flex-wrap:wrap">
         <span>Família: <strong style="color:var(--text)">{{ artigo.familia or '-' }}</strong></span>
         <span>Unidade: <strong style="color:var(--text)">{{ artigo.unidade or 'un' }}</strong></span>
         <span>P. Custo: <strong style="color:var(--text)">{{ '%.2f'|format(result.preco_custo) }}€</strong></span>
+        <span>C. Posse: <strong style="color:var(--text)">{{ '%.2f'|format(result.preco_custo * config.taxa_posse_anual) }}€/ano</strong></span>
       </div>
     </div>
-    <div style="text-align:center;background:{% if result.urgencia=='critico' %}rgba(239,68,68,.1){% elif result.urgencia=='urgente' %}rgba(245,158,11,.1){% elif result.urgencia=='necessario' %}rgba(59,110,240,.1){% elif result.urgencia=='ok' %}rgba(34,197,94,.1){% else %}var(--surface2){% endif %};border-radius:10px;padding:16px 24px">
-      <div style="font-size:32px">
+    <div style="text-align:center;padding:16px 24px;border-radius:10px;border:1px solid var(--border);background:var(--surface2)">
+      <div style="font-size:28px">
         {% if result.urgencia=='critico' %}🔴{% elif result.urgencia=='urgente' %}🟡{% elif result.urgencia=='necessario' %}🔵{% elif result.urgencia=='ok' %}✅{% else %}⚪{% endif %}
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px">
-        {% if result.urgencia=='critico' %}CRÍTICO{% elif result.urgencia=='urgente' %}URGENTE{% elif result.urgencia=='necessario' %}NECESSÁRIO{% elif result.urgencia=='ok' %}OK{% elif result.urgencia=='parado' %}PARADO{% else %}SEM DADOS{% endif %}
+      <div style="font-size:10px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px">
+        {% if result.urgencia=='critico' %}CRÍTICO{% elif result.urgencia=='urgente' %}URGENTE{% elif result.urgencia=='necessario' %}NECESSÁRIO{% elif result.urgencia=='ok' %}STOCK OK{% elif result.urgencia=='parado' %}PARADO{% elif result.urgencia=='nao_recomendado' %}NÃO RECOMENDADO{% else %}SEM DADOS{% endif %}
       </div>
       {% if result.quantidade_sugerida > 0 %}
-      <div style="margin-top:8px;font-size:18px;font-weight:700;color:var(--warning)">
-        Encomendar {{ '%.0f'|format(result.quantidade_sugerida) }} {{ result.unidade }}
+      <div style="margin-top:8px;font-size:16px;font-weight:700;color:var(--warning)">
+        Encomendar {{ result.quantidade_sugerida|int }} {{ result.unidade }}
       </div>
       {% endif %}
     </div>
   </div>
 </div>
 
+{% if not result.tem_dados %}
+<div class="card" style="text-align:center;padding:40px;border-style:dashed">
+  <div style="font-size:32px;margin-bottom:8px">📭</div>
+  <div style="font-weight:600;margin-bottom:4px">Sem histórico de vendas suficiente</div>
+  <div style="font-size:13px;color:var(--text-muted)">
+    {{ result.meses_com_venda or 0 }} meses com vendas (mínimo: {{ config.min_meses_com_venda }}) ·
+    {{ result.total_vendido or 0 }} unidades vendidas (mínimo: {{ config.min_total_vendido }})
+  </div>
+</div>
 
-{% if score_info %}
+{% else %}
+
 <!-- Score de relevância -->
-<div class="card mb-16" style="border-color:{% if score_info.score>=70 %}rgba(34,197,94,.4){% elif score_info.score>=45 %}rgba(245,158,11,.4){% else %}rgba(239,68,68,.4){% endif %}">
-  <div style="display:flex;align-items:center;gap:20px">
-    <!-- Score circle -->
-    <div style="flex-shrink:0;text-align:center;width:80px">
-      <div style="font-size:36px;font-weight:700;color:{% if score_info.score>=70 %}var(--success){% elif score_info.score>=45 %}var(--warning){% else %}var(--danger){% endif %}">
-        {{ score_info.score }}
-      </div>
-      <div style="font-size:10px;color:var(--text-muted);letter-spacing:1px">/ 100</div>
+{% if score_info %}
+<div class="card mb-16">
+  <div class="card-title">🎯 Score de Relevância para Stock</div>
+  <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <div style="text-align:center;width:90px;flex-shrink:0">
+      <div style="font-size:40px;font-weight:700;color:{% if score_info.score>=70 %}var(--success){% elif score_info.score>=45 %}var(--warning){% else %}var(--danger){% endif %}">{{ score_info.score }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">/100</div>
       <div style="background:var(--border);border-radius:4px;height:6px;margin-top:6px">
         <div style="width:{{ score_info.score }}%;height:100%;background:{% if score_info.score>=70 %}var(--success){% elif score_info.score>=45 %}var(--warning){% else %}var(--danger){% endif %};border-radius:4px"></div>
       </div>
     </div>
-    <!-- Recommendation -->
     <div style="flex:1">
-      <div style="font-size:14px;font-weight:700;margin-bottom:8px">{{ score_info.rec_label }}</div>
-      <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);margin-bottom:8px">
-        <span>👥 {{ diversidade.num_clientes or 0 }} cliente(s) distintos</span>
-        <span>📄 {{ diversidade.num_facturas or 0 }} factura(s)</span>
-        <span>📦 {{ '%.2f'|format(result.preco_custo) }}€/un</span>
-        <span>📈 {{ '%.1f'|format(score_info.consumo_anual) }}/ano</span>
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px">{{ score_info.rec_label }}</div>
+      <div style="display:flex;gap:16px;font-size:12px;margin-bottom:8px;flex-wrap:wrap">
+        <span>👥 <strong>{{ diversidade.num_clientes or 0 }}</strong> cliente(s)</span>
+        <span>📄 <strong>{{ diversidade.num_facturas or 0 }}</strong> factura(s)</span>
+        <span>📈 <strong>{{ '%.1f'|format(score_info.consumo_anual) }}</strong>/ano</span>
+        <span>💰 <strong>{{ '%.0f'|format(result.preco_custo) }}€</strong>/un</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        {% for r in score_info.razoes %}
-        <div style="font-size:12px">{{ r }}</div>
-        {% endfor %}
+      <div style="font-size:12px;display:flex;flex-direction:column;gap:3px">
+        {% for r in score_info.razoes %}<div>{{ r }}</div>{% endfor %}
       </div>
     </div>
   </div>
 </div>
 {% endif %}
 
-{% if not result.tem_dados %}
-<div class="card mb-16" style="text-align:center;padding:32px;border-style:dashed">
-  <div style="font-size:32px;margin-bottom:8px">📭</div>
-  <div style="font-size:14px;font-weight:600;margin-bottom:4px">Sem histórico de vendas</div>
-  <div style="font-size:13px;color:var(--text-muted)">
-    {% if not result.relevante %}
-    Este artigo não cumpre os critérios mínimos de relevância:<br>
-    vendido em {{ result.meses_com_venda or 0 }} meses distintos (mínimo: {{ config.min_meses_com_venda }}),
-    total: {{ result.total_vendido or 0 }} unidades (mínimo: {{ config.min_total_vendido }}).
-    {% else %}
-    Não foram encontradas vendas deste artigo no PHC nos últimos {{ config.meses_historico }} meses.
-    {% endif %}
-  </div>
-</div>
-
-{% else %}
-
-<!-- KPIs principais -->
-<div class="stats-grid mb-16">
-  <div class="stat-card {% if result.stock_atual <= 0 %}danger{% elif result.precisa_encomendar %}warning{% else %}success{% endif %}">
-    <div class="stat-label">Stock Actual</div>
-    <div class="stat-value">{{ '%.1f'|format(result.stock_atual) }}</div>
-    <div class="stat-icon">📦</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Cobertura Actual</div>
-    <div class="stat-value">{{ result.dias_cobertura_atual or 0 }}d</div>
-    <div class="stat-icon">📅</div>
-  </div>
-  <div class="stat-card warning">
-    <div class="stat-label">Ponto de Reorder</div>
-    <div class="stat-value">{{ '%.1f'|format(result.ponto_reorder) }}</div>
-    <div class="stat-icon">⚠️</div>
-  </div>
-  <div class="stat-card info">
-    <div class="stat-label">Qtd. Económica (EOQ)</div>
-    <div class="stat-value">{{ '%.1f'|format(result.eoq) }}</div>
-    <div class="stat-icon">🧮</div>
-  </div>
-</div>
-
-<!-- Explicação dos cálculos -->
+<!-- Métodos de Previsão -->
+{% if previsoes %}
 <div class="card mb-16">
-  <div class="card-title">🧮 Como foram calculados os valores</div>
-
-  {% if periodo %}
-  <!-- Secção 1: Período e dados base -->
-  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">1. Período de análise e dados base</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
-      <div>
-        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">PRIMEIRA VENDA REGISTADA</div>
-        <div style="font-weight:600">{{ periodo.primeiro_mes }}</div>
-      </div>
-      <div>
-        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">ÚLTIMA VENDA REGISTADA</div>
-        <div style="font-weight:600">{{ periodo.ultimo_mes }}</div>
-      </div>
-      <div>
-        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">PERÍODO TOTAL</div>
-        <div style="font-weight:600">{{ periodo.meses_periodo }} meses ({{ periodo.anos_periodo }} anos)</div>
-      </div>
-      <div>
-        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">MESES COM VENDAS</div>
-        <div style="font-weight:600">{{ periodo.meses_com_venda }} de {{ periodo.meses_periodo }}</div>
-      </div>
-      <div>
-        <div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">TOTAL VENDIDO</div>
-        <div style="font-weight:600">{{ '%.1f'|format(periodo.total_vendido) }} {{ result.unidade }}</div>
-      </div>
-    </div>
+  <div class="card-title">🔮 Métodos de Previsão de Consumo</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+    Comparação de métodos para estimar o consumo futuro. Seleccione o método a usar no cálculo do EOQ.
   </div>
 
-  <!-- Secção 2: Média -->
-  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">2. Cálculo da média de consumo</div>
-    <div style="font-size:13px;line-height:2;font-family:monospace">
-      <div style="color:var(--text-muted)">Média mensal = Total vendido ÷ Período total</div>
-      <div style="font-size:15px;font-weight:700;color:var(--text)">
-        {{ '%.3f'|format(periodo.media_mensal) }} {{ result.unidade }}/mês
-        = {{ '%.1f'|format(periodo.total_vendido) }} ÷ {{ periodo.meses_periodo }} meses
-      </div>
-      <div style="color:var(--text-muted);margin-top:8px">Média anual = Média mensal × 12</div>
-      <div style="font-size:15px;font-weight:700;color:var(--accent)">
-        {{ '%.2f'|format(periodo.media_anual) }} {{ result.unidade }}/ano
-        = {{ '%.3f'|format(periodo.media_mensal) }} × 12
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:8px;background:rgba(59,110,240,.08);border-radius:6px">
-      💡 A média usa o <strong>período total desde a 1ª venda</strong> (não apenas os meses com vendas),
-      para reflectir a procura real incluindo meses sem venda.
-      Um artigo vendido 10 unidades há 5 anos tem média de 2/ano, não 10/ano.
-    </div>
-  </div>
-
-  <!-- Secção 3: Stock de segurança -->
-  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">3. Stock de segurança</div>
-    <div style="font-size:13px;line-height:2;font-family:monospace">
-      <div style="color:var(--text-muted)">Consumo diário = Média mensal ÷ 30</div>
-      <div>= {{ '%.3f'|format(result.consumo_medio_diario) }} {{ result.unidade }}/dia</div>
-      <div style="color:var(--text-muted);margin-top:4px">Stock segurança = Factor segurança × Consumo diário × Lead time</div>
-      <div style="font-size:15px;font-weight:700;color:var(--text)">
-        {{ '%.2f'|format(result.stock_seguranca) }} {{ result.unidade }}
-        = {{ config.fator_seguranca }} × {{ '%.4f'|format(result.consumo_medio_diario) }} × {{ config.lead_time_dias }} dias
-      </div>
-    </div>
-  </div>
-
-  <!-- Secção 4: Ponto de reorder -->
-  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--warning)">4. Ponto de Reorder (ROP)</div>
-    <div style="font-size:13px;line-height:2;font-family:monospace">
-      <div style="color:var(--text-muted)">ROP = (Consumo diário × Lead time) + Stock segurança</div>
-      <div style="font-size:15px;font-weight:700;color:var(--warning)">
-        {{ '%.2f'|format(result.ponto_reorder) }} {{ result.unidade }}
-        = ({{ '%.4f'|format(result.consumo_medio_diario) }} × {{ config.lead_time_dias }}) + {{ '%.2f'|format(result.stock_seguranca) }}
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:8px;background:rgba(245,158,11,.08);border-radius:6px">
-      ⚠️ Quando o stock desce abaixo de <strong>{{ '%.2f'|format(result.ponto_reorder) }} {{ result.unidade }}</strong>,
-      deve ser feita uma encomenda. Stock actual: <strong>{{ '%.1f'|format(result.stock_atual) }}</strong>
-      → {% if result.precisa_encomendar %}<span style="color:var(--danger)">Abaixo do ROP — encomendar!</span>{% else %}<span style="color:var(--success)">Acima do ROP — OK</span>{% endif %}
-    </div>
-  </div>
-
-  <!-- Secção 5: EOQ -->
-  <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)">5. Quantidade Económica de Encomenda (EOQ)</div>
-    <div style="font-size:13px;line-height:2;font-family:monospace">
-      <div style="color:var(--text-muted)">D = Consumo anual = {{ '%.2f'|format(result.consumo_medio_mensal * 12) }} {{ result.unidade }}/ano</div>
-      <div style="color:var(--text-muted)">S = Custo por encomenda = {{ config.custo_encomenda }}€</div>
-      <div style="color:var(--text-muted)">H = Custo posse unitário = P. Custo × Taxa posse = {{ '%.2f'|format(result.preco_custo) }}€ × {{ (config.taxa_posse_anual * 100)|round(1) }}% = {{ '%.2f'|format(result.preco_custo * config.taxa_posse_anual) }}€/ano</div>
-      <div style="color:var(--text-muted);margin-top:4px">EOQ = √(2 × D × S ÷ H)</div>
-      <div style="font-size:15px;font-weight:700;color:var(--accent)">
-        {{ '%.1f'|format(result.eoq) }} {{ result.unidade }}
-        = √(2 × {{ '%.1f'|format(result.consumo_medio_mensal * 12) }} × {{ config.custo_encomenda }} ÷ {{ '%.4f'|format(result.preco_custo * config.taxa_posse_anual) }})
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:8px;background:rgba(59,110,240,.08);border-radius:6px">
-      💡 O EOQ é a quantidade que minimiza o custo total (encomenda + armazenamento).
-      Encomendar menos vezes com mais quantidade, ou mais vezes com menos?
-      O EOQ dá o equilíbrio óptimo.
-    </div>
-  </div>
-
-  <!-- Secção 6: Parâmetros usados -->
-  <div style="background:var(--surface2);border-radius:8px;padding:16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-muted)">6. Parâmetros utilizados neste cálculo</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
-      <div>Lead time: <strong>{{ config.lead_time_dias }} dias</strong></div>
-      <div>Factor segurança: <strong>{{ config.fator_seguranca }}</strong></div>
-      <div>Meses cobertura: <strong>{{ config.meses_cobertura }}</strong></div>
-      <div>Custo encomenda: <strong>{{ config.custo_encomenda }}€</strong></div>
-      <div>Taxa posse: <strong>{{ (config.taxa_posse_anual * 100)|round(1) }}%/ano</strong></div>
-      <div>Histórico: <strong>{{ config.meses_historico }} meses</strong></div>
-    </div>
-    <div style="margin-top:8px">
-      <a href="{{ url_for('reposicao') }}" class="btn btn-ghost btn-sm" style="font-size:11px">⚙️ Alterar parâmetros</a>
-    </div>
+  <!-- Tendência info -->
+  {% set t = previsoes.tendencia %}
+  {% if t.tendencia is defined and t.tendencia != 'indefinida' %}
+  <div style="padding:10px 14px;border-radius:8px;margin-bottom:16px;background:{% if t.tendencia=='crescente' %}rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3){% elif t.tendencia=='decrescente' %}rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3){% else %}rgba(59,110,240,.1);border:1px solid rgba(59,110,240,.3){% endif %};font-size:13px">
+    {% if t.tendencia=='crescente' %}📈 Tendência <strong>crescente</strong>: +{{ t.pct_change }}%/ano
+    {% elif t.tendencia=='decrescente' %}📉 Tendência <strong>decrescente</strong>: {{ t.pct_change }}%/ano — cuidado ao fazer stock!
+    {% else %}➡️ Tendência <strong>estável</strong>
+    {% endif %}
+    {% if t.slope != 0 %} · {{ '%.1f'|format(t.slope|abs) }} un/ano de {{ 'ganho' if t.slope > 0 else 'perda' }}{% endif %}
   </div>
   {% endif %}
-</div>
 
-<!-- Histórico de vendas por mês -->
-{% if vendas_lista %}
-<div class="card mb-16">
-  <div class="card-title">📈 Histórico de Vendas por Mês</div>
-  <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
-    {{ vendas_lista|length }} meses com vendas registadas nos últimos {{ config.meses_historico }} meses
-  </div>
-  <div class="table-wrap" style="margin:0;max-height:400px;overflow-y:auto">
+  <!-- Methods table -->
+  <div class="table-wrap" style="margin:0 0 16px">
     <table>
       <thead>
         <tr>
-          <th>Mês</th>
-          <th style="text-align:right">Total Vendido</th>
-          <th style="text-align:right">Nº Facturas</th>
-          <th style="text-align:right">vs. Média Mensal</th>
+          <th>Método</th>
+          <th style="text-align:right">Consumo/Mês</th>
+          <th style="text-align:right">Consumo/Ano</th>
+          <th style="text-align:center">Confiança</th>
+          <th>Descrição</th>
+          <th style="text-align:center">Usar</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key, m in previsoes.items() %}
+        <tr id="row-{{ key }}" style="cursor:pointer" onclick="selecionarMetodo('{{ key }}', {{ m.cmm }}, {{ m.anual }})">
+          <td style="font-weight:600;font-size:13px">{{ m.nome }}</td>
+          <td style="text-align:right;font-family:monospace">{{ '%.3f'|format(m.cmm) }}</td>
+          <td style="text-align:right;font-family:monospace;font-weight:700;color:var(--accent)">{{ '%.1f'|format(m.anual) }}</td>
+          <td style="text-align:center">
+            {% if m.confianca == 'alta' %}<span style="color:var(--success);font-size:11px">●●● Alta</span>
+            {% elif m.confianca == 'media' %}<span style="color:var(--warning);font-size:11px">●●○ Média</span>
+            {% else %}<span style="color:var(--text-muted);font-size:11px">●○○ Baixa</span>{% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--text-muted)">{{ m.descricao }}</td>
+          <td style="text-align:center">
+            <input type="radio" name="metodo_prev" value="{{ key }}" id="radio-{{ key }}"
+                   onchange="selecionarMetodo('{{ key }}', {{ m.cmm }}, {{ m.anual }})"
+                   {% if key == 'media_simples' %}checked{% endif %}>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- EOQ calculator with selected method -->
+  <div id="eoq-panel" style="background:var(--surface2);border-radius:8px;padding:16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">🧮 EOQ com método seleccionado</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;font-size:13px">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted)">CONSUMO ANUAL</div>
+        <div id="eoq-D" style="font-weight:700;font-size:16px">-</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted)">EOQ</div>
+        <div id="eoq-Q" style="font-weight:700;font-size:16px;color:var(--accent)">-</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted)">ROP</div>
+        <div id="eoq-ROP" style="font-weight:700;font-size:16px;color:var(--warning)">-</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted)">COBERTURA (dias)</div>
+        <div id="eoq-cob" style="font-weight:700;font-size:16px">-</div>
+      </div>
+    </div>
+    <div id="eoq-formula" style="margin-top:10px;font-size:11px;color:var(--text-muted);font-family:monospace"></div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Charts -->
+{% if vendas_lista %}
+<div class="card mb-16">
+  <div class="card-title">📊 Evolução de Vendas</div>
+  <canvas id="chartVendas" style="width:100%;max-height:280px"></canvas>
+</div>
+{% endif %}
+
+<!-- Cálculos detalhados -->
+{% if periodo %}
+<div class="card mb-16">
+  <div class="card-title">🧮 Cálculos Detalhados (Método: Média Histórica)</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div style="background:var(--surface2);border-radius:8px;padding:14px">
+      <div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:10px">PERÍODO E DADOS</div>
+      <div style="font-size:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">1ª venda</span><strong>{{ periodo.primeiro_mes }}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Última venda</span><strong>{{ periodo.ultimo_mes }}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Período total</span><strong>{{ periodo.meses_periodo }} meses ({{ periodo.anos_periodo }}a)</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Meses c/ vendas</span><strong>{{ periodo.meses_com_venda }}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Total vendido</span><strong>{{ '%.1f'|format(periodo.total_vendido) }} {{ result.unidade }}</strong></div>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px">
+      <div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:10px">MÉTRICAS BASE</div>
+      <div style="font-size:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Média mensal</span><strong>{{ '%.3f'|format(periodo.media_mensal) }}/mês</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Média anual</span><strong>{{ '%.2f'|format(periodo.media_anual) }}/ano</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Stock actual</span><strong>{{ '%.1f'|format(result.stock_atual) }} {{ result.unidade }}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Stock segurança</span><strong>{{ '%.2f'|format(result.stock_seguranca) }}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Ponto de reorder</span><strong>{{ '%.2f'|format(result.ponto_reorder) }}</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulas -->
+  <div style="font-size:12px;font-family:monospace;background:var(--surface2);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px">
+    <div><span style="color:var(--text-muted)">Média mensal  = </span>{{ '%.1f'|format(periodo.total_vendido) }} ÷ {{ periodo.meses_periodo }} meses = <strong>{{ '%.4f'|format(periodo.media_mensal) }}</strong></div>
+    <div><span style="color:var(--text-muted)">Consumo diário = </span>{{ '%.4f'|format(periodo.media_mensal) }} ÷ 30 = <strong>{{ '%.5f'|format(result.consumo_medio_diario) }}</strong></div>
+    <div><span style="color:var(--text-muted)">Stock segurança = </span>{{ config.fator_seguranca }} × {{ '%.5f'|format(result.consumo_medio_diario) }} × {{ config.lead_time_dias }}d = <strong>{{ '%.3f'|format(result.stock_seguranca) }}</strong></div>
+    <div><span style="color:var(--text-muted)">ROP = </span>({{ '%.5f'|format(result.consumo_medio_diario) }} × {{ config.lead_time_dias }}) + {{ '%.3f'|format(result.stock_seguranca) }} = <strong>{{ '%.3f'|format(result.ponto_reorder) }}</strong></div>
+    <div><span style="color:var(--text-muted)">EOQ = </span>√(2 × {{ '%.2f'|format(periodo.media_anual) }} × {{ config.custo_encomenda }}€ ÷ {{ '%.2f'|format(result.preco_custo * config.taxa_posse_anual) }}€) = <strong>{{ result.eoq }}</strong></div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Histórico mês a mês -->
+{% if vendas_lista %}
+<div class="card">
+  <div class="card-title">📅 Histórico Mensal de Vendas</div>
+  <div class="table-wrap" style="margin:0;max-height:350px;overflow-y:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Mês/Ano</th>
+          <th style="text-align:right">Vendido</th>
+          <th style="text-align:right">Nº Fact.</th>
+          <th>vs. Média</th>
         </tr>
       </thead>
       <tbody>
         {% set media_m = result.consumo_medio_mensal %}
         {% for v in vendas_lista|reverse %}
         <tr>
-          <td style="font-family:monospace;font-size:12px">{{ '%02d'|format(v.mes) }}/{{ v.ano }}</td>
-          <td style="text-align:right;font-weight:600;font-family:monospace">{{ '%.2f'|format(v.total) }} {{ result.unidade }}</td>
+          <td class="mono" style="font-size:12px">{{ '%02d'|format(v.mes) }}/{{ v.ano }}</td>
+          <td style="text-align:right;font-weight:600;font-family:monospace">{{ '%.1f'|format(v.total) }}</td>
           <td style="text-align:right;color:var(--text-muted)">{{ v.nfat }}</td>
-          <td style="text-align:right">
+          <td>
             {% if media_m > 0 %}
             {% set ratio = v.total / media_m %}
-            <span style="color:{% if ratio > 1.5 %}var(--warning){% elif ratio < 0.5 %}var(--text-muted){% else %}var(--success){% endif %}">
-              {{ '%+.0f'|format((ratio-1)*100) }}%
-            </span>
+            {% set w = [ratio * 60, 120]|min|int %}
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:{% if ratio>1.5 %}var(--warning){% elif ratio<0.5 %}var(--surface2){% else %}var(--accent){% endif %};height:6px;width:{{ w }}px;border-radius:3px;min-width:2px"></div>
+              <span style="font-size:11px;color:var(--text-muted)">{{ '%+.0f'|format((ratio-1)*100) }}%</span>
+            </div>
             {% else %}-{% endif %}
           </td>
         </tr>
@@ -275,5 +246,126 @@
 {% endif %}
 
 {% endif %}
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ── EOQ Calculator ────────────────────────────────────────────────────────────
+const PRECO_CUSTO  = {{ result.preco_custo }};
+const TAXA_POSSE   = {{ config.taxa_posse_anual }};
+const CUSTO_ENC    = {{ config.custo_encomenda }};
+const LEAD_TIME    = {{ config.lead_time_dias }};
+const FATOR_SEG    = {{ config.fator_seguranca }};
+const STOCK_ATUAL  = {{ result.stock_atual }};
+const UNIDADE      = "{{ result.unidade }}";
+
+function selecionarMetodo(key, cmm, anual) {
+  document.getElementById('radio-' + key).checked = true;
+  // Highlight row
+  document.querySelectorAll('[id^="row-"]').forEach(r => r.style.background = '');
+  document.getElementById('row-' + key).style.background = 'rgba(59,110,240,.08)';
+
+  const D   = anual;
+  const H   = PRECO_CUSTO * TAXA_POSSE || 1;
+  const eoq = D > 0 ? Math.ceil(Math.sqrt(2 * D * CUSTO_ENC / H)) : 0;
+  const cmd = cmm / 30;
+  const ss  = FATOR_SEG * cmd * LEAD_TIME;
+  const rop = cmd * LEAD_TIME + ss;
+  const cob = cmd > 0 && STOCK_ATUAL > 0 ? Math.round(STOCK_ATUAL / cmd) : 0;
+
+  document.getElementById('eoq-D').textContent   = D.toFixed(1) + ' ' + UNIDADE + '/ano';
+  document.getElementById('eoq-Q').textContent   = eoq + ' ' + UNIDADE;
+  document.getElementById('eoq-ROP').textContent = rop.toFixed(2) + ' ' + UNIDADE;
+  document.getElementById('eoq-cob').textContent = STOCK_ATUAL <= 0 ? '0d' : (cob + 'd');
+  document.getElementById('eoq-formula').textContent =
+    `EOQ = √(2 × ${D.toFixed(1)} × ${CUSTO_ENC}€ ÷ ${H.toFixed(2)}€) = ${eoq} ${UNIDADE}`;
+}
+
+// Init with media_simples
+const init = document.querySelector('input[name="metodo_prev"]:checked');
+if (init) {
+  const row = document.getElementById('row-' + init.value);
+  const tds = row.querySelectorAll('td');
+  const cmm = parseFloat(tds[1].textContent);
+  const anual = parseFloat(tds[2].textContent);
+  selecionarMetodo(init.value, cmm, anual);
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+{% if vendas_lista %}
+const vendas = {{ vendas_lista | tojson }};
+
+// Aggregate by year for bar chart
+const porAno = {};
+vendas.forEach(v => {
+  const key = v.ano;
+  porAno[key] = (porAno[key] || 0) + v.total;
+});
+const anos  = Object.keys(porAno).sort();
+const qtds  = anos.map(a => porAno[a]);
+
+// Linear regression for trend line
+const n   = anos.length;
+const xs  = anos.map((_, i) => i);
+const sx  = xs.reduce((a,b)=>a+b,0);
+const sy  = qtds.reduce((a,b)=>a+b,0);
+const sxy = xs.reduce((s,x,i)=>s+x*qtds[i],0);
+const sx2 = xs.reduce((s,x)=>s+x*x,0);
+const den = n*sx2 - sx*sx;
+const slope = den ? (n*sxy - sx*sy)/den : 0;
+const inter = (sy - slope*sx)/n;
+const trend = xs.map(x => Math.max(0, inter + slope*x));
+
+const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3b6ef0';
+const ctx = document.getElementById('chartVendas').getContext('2d');
+new Chart(ctx, {
+  data: {
+    labels: anos,
+    datasets: [
+      {
+        type: 'bar',
+        label: 'Vendas (un)',
+        data: qtds,
+        backgroundColor: anos.map((_, i) => {
+          const alpha = 0.4 + 0.6 * (i / Math.max(anos.length-1,1));
+          return `rgba(59,110,240,${alpha.toFixed(2)})`;
+        }),
+        borderColor: 'rgba(59,110,240,.8)',
+        borderWidth: 1,
+        borderRadius: 4,
+      },
+      {
+        type: 'line',
+        label: 'Tendência',
+        data: trend,
+        borderColor: slope > 0 ? 'rgba(34,197,94,.9)' : slope < 0 ? 'rgba(239,68,68,.9)' : 'rgba(156,163,175,.6)',
+        borderWidth: 2,
+        borderDash: [6,3],
+        pointRadius: 4,
+        pointBackgroundColor: slope > 0 ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)',
+        tension: 0.3,
+        fill: false,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { labels: { color: '#8b9cb3', font: { size: 11 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} un`
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#8b9cb3' }, grid: { color: 'rgba(255,255,255,.05)' } },
+      y: { ticks: { color: '#8b9cb3' }, grid: { color: 'rgba(255,255,255,.05)' }, beginAtZero: true }
+    }
+  }
+});
+{% endif %}
+</script>
 
 {% endblock %}

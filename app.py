@@ -661,8 +661,10 @@ def analisar_artigo(ref):
 
     # Compute relevance score
     score_info = {}
+    previsoes  = {}
     if periodo:
-        from reposicao import score_relevancia
+        from reposicao import score_relevancia, calcular_todos_metodos
+        previsoes = calcular_todos_metodos(vendas_por_mes, periodo.get('meses_periodo', 1))
         score_info = score_relevancia(
             total_vendido = periodo.get('total_vendido', 0),
             num_clientes  = diversidade.get('num_clientes', 0),
@@ -675,7 +677,7 @@ def analisar_artigo(ref):
     return render_template('reposicao_artigo.html',
         artigo=artigo, result=result, vendas_lista=vendas_lista,
         periodo=periodo, config=config, score_info=score_info,
-        diversidade=diversidade)
+        diversidade=diversidade, previsoes=previsoes)
 
 
 @app.route('/reposicao/lista')
