@@ -2294,9 +2294,15 @@ def reposicao_por_fornecedor():
             if precisam:
                 sample = [r['referencia'] for r in precisam[:5]]
                 print(f'[DEBUG] Sample precisam refs: {sample}')
+                # Check first key in fornecedor_por_ref
+                if fornecedor_por_ref:
+                    first_key = next(iter(fornecedor_por_ref))
+                    print(f'[DEBUG] First key in dict: {repr(first_key)}')
                 for ref in sample:
                     forn = fornecedor_por_ref.get(ref)
-                    print(f'[DEBUG]   {ref} -> {forn}')
+                    forn2 = fornecedor_por_ref.get(ref.strip())
+                    forn3 = fornecedor_por_ref.get(ref.upper())
+                    print(f'[DEBUG]   {repr(ref)} -> direct={forn} strip={forn2} upper={forn3}')
             conn.close()
         except Exception as e:
             app.logger.warning(f"PHC supplier fetch error: {e}")
