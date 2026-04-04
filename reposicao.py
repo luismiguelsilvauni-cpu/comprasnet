@@ -402,16 +402,22 @@ def calcular_metricas(vendas_por_mes: dict, stock_atual: float,
     qtd_min      = config.get('quantidade_minima_encomenda', 1)
     consumo_anual = cmm * 12
 
-    # For very slow articles (< 1/year), don't use EOQ - just use base coverage
-    if consumo_anual < 1:
+    # EOQ only makes sense for high-volume items.
+    # For low consumption, just use meses_cobertura (avoid over-stocking).
+    # Rule: only use EOQ if it results in <= meses_cobertura * 2 of stock.
+    import math as _math
+    max_meses_stock = meses_cob * 2  # never suggest more than 2x coverage target
+    eoq_max = cmm * max_meses_stock
+
+    if consumo_anual < 6:
+        # Low consumption: ignore EOQ, just order meses_cobertura
         qtd_raw = max(qtd_base, qtd_min)
     else:
-        # Cap EOQ at 12 months of consumption to avoid absurd suggestions
-        eoq_capped = min(eoq, cmm * 12)
+        # Higher consumption: use EOQ but cap it
+        eoq_capped = min(eoq, eoq_max)
         qtd_raw = max(qtd_base, eoq_capped, qtd_min)
 
-    # Always round UP to integers (can't order 1.4 units)
-    import math as _math
+    # Always round UP to integers
     qtd = int(_math.ceil(qtd_raw)) if precisa else 0
 
     # Suppress suggestion if not enough invoice history
