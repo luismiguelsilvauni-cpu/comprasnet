@@ -2207,7 +2207,7 @@ def remove_logo():
 @login_required
 def reposicao_por_fornecedor():
     """Group articles needing replenishment by their usual supplier."""
-    from reposicao import CONFIG_PADRAO, analisar_todos, SQL_TODAS_VENDAS, SQL_DIVERSIDADE_TODAS
+    from reposicao import CONFIG_PADRAO, analisar_todos
     import json as _json
 
     cfg_phc    = ConfigPHC.query.first()
@@ -2232,16 +2232,16 @@ def reposicao_por_fornecedor():
         })
 
     # SQL: for each article, find most frequent supplier from purchase invoices (fo table)
-    SQL_FORNECEDOR_ARTIGO = """
-        SELECT fi.ref, fo.nome AS fornecedor, fo.no AS fornecedor_no,
-               COUNT(*) AS n_compras
-        FROM fi
-        INNER JOIN ft ON ft.ftstamp = fi.ftstamp
-        INNER JOIN fo ON fo.no = ft.no
-        WHERE fi.ref IS NOT NULL AND fi.ref <> ''
-          AND fi.qtt > 0
-        GROUP BY fi.ref, fo.nome, fo.no
-    """
+    SQL_FORNECEDOR_ARTIGO = (
+        "SELECT fi.ref, fo.nome AS fornecedor, fo.no AS fornecedor_no,"
+        " COUNT(*) AS n_compras"
+        " FROM fi"
+        " INNER JOIN ft ON ft.ftstamp = fi.ftstamp"
+        " INNER JOIN fo ON fo.no = ft.no"
+        " WHERE fi.ref IS NOT NULL AND fi.ref <> ''"
+        " AND fi.qtt > 0"
+        " GROUP BY fi.ref, fo.nome, fo.no"
+    )
 
     # Run bulk analysis
     artigos = ArtigoPHC.query.filter(ArtigoPHC.stock_atual >= 0).all()
