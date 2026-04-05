@@ -1480,14 +1480,19 @@ def chat_claude():
 def api_chat():
     """Chat using the configured AI provider (Gemini, Claude, LM Studio, Ollama)."""
     data       = request.get_json()
+    # Support both 'messages' array and single 'message' string
+    single_msg = data.get('message')
     messages   = data.get('messages', [])
+    if single_msg and not messages:
+        messages = [{'role': 'user', 'content': single_msg}]
     imagem_b64 = data.get('imagem_b64')
     imagem_tipo= data.get('imagem_tipo', 'image/jpeg')
 
     cfg_ia  = ConfigIA.query.first()
     cfg     = get_config_geral()
-    sistema = (cfg.claude_chat_sistema if cfg else None) or \
-              'És um assistente técnico especializado em equipamentos e compras industriais. Responde sempre em português.'
+    # Allow caller to override system prompt (e.g. from backlog AI agent)
+    sistema = data.get('system') or (cfg.claude_chat_sistema if cfg else None) or \
+              'Es um assistente tecnico especializado em equipamentos e compras industriais. Responde sempre em portugues.'
 
     if not cfg_ia:
         return jsonify({'error': 'IA não configurada. Configure em Admin → Provedor IA.'}), 400
