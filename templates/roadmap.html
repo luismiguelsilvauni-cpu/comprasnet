@@ -258,9 +258,9 @@ async function iaBacklog(modo){
     estimar:`Estima a complexidade de implementacao desta tarefa no ComprasNet (Flask/Python/SQLite/PHC). Titulo: "${titulo}". Descricao: "${desc}". Indica: complexidade (1-10), tempo estimado, riscos e dependencias.`
   };
   try{
-    const r=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:prompts[modo],provider:'auto',system:'Es um especialista em desenvolvimento de software. Responde sempre em portugues de Portugal de forma pratica e directa.'})});
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:prompts[modo],system:'Es um especialista em desenvolvimento de software. Responde sempre em portugues de Portugal de forma pratica e directa.'})});
     const d=await r.json();
-    const txt=(d.response||d.error||'Sem resposta').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    const txt=(d.text||d.response||d.error||'Sem resposta').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     panel.innerHTML=txt;
   }catch(e){panel.innerHTML='Erro: '+e.message;}
 }
@@ -272,13 +272,12 @@ async function iaExpandir(id){
   panel.style.display='block';
   panel.innerHTML='<em style="color:var(--text-muted)">Agente a analisar...</em>';
   try{
-    const r=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       message:`Analisa esta tarefa do backlog do ComprasNet e sugere como implementar. Titulo: "${item.titulo}". Descricao: "${item.descricao||''}". Tipo: ${item.tipo}. Responde em portugues de Portugal com: abordagem de implementacao, ficheiros a modificar (app.py, templates, modelos), e possiveis dificuldades.`,
-      provider:'auto',
       system:'Es um especialista em Flask, Python, SQLite e sistemas ERP PHC. Responde em portugues de Portugal.'
     })});
     const d=await r.json();
-    const txt=(d.response||'Sem resposta').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    const txt=(d.text||d.response||'Sem resposta').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     panel.innerHTML=txt;
   }catch(e){panel.innerHTML='Erro: '+e.message;}
 }
