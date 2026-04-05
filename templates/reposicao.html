@@ -662,17 +662,25 @@ function aplicarFiltros() {
 
 function sortTabela(col) {
   const tbody = document.querySelector('#tabelaReposicao tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
+  // Only sort visible rows for speed
+  const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+  const hidden = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display === 'none');
   const dir = sortDir[col] = !(sortDir[col]);
-  rows.sort((a, b) => {
-    const ax = a.cells[col]?.textContent.trim() || '';
-    const bx = b.cells[col]?.textContent.trim() || '';
-    const an = parseFloat(ax.replace(/[^0-9.-]/g,''));
-    const bn = parseFloat(bx.replace(/[^0-9.-]/g,''));
-    if (!isNaN(an) && !isNaN(bn)) return dir ? an-bn : bn-an;
-    return dir ? ax.localeCompare(bx) : bx.localeCompare(ax);
+  // Pre-extract values for speed
+  const keyed = rows.map(r => {
+    const txt = (r.cells[col]?.textContent || '').trim();
+    const num = parseFloat(txt.replace(/[^0-9.-]/g,''));
+    return {r, txt, num};
   });
-  rows.forEach(r => tbody.appendChild(r));
+  keyed.sort((a, b) => {
+    if (!isNaN(a.num) && !isNaN(b.num)) return dir ? a.num-b.num : b.num-a.num;
+    return dir ? a.txt < b.txt ? -1 : 1 : a.txt > b.txt ? -1 : 1;
+  });
+  // Use fragment for fast DOM update
+  const frag = document.createDocumentFragment();
+  keyed.forEach(k => frag.appendChild(k.r));
+  hidden.forEach(r => frag.appendChild(r));
+  tbody.appendChild(frag);
 }
 
 function filtrarTabela(urgencia) {
