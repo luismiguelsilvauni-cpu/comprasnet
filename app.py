@@ -2522,10 +2522,33 @@ def api_clientes():
     q = request.args.get('q','').strip()
     if not q or len(q) < 2:
         return jsonify([])
+    
+    # Try local DB first
     clientes = ClientePHC.query.filter(
         ClientePHC.nome.ilike(f'%{q}%')
     ).limit(10).all()
-    return jsonify([{'no': c.no, 'nome': c.nome} for c in clientes])
+    
+    if clientes:
+        return jsonify([{'no': c.no, 'nome': c.nome} for c in clientes])
+    
+    # Fallback: query PHC directly
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if cfg_phc and cfg_phc.ultima_sync:
+            from phc_sync import get_phc_connection
+            conn = get_phc_connection(cfg_phc)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT TOP 10 no, nome FROM PHC_Uniao..cl WHERE nome LIKE ? AND ISNULL(inactivo,0)=0 ORDER BY nome",
+                (f'%{q}%',)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            return jsonify([{'no': r[0], 'nome': r[1]} for r in rows])
+    except Exception as e:
+        app.logger.warning(f"PHC clientes search error: {e}")
+    
+    return jsonify([])
 
 
 @app.route('/roadmap')
@@ -2672,6 +2695,30 @@ def api_registar_commit():
     with app.app_context():
         v = auto_registar_commit(commit_msg, versao or None)
     return jsonify({'ok': True, 'versao': v})
+
+
+@app.route('/api/fornecedores')
+@login_required
+def api_fornecedores():
+    q = request.args.get('q','').strip()
+    if not q or len(q) < 2:
+        return jsonify([])
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if cfg_phc and cfg_phc.ultima_sync:
+            from phc_sync import get_phc_connection
+            conn = get_phc_connection(cfg_phc)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT TOP 10 fo.no, fo.nome FROM PHC_Uniao..fo WHERE fo.nome LIKE ? ORDER BY fo.nome",
+                (f'%{q}%',)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            return jsonify([{'no': r[0], 'nome': r[1]} for r in rows])
+    except Exception as e:
+        app.logger.warning(f"PHC fornecedores search error: {e}")
+    return jsonify([])
 
 
 def init_db():

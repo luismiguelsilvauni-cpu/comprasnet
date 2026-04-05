@@ -405,7 +405,7 @@ function pesquisarFornecedorEv(q) {
   const res = document.getElementById('evFornecedorResults');
   if (q.length < 2) { res.style.display='none'; return; }
   evSearchTimer = setTimeout(()=>{
-    fetch('/api/clientes?q='+encodeURIComponent(q)+'&fornecedor=1')
+    fetch('/api/fornecedores?q='+encodeURIComponent(q))
       .then(r=>r.json())
       .then(data=>{
         if(!data.length){res.style.display='none';return;}
