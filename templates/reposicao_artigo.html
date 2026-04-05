@@ -4,6 +4,153 @@
 {% block topbar_actions %}
   <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-ghost btn-sm">← Voltar à Lista</a>
   <a href="{{ url_for('stock_artigo', ref=artigo.referencia) }}" class="btn btn-ghost btn-sm">📦 Ficha</a>
+  <button onclick="abrirAIAnalise()" class="btn btn-primary btn-sm">🤖 Análise IA</button>
+<!-- AI Analysis Modal -->
+<div id="aiModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto" onclick="if(event.target===this)fecharAI()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:700px;max-width:95vw;margin:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:16px;font-weight:700">🤖 Análise IA — {{ artigo.referencia }}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">{{ artigo.designacao }}</div>
+      </div>
+      <button onclick="fecharAI()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="aiContent" style="padding:24px;font-size:13px;line-height:1.7;min-height:200px">
+      <div style="text-align:center;padding:40px;color:var(--text-muted)">
+        Clique em <strong>Analisar</strong> para obter a análise IA deste artigo.
+      </div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharAI()" class="btn btn-ghost btn-sm">Fechar</button>
+      <button onclick="correrAnaliseAI()" id="btnRunAI" class="btn btn-primary btn-sm">🤖 Analisar com IA</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const AI_DATA = {
+  referencia:     "{{ artigo.referencia }}",
+  designacao:     "{{ artigo.designacao }}",
+  familia:        "{{ artigo.familia or '' }}",
+  unidade:        "{{ artigo.unidade or 'un' }}",
+  stock_atual:    {{ result.stock_atual or 0 }},
+  preco_custo:    {{ result.preco_custo or 0 }},
+  consumo_mensal: {{ result.consumo_medio_mensal or 0 }},
+  consumo_anual:  {{ (result.consumo_medio_mensal or 0) * 12 }},
+  ponto_reorder:  {{ result.ponto_reorder or 0 }},
+  qtd_sugerida:   {{ result.quantidade_sugerida or 0 }},
+  dias_cobertura: {{ result.dias_cobertura_atual or 0 }},
+  score:          {{ result.score or 0 }},
+  num_clientes:   {{ result.num_clientes or 0 }},
+  num_facturas:   {{ result.num_facturas or 0 }},
+  meses_com_venda:{{ result.meses_com_venda or 0 }},
+  urgencia:       "{{ result.urgencia or '' }}",
+  lead_time_dias: {{ config.lead_time_dias or 7 }},
+  fator_seguranca:{{ config.fator_seguranca or 1.5 }},
+  meses_cobertura:{{ config.meses_cobertura or 2 }},
+  vendas_historico: {{ vendas_lista | tojson }},
+};
+
+function abrirAIAnalise() {
+  document.getElementById('aiModal').style.display = 'flex';
+}
+
+function fecharAI() {
+  document.getElementById('aiModal').style.display = 'none';
+}
+
+async function correrAnaliseAI() {
+  const btn = document.getElementById('btnRunAI');
+  const content = document.getElementById('aiContent');
+  btn.disabled = true;
+  btn.textContent = '⏳ A analisar...';
+  content.innerHTML = '<div style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">🤖</div><div style="color:var(--text-muted)">A analisar dados de vendas, stock, tendências e métricas...</div></div>';
+
+  // Build prompt with all data
+  const v = AI_DATA;
+  const tendencia_vendas = v.vendas_historico.length >= 2 
+    ? (v.vendas_historico[v.vendas_historico.length-1].total > v.vendas_historico[0].total ? 'crescente' : 'decrescente')
+    : 'sem dados suficientes';
+  
+  const vendas_recentes = v.vendas_historico.slice(-6).map(x => `${x.mes}/${x.ano}: ${x.total} un (${x.nfat} fact.)`).join(', ');
+  const vendas_antigas = v.vendas_historico.slice(0, 6).map(x => `${x.mes}/${x.ano}: ${x.total} un`).join(', ');
+
+  const prompt = `És um especialista em gestão de stocks e compras industriais/comerciais. Analisa este artigo e recomenda a quantidade a comprar com justificação detalhada.
+
+ARTIGO: ${v.referencia} — ${v.designacao}
+Família: ${v.familia || 'N/D'} | Unidade: ${v.unidade}
+
+SITUAÇÃO ACTUAL:
+- Stock actual: ${v.stock_atual} ${v.unidade}
+- Cobertura actual: ${v.dias_cobertura} dias
+- Ponto de reorder (ROP): ${v.ponto_reorder.toFixed(1)} ${v.unidade}
+- Urgência: ${v.urgencia.toUpperCase()}
+
+DADOS DE VENDAS:
+- Consumo médio mensal: ${v.consumo_mensal.toFixed(1)} ${v.unidade}/mês
+- Consumo médio anual: ${v.consumo_anual.toFixed(1)} ${v.unidade}/ano
+- Nº clientes distintos: ${v.num_clientes}
+- Nº facturas históricas: ${v.num_facturas}
+- Meses com vendas: ${v.meses_com_venda}
+- Tendência: ${tendencia_vendas}
+- Vendas mais recentes (6 meses): ${vendas_recentes || 'sem dados'}
+- Vendas mais antigas (6 meses): ${vendas_antigas || 'sem dados'}
+
+FINANCEIRO:
+- Preço custo: ${v.preco_custo.toFixed(2)}€
+- Score de relevância: ${v.score}/100
+- Custo de posse anual: ${(v.preco_custo * 0.20).toFixed(2)}€/un/ano
+
+PARÂMETROS DO SISTEMA:
+- Lead time: ${v.lead_time_dias} dias
+- Factor segurança: ${v.fator_seguranca}x
+- Cobertura alvo: ${v.meses_cobertura} meses
+- Quantidade sugerida pelo sistema: ${v.qtd_sugerida} ${v.unidade}
+
+Com base em todos estes dados, responde em português (Portugal) com:
+
+1. **RECOMENDAÇÃO**: Quantidade exacta a comprar e urgência (imediato/normal/aguardar)
+2. **JUSTIFICAÇÃO**: Explica o raciocínio considerando tendência, risco de ruptura, custo de posse, diversidade de clientes, e sazonalidade
+3. **ALERTAS**: Riscos ou factores a considerar (mono-cliente, preço elevado, tendência negativa, etc.)
+4. **ALTERNATIVA**: Se a quantidade sugerida pelo sistema parece adequada ou propões ajuste, e porquê
+
+Sê directo e prático. Usa dados concretos na justificação.`;
+
+  try {
+    const resp = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        message: prompt,
+        provider: 'auto',
+        system: 'És um especialista em gestão de stocks e compras. Responde sempre em português de Portugal. Usa dados concretos e sê directo.'
+      })
+    });
+    const data = await resp.json();
+    const texto = data.response || data.error || 'Sem resposta';
+    
+    // Format markdown-like response
+    const html = texto
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^(\d+\. \*\*.*?\*\*)/gm, '<div style="margin-top:16px;margin-bottom:6px;font-size:14px;font-weight:700;color:var(--accent)">$1</div>')
+      .replace(/^- (.+)/gm, '<div style="padding:4px 0 4px 16px;border-left:2px solid var(--border)">• $1</div>')
+      .replace(/
+
+/g, '<br><br>')
+      .replace(/
+/g, '<br>');
+    
+    content.innerHTML = `<div style="line-height:1.8">${html}</div>`;
+  } catch(e) {
+    content.innerHTML = `<div style="color:var(--danger);padding:20px">Erro: ${e.message}<br><br>Verifique se a IA está configurada nas Definições.</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔄 Re-analisar';
+}
+</script>
+
+
 {% endblock %}
 
 {% block content %}
