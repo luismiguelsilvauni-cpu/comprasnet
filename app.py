@@ -2502,6 +2502,12 @@ def api_clientes():
     return jsonify([{'no': c.no, 'nome': c.nome} for c in clientes])
 
 
+@app.route('/roadmap')
+@login_required
+def roadmap():
+    return render_template('roadmap.html')
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Próximas Funcionalidades · ComprasNet{% endblock %}
+{% block page_title %}Próximas Funcionalidades{% endblock %}
+
+{% block content %}
+<style>
+.road-section { margin-bottom:28px }
+.road-label { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:10px }
+.road-label::after { content:'';flex:1;height:1px;background:var(--border) }
+.road-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px }
+.road-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .15s }
+.road-card:hover { border-color:var(--accent) }
+.road-badge { font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px }
+.b-bug    { background:rgba(239,68,68,.15);color:#ef4444 }
+.b-small  { background:rgba(34,197,94,.15);color:#22c55e }
+.b-medium { background:rgba(245,158,11,.15);color:#f59e0b }
+.b-large  { background:rgba(59,110,240,.15);color:var(--accent) }
+.b-epic   { background:rgba(139,92,246,.15);color:#8b5cf6 }
+.road-info { flex:1 }
+.road-title { font-size:13px;font-weight:600;margin-bottom:3px;color:var(--text) }
+.road-sub { font-size:12px;color:var(--text-muted);line-height:1.5 }
+.road-done { opacity:.45 }
+.road-done .road-title { text-decoration:line-through }
+.stat-row { display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap }
+.stat-box { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:100px;text-align:center }
+.stat-n { font-size:22px;font-weight:700;color:var(--text) }
+.stat-l { font-size:11px;color:var(--text-muted);margin-top:2px }
+</style>
+
+<!-- Summary stats -->
+<div class="stat-row">
+  <div class="stat-box"><div class="stat-n" style="color:#ef4444">2</div><div class="stat-l">Bugs / Fixes</div></div>
+  <div class="stat-box"><div class="stat-n" style="color:#22c55e">3</div><div class="stat-l">Pequenas</div></div>
+  <div class="stat-box"><div class="stat-n" style="color:#f59e0b">5</div><div class="stat-l">Médias</div></div>
+  <div class="stat-box"><div class="stat-n" style="color:var(--accent)">2</div><div class="stat-l">Grandes</div></div>
+  <div class="stat-box"><div class="stat-n" style="color:#8b5cf6">1</div><div class="stat-l">Épicas</div></div>
+  <div class="stat-box"><div class="stat-n" style="color:var(--success)">✓ 12</div><div class="stat-l">Concluídas</div></div>
+</div>
+
+<!-- CONCLUÍDAS -->
+<div class="road-section">
+  <div class="road-label">✅ Concluídas recentemente</div>
+  <div class="road-grid">
+    <div class="road-card road-done"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Calendário — gravar evento</div><div class="road-sub">Erro None.strip e sessão corrigidos</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Calendário multi-dia</div><div class="road-sub">Eventos com início/fim mostram barra contínua</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Pesquisa de fornecedor no evento</div><div class="road-sub">Campo com sugestões do PHC</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Reposição server-side</div><div class="road-sub">Paginação, pesquisa e ordenação rápidas</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Análise IA por artigo</div><div class="road-sub">Recomendação com justificação detalhada</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Histórico vendas com nº factura</div><div class="road-sub">Data, factura e cliente por linha</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Ajuda interactiva nos filtros</div><div class="road-sub">Modal com exemplos para cada parâmetro</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Agrupamento por fornecedor</div><div class="road-sub">Artigos a encomendar agrupados por fornecedor PHC</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Barra de estado "Por Fornecedor"</div><div class="road-sub">Loading modal funcional</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Ligação PHC tabela fn/fo</div><div class="road-sub">Fornecedor real por artigo via facturas de compra</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">API reposição com paginação</div><div class="road-sub">Endpoint server-side com filtros e sort</div></div></div>
+    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Modal loading global</div><div class="road-sub">Barra de progresso em base.html</div></div></div>
+  </div>
+</div>
+
+<!-- BUGS / FIXES -->
+<div class="road-section">
+  <div class="road-label">🔴 Fixes pendentes</div>
+  <div class="road-grid">
+    <div class="road-card"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Auto-update ao iniciar servidor</div><div class="road-sub">Servidor puxa actualizações do GitHub antes de arrancar, sem intervenção manual</div></div></div>
+    <div class="road-card"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Histórico de versões desactualizado</div><div class="road-sub">Changelog parado na v1.8 — actualizar com todas as funcionalidades recentes</div></div></div>
+  </div>
+</div>
+
+<!-- PEQUENAS -->
+<div class="road-section">
+  <div class="road-label">🟢 Pequenas melhorias</div>
+  <div class="road-grid">
+    <div class="road-card"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Editor de logotipo melhorado</div><div class="road-sub">Controlo de posição, tamanho, filtros e preview em tempo real</div></div></div>
+    <div class="road-card"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Assinatura de email</div><div class="road-sub">Editor de assinatura com suporte a imagens para emails de consulta</div></div></div>
+    <div class="road-card"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Score e alertas no artigo</div><div class="road-sub">Badge de score mais visual e alertas de mono-cliente, preço alto</div></div></div>
+  </div>
+</div>
+
+<!-- MÉDIAS -->
+<div class="road-section">
+  <div class="road-label">🟡 Médio prazo</div>
+  <div class="road-grid">
+    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Email de consulta ao fornecedor</div><div class="road-sub">Janela com assunto, designações, quantidades e envio directo. Gerada a partir da lista de compras de um fornecedor</div></div></div>
+    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Menu Embarcações</div><div class="road-sub">Associar cliente + dados do motor (marca, modelo, nº série) e caixa redutora. Listagem de artigos frequentes por embarcação</div></div></div>
+    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Menu Técnico — Catálogos PDF</div><div class="road-sub">Upload de PDFs de peças associados a nº de série. Pesquisa por nº série → catálogos disponíveis, visualização e download</div></div></div>
+    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Análise de stock — Excesso e Obsoletos</div><div class="road-sub">Identifica artigos com stock excessivo, sem vendas recentes e classificação ABC automática</div></div></div>
+    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">IA global de reposição</div><div class="road-sub">Análise de toda a carteira de artigos com recomendações priorizadas, não apenas artigo a artigo</div></div></div>
+  </div>
+</div>
+
+<!-- GRANDES -->
+<div class="road-section">
+  <div class="road-label">🔵 Grandes funcionalidades</div>
+  <div class="road-grid">
+    <div class="road-card"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Painel global de gestão de stock</div><div class="road-sub">20+ métricas: valor total (custo/venda), margem, GMROI, DIO, rotação, ABC, top/bottom produtos, fornecedores, alertas automáticos</div></div></div>
+    <div class="road-card"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Dashboard financeiro</div><div class="road-sub">KPIs financeiros avançados: capital imobilizado, stock parado, ROI, sell-through rate, variação de preços por fornecedor</div></div></div>
+  </div>
+</div>
+
+<!-- ÉPICAS -->
+<div class="road-section">
+  <div class="road-label">🟣 Épicas (longo prazo)</div>
+  <div class="road-grid">
+    <div class="road-card"><span class="road-badge b-epic">Épica</span><div class="road-info"><div class="road-title">Motor de previsão avançado</div><div class="road-sub">Previsão de vendas com machine learning, sazonalidade automática, alertas preditivos e optimização de encomendas por horizonte temporal</div></div></div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--text-muted);line-height:1.6">
+  💡 <strong style="color:var(--text)">Como sugerir funcionalidades:</strong> Use o chat de IA integrado ou contacte o desenvolvimento. As prioridades são ajustadas em função das necessidades operacionais.
+</div>
+{% endblock %}
