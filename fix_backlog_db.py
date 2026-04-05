@@ -1,16 +1,19 @@
-import sqlite3
-conn = sqlite3.connect('compras.db')
-conn.execute("""CREATE TABLE IF NOT EXISTS backlog_item (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    titulo TEXT NOT NULL,
-    descricao TEXT DEFAULT '',
-    tipo TEXT DEFAULT 'medium',
-    estado TEXT DEFAULT 'pending',
-    prioridade INTEGER DEFAULT 10,
-    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
-)""")
-conn.commit()
-n = conn.execute('SELECT COUNT(*) FROM backlog_item').fetchone()[0]
-print('OK. Items:', n)
-conn.close()
+import sys, os
+sys.path.insert(0, '.')
+
+from app import app, db, init_db
+
+with app.app_context():
+    # Get DB path
+    uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    print("DB URI:", uri)
+    
+    # Create all tables including backlog_item
+    db.create_all()
+    print("db.create_all() done")
+    
+    # Check
+    from sqlalchemy import text
+    with db.engine.connect() as conn:
+        n = conn.execute(text("SELECT COUNT(*) FROM backlog_item")).fetchone()[0]
+        print("Items:", n)
