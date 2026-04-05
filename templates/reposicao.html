@@ -555,17 +555,17 @@ function fecharAjuda() {
       <thead>
         <tr>
           <th></th>
-          <th>Referência</th>
-          <th>Designação</th>
-          <th style="text-align:right">Stock</th>
-          <th style="text-align:right">Média/Ano</th>
+          <th onclick="sortTabela(1)" style="cursor:pointer" title="Ordenar">Referência ⇅</th>
+          <th onclick="sortTabela(2)" style="cursor:pointer" title="Ordenar">Designação ⇅</th>
+          <th onclick="sortTabela(3)" style="cursor:pointer;text-align:right" title="Ordenar">Stock ⇅</th>
+          <th onclick="sortTabela(4)" style="cursor:pointer;text-align:right" title="Ordenar">Média/Ano ⇅</th>
           <th style="text-align:right">Clientes</th>
-          <th style="text-align:right" title="Score de relevância para fazer stock (0-100)">Score</th>
-          <th style="text-align:right">Dias Cob.</th>
+          <th onclick="sortTabela(6)" style="cursor:pointer;text-align:right" title="Ordenar">Score ⇅</th>
+          <th onclick="sortTabela(7)" style="cursor:pointer;text-align:right" title="Ordenar">Dias Cob. ⇅</th>
           <th style="text-align:right">ROP</th>
           <th style="text-align:right">C. Posse/un</th>
-          <th style="text-align:right">Qtd. Sugerida</th>
-          <th style="text-align:right" title="Meses com vendas / Período total">Meses/Período</th>
+          <th onclick="sortTabela(10)" style="cursor:pointer;text-align:right" title="Ordenar">Qtd. Sug. ⇅</th>
+          <th style="text-align:right">Meses/Período</th>
         </tr>
       </thead>
       <tbody>
@@ -629,21 +629,57 @@ function fecharAjuda() {
 {% endif %}
 
 <script>
-function filtrarTabela(urgencia) {
+var sortDir = {};
+var currentSearch = '';
+
+function pesquisarTabela(termo) {
+  currentSearch = termo.toLowerCase();
+  aplicarFiltros();
+}
+
+function limparPesquisa() {
+  document.getElementById('searchInput').value = '';
+  currentSearch = '';
+  aplicarFiltros();
+}
+
+function aplicarFiltros() {
+  const urgenciaAtiva = document.querySelector('[id^="tab-"].btn-primary')?.id?.replace('tab-','') || 'todos';
   const sem_relevancia = ['parado','pouco_historico','irrelevante','sem_dados','nao_recomendado'];
   const precisam = ['critico','urgente','necessario'];
   document.querySelectorAll('#tabelaReposicao tbody tr').forEach(tr => {
     const urg = tr.dataset.urgencia;
-    let show = false;
-    if (urgencia === 'todos') show = true;
-    else if (urgencia === 'necessarios') show = precisam.includes(urg);
-    else if (urgencia === 'sem_relevancia') show = sem_relevancia.includes(urg);
-    else show = urg === urgencia;
-    tr.style.display = show ? '' : 'none';
+    const txt = tr.textContent.toLowerCase();
+    let showUrgencia = false;
+    if (urgenciaAtiva === 'todos') showUrgencia = true;
+    else if (urgenciaAtiva === 'necessarios') showUrgencia = precisam.includes(urg);
+    else if (urgenciaAtiva === 'sem_relevancia') showUrgencia = sem_relevancia.includes(urg);
+    else showUrgencia = urg === urgenciaAtiva;
+    const showSearch = !currentSearch || txt.includes(currentSearch);
+    tr.style.display = (showUrgencia && showSearch) ? '' : 'none';
   });
+}
+
+function sortTabela(col) {
+  const tbody = document.querySelector('#tabelaReposicao tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const dir = sortDir[col] = !(sortDir[col]);
+  rows.sort((a, b) => {
+    const ax = a.cells[col]?.textContent.trim() || '';
+    const bx = b.cells[col]?.textContent.trim() || '';
+    const an = parseFloat(ax.replace(/[^0-9.-]/g,''));
+    const bn = parseFloat(bx.replace(/[^0-9.-]/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return dir ? an-bn : bn-an;
+    return dir ? ax.localeCompare(bx) : bx.localeCompare(ax);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+function filtrarTabela(urgencia) {
   document.querySelectorAll('[id^="tab-"]').forEach(b => b.classList.remove('btn-primary'));
   const btn = document.getElementById('tab-' + urgencia);
   if (btn) btn.classList.add('btn-primary');
+  aplicarFiltros();
 }
 // Default: show only items that need ordering
 document.addEventListener('DOMContentLoaded', () => {
