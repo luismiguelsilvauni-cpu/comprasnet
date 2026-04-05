@@ -2395,6 +2395,92 @@ def reposicao_criar_pedido():
                     'url': url_for('pedido_detalhe', pid=p.id)})
 
 
+@app.route('/api/reposicao/resultados')
+@login_required
+def api_reposicao_resultados():
+    """Return paginated replenishment results as JSON."""
+    from reposicao import CONFIG_PADRAO, analisar_todos
+    cfg_phc    = ConfigPHC.query.first()
+    cfg_global = ConfigReposicao.query.filter_by(artigo_ref=None).first()
+    config = dict(CONFIG_PADRAO)
+    if cfg_global:
+        config.update({
+            'meses_historico':            cfg_global.meses_historico or 60,
+            'lead_time_dias':             cfg_global.lead_time_dias or 7,
+            'fator_seguranca':            cfg_global.fator_seguranca or 1.5,
+            'meses_cobertura':            cfg_global.meses_cobertura or 2,
+            'custo_encomenda':            cfg_global.custo_encomenda or 25,
+            'taxa_posse_anual':           cfg_global.taxa_posse_anual or 0.20,
+            'quantidade_minima_encomenda':cfg_global.quantidade_minima_encomenda or 1,
+            'alertar_dias_cobertura':     cfg_global.alertar_dias_cobertura or 30,
+            'min_anos_historico':         getattr(cfg_global,'min_anos_historico',2) or 2,
+            'min_meses_com_venda':        getattr(cfg_global,'min_meses_com_venda',3) or 3,
+            'min_total_vendido':          getattr(cfg_global,'min_total_vendido',3) or 3,
+            'ignorar_sem_movimento_anos': getattr(cfg_global,'ignorar_sem_movimento_anos',3) or 3,
+            'min_facturas_sugerir':       getattr(cfg_global,'min_facturas_sugerir',8) or 8,
+        })
+
+    urgencia  = request.args.get('urgencia', 'necessarios')
+    pesquisa  = request.args.get('q', '').strip().lower()
+    sort_col  = request.args.get('sort', '')
+    sort_dir  = request.args.get('dir', 'asc')
+    page      = int(request.args.get('page', 1))
+    per_page  = 50
+
+    artigos = ArtigoPHC.query.filter(ArtigoPHC.stock_atual >= 0).all()
+    try:
+        resultados = analisar_todos(cfg_phc, config, artigos)
+    except Exception as e:
+        return jsonify({'error': str(e), 'rows': [], 'total': 0})
+
+    # Filter by urgencia
+    SEM = {'parado','pouco_historico','irrelevante','sem_dados','nao_recomendado'}
+    PRECISAM = {'critico','urgente','necessario'}
+    def match_urg(r):
+        u = r.get('urgencia','')
+        if urgencia == 'todos':       return True
+        if urgencia == 'necessarios': return u in PRECISAM
+        if urgencia == 'sem_relevancia': return u in SEM
+        return u == urgencia
+
+    rows = [r for r in resultados if match_urg(r)]
+
+    # Filter by search
+    if pesquisa:
+        rows = [r for r in rows if pesquisa in (r.get('referencia','') or '').lower()
+                or pesquisa in (r.get('designacao','') or '').lower()]
+
+    total = len(rows)
+
+    # Sort
+    if sort_col:
+        rev = sort_dir == 'desc'
+        key_map = {
+            'referencia':   lambda r: r.get('referencia','') or '',
+            'designacao':   lambda r: r.get('designacao','') or '',
+            'stock':        lambda r: float(r.get('stock_atual',0) or 0),
+            'media_ano':    lambda r: float(r.get('consumo_medio_mensal',0) or 0)*12,
+            'score':        lambda r: float(r.get('score',0) or 0),
+            'dias_cob':     lambda r: float(r.get('dias_cobertura_atual',0) or 0),
+            'qtd':          lambda r: float(r.get('quantidade_sugerida',0) or 0),
+        }
+        fn = key_map.get(sort_col)
+        if fn:
+            rows.sort(key=fn, reverse=rev)
+
+    # Paginate
+    start = (page-1) * per_page
+    rows_page = rows[start:start+per_page]
+
+    return jsonify({
+        'rows': rows_page,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'pages': max(1, (total + per_page - 1) // per_page),
+    })
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():

@@ -516,116 +516,164 @@ function fecharAjuda() {
 <div class="stats-grid mb-16">
   <div class="stat-card">
     <div class="stat-label">Artigos Analisados</div>
-    <div class="stat-value">{{ resultados|length }}</div>
+    <div class="stat-value" id="kpi-total">{{ resultados|length }}</div>
     <div class="stat-icon">📦</div>
   </div>
   <div class="stat-card danger">
     <div class="stat-label">Críticos (stock=0)</div>
-    <div class="stat-value">{{ criticos|length }}</div>
+    <div class="stat-value" id="kpi-criticos">{{ criticos|length }}</div>
     <div class="stat-icon">🔴</div>
   </div>
   <div class="stat-card warning">
     <div class="stat-label">Precisam Encomendar</div>
-    <div class="stat-value">{{ precisam|length }}</div>
+    <div class="stat-value" id="kpi-precisam">{{ precisam|length }}</div>
     <div class="stat-icon">⚠️</div>
   </div>
   <div class="stat-card">
     <div class="stat-label">Sem Dados de Venda</div>
-    <div class="stat-value">{{ sem_dados|length }}</div>
+    <div class="stat-value" id="kpi-semdados">{{ sem_dados|length }}</div>
     <div class="stat-icon">❓</div>
   </div>
 </div>
 
-{% if resultados %}
-<!-- Filter tabs -->
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-  <button onclick="filtrarTabela('todos')"       class="btn btn-ghost btn-sm" id="tab-todos">Todos ({{ resultados|length }})</button>
-  <button onclick="filtrarTabela('critico')"     class="btn btn-ghost btn-sm" id="tab-critico" style="color:var(--danger)">🔴 Críticos ({{ criticos|length }})</button>
-  <button onclick="filtrarTabela('urgente')"     class="btn btn-ghost btn-sm" id="tab-urgente" style="color:var(--warning)">🟡 Urgentes</button>
-  <button onclick="filtrarTabela('necessario')"  class="btn btn-ghost btn-sm" id="tab-necessario" style="color:var(--accent)">🔵 Necessários</button>
-  <button onclick="filtrarTabela('ok')"          class="btn btn-ghost btn-sm" id="tab-ok" style="color:var(--success)">✅ OK</button>
-  <button onclick="filtrarTabela('irrelevante')"     class="btn btn-ghost btn-sm" id="tab-irrelevante">⚪ Irrelevantes</button>
-  <button onclick="filtrarTabela('parado')"          class="btn btn-ghost btn-sm" id="tab-parado">💤 Parados (+{{ config_padrao.ignorar_sem_movimento_anos|int }}a)</button>
-  <button onclick="filtrarTabela('pouco_historico')" class="btn btn-ghost btn-sm" id="tab-pouco_historico">📉 Pouco histórico</button>
+<!-- Tabs -->
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+  <button onclick="setTab('necessarios')" id="tab-necessarios" class="btn btn-primary btn-sm">⚠️ Precisam Encomendar ({{ precisam|length }})</button>
+  <button onclick="setTab('critico')"     id="tab-critico"     class="btn btn-ghost btn-sm" style="color:var(--danger)">🔴 Críticos ({{ criticos|length }})</button>
+  <button onclick="setTab('urgente')"     id="tab-urgente"     class="btn btn-ghost btn-sm" style="color:var(--warning)">🟡 Urgentes</button>
+  <button onclick="setTab('necessario')"  id="tab-necessario"  class="btn btn-ghost btn-sm" style="color:var(--accent)">🔵 Necessários</button>
+  <button onclick="setTab('ok')"          id="tab-ok"          class="btn btn-ghost btn-sm" style="color:var(--success)">✅ OK</button>
+  <button onclick="setTab('sem_relevancia')" id="tab-sem_relevancia" class="btn btn-ghost btn-sm">⚪ Sem relevância</button>
+  <button onclick="setTab('todos')"       id="tab-todos"       class="btn btn-ghost btn-sm">📋 Todos</button>
 </div>
 
+<!-- Search -->
+<div style="display:flex;gap:8px;margin-bottom:12px">
+  <input type="text" id="searchInput" placeholder="🔍 Pesquisar referência ou designação..."
+    oninput="debounceSearch(this.value)"
+    style="flex:1;padding:6px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+  <button onclick="clearSearch()" class="btn btn-ghost btn-sm">✕</button>
+</div>
+
+<!-- Table -->
 <div class="card" style="padding:0;overflow:hidden">
   <div class="table-wrap" style="margin:0">
     <table id="tabelaReposicao">
       <thead>
         <tr>
-          <th></th>
-          <th id="th1" onclick="sortSafe(1)" style="cursor:pointer;user-select:none" title="Ordenar">Referência ⇅</th>
-          <th id="th2" onclick="sortSafe(2)" style="cursor:pointer;user-select:none" title="Ordenar">Designação ⇅</th>
-          <th id="th3" onclick="sortSafe(3)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Stock ⇅</th>
-          <th id="th4" onclick="sortSafe(4)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Média/Ano ⇅</th>
+          <th style="width:32px"></th>
+          <th onclick="setSort('referencia')" style="cursor:pointer">Referência <span id="sort-referencia"></span></th>
+          <th onclick="setSort('designacao')" style="cursor:pointer">Designação <span id="sort-designacao"></span></th>
+          <th onclick="setSort('stock')" style="cursor:pointer;text-align:right">Stock <span id="sort-stock"></span></th>
+          <th onclick="setSort('media_ano')" style="cursor:pointer;text-align:right">Média/Ano <span id="sort-media_ano"></span></th>
           <th style="text-align:right">Clientes</th>
-          <th id="th6" onclick="sortSafe(6)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Score ⇅</th>
-          <th id="th7" onclick="sortSafe(7)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Dias Cob. ⇅</th>
+          <th onclick="setSort('score')" style="cursor:pointer;text-align:right">Score <span id="sort-score"></span></th>
+          <th onclick="setSort('dias_cob')" style="cursor:pointer;text-align:right">Dias Cob. <span id="sort-dias_cob"></span></th>
           <th style="text-align:right">ROP</th>
           <th style="text-align:right">C. Posse/un</th>
-          <th id="th10" onclick="sortSafe(10)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Qtd. Sug. ⇅</th>
+          <th onclick="setSort('qtd')" style="cursor:pointer;text-align:right">Qtd. Sug. <span id="sort-qtd"></span></th>
           <th style="text-align:right">Meses/Período</th>
         </tr>
       </thead>
-      <tbody>
-        {% for r in resultados %}
-        <tr data-urgencia="{{ r.urgencia }}" {% if not r.relevante %}style="opacity:.5"{% endif %}>
-          <td style="text-align:center;font-size:16px">
-            {% if r.urgencia == 'critico' %}🔴
-            {% elif r.urgencia == 'urgente' %}🟡
-            {% elif r.urgencia == 'necessario' %}🔵
-            {% elif r.urgencia == 'ok' %}✅
-            {% elif r.urgencia == 'irrelevante' %}⚪
-            {% elif r.urgencia == 'parado' %}💤
-            {% elif r.urgencia == 'pouco_historico' %}📉
-            {% elif r.urgencia == 'nao_recomendado' %}🚫
-            {% else %}❓{% endif %}
-          </td>
-          <td class="mono" style="font-size:12px;color:var(--accent)">
-            <a href="{{ url_for('analisar_artigo', ref=r.referencia) }}" title="Ver análise detalhada">{{ r.referencia }}</a>
-          </td>
-          <td style="font-size:12px">{{ (r.designacao or '')[:45] }}</td>
-          <td style="text-align:right;font-family:monospace;font-weight:700;color:{% if r.stock_atual <= 0 %}var(--danger){% elif r.precisa_encomendar %}var(--warning){% else %}var(--success){% endif %}">
-            {{ '%.1f'|format(r.stock_atual) }} {{ r.unidade }}
-          </td>
-          <td style="text-align:right;font-family:monospace;font-size:12px">
-            {% if r.consumo_medio_mensal > 0 %}{{ '%.1f'|format(r.consumo_medio_mensal * 12) }}{% else %}-{% endif %}
-          </td>
-          <td style="text-align:right;font-size:12px">
-            {% if r.num_clientes %}
-            <span style="color:{% if r.num_clientes==1 %}var(--danger){% elif r.num_clientes<=3 %}var(--warning){% else %}var(--success){% endif %}">{{ r.num_clientes }}</span>
-            {% else %}-{% endif %}
-          </td>
-          <td style="text-align:right">
-            {% if r.score is defined %}
-            <span style="font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;background:{% if r.score>=70 %}rgba(34,197,94,.2){% elif r.score>=45 %}rgba(245,158,11,.2){% else %}rgba(239,68,68,.2){% endif %};color:{% if r.score>=70 %}var(--success){% elif r.score>=45 %}var(--warning){% else %}var(--danger){% endif %}">
-              {{ r.score }}
-            </span>
-            {% else %}-{% endif %}
-          </td>
-          <td style="text-align:right;font-family:monospace;font-size:12px;color:{% if r.dias_cobertura_atual is not none and r.dias_cobertura_atual < 30 %}var(--danger){% elif r.dias_cobertura_atual is not none and r.dias_cobertura_atual < 60 %}var(--warning){% else %}var(--text-muted){% endif %}">
-            {% if r.stock_atual <= 0 %}0d{% elif r.dias_cobertura_atual is not none and r.tem_dados %}{{ r.dias_cobertura_atual }}d{% else %}-{% endif %}
-          </td>
-          <td style="text-align:right;font-family:monospace;font-size:12px">
-            {% if r.ponto_reorder > 0 %}{{ '%.1f'|format(r.ponto_reorder) }}{% else %}-{% endif %}
-          </td>
-          <td style="text-align:right;font-family:monospace;font-size:12px;color:var(--text-muted)">
-            {% if r.preco_custo > 0 %}{{ '%.2f'|format(r.preco_custo * config_padrao.taxa_posse_anual) }}€{% else %}-{% endif %}
-          </td>
-          <td style="text-align:right;font-weight:700;color:{% if r.quantidade_sugerida > 0 %}var(--warning){% else %}var(--text-muted){% endif %}">
-            {% if r.quantidade_sugerida > 0 %}{{ r.quantidade_sugerida|int }} {{ r.unidade }}{% else %}-{% endif %}
-          </td>
-          <td style="text-align:right;font-size:12px;color:var(--text-muted)">
-            {% if r.meses_com_venda %}{{ r.meses_com_venda }} / {{ r.meses_periodo or '-' }}{% else %}-{% endif %}
-          </td>
-        </tr>
-        {% endfor %}
+      <tbody id="tbody-resultados">
+        <tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text-muted)">A carregar...</td></tr>
       </tbody>
     </table>
   </div>
 </div>
-{% endif %}
+
+<!-- Pagination -->
+<div id="paginacao" style="display:flex;gap:8px;justify-content:center;align-items:center;margin-top:12px;font-size:13px"></div>
+
+<script>
+let currentTab = 'necessarios';
+let currentSearch = '';
+let currentSort = '';
+let currentDir = 'asc';
+let currentPage = 1;
+let searchTimer = null;
+
+function setTab(tab) {
+  currentTab = tab; currentPage = 1;
+  document.querySelectorAll('[id^="tab-"]').forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-ghost'); });
+  const btn = document.getElementById('tab-' + tab);
+  if (btn) { btn.classList.add('btn-primary'); btn.classList.remove('btn-ghost'); }
+  loadResultados();
+}
+
+function debounceSearch(v) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { currentSearch = v; currentPage = 1; loadResultados(); }, 300);
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  currentSearch = ''; currentPage = 1; loadResultados();
+}
+
+function setSort(col) {
+  if (currentSort === col) currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+  else { currentSort = col; currentDir = 'asc'; }
+  currentPage = 1;
+  document.querySelectorAll('[id^="sort-"]').forEach(s => s.textContent = '');
+  const el = document.getElementById('sort-' + col);
+  if (el) el.textContent = currentDir === 'asc' ? ' ▲' : ' ▼';
+  loadResultados();
+}
+
+function urgIcon(u) {
+  return {critico:'🔴',urgente:'🟡',necessario:'🔵',ok:'✅',nao_recomendado:'🚫',parado:'💤',pouco_historico:'📉',sem_dados:'❓',irrelevante:'⚪'}[u]||'❓';
+}
+
+function loadResultados() {
+  const tbody = document.getElementById('tbody-resultados');
+  tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text-muted)">⏳ A carregar...</td></tr>';
+  const params = new URLSearchParams({
+    urgencia: currentTab, q: currentSearch,
+    sort: currentSort, dir: currentDir, page: currentPage
+  });
+  fetch('/api/reposicao/resultados?' + params)
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { tbody.innerHTML = `<tr><td colspan="12" style="color:var(--danger);padding:20px;text-align:center">Erro: ${d.error}</td></tr>`; return; }
+      if (!d.rows.length) { tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text-muted)">Sem resultados</td></tr>'; renderPagination(d); return; }
+      const TAXA = {{ config_padrao.taxa_posse_anual }};
+      tbody.innerHTML = d.rows.map(r => `
+        <tr>
+          <td style="text-align:center;font-size:16px">${urgIcon(r.urgencia)}</td>
+          <td class="mono" style="font-size:12px;color:var(--accent)"><a href="/reposicao/analisar/${encodeURIComponent(r.referencia)}">${r.referencia||''}</a></td>
+          <td style="font-size:12px">${(r.designacao||'').substring(0,45)}</td>
+          <td style="text-align:right;font-family:monospace;font-weight:700;color:${r.stock_atual<=0?'var(--danger)':r.precisa_encomendar?'var(--warning)':'var(--success)'}">${(r.stock_atual||0).toFixed(1)} ${r.unidade||''}</td>
+          <td style="text-align:right;font-family:monospace;font-size:12px">${r.consumo_medio_mensal>0?((r.consumo_medio_mensal||0)*12).toFixed(1):'-'}</td>
+          <td style="text-align:right;font-size:12px"><span style="color:${r.num_clientes===1?'var(--danger)':r.num_clientes<=3?'var(--warning)':'var(--success)'}">${r.num_clientes||'-'}</span></td>
+          <td style="text-align:right"><span style="font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;background:${r.score>=70?'rgba(34,197,94,.2)':r.score>=45?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)'};color:${r.score>=70?'var(--success)':r.score>=45?'var(--warning)':'var(--danger)'}">${r.score!==undefined?r.score:'-'}</span></td>
+          <td style="text-align:right;font-size:12px;color:${(r.dias_cobertura_atual||0)<30?'var(--danger)':(r.dias_cobertura_atual||0)<60?'var(--warning)':'var(--text-muted)'}">${r.stock_atual<=0?'0d':r.dias_cobertura_atual!=null?r.dias_cobertura_atual+'d':'-'}</td>
+          <td style="text-align:right;font-size:12px">${r.ponto_reorder>0?(r.ponto_reorder||0).toFixed(1):'-'}</td>
+          <td style="text-align:right;font-size:12px;color:var(--text-muted)">${r.preco_custo>0?((r.preco_custo||0)*TAXA).toFixed(2)+'€':'-'}</td>
+          <td style="text-align:right;font-weight:700;color:${r.quantidade_sugerida>0?'var(--warning)':'var(--text-muted)'}">${r.quantidade_sugerida>0?Math.ceil(r.quantidade_sugerida)+' '+(r.unidade||''):'-'}</td>
+          <td style="text-align:right;font-size:12px;color:var(--text-muted)">${r.meses_com_venda||'-'}${r.meses_periodo?' / '+r.meses_periodo:''}</td>
+        </tr>`).join('');
+      renderPagination(d);
+    })
+    .catch(e => { tbody.innerHTML = `<tr><td colspan="12" style="color:var(--danger);padding:20px;text-align:center">Erro: ${e}</td></tr>`; });
+}
+
+function renderPagination(d) {
+  const el = document.getElementById('paginacao');
+  if (d.pages <= 1) { el.innerHTML = `<span style="color:var(--text-muted)">${d.total} resultado(s)</span>`; return; }
+  let html = `<span style="color:var(--text-muted)">${d.total} resultados</span> `;
+  if (d.page > 1) html += `<button onclick="goPage(${d.page-1})" class="btn btn-ghost btn-sm">◀</button>`;
+  html += `<span style="padding:0 8px">Pág. ${d.page} / ${d.pages}</span>`;
+  if (d.page < d.pages) html += `<button onclick="goPage(${d.page+1})" class="btn btn-ghost btn-sm">▶</button>`;
+  el.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; loadResultados(); }
+
+// Load on start
+document.addEventListener('DOMContentLoaded', () => setTab('necessarios'));
+</script>
+
 {% endif %}
 
 <script>
