@@ -455,28 +455,6 @@ function mostrarProgresso() {
 </div>
 {% endif %}
 
-<!-- Toggle help button - always visible -->
-<div style="text-align:right;margin-bottom:8px">
-  <button onclick="document.getElementById('helpPanel').style.display=document.getElementById('helpPanel').style.display==='none'?'block':'none'" class="btn btn-ghost btn-sm">❓ Como funciona os filtros</button>
-</div>
-<div id="helpPanel" style="display:none;margin-bottom:16px">
-<div class="card" style="border-style:dashed">
-  <div class="card-title">📋 Filtros de Relevância <span style="font-size:11px;color:var(--text-muted);font-weight:400">(clique para saber mais)</span></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <div onclick="mostrarAjuda('anos')" style="cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border)">📆 <strong>Min. anos historico:</strong> <span style="color:var(--accent)">{{ config_padrao.min_anos_historico }} anos</span></div>
-      <div onclick="mostrarAjuda('meses')" style="cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border)">📊 <strong>Min. meses com venda:</strong> <span style="color:var(--accent)">{{ config_padrao.min_meses_com_venda }} meses</span></div>
-      <div onclick="mostrarAjuda('total')" style="cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border)">🔢 <strong>Min. total vendido:</strong> <span style="color:var(--accent)">{{ config_padrao.min_total_vendido }} unidades</span></div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <div onclick="mostrarAjuda('parados')" style="cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border)">💤 <strong>Ignorar parados:</strong> <span style="color:var(--accent)">{{ config_padrao.ignorar_sem_movimento_anos }} anos</span></div>
-      <div onclick="mostrarAjuda('facturas')" style="cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border)">🧾 <strong>Min. facturas p/ sugerir:</strong> <span style="color:var(--accent)">{{ config_padrao.min_facturas_sugerir }}</span></div>
-      <div onclick="mostrarAjuda('score')" style="cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border)">👥 <strong>Score relevancia</strong> <span style="color:var(--text-muted)">(clique para saber mais)</span></div>
-    </div>
-  </div>
-</div>
-</div>
-
 {% if not analise_feita %}
 <!-- Parameter explanation -->
 <div class="card" style="border-style:dashed">
