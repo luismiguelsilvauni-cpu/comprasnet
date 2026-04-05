@@ -2522,34 +2522,27 @@ def api_clientes():
     q = request.args.get('q','').strip()
     if not q or len(q) < 2:
         return jsonify([])
-    
     # Try local DB first
-    clientes = ClientePHC.query.filter(
-        ClientePHC.nome.ilike(f'%{q}%')
-    ).limit(10).all()
-    
+    clientes = ClientePHC.query.filter(ClientePHC.nome.ilike(f'%{q}%')).limit(10).all()
     if clientes:
         return jsonify([{'no': c.no, 'nome': c.nome} for c in clientes])
-    
-    # Fallback: query PHC directly
+    # Query PHC directly
     try:
         cfg_phc = ConfigPHC.query.first()
-        if cfg_phc and cfg_phc.ultima_sync:
+        if cfg_phc:
             from phc_sync import get_phc_connection
             conn = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT TOP 10 no, nome FROM PHC_Uniao..cl WHERE nome LIKE ? AND ISNULL(inactivo,0)=0 ORDER BY nome",
+                "SELECT no, nome FROM PHC_Uniao..cl WHERE nome LIKE ? AND ISNULL(inactivo,0)=0 ORDER BY nome",
                 (f'%{q}%',)
             )
-            rows = cursor.fetchall()
+            rows = [{'no': r[0], 'nome': (r[1] or '').strip()} for r in cursor.fetchmany(10)]
             conn.close()
-            return jsonify([{'no': r[0], 'nome': r[1]} for r in rows])
+            return jsonify(rows)
     except Exception as e:
-        app.logger.warning(f"PHC clientes search error: {e}")
-    
+        app.logger.warning(f"api_clientes PHC error: {e}")
     return jsonify([])
-
 
 @app.route('/roadmap')
 @login_required
@@ -2705,58 +2698,40 @@ def api_fornecedores():
         return jsonify([])
     # Try local FornecedorPHC table first
     try:
-        local = FornecedorPHC.query.filter(
-            FornecedorPHC.nome.ilike(f'%{q}%')
-        ).limit(10).all()
+        local = FornecedorPHC.query.filter(FornecedorPHC.nome.ilike(f'%{q}%')).limit(10).all()
         if local:
             return jsonify([{'no': f.no, 'nome': f.nome} for f in local])
     except Exception:
         pass
-    # Fallback: query PHC cl table directly (fornecedores are in cl with ncont)
+    # Query PHC cl table directly (fornecedores sao clientes com ncont)
     try:
         cfg_phc = ConfigPHC.query.first()
-        if cfg_phc and cfg_phc.ultima_sync:
+        if cfg_phc:
             from phc_sync import get_phc_connection
             conn = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
-            # Search in cl table - all entities including suppliers
+            # Search in fo (facturas compra) for supplier names
             cursor.execute(
-                "SELECT TOP 10 cl.no, cl.nome FROM PHC_Uniao..cl WHERE cl.nome LIKE ? AND ISNULL(cl.inactivo,0)=0 ORDER BY cl.nome",
+                "SELECT DISTINCT fo.no, fo.nome FROM PHC_Uniao..fo WHERE fo.nome LIKE ? AND fo.nome IS NOT NULL ORDER BY fo.nome",
                 (f'%{q}%',)
             )
-            rows = cursor.fetchall()
+            rows = [{'no': r[0], 'nome': (r[1] or '').strip()} for r in cursor.fetchmany(10)]
             conn.close()
             if rows:
-                return jsonify([{'no': r[0], 'nome': r[1]} for r in rows])
+                return jsonify(rows)
+            # Fallback to cl table
+            conn = get_phc_connection(cfg_phc)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT no, nome FROM PHC_Uniao..cl WHERE nome LIKE ? AND ISNULL(inactivo,0)=0 ORDER BY nome",
+                (f'%{q}%',)
+            )
+            rows = [{'no': r[0], 'nome': (r[1] or '').strip()} for r in cursor.fetchmany(10)]
+            conn.close()
+            return jsonify(rows)
     except Exception as e:
-        app.logger.warning(f"PHC fornecedores search error: {e}")
+        app.logger.warning(f"api_fornecedores PHC error: {e}")
     return jsonify([])
-
-
-def init_db():
-    """Run migrations then seed default admin. Safe to call on every startup."""
-    with app.app_context():
-        # 1. Apply any pending migrations (creates tables if first run)
-        try:
-            from flask_migrate import upgrade
-            upgrade(directory=os.path.join(os.path.dirname(__file__), 'migrations'))
-        except Exception:
-            # Fallback: create all tables directly (no migrations folder)
-            db.create_all()
-
-        # 2. Seed default admin if no users exist
-        try:
-            if not User.query.first():
-                db.session.add(User(
-                    username='admin', nome='Administrador',
-                    password_hash=generate_password_hash('admin123'),
-                    is_admin=True, departamento='Administração'))
-                db.session.commit()
-                print("✅ Utilizador admin criado  →  user: admin  /  pass: admin123")
-        except Exception as e:
-            print(f"⚠️  Erro ao criar admin: {e}")
-
-# ── ADMIN IA ──────────────────────────────────────────────────────────────────
 
 @app.route('/admin/ia', methods=['GET', 'POST'])
 @login_required
