@@ -109,6 +109,145 @@ document.getElementById('btnFornecedor').addEventListener('click', function(e) {
 });
 </script>
 
+
+<!-- Help modal -->
+<div id="ajudaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)fecharAjuda()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:520px;max-width:95vw;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div id="ajudaTitulo" style="font-size:15px;font-weight:700"></div>
+      <button onclick="fecharAjuda()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="ajudaConteudo" style="font-size:13px;line-height:1.7;color:var(--text-muted)"></div>
+  </div>
+</div>
+
+<script>
+const ajudas = {
+  anos: {
+    titulo: '📆 Mínimo de Anos de Histórico',
+    conteudo: `
+      <p>Este filtro ignora artigos cuja <strong>primeira venda registada foi há menos de N anos</strong>.</p>
+      <p><strong>Porquê?</strong> Um artigo vendido pela primeira vez há 6 meses não tem histórico suficiente para calcular uma média fiável. A média seria enganosa.</p>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin:12px 0">
+        <div style="font-weight:600;margin-bottom:6px">Exemplos:</div>
+        <div>✅ <strong>Mín. 2 anos:</strong> Artigo com 1ª venda em 2020 → analisado (5 anos de histórico)</div>
+        <div>❌ <strong>Mín. 2 anos:</strong> Artigo com 1ª venda em 2024 → ignorado (só 1 ano)</div>
+      </div>
+      <p><strong>Como escolher:</strong></p>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div>• <strong>1 ano</strong> — permissivo, inclui artigos novos</div>
+        <div>• <strong>2 anos</strong> — recomendado, garante sazonalidade completa</div>
+        <div>• <strong>3 anos</strong> — conservador, só artigos com histórico longo</div>
+      </div>
+    `
+  },
+  meses: {
+    titulo: '📊 Mínimo de Meses com Venda',
+    conteudo: `
+      <p>Ignora artigos que só venderam em <strong>menos de N meses distintos</strong> ao longo de todo o histórico.</p>
+      <p><strong>Porquê?</strong> Um artigo vendido apenas em 2 meses nos últimos 5 anos é provavelmente uma venda pontual, não um produto de rotação regular.</p>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin:12px 0">
+        <div style="font-weight:600;margin-bottom:6px">Exemplos (Mín. 3 meses):</div>
+        <div>✅ Vendeu em Jan/2020, Mar/2021, Set/2022, Fev/2023 → 4 meses → analisado</div>
+        <div>❌ Vendeu só em Mai/2021 e Jun/2023 → 2 meses → ignorado</div>
+      </div>
+      <p><strong>Como escolher:</strong></p>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div>• <strong>2 meses</strong> — permissivo</div>
+        <div>• <strong>3 meses</strong> — recomendado para maioria dos negócios</div>
+        <div>• <strong>6 meses</strong> — só artigos com venda consistente</div>
+      </div>
+    `
+  },
+  total: {
+    titulo: '🔢 Mínimo Total Vendido',
+    conteudo: `
+      <p>Ignora artigos cujo total vendido em todo o histórico é <strong>inferior a N unidades</strong>.</p>
+      <p><strong>Porquê?</strong> Se um artigo só vendeu 2 unidades em 5 anos, fazer stock não tem sentido económico — é uma compra/venda isolada.</p>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin:12px 0">
+        <div style="font-weight:600;margin-bottom:6px">Exemplos (Mín. 3 unidades):</div>
+        <div>✅ Vendeu 15 unidades no total → analisado</div>
+        <div>❌ Vendeu 1 unidade em 2021 e 1 em 2023 = 2 unidades → ignorado</div>
+      </div>
+      <p><strong>Como escolher:</strong></p>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div>• <strong>2-3 unidades</strong> — padrão para peças e componentes</div>
+        <div>• <strong>5-10 unidades</strong> — para materiais de consumo</div>
+        <div>• <strong>1 unidade</strong> — permissivo (inclui quase tudo)</div>
+      </div>
+    `
+  },
+  parados: {
+    titulo: '💤 Ignorar Artigos Parados',
+    conteudo: `
+      <p>Ignora artigos cuja <strong>última venda foi há mais de N anos</strong>.</p>
+      <p><strong>Porquê?</strong> Um artigo que não vende há 4 anos provavelmente foi descontinuado, substituído, ou perdeu procura. Fazer stock seria um erro.</p>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin:12px 0">
+        <div style="font-weight:600;margin-bottom:6px">Exemplos (Ignorar &gt; 3 anos):</div>
+        <div>✅ Última venda: Dezembro 2023 → activo (há ~16 meses) → analisado</div>
+        <div>❌ Última venda: Janeiro 2020 → parado há 5 anos → ignorado</div>
+      </div>
+      <p><strong>Como escolher:</strong></p>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div>• <strong>2 anos</strong> — agressivo, descarta mais artigos</div>
+        <div>• <strong>3 anos</strong> — recomendado</div>
+        <div>• <strong>5 anos</strong> — permissivo, inclui artigos de venda muito esporádica</div>
+      </div>
+    `
+  },
+  facturas: {
+    titulo: '🧾 Mínimo de Facturas para Sugerir Compra',
+    conteudo: `
+      <p>Mesmo que um artigo passe todos os outros filtros, só <strong>sugere encomenda se tiver N ou mais facturas</strong> no histórico.</p>
+      <p><strong>Porquê?</strong> Poucas facturas significa baixa consistência. Um artigo com 3 facturas em 5 anos pode ter sido uma encomenda especial, não procura regular. O EOQ calculado com dados escassos é pouco fiável.</p>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin:12px 0">
+        <div style="font-weight:600;margin-bottom:6px">Exemplos (Mín. 8 facturas):</div>
+        <div>✅ 15 facturas em 5 anos → sugestão de compra gerada</div>
+        <div>⚠️ 5 facturas → aparece na análise mas SEM sugestão de quantidade</div>
+        <div>❌ 2 facturas → ignorado como pouco relevante</div>
+      </div>
+      <p><strong>Como escolher:</strong></p>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div>• <strong>5 facturas</strong> — permissivo</div>
+        <div>• <strong>8 facturas</strong> — recomendado (aprox. 1-2 vendas/ano em 5 anos)</div>
+        <div>• <strong>12+ facturas</strong> — só artigos de venda muito regular</div>
+      </div>
+    `
+  },
+  score: {
+    titulo: '👥 Score de Relevância (0-100)',
+    conteudo: `
+      <p>O score avalia automaticamente se <strong>vale a pena fazer stock</strong> de um artigo, mesmo que tenha histórico suficiente.</p>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin:12px 0">
+        <div style="font-weight:600;margin-bottom:8px">Factores que reduzem o score:</div>
+        <div>🔴 <strong>-40 pontos:</strong> Só 1 cliente → risco de dependência total</div>
+        <div>🟡 <strong>-35 pontos:</strong> ≤ 2 facturas → venda isolada</div>
+        <div>🟡 <strong>-25 pontos:</strong> Preço &gt; 500€ → capital imobilizado elevado</div>
+        <div>🟡 <strong>-20 pontos:</strong> Consumo &lt; 1/ano → rotatividade muito baixa</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="padding:6px 10px;background:rgba(34,197,94,.1);border-radius:6px">✅ <strong>Score ≥ 70</strong> — Vale a pena fazer stock</div>
+        <div style="padding:6px 10px;background:rgba(245,158,11,.1);border-radius:6px">⚠️ <strong>Score 45-70</strong> — Avaliar caso a caso</div>
+        <div style="padding:6px 10px;background:rgba(239,68,68,.1);border-radius:6px">🚫 <strong>Score &lt; 45</strong> — Não recomendado fazer stock (sugestão = 0)</div>
+      </div>
+      <p style="margin-top:12px"><strong>Exemplo:</strong> Artigo vendido a 1 cliente (−40), só 2 facturas (−35), preço 600€ (−25) = Score 0 → não sugere compra.</p>
+    `
+  }
+};
+
+function mostrarAjuda(tipo) {
+  const a = ajudas[tipo];
+  if (!a) return;
+  document.getElementById('ajudaTitulo').textContent = a.titulo;
+  document.getElementById('ajudaConteudo').innerHTML = a.conteudo;
+  document.getElementById('ajudaModal').style.display = 'flex';
+}
+
+function fecharAjuda() {
+  document.getElementById('ajudaModal').style.display = 'none';
+}
+</script>
+
 {% endblock %}
 {% block page_title %}Reposição de Stock
 <!-- Progress modal -->
@@ -335,14 +474,33 @@ function mostrarProgresso() {
     </div>
 
     <div>
-      <div style="font-weight:600;color:var(--accent);margin-bottom:8px">🔍 Filtros de Relevância</div>
-      <div style="display:flex;flex-direction:column;gap:6px;color:var(--text-muted)">
-        <div>📆 <strong style="color:var(--text)">Mín. anos histórico:</strong> {{ config_padrao.min_anos_historico }} anos — ignora artigos com 1ª venda recente</div>
-        <div>📊 <strong style="color:var(--text)">Mín. meses com venda:</strong> {{ config_padrao.min_meses_com_venda }} meses — ignora vendas isoladas</div>
-        <div>🔢 <strong style="color:var(--text)">Mín. total vendido:</strong> {{ config_padrao.min_total_vendido }} unidades — ignora quantidades insignificantes</div>
-        <div>💤 <strong style="color:var(--text)">Ignorar parados:</strong> {{ config_padrao.ignorar_sem_movimento_anos }} anos — ignora sem movimento recente</div>
-        <div>🧾 <strong style="color:var(--text)">Mín. facturas p/ sugerir:</strong> {{ config_padrao.min_facturas_sugerir }} — só propõe com histórico sólido</div>
-        <div>👥 <strong style="color:var(--text)">Score relevância:</strong> considera nº clientes, frequência e preço</div>
+      <div style="font-weight:600;color:var(--accent);margin-bottom:8px">🔍 Filtros de Relevância <span style="font-size:11px;color:var(--text-muted);font-weight:400">(clique para saber mais)</span></div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+
+        <div class="filtro-item" onclick="mostrarAjuda('anos')" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid transparent;transition:all .2s" onmouseover="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'" onmouseout="this.style.background='';this.style.borderColor='transparent'">
+          <span style="font-size:13px">📆 <strong>Mín. anos histórico:</strong> <span style="color:var(--accent)">{{ config_padrao.min_anos_historico }} anos</span></span>
+        </div>
+
+        <div class="filtro-item" onclick="mostrarAjuda('meses')" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid transparent;transition:all .2s" onmouseover="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'" onmouseout="this.style.background='';this.style.borderColor='transparent'">
+          <span style="font-size:13px">📊 <strong>Mín. meses com venda:</strong> <span style="color:var(--accent)">{{ config_padrao.min_meses_com_venda }} meses</span></span>
+        </div>
+
+        <div class="filtro-item" onclick="mostrarAjuda('total')" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid transparent;transition:all .2s" onmouseover="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'" onmouseout="this.style.background='';this.style.borderColor='transparent'">
+          <span style="font-size:13px">🔢 <strong>Mín. total vendido:</strong> <span style="color:var(--accent)">{{ config_padrao.min_total_vendido }} unidades</span></span>
+        </div>
+
+        <div class="filtro-item" onclick="mostrarAjuda('parados')" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid transparent;transition:all .2s" onmouseover="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'" onmouseout="this.style.background=''>
+          <span style="font-size:13px">💤 <strong>Ignorar parados:</strong> <span style="color:var(--accent)">{{ config_padrao.ignorar_sem_movimento_anos }} anos</span></span>
+        </div>
+
+        <div class="filtro-item" onclick="mostrarAjuda('facturas')" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid transparent;transition:all .2s" onmouseover="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'" onmouseout="this.style.background='';this.style.borderColor='transparent'">
+          <span style="font-size:13px">🧾 <strong>Mín. facturas p/ sugerir:</strong> <span style="color:var(--accent)">{{ config_padrao.min_facturas_sugerir }}</span></span>
+        </div>
+
+        <div class="filtro-item" onclick="mostrarAjuda('score')" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid transparent;transition:all .2s" onmouseover="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'" onmouseout="this.style.background='';this.style.borderColor='transparent'">
+          <span style="font-size:13px">👥 <strong>Score de relevância</strong> <span style="color:var(--text-muted)">(clientes, frequência, preço)</span></span>
+        </div>
+
       </div>
     </div>
   </div>
