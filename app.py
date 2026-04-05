@@ -971,7 +971,11 @@ def apagar_utilizador(uid):
 @app.route('/changelog')
 @login_required
 def changelog():
-    return render_template('changelog.html')
+    try:
+        entries = ChangelogEntry.query.order_by(ChangelogEntry.criado_em.desc()).limit(100).all()
+    except Exception:
+        entries = []
+    return render_template('changelog.html', entries=entries)
 
 
 # ── EMAIL CONSULTA ─────────────────────────────────────────────────────────────
@@ -1716,6 +1720,19 @@ def update_apply():
         steps.append({'passo': 'Download (fallback pull)', 'ok': ok, 'msg': out[:200]})
         if not ok:
             return jsonify({'ok': False, 'steps': steps, 'msg': 'Falhou na actualização'})
+
+    # Auto-register commits in changelog and backlog
+    try:
+        log_r = subprocess.run(
+            ['git', 'log', 'ORIG_HEAD..HEAD', '--oneline', '--no-merges'],
+            capture_output=True, text=True, cwd=cwd
+        )
+        for line in log_r.stdout.strip().splitlines():
+            if ' ' in line:
+                commit_msg = line.split(' ', 1)[1].strip()
+                auto_registar_commit(commit_msg)
+    except Exception as e:
+        app.logger.warning(f"Auto-register error: {e}")
 
     # 3. pip install
     import sys
@@ -2517,6 +2534,16 @@ def roadmap():
     return render_template('roadmap.html')
 
 
+class ChangelogEntry(db.Model):
+    __tablename__ = 'changelog_entry'
+    id          = db.Column(db.Integer, primary_key=True)
+    versao      = db.Column(db.String(20), nullable=False)
+    descricao   = db.Column(db.Text, default='')
+    tipo        = db.Column(db.String(20), default='feat')  # feat/fix/chore
+    commit_msg  = db.Column(db.Text, default='')
+    criado_em   = db.Column(db.DateTime, default=datetime.now)
+
+
 class BacklogItem(db.Model):
     __tablename__ = 'backlog_item'
     id         = db.Column(db.Integer, primary_key=True)
@@ -2577,6 +2604,74 @@ def api_backlog_apagar(bid):
     db.session.delete(item)
     db.session.commit()
     return jsonify({'ok': True})
+
+
+def auto_registar_commit(commit_msg, versao=None):
+    """Called after git pull to auto-update backlog and changelog."""
+    try:
+        import re
+        from datetime import datetime as dt
+        
+        # Detect type from conventional commit prefix
+        tipo = 'chore'
+        if commit_msg.startswith('feat:'): tipo = 'feat'
+        elif commit_msg.startswith('fix:'): tipo = 'fix'
+        elif commit_msg.startswith('refactor:'): tipo = 'refactor'
+        
+        # Clean description
+        desc = re.sub(r'^(feat|fix|chore|refactor|docs|style|test):\s*', '', commit_msg).strip()
+        
+        # Auto-version based on date + count
+        if not versao:
+            today = dt.now().strftime('%Y.%m.%d')
+            existing = ChangelogEntry.query.filter(
+                ChangelogEntry.versao.like(f'{today}%')
+            ).count()
+            versao = f'{today}.{existing+1}'
+        
+        # Add to changelog
+        entry = ChangelogEntry(
+            versao=versao,
+            descricao=desc,
+            tipo=tipo,
+            commit_msg=commit_msg,
+        )
+        db.session.add(entry)
+        
+        # Try to match backlog items and mark done
+        if tipo in ('feat', 'fix'):
+            desc_lower = desc.lower()
+            items = BacklogItem.query.filter(BacklogItem.estado != 'done').all()
+            for item in items:
+                title_lower = item.titulo.lower()
+                # Simple keyword match - if 3+ words from title appear in commit
+                words = [w for w in title_lower.split() if len(w) > 4]
+                matches = sum(1 for w in words if w in desc_lower)
+                if matches >= 2:
+                    item.estado = 'done'
+                    item.atualizado_em = dt.now()
+                    app.logger.info(f"Auto-marked backlog item done: {item.titulo}")
+        
+        db.session.commit()
+        app.logger.info(f"Auto-registered commit: {versao} - {desc}")
+        return versao
+    except Exception as e:
+        app.logger.warning(f"auto_registar_commit error: {e}")
+        return None
+
+
+@app.route('/api/admin/registar-commit', methods=['POST'])
+@login_required  
+def api_registar_commit():
+    """Called by update script after git pull."""
+    d = request.get_json() or {}
+    commit_msg = d.get('commit_msg', '').strip()
+    versao = d.get('versao', '')
+    if not commit_msg:
+        return jsonify({'error': 'commit_msg required'}), 400
+    with app.app_context():
+        v = auto_registar_commit(commit_msg, versao or None)
+    return jsonify({'ok': True, 'versao': v})
 
 
 def init_db():
