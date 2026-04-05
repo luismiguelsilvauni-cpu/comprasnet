@@ -669,28 +669,22 @@ function sortSafe(col) {
   sortTabela(col);
 }
 function sortTabela(col) {
-  // Only sort when in a focused tab (not todos/sem_relevancia)
-  const activeTab = document.querySelector('[id^="tab-"].btn-primary')?.id?.replace('tab-','');
-  const bigTabs = ['todos','sem_relevancia'];
-  if (bigTabs.includes(activeTab)) {
-    alert('Ordenacao so disponivel nos separadores Criticos, Urgentes, Necessarios e OK.');
-    return;
-  }
   const tbody = document.querySelector('#tabelaReposicao tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
-  const hidden = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display === 'none');
+  if (!tbody) return;
   const dir = sortDir[col] = !(sortDir[col]);
-  const keyed = rows.map(r => {
-    const txt = (r.cells[col]?.textContent || '').trim();
-    const num = parseFloat(txt.replace(/[^0-9.-]/g,''));
-    return {r, txt, num};
-  });
-  keyed.sort((a, b) => {
-    if (!isNaN(a.num) && !isNaN(b.num)) return dir ? a.num-b.num : b.num-a.num;
-    return dir ? a.txt < b.txt ? -1 : 1 : a.txt > b.txt ? -1 : 1;
+  const allRows = Array.from(tbody.rows);
+  const visible = allRows.filter(r => r.style.display !== 'none');
+  const hidden  = allRows.filter(r => r.style.display === 'none');
+  visible.sort((a, b) => {
+    const at = (a.cells[col]?.innerText || '').trim();
+    const bt = (b.cells[col]?.innerText || '').trim();
+    const an = parseFloat(at); const bn = parseFloat(bt);
+    if (!isNaN(an) && !isNaN(bn)) return dir ? an-bn : bn-an;
+    return dir ? at < bt ? -1 : at > bt ? 1 : 0
+               : bt < at ? -1 : bt > at ? 1 : 0;
   });
   const frag = document.createDocumentFragment();
-  keyed.forEach(k => frag.appendChild(k.r));
+  visible.forEach(r => frag.appendChild(r));
   hidden.forEach(r => frag.appendChild(r));
   tbody.appendChild(frag);
 }
