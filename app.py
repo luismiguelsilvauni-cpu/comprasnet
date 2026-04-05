@@ -2516,6 +2516,7 @@ class BacklogItem(db.Model):
     tipo       = db.Column(db.String(20), default='medium')  # bug/small/medium/large/epic
     estado     = db.Column(db.String(20), default='pending') # pending/in_progress/done
     prioridade = db.Column(db.Integer, default=10)
+    notas      = db.Column(db.Text, default='')
     criado_em  = db.Column(db.DateTime, default=datetime.now)
     atualizado_em = db.Column(db.DateTime, default=datetime.now)
 
@@ -2526,7 +2527,7 @@ def api_backlog_list():
     items = BacklogItem.query.order_by(BacklogItem.prioridade, BacklogItem.id).all()
     return jsonify([{
         'id': i.id, 'titulo': i.titulo, 'descricao': i.descricao,
-        'tipo': i.tipo, 'estado': i.estado, 'prioridade': i.prioridade
+        'notas': i.notas, 'tipo': i.tipo, 'estado': i.estado, 'prioridade': i.prioridade
     } for i in items])
 
 @app.route('/api/backlog', methods=['POST'])
@@ -2536,6 +2537,7 @@ def api_backlog_criar():
     item = BacklogItem(
         titulo=d.get('titulo','').strip() or 'Sem titulo',
         descricao=d.get('descricao','').strip(),
+        notas=d.get('notas','').strip(),
         tipo=d.get('tipo','medium'),
         estado=d.get('estado','pending'),
         prioridade=int(d.get('prioridade',10)),
@@ -2551,6 +2553,7 @@ def api_backlog_atualizar(bid):
     d = request.get_json() or {}
     if 'titulo'     in d: item.titulo     = d['titulo']
     if 'descricao'  in d: item.descricao  = d['descricao']
+    if 'notas'      in d: item.notas      = d['notas']
     if 'tipo'       in d: item.tipo       = d['tipo']
     if 'estado'     in d: item.estado     = d['estado']
     if 'prioridade' in d: item.prioridade = int(d['prioridade'])

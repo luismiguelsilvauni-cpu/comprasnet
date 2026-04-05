@@ -8,21 +8,59 @@
 
 {% block content %}
 <style>
-.bl-section{margin-bottom:24px}.bl-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:10px}.bl-label::after{content:'';flex:1;height:1px;background:var(--border)}.bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}.bl-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .15s;position:relative}.bl-card:hover{border-color:var(--accent)}.bl-card:hover .bl-actions{opacity:1}.bl-actions{opacity:0;position:absolute;top:10px;right:10px;display:flex;gap:4px;transition:opacity .15s}.bl-btn-sm{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer;color:var(--text-muted)}.bl-btn-sm:hover{color:var(--text);border-color:var(--accent)}.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px;cursor:pointer}.b-bug{background:rgba(239,68,68,.15);color:#ef4444}.b-small{background:rgba(34,197,94,.15);color:#22c55e}.b-medium{background:rgba(245,158,11,.15);color:#f59e0b}.b-large{background:rgba(59,110,240,.15);color:var(--accent)}.b-epic{background:rgba(139,92,246,.15);color:#8b5cf6}.bl-info{flex:1;min-width:0}.bl-title{font-size:13px;font-weight:600;margin-bottom:3px;color:var(--text)}.bl-sub{font-size:12px;color:var(--text-muted);line-height:1.5}.bl-done{opacity:.45}.bl-done .bl-title{text-decoration:line-through}.stat-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;flex:1;min-width:80px;text-align:center}.stat-n{font-size:20px;font-weight:700}.stat-l{font-size:11px;color:var(--text-muted);margin-top:2px}.bl-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center}.bl-modal-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:480px;max-width:95vw}.bl-field{margin-bottom:14px}.bl-field label{font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px}.bl-field input,.bl-field select,.bl-field textarea{width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px}.bl-field textarea{min-height:70px;resize:vertical}
+.bl-section{margin-bottom:24px}
+.bl-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.bl-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.bl-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s}
+.bl-card:hover{border-color:var(--accent)}
+.bl-card-header{padding:12px 14px;display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.bl-card-body{display:none;padding:0 14px 14px;border-top:1px solid var(--border);margin-top:0}
+.bl-card.expanded .bl-card-body{display:block}
+.bl-card.expanded{border-color:var(--accent)}
+.bl-actions{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px}
+.b-bug{background:rgba(239,68,68,.15);color:#ef4444}
+.b-small{background:rgba(34,197,94,.15);color:#22c55e}
+.b-medium{background:rgba(245,158,11,.15);color:#f59e0b}
+.b-large{background:rgba(59,110,240,.15);color:var(--accent)}
+.b-epic{background:rgba(139,92,246,.15);color:#8b5cf6}
+.bl-info{flex:1;min-width:0}
+.bl-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.4}
+.bl-sub{font-size:12px;color:var(--text-muted);margin-top:3px;line-height:1.5}
+.bl-chevron{font-size:12px;color:var(--text-muted);transition:transform .2s;flex-shrink:0;margin-top:3px}
+.bl-card.expanded .bl-chevron{transform:rotate(90deg)}
+.bl-done .bl-title{text-decoration:line-through;opacity:.6}
+.stat-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;flex:1;min-width:80px;text-align:center}
+.stat-n{font-size:20px;font-weight:700}
+.stat-l{font-size:11px;color:var(--text-muted);margin-top:2px}
+/* Modal */
+.bl-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;padding:16px}
+.bl-modal-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.bl-field{margin-bottom:14px}
+.bl-field label{font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px}
+.bl-field input,.bl-field select,.bl-field textarea{width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px}
+.bl-field textarea{min-height:80px;resize:vertical}
+/* AI panel */
+.ai-panel{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:13px;line-height:1.7}
+.ai-panel strong{color:var(--accent)}
 </style>
 
 <div class="stat-row" id="statsRow"></div>
 <div id="backlogContainer"></div>
 
+<!-- Edit Modal -->
 <div class="bl-modal" id="blModal" onclick="if(event.target===this)fecharModal()">
   <div class="bl-modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
       <div style="font-size:15px;font-weight:700" id="blModalTitle">Novo Item</div>
-      <button onclick="fecharModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)">x</button>
+      <button onclick="fecharModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)">&#x2715;</button>
     </div>
     <input type="hidden" id="blId">
     <div class="bl-field"><label>Titulo</label><input id="blTitulo" type="text" placeholder="Nome da funcionalidade"></div>
     <div class="bl-field"><label>Descricao</label><textarea id="blDescricao" placeholder="Detalhe do que vai ser implementado"></textarea></div>
+    <div class="bl-field"><label>Notas / Criterios de aceitacao</label><textarea id="blNotas" placeholder="Requisitos, edge cases, referencias..."></textarea></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="bl-field"><label>Tipo</label>
         <select id="blTipo">
@@ -42,7 +80,18 @@
       </div>
     </div>
     <div class="bl-field"><label>Prioridade (1 = mais alta)</label><input id="blPrioridade" type="number" min="1" max="999" value="10"></div>
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+    <!-- AI assistant -->
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Agente IA</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button onclick="iaBacklog('melhorar')" class="btn btn-ghost btn-sm">Melhorar descricao</button>
+        <button onclick="iaBacklog('detalhar')" class="btn btn-ghost btn-sm">Detalhar requisitos</button>
+        <button onclick="iaBacklog('dividir')" class="btn btn-ghost btn-sm">Dividir em sub-tarefas</button>
+        <button onclick="iaBacklog('estimar')" class="btn btn-ghost btn-sm">Estimar complexidade</button>
+      </div>
+      <div id="iaPanel" style="display:none" class="ai-panel"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
       <button id="blBtnApagar" onclick="apagarItem()" class="btn btn-ghost btn-sm" style="display:none;color:var(--danger)">Apagar</button>
       <button onclick="fecharModal()" class="btn btn-ghost btn-sm">Cancelar</button>
       <button onclick="guardarItem()" class="btn btn-primary btn-sm">Guardar</button>
@@ -51,34 +100,189 @@
 </div>
 
 <script>
-const TIPOS={bug:{label:'Bug / Fix',cls:'b-bug',icon:'🔴'},small:{label:'Pequeno',cls:'b-small',icon:'🟢'},medium:{label:'Medio',cls:'b-medium',icon:'🟡'},large:{label:'Grande',cls:'b-large',icon:'🔵'},epic:{label:'Epica',cls:'b-epic',icon:'🟣'}};
-const SECCOES=[{key:'in_progress',label:'🔄 Em progresso'},{key:'bug',label:'🔴 Fixes',tipo:'bug'},{key:'small',label:'🟢 Pequenas melhorias',tipo:'small'},{key:'medium',label:'🟡 Medio prazo',tipo:'medium'},{key:'large',label:'🔵 Grandes funcionalidades',tipo:'large'},{key:'epic',label:'🟣 Epicas',tipo:'epic'},{key:'done',label:'Concluidas'}];
+const TIPOS={bug:{label:'Bug/Fix',cls:'b-bug',icon:'🔴'},small:{label:'Pequeno',cls:'b-small',icon:'🟢'},medium:{label:'Medio',cls:'b-medium',icon:'🟡'},large:{label:'Grande',cls:'b-large',icon:'🔵'},epic:{label:'Epica',cls:'b-epic',icon:'🟣'}};
+const SECCOES=[
+  {key:'in_progress',label:'🔄 Em progresso'},
+  {key:'bug',label:'🔴 Fixes pendentes',tipo:'bug'},
+  {key:'small',label:'🟢 Pequenas melhorias',tipo:'small'},
+  {key:'medium',label:'🟡 Medio prazo',tipo:'medium'},
+  {key:'large',label:'🔵 Grandes funcionalidades',tipo:'large'},
+  {key:'epic',label:'🟣 Epicas',tipo:'epic'},
+  {key:'done',label:'Concluidas'},
+];
 let items=[];
-async function carregarItems(){const r=await fetch('/api/backlog');items=await r.json();renderizar();}
+
+async function carregarItems(){
+  const r=await fetch('/api/backlog');
+  items=await r.json();
+  renderizar();
+}
+
 function renderizar(){
   const t={bug:0,small:0,medium:0,large:0,epic:0,done:0};
   items.forEach(i=>{if(i.estado==='done')t.done++;else t[i.tipo]=(t[i.tipo]||0)+1;});
-  document.getElementById('statsRow').innerHTML=[{n:t.bug,l:'Fixes',c:'#ef4444'},{n:t.small,l:'Pequenas',c:'#22c55e'},{n:t.medium,l:'Medias',c:'#f59e0b'},{n:t.large,l:'Grandes',c:'var(--accent)'},{n:t.epic,l:'Epicas',c:'#8b5cf6'},{n:t.done,l:'Concluidas',c:'var(--success)'}].map(s=>`<div class="stat-box"><div class="stat-n" style="color:${s.c}">${s.n}</div><div class="stat-l">${s.l}</div></div>`).join('');
+  document.getElementById('statsRow').innerHTML=[
+    {n:t.bug,l:'Fixes',c:'#ef4444'},{n:t.small,l:'Pequenas',c:'#22c55e'},
+    {n:t.medium,l:'Medias',c:'#f59e0b'},{n:t.large,l:'Grandes',c:'var(--accent)'},
+    {n:t.epic,l:'Epicas',c:'#8b5cf6'},{n:t.done,l:'Concluidas',c:'var(--success)'}
+  ].map(s=>`<div class="stat-box"><div class="stat-n" style="color:${s.c}">${s.n}</div><div class="stat-l">${s.l}</div></div>`).join('');
+
   let html='';
   SECCOES.forEach(sec=>{
-    let lista=sec.key==='done'?items.filter(i=>i.estado==='done'):sec.key==='in_progress'?items.filter(i=>i.estado==='in_progress'):items.filter(i=>i.tipo===sec.tipo&&i.estado==='pending');
+    let lista=sec.key==='done'?items.filter(i=>i.estado==='done')
+      :sec.key==='in_progress'?items.filter(i=>i.estado==='in_progress')
+      :items.filter(i=>i.tipo===sec.tipo&&i.estado==='pending');
     if(!lista.length)return;
     lista.sort((a,b)=>a.prioridade-b.prioridade);
     html+=`<div class="bl-section"><div class="bl-label">${sec.label}</div><div class="bl-grid">`;
     lista.forEach(item=>{
       const tp=TIPOS[item.tipo]||TIPOS.medium;
-      html+=`<div class="bl-card${item.estado==='done'?' bl-done':''}"><span class="badge ${tp.cls}" onclick="editarItem(${item.id})">${tp.icon} ${tp.label}</span><div class="bl-info"><div class="bl-title">${item.titulo}</div>${item.descricao?`<div class="bl-sub">${item.descricao}</div>`:''}</div><div class="bl-actions"><button class="bl-btn-sm" onclick="editarItem(${item.id})">editar</button>${item.estado!=='done'?`<button class="bl-btn-sm" onclick="marcarConcluido(${item.id})">done</button>`:''}</div></div>`;
+      const notas=item.notas?`<div style="margin-top:8px;padding:8px 10px;background:var(--surface);border-radius:6px;font-size:12px;color:var(--text-muted);border-left:2px solid var(--border)">${item.notas}</div>`:'';
+      html+=`<div class="bl-card${item.estado==='done'?' bl-done':''}" id="card-${item.id}">
+        <div class="bl-card-header" onclick="toggleCard(${item.id})">
+          <span class="badge ${tp.cls}">${tp.icon} ${tp.label}</span>
+          <div class="bl-info">
+            <div class="bl-title">${item.titulo}</div>
+            ${item.descricao?`<div class="bl-sub">${item.descricao.substring(0,80)}${item.descricao.length>80?'...':''}</div>`:''}
+          </div>
+          <span class="bl-chevron">&#9654;</span>
+        </div>
+        <div class="bl-card-body">
+          ${item.descricao?`<p style="font-size:13px;color:var(--text-muted);margin:12px 0">${item.descricao}</p>`:''}
+          ${notas}
+          <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--text-muted)">
+            <span>Prioridade: <strong style="color:var(--text)">${item.prioridade}</strong></span>
+            <span style="flex:1"></span>
+            <span style="padding:2px 8px;border-radius:4px;background:var(--surface2)">${item.estado}</span>
+          </div>
+          <div class="bl-actions">
+            <button onclick="editarItem(${item.id})" class="btn btn-ghost btn-sm">Editar</button>
+            ${item.estado!=='done'?`<button onclick="marcarConcluido(${item.id})" class="btn btn-ghost btn-sm">Marcar concluido</button>`:''}
+            ${item.estado==='pending'?`<button onclick="marcarEstado(${item.id},'in_progress')" class="btn btn-ghost btn-sm">Iniciar</button>`:''}
+            <button onclick="iaExpandir(${item.id})" class="btn btn-ghost btn-sm">Agente IA</button>
+          </div>
+          <div id="ia-inline-${item.id}" style="display:none;margin-top:10px" class="ai-panel"></div>
+        </div>
+      </div>`;
     });
     html+='</div></div>';
   });
   document.getElementById('backlogContainer').innerHTML=html||'<div style="text-align:center;padding:40px;color:var(--text-muted)">Sem itens. Clique em + Novo Item.</div>';
 }
-function abrirNovoItem(){document.getElementById('blModalTitle').textContent='Novo Item';document.getElementById('blId').value='';document.getElementById('blTitulo').value='';document.getElementById('blDescricao').value='';document.getElementById('blTipo').value='medium';document.getElementById('blEstado').value='pending';document.getElementById('blPrioridade').value=10;document.getElementById('blBtnApagar').style.display='none';document.getElementById('blModal').style.display='flex';}
-function editarItem(id){const item=items.find(i=>i.id===id);if(!item)return;document.getElementById('blModalTitle').textContent='Editar Item';document.getElementById('blId').value=id;document.getElementById('blTitulo').value=item.titulo;document.getElementById('blDescricao').value=item.descricao||'';document.getElementById('blTipo').value=item.tipo;document.getElementById('blEstado').value=item.estado;document.getElementById('blPrioridade').value=item.prioridade;document.getElementById('blBtnApagar').style.display='inline-flex';document.getElementById('blModal').style.display='flex';}
+
+function toggleCard(id){
+  const card=document.getElementById('card-'+id);
+  card.classList.toggle('expanded');
+}
+
+function abrirNovoItem(){
+  document.getElementById('blModalTitle').textContent='Novo Item';
+  document.getElementById('blId').value='';
+  document.getElementById('blTitulo').value='';
+  document.getElementById('blDescricao').value='';
+  document.getElementById('blNotas').value='';
+  document.getElementById('blTipo').value='medium';
+  document.getElementById('blEstado').value='pending';
+  document.getElementById('blPrioridade').value=10;
+  document.getElementById('blBtnApagar').style.display='none';
+  document.getElementById('iaPanel').style.display='none';
+  document.getElementById('blModal').style.display='flex';
+  setTimeout(()=>document.getElementById('blTitulo').focus(),100);
+}
+
+function editarItem(id){
+  const item=items.find(i=>i.id===id);
+  if(!item)return;
+  document.getElementById('blModalTitle').textContent='Editar Item';
+  document.getElementById('blId').value=id;
+  document.getElementById('blTitulo').value=item.titulo;
+  document.getElementById('blDescricao').value=item.descricao||'';
+  document.getElementById('blNotas').value=item.notas||'';
+  document.getElementById('blTipo').value=item.tipo;
+  document.getElementById('blEstado').value=item.estado;
+  document.getElementById('blPrioridade').value=item.prioridade;
+  document.getElementById('blBtnApagar').style.display='inline-flex';
+  document.getElementById('iaPanel').style.display='none';
+  document.getElementById('blModal').style.display='flex';
+}
+
 function fecharModal(){document.getElementById('blModal').style.display='none';}
-async function guardarItem(){const id=document.getElementById('blId').value;const dados={titulo:document.getElementById('blTitulo').value.trim(),descricao:document.getElementById('blDescricao').value.trim(),tipo:document.getElementById('blTipo').value,estado:document.getElementById('blEstado').value,prioridade:parseInt(document.getElementById('blPrioridade').value)||10};if(!dados.titulo){alert('Preencha o titulo.');return;}const r=await fetch(id?`/api/backlog/${id}`:'/api/backlog',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dados)});const d=await r.json();if(d.ok){fecharModal();carregarItems();}else alert('Erro: '+(d.error||'?'));}
-async function apagarItem(){const id=document.getElementById('blId').value;if(!id||!confirm('Apagar?'))return;const r=await fetch(`/api/backlog/${id}`,{method:'DELETE'});const d=await r.json();if(d.ok){fecharModal();carregarItems();}}
-async function marcarConcluido(id){await fetch(`/api/backlog/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado:'done'})});carregarItems();}
+
+async function guardarItem(){
+  const id=document.getElementById('blId').value;
+  const dados={
+    titulo:document.getElementById('blTitulo').value.trim(),
+    descricao:document.getElementById('blDescricao').value.trim(),
+    notas:document.getElementById('blNotas').value.trim(),
+    tipo:document.getElementById('blTipo').value,
+    estado:document.getElementById('blEstado').value,
+    prioridade:parseInt(document.getElementById('blPrioridade').value)||10
+  };
+  if(!dados.titulo){alert('Preencha o titulo.');return;}
+  const r=await fetch(id?`/api/backlog/${id}`:'/api/backlog',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dados)});
+  const d=await r.json();
+  if(d.ok){fecharModal();carregarItems();}
+  else alert('Erro: '+(d.error||'?'));
+}
+
+async function apagarItem(){
+  const id=document.getElementById('blId').value;
+  if(!id||!confirm('Apagar este item?'))return;
+  const r=await fetch(`/api/backlog/${id}`,{method:'DELETE'});
+  const d=await r.json();
+  if(d.ok){fecharModal();carregarItems();}
+}
+
+async function marcarConcluido(id){
+  await fetch(`/api/backlog/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado:'done'})});
+  carregarItems();
+}
+
+async function marcarEstado(id, estado){
+  await fetch(`/api/backlog/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado})});
+  carregarItems();
+}
+
+async function iaBacklog(modo){
+  const titulo=document.getElementById('blTitulo').value;
+  const desc=document.getElementById('blDescricao').value;
+  const tipo=document.getElementById('blTipo').value;
+  if(!titulo){alert('Preencha o titulo primeiro.');return;}
+  const panel=document.getElementById('iaPanel');
+  panel.style.display='block';
+  panel.innerHTML='<em style="color:var(--text-muted)">Agente a trabalhar...</em>';
+  const prompts={
+    melhorar:`Melhora a descricao desta tarefa de software para o ComprasNet (sistema de gestao de compras e stock PHC). Titulo: "${titulo}". Descricao actual: "${desc}". Tipo: ${tipo}. Responde com uma descricao melhorada, clara e concisa, em portugues de Portugal.`,
+    detalhar:`Para esta tarefa do ComprasNet, lista os criterios de aceitacao e requisitos tecnicos principais. Titulo: "${titulo}". Descricao: "${desc}". Responde em portugues de Portugal com uma lista estruturada.`,
+    dividir:`Divide esta tarefa do ComprasNet em sub-tarefas implementaveis. Titulo: "${titulo}". Descricao: "${desc}". Lista cada sub-tarefa com estimativa de complexidade (pequena/media/grande).`,
+    estimar:`Estima a complexidade de implementacao desta tarefa no ComprasNet (Flask/Python/SQLite/PHC). Titulo: "${titulo}". Descricao: "${desc}". Indica: complexidade (1-10), tempo estimado, riscos e dependencias.`
+  };
+  try{
+    const r=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:prompts[modo],provider:'auto',system:'Es um especialista em desenvolvimento de software. Responde sempre em portugues de Portugal de forma pratica e directa.'})});
+    const d=await r.json();
+    const txt=(d.response||d.error||'Sem resposta').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    panel.innerHTML=txt;
+  }catch(e){panel.innerHTML='Erro: '+e.message;}
+}
+
+async function iaExpandir(id){
+  const item=items.find(i=>i.id===id);
+  if(!item)return;
+  const panel=document.getElementById('ia-inline-'+id);
+  panel.style.display='block';
+  panel.innerHTML='<em style="color:var(--text-muted)">Agente a analisar...</em>';
+  try{
+    const r=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      message:`Analisa esta tarefa do backlog do ComprasNet e sugere como implementar. Titulo: "${item.titulo}". Descricao: "${item.descricao||''}". Tipo: ${item.tipo}. Responde em portugues de Portugal com: abordagem de implementacao, ficheiros a modificar (app.py, templates, modelos), e possiveis dificuldades.`,
+      provider:'auto',
+      system:'Es um especialista em Flask, Python, SQLite e sistemas ERP PHC. Responde em portugues de Portugal.'
+    })});
+    const d=await r.json();
+    const txt=(d.response||'Sem resposta').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    panel.innerHTML=txt;
+  }catch(e){panel.innerHTML='Erro: '+e.message;}
+}
+
 carregarItems();
 </script>
 {% endblock %}
