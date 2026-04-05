@@ -617,6 +617,18 @@ def analisar_artigo(ref):
                 ano, mes, total, nfat = row[0], row[1], float(row[2]), row[3]
                 vendas_por_mes[(ano, mes)] = total
                 vendas_lista.append({'ano':ano,'mes':mes,'total':total,'nfat':nfat})
+            # Fetch invoice detail
+            from reposicao import SQL_DETALHE_VENDAS
+            cursor.execute(SQL_DETALHE_VENDAS, ref, meses)
+            vendas_detalhe = []
+            for row in cursor.fetchall():
+                vendas_detalhe.append({
+                    'cliente_no':   row[0],
+                    'cliente_nome': (row[1] or '').strip(),
+                    'data':         row[2].strftime('%d/%m/%Y') if row[2] else '',
+                    'quantidade':   float(row[3]),
+                    'preco_venda':  float(row[4] or 0),
+                })
             # Diversity
             cursor.execute(SQL_DIVERSIDADE_ARTIGO, ref)
             row = cursor.fetchone()
@@ -677,7 +689,8 @@ def analisar_artigo(ref):
     return render_template('reposicao_artigo.html',
         artigo=artigo, result=result, vendas_lista=vendas_lista,
         periodo=periodo, config=config, score_info=score_info,
-        diversidade=diversidade, previsoes=previsoes)
+        diversidade=diversidade, previsoes=previsoes,
+        vendas_detalhe=vendas_detalhe if 'vendas_detalhe' in dir() else [])
 
 
 @app.route('/reposicao/lista')

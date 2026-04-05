@@ -76,6 +76,26 @@ GROUP BY fi.ref
 
 
 
+
+SQL_DETALHE_VENDAS = """
+SELECT
+    ft.no                           AS cliente_no,
+    cl.nome                         AS cliente_nome,
+    ft.fdata                        AS data,
+    fi.qtt                          AS quantidade,
+    ISNULL(fi.epv, 0)               AS preco_venda
+FROM fi
+INNER JOIN ft ON ft.ftstamp = fi.ftstamp
+LEFT JOIN cl ON cl.no = ft.no
+WHERE fi.ref = ?
+  AND ft.anulado = 0
+  AND ft.tipodoc = 1
+  AND ft.fdata >= DATEADD(month, -?, GETDATE())
+  AND fi.qtt IS NOT NULL
+  AND fi.qtt > 0
+ORDER BY ft.fdata DESC
+"""
+
 SQL_VENDAS_ARTIGO = """
 SELECT
     YEAR(ft.fdata)              AS ano,
