@@ -1491,8 +1491,12 @@ def api_chat():
     cfg_ia  = ConfigIA.query.first()
     cfg     = get_config_geral()
     # Allow caller to override system prompt (e.g. from backlog AI agent)
-    sistema = data.get('system') or (cfg.claude_chat_sistema if cfg else None) or \
-              'Es um assistente tecnico especializado em equipamentos e compras industriais. Responde sempre em portugues.'
+    _sys_override = data.get('system', '').strip()
+    if _sys_override:
+        sistema = _sys_override
+    else:
+        sistema = (cfg.claude_chat_sistema if cfg else None) or \
+                  'Es um assistente tecnico especializado em equipamentos e compras industriais. Responde sempre em portugues.'
 
     if not cfg_ia:
         return jsonify({'error': 'IA não configurada. Configure em Admin → Provedor IA.'}), 400
