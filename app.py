@@ -2107,7 +2107,7 @@ def api_criar_evento():
         tipo         = data.get('tipo','manual'),
         data_inicio  = parse_date(data.get('data_inicio')),
         data_fim     = parse_date(data.get('data_fim')),
-        hora         = data.get('hora','').strip() or None,
+        hora         = (data.get('hora') or '').strip() or None,
         descricao    = data.get('descricao','').strip(),
         artigos_json = json.dumps(data.get('artigos',[])),
         pedido_id    = data.get('pedido_id'),
