@@ -1,24 +1,33 @@
-"""fix_artigo_template.py - Adiciona historico de vendas com nr factura e cliente"""
+"""fix_artigo_template.py v3"""
 
 with open('templates/reposicao_artigo.html', 'r', encoding='utf-8') as f:
     src = f.read()
 
-# Check if already has the feature
-if 'view-detalhe' in src:
-    print("Template ja tem a funcionalidade. OK.")
-else:
-    # Add before {% endblock %}
-    new_section = '''
-<!-- Historico de Vendas com tabs -->
-{% if vendas_lista %}
-<div style="display:flex;gap:8px;margin-bottom:12px;margin-top:16px">
-  <button onclick="showTab('mensal')" id="tab-mensal" class="btn btn-primary btn-sm">Por Mes</button>
-  <button onclick="showTab('detalhe')" id="tab-detalhe" class="btn btn-ghost btn-sm">Por Factura / Cliente</button>
+print("Tamanho:", len(src))
+
+# Find the monthly history table and replace it
+# Look for the card that contains the monthly history
+marker = 'Nº Fact.'
+if marker in src:
+    # Find the enclosing card div
+    idx = src.find(marker)
+    # Go back to find the card start
+    card_start = src.rfind('<div class="card">', 0, idx)
+    # Find card end
+    card_end = src.find('</div>\n</div>', idx)
+    if card_end > 0:
+        card_end = card_end + len('</div>\n</div>')
+    
+    print(f"Card: {card_start} to {card_end}")
+    
+    new_section = '''<div style="display:flex;gap:8px;margin-bottom:12px">
+  <button onclick="showTab2('mensal')" id="tab2-mensal" class="btn btn-primary btn-sm">Por Mes</button>
+  <button onclick="showTab2('detalhe')" id="tab2-detalhe" class="btn btn-ghost btn-sm">Por Factura / Cliente</button>
 </div>
 
-<div id="view-mensal" class="card">
-  <div class="card-title">Historico Mensal de Vendas</div>
-  <div class="table-wrap" style="margin:0;max-height:350px;overflow-y:auto">
+<div id="view2-mensal" class="card">
+  <div class="card-title">Historico Mensal</div>
+  <div class="table-wrap" style="margin:0;max-height:320px;overflow-y:auto">
     <table>
       <thead><tr>
         <th>Mes/Ano</th>
@@ -33,11 +42,9 @@ else:
           <td class="mono" style="font-size:12px">{{ '%02d'|format(v.mes) }}/{{ v.ano }}</td>
           <td style="text-align:right;font-weight:600;font-family:monospace">{{ '%.1f'|format(v.total) }}</td>
           <td style="text-align:right;color:var(--text-muted)">{{ v.nfat }}</td>
-          <td>
-            {% if media_m > 0 %}{% set ratio = v.total / media_m %}
+          <td>{% if media_m > 0 %}{% set ratio = v.total / media_m %}
             <span style="font-size:11px;color:var(--text-muted)">{{ '%+.0f'|format((ratio-1)*100) }}%</span>
-            {% else %}-{% endif %}
-          </td>
+          {% else %}-{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -45,10 +52,10 @@ else:
   </div>
 </div>
 
-<div id="view-detalhe" class="card" style="display:none;margin-top:0">
+<div id="view2-detalhe" class="card" style="display:none">
   <div class="card-title">Detalhe por Factura / Cliente</div>
   {% if vendas_detalhe %}
-  <div class="table-wrap" style="margin:0;max-height:350px;overflow-y:auto">
+  <div class="table-wrap" style="margin:0;max-height:320px;overflow-y:auto">
     <table>
       <thead><tr>
         <th>Data</th>
@@ -64,38 +71,39 @@ else:
           <td class="mono" style="font-size:12px;color:var(--accent)">{{ v.num_fatura }}</td>
           <td style="font-size:12px">{{ (v.cliente_nome or 'N/D')[:35] }}</td>
           <td style="text-align:right;font-weight:600;font-family:monospace">{{ '%.1f'|format(v.quantidade) }}</td>
-          <td style="text-align:right;font-size:12px;color:var(--text-muted)">
-            {% if v.preco_venda %}{{ '%.2f'|format(v.preco_venda) }}EUR{% else %}-{% endif %}
-          </td>
+          <td style="text-align:right;font-size:12px;color:var(--text-muted)">{% if v.preco_venda %}{{ '%.2f'|format(v.preco_venda) }}EUR{% else %}-{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-  <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Sem dados de detalhe (PHC nao ligado)</div>
+  <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Sem dados (PHC nao ligado ou sem vendas)</div>
   {% endif %}
 </div>
 
 <script>
-function showTab(tab) {
-  document.getElementById('view-mensal').style.display = tab==='mensal' ? '' : 'none';
-  document.getElementById('view-detalhe').style.display = tab==='detalhe' ? '' : 'none';
-  document.getElementById('tab-mensal').className = 'btn btn-sm ' + (tab==='mensal' ? 'btn-primary' : 'btn-ghost');
-  document.getElementById('tab-detalhe').className = 'btn btn-sm ' + (tab==='detalhe' ? 'btn-primary' : 'btn-ghost');
+function showTab2(tab) {
+  document.getElementById('view2-mensal').style.display = tab==='mensal' ? '' : 'none';
+  document.getElementById('view2-detalhe').style.display = tab==='detalhe' ? '' : 'none';
+  document.getElementById('tab2-mensal').className = 'btn btn-sm ' + (tab==='mensal' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('tab2-detalhe').className = 'btn btn-sm ' + (tab==='detalhe' ? 'btn-primary' : 'btn-ghost');
 }
-</script>
-{% endif %}
-
-'''
-    src = src.replace('\n{% endblock %}', new_section + '\n{% endblock %}')
-    print("OK: Secção adicionada")
+</script>'''
+    
+    src = src[:card_start] + new_section + src[card_end:]
+    print("OK: Replaced card section")
+else:
+    print("Marker not found, looking for alternative...")
+    idx = src.find('vendas_lista')
+    print(f"vendas_lista at: {idx}")
+    if idx > 0:
+        print(repr(src[idx-100:idx+100]))
 
 with open('templates/reposicao_artigo.html', 'w', encoding='utf-8') as f:
     f.write(src)
 
 with open('templates/reposicao_artigo.html', encoding='utf-8') as f:
     check = f.read()
-print("view-detalhe:", 'view-detalhe' in check)
-print("num_fatura:", 'num_fatura' in check)
 print("Nr. Factura:", 'Nr. Factura' in check)
+print("view2-detalhe:", 'view2-detalhe' in check)
