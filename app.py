@@ -25,6 +25,15 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Por favor faça login para aceder.'
 
+@app.before_request
+def refresh_session():
+    """Keep session alive on every request."""
+    from flask_login import current_user
+    if current_user.is_authenticated:
+        session.permanent = True
+        session.modified = True
+
+
 @login_manager.unauthorized_handler
 def handle_unauthorized():
     """Return JSON for API calls, redirect for normal pages."""

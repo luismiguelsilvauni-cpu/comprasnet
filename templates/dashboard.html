@@ -356,11 +356,14 @@ function guardarEvento() {
   };
   const url = id ? `/api/calendario/eventos/${id}` : '/api/calendario/eventos';
   fetch(url, {method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados)})
-    .then(r=>{
+    .then(async r=>{
       if(r.status===401||r.status===302){ alert('Sessão expirada. A recarregar...'); location.reload(); return null; }
-      return r.json();
-    }).then(d=>{ if(!d) return; if(d.ok){fecharEvModal();window._calInit=false;carregarCalendario();} else alert('Erro: '+(d.error||'?')); })
-    .catch(e=>alert('Erro: '+e));
+      const ct = r.headers.get('content-type')||'';
+      if(!ct.includes('application/json')){ alert('Erro de sessão. A recarregar...'); location.reload(); return null; }
+      const d = await r.json();
+      if(d.ok){fecharEvModal();window._calInit=false;carregarCalendario();} else alert('Erro: '+(d.error||'?'));
+    })
+    .catch(e=>alert('Erro ao guardar: '+e));
 }
 
 function apagarEvento() {
