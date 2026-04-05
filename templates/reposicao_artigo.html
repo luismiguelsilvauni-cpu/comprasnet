@@ -209,7 +209,35 @@
 <!-- Histórico mês a mês -->
 {% if vendas_lista %}
 <div class="card">
-  <div class="card-title">📅 Histórico Mensal de Vendas</div>
+  <div class="card-title">📅 Histórico de Vendas</div>
+  {% if vendas_detalhe %}
+  <div class="table-wrap" style="margin:0;max-height:400px;overflow-y:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Nº Factura</th>
+          <th>Cliente</th>
+          <th style="text-align:right">Qtd.</th>
+          <th style="text-align:right">P. Venda</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vendas_detalhe %}
+        <tr>
+          <td class="mono" style="font-size:12px">{{ v.data }}</td>
+          <td class="mono" style="font-size:12px;color:var(--accent)">{{ v.num_fatura }}</td>
+          <td style="font-size:12px">{{ (v.cliente_nome or 'N/D')[:40] }}</td>
+          <td style="text-align:right;font-weight:600;font-family:monospace">{{ '%.1f'|format(v.quantidade) }}</td>
+          <td style="text-align:right;font-size:12px;color:var(--text-muted)">
+            {% if v.preco_venda %}{{ '%.2f'|format(v.preco_venda) }}€{% else %}-{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
   <div class="table-wrap" style="margin:0;max-height:350px;overflow-y:auto">
     <table>
       <thead>
