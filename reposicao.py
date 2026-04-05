@@ -79,7 +79,7 @@ GROUP BY fi.ref
 
 SQL_DETALHE_VENDAS = """
 SELECT
-    ft.no                           AS cliente_no,
+    ft.no                           AS num_fatura,
     cl.nome                         AS cliente_nome,
     ft.fdata                        AS data,
     fi.qtt                          AS quantidade,

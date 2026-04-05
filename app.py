@@ -623,7 +623,7 @@ def analisar_artigo(ref):
             vendas_detalhe = []
             for row in cursor.fetchall():
                 vendas_detalhe.append({
-                    'cliente_no':   row[0],
+                    'num_fatura':   str(row[0]) if row[0] else '-',
                     'cliente_nome': (row[1] or '').strip(),
                     'data':         row[2].strftime('%d/%m/%Y') if row[2] else '',
                     'quantidade':   float(row[3]),
