@@ -317,16 +317,38 @@ function mostrarProgresso() {
 {% endif %}
 
 {% if not analise_feita %}
-<!-- Instructions -->
-<div class="card" style="text-align:center;padding:40px;border-style:dashed">
-  <div style="font-size:48px;margin-bottom:16px">📊</div>
-  <div style="font-size:16px;font-weight:600;margin-bottom:8px">Análise de Reposição</div>
-  <div style="font-size:13px;color:var(--text-muted);max-width:500px;margin:0 auto 20px">
-    Analisa as vendas dos últimos <strong>{{ config_padrao.meses_historico }} meses</strong> para todos os artigos,
-    compara com o stock actual e determina quais precisam de ser encomendados.
-    Ignora automaticamente artigos sem histórico relevante.
+<!-- Parameter explanation -->
+<div class="card" style="border-style:dashed">
+  <div class="card-title">📋 Como funciona a análise</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px">
+
+    <div>
+      <div style="font-weight:600;color:var(--accent);margin-bottom:8px">⚙️ Parâmetros de Cálculo</div>
+      <div style="display:flex;flex-direction:column;gap:6px;color:var(--text-muted)">
+        <div>📅 <strong style="color:var(--text)">Histórico:</strong> últimos {{ config_padrao.meses_historico }} meses ({{ (config_padrao.meses_historico/12)|round(1) }} anos)</div>
+        <div>🚚 <strong style="color:var(--text)">Lead time:</strong> {{ config_padrao.lead_time_dias }} dias — prazo médio de entrega</div>
+        <div>🛡️ <strong style="color:var(--text)">Factor segurança:</strong> {{ config_padrao.fator_seguranca }}× — margem extra sobre o ROP</div>
+        <div>📦 <strong style="color:var(--text)">Cobertura alvo:</strong> {{ config_padrao.meses_cobertura }} meses — stock a encomendar</div>
+        <div>💶 <strong style="color:var(--text)">Custo encomenda:</strong> {{ config_padrao.custo_encomenda }}€ — custo fixo por encomenda (EOQ)</div>
+        <div>📉 <strong style="color:var(--text)">Taxa de posse:</strong> {{ (config_padrao.taxa_posse_anual*100)|round(1) }}%/ano — custo de guardar stock</div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-weight:600;color:var(--accent);margin-bottom:8px">🔍 Filtros de Relevância</div>
+      <div style="display:flex;flex-direction:column;gap:6px;color:var(--text-muted)">
+        <div>📆 <strong style="color:var(--text)">Mín. anos histórico:</strong> {{ config_padrao.min_anos_historico }} anos — ignora artigos com 1ª venda recente</div>
+        <div>📊 <strong style="color:var(--text)">Mín. meses com venda:</strong> {{ config_padrao.min_meses_com_venda }} meses — ignora vendas isoladas</div>
+        <div>🔢 <strong style="color:var(--text)">Mín. total vendido:</strong> {{ config_padrao.min_total_vendido }} unidades — ignora quantidades insignificantes</div>
+        <div>💤 <strong style="color:var(--text)">Ignorar parados:</strong> {{ config_padrao.ignorar_sem_movimento_anos }} anos — ignora sem movimento recente</div>
+        <div>🧾 <strong style="color:var(--text)">Mín. facturas p/ sugerir:</strong> {{ config_padrao.min_facturas_sugerir }} — só propõe com histórico sólido</div>
+        <div>👥 <strong style="color:var(--text)">Score relevância:</strong> considera nº clientes, frequência e preço</div>
+      </div>
+    </div>
   </div>
-  <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-primary">🔍 Iniciar Análise</a>
+  <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted)">
+    💡 Ajuste os parâmetros acima e clique <strong>🔍 Guardar e Analisar</strong> para correr a análise.
+  </div>
 </div>
 
 {% else %}
