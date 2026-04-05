@@ -2293,6 +2293,8 @@ def reposicao_por_fornecedor():
             rows = cursor.fetchall()
             print(f'[DEBUG] Supplier rows fetched: {len(rows)}')
             for ref, forn_nome, forn_no in rows:
+                ref = (ref or '').strip()
+                if not ref: continue
                 if ref not in contagens:
                     contagens[ref] = {}
                 key = str(forn_no)
@@ -2325,8 +2327,7 @@ def reposicao_por_fornecedor():
     sem_fornecedor = []
     for r in precisam:
         ref_key = r['referencia'].strip()
-        forn = fornecedor_por_ref.get(ref_key) or fornecedor_por_ref.get(r['referencia'])
-        forn = forn  # use stripped lookup
+        forn = fornecedor_por_ref.get(ref_key)
         if forn:
             key = forn['nome']
             if key not in por_fornecedor:

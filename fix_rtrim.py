@@ -1,20 +1,34 @@
-"""fix_rtrim.py - Adds RTRIM to fn.ref query"""
+"""fix_rtrim.py - Force strip on supplier ref keys"""
 
 with open('app.py', 'r', encoding='utf-8') as f:
     src = f.read()
 
-old = '"SELECT fn.ref, fo.nome, fo.no"'
-new = '"SELECT RTRIM(fn.ref) AS ref, fo.nome, fo.no"'
+fixes = 0
 
-if old in src:
-    src = src.replace(old, new)
-    print("OK: RTRIM added to SELECT")
+# Fix 1: strip refs when building dict
+old1 = "for ref, forn_nome, forn_no in rows:\n                if ref not in contagens:"
+new1 = "for ref, forn_nome, forn_no in rows:\n                ref = (ref or '').strip()\n                if not ref: continue\n                if ref not in contagens:"
+if old1.replace('\\n', '\n') in src.replace('\n', '\n'):
+    pass
+
+# Force strip in building dict - find the loop
+import re
+old = r"for ref, forn_nome, forn_no in rows:.*?if ref not in contagens:"
+def replacer(m):
+    return "for ref, forn_nome, forn_no in rows:\n                ref = (ref or '').strip()\n                if not ref: continue\n                if ref not in contagens:"
+
+if "ref = (ref or '').strip()" not in src:
+    src = re.sub(
+        r"for ref, forn_nome, forn_no in rows:
+                if ref not in contagens:",
+        "for ref, forn_nome, forn_no in rows:\n                ref = (ref or '').strip()\n                if not ref: continue\n                if ref not in contagens:",
+        src
+    )
+    fixes += 1
+    print("OK: strip added to ref loop")
 else:
-    print("Already has RTRIM or query not found")
-    idx = src.find('SQL_FORN_SIMPLES')
-    if idx > 0:
-        print("Current:", repr(src[idx:idx+150]))
+    print("OK: strip already present")
 
 with open('app.py', 'w', encoding='utf-8') as f:
     f.write(src)
-print("Done. Restart server.")
+print(f"Done ({fixes} fixes). Restart server.")
