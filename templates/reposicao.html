@@ -555,16 +555,16 @@ function fecharAjuda() {
       <thead>
         <tr>
           <th></th>
-          <th onclick="sortTabela(1)" style="cursor:pointer" title="Ordenar">Referência ⇅</th>
-          <th onclick="sortTabela(2)" style="cursor:pointer" title="Ordenar">Designação ⇅</th>
-          <th onclick="sortTabela(3)" style="cursor:pointer;text-align:right" title="Ordenar">Stock ⇅</th>
-          <th onclick="sortTabela(4)" style="cursor:pointer;text-align:right" title="Ordenar">Média/Ano ⇅</th>
+          <th id="th1" onclick="sortSafe(1)" style="cursor:pointer;user-select:none" title="Ordenar">Referência ⇅</th>
+          <th id="th2" onclick="sortSafe(2)" style="cursor:pointer;user-select:none" title="Ordenar">Designação ⇅</th>
+          <th id="th3" onclick="sortSafe(3)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Stock ⇅</th>
+          <th id="th4" onclick="sortSafe(4)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Média/Ano ⇅</th>
           <th style="text-align:right">Clientes</th>
-          <th onclick="sortTabela(6)" style="cursor:pointer;text-align:right" title="Ordenar">Score ⇅</th>
-          <th onclick="sortTabela(7)" style="cursor:pointer;text-align:right" title="Ordenar">Dias Cob. ⇅</th>
+          <th id="th6" onclick="sortSafe(6)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Score ⇅</th>
+          <th id="th7" onclick="sortSafe(7)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Dias Cob. ⇅</th>
           <th style="text-align:right">ROP</th>
           <th style="text-align:right">C. Posse/un</th>
-          <th onclick="sortTabela(10)" style="cursor:pointer;text-align:right" title="Ordenar">Qtd. Sug. ⇅</th>
+          <th id="th10" onclick="sortSafe(10)" style="cursor:pointer;user-select:none;text-align:right" title="Ordenar">Qtd. Sug. ⇅</th>
           <th style="text-align:right">Meses/Período</th>
         </tr>
       </thead>
@@ -660,6 +660,14 @@ function aplicarFiltros() {
   });
 }
 
+function sortSafe(col) {
+  const visible = document.querySelectorAll('#tabelaReposicao tbody tr:not([style*="display: none"])').length;
+  if (visible > 500) {
+    alert('Seleccione um filtro (Criticos, Urgentes, etc.) antes de ordenar.\nA ordenar ' + visible + ' linhas pode bloquear o browser.');
+    return;
+  }
+  sortTabela(col);
+}
 function sortTabela(col) {
   const tbody = document.querySelector('#tabelaReposicao tbody');
   // Only sort visible rows for speed
