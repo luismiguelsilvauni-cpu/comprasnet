@@ -2,109 +2,83 @@
 {% block title %}Backlog · ComprasNet{% endblock %}
 {% block page_title %}Backlog{% endblock %}
 
+{% block topbar_actions %}
+  <button onclick="abrirNovoItem()" class="btn btn-primary btn-sm">+ Novo Item</button>
+{% endblock %}
+
 {% block content %}
 <style>
-.road-section { margin-bottom:28px }
-.road-label { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:10px }
-.road-label::after { content:'';flex:1;height:1px;background:var(--border) }
-.road-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px }
-.road-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .15s }
-.road-card:hover { border-color:var(--accent) }
-.road-badge { font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px }
-.b-bug    { background:rgba(239,68,68,.15);color:#ef4444 }
-.b-small  { background:rgba(34,197,94,.15);color:#22c55e }
-.b-medium { background:rgba(245,158,11,.15);color:#f59e0b }
-.b-large  { background:rgba(59,110,240,.15);color:var(--accent) }
-.b-epic   { background:rgba(139,92,246,.15);color:#8b5cf6 }
-.road-info { flex:1 }
-.road-title { font-size:13px;font-weight:600;margin-bottom:3px;color:var(--text) }
-.road-sub { font-size:12px;color:var(--text-muted);line-height:1.5 }
-.road-done { opacity:.45 }
-.road-done .road-title { text-decoration:line-through }
-.stat-row { display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap }
-.stat-box { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:100px;text-align:center }
-.stat-n { font-size:22px;font-weight:700;color:var(--text) }
-.stat-l { font-size:11px;color:var(--text-muted);margin-top:2px }
+.bl-section{margin-bottom:24px}.bl-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:10px}.bl-label::after{content:'';flex:1;height:1px;background:var(--border)}.bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}.bl-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .15s;position:relative}.bl-card:hover{border-color:var(--accent)}.bl-card:hover .bl-actions{opacity:1}.bl-actions{opacity:0;position:absolute;top:10px;right:10px;display:flex;gap:4px;transition:opacity .15s}.bl-btn-sm{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer;color:var(--text-muted)}.bl-btn-sm:hover{color:var(--text);border-color:var(--accent)}.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px;cursor:pointer}.b-bug{background:rgba(239,68,68,.15);color:#ef4444}.b-small{background:rgba(34,197,94,.15);color:#22c55e}.b-medium{background:rgba(245,158,11,.15);color:#f59e0b}.b-large{background:rgba(59,110,240,.15);color:var(--accent)}.b-epic{background:rgba(139,92,246,.15);color:#8b5cf6}.bl-info{flex:1;min-width:0}.bl-title{font-size:13px;font-weight:600;margin-bottom:3px;color:var(--text)}.bl-sub{font-size:12px;color:var(--text-muted);line-height:1.5}.bl-done{opacity:.45}.bl-done .bl-title{text-decoration:line-through}.stat-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;flex:1;min-width:80px;text-align:center}.stat-n{font-size:20px;font-weight:700}.stat-l{font-size:11px;color:var(--text-muted);margin-top:2px}.bl-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center}.bl-modal-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:480px;max-width:95vw}.bl-field{margin-bottom:14px}.bl-field label{font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px}.bl-field input,.bl-field select,.bl-field textarea{width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px}.bl-field textarea{min-height:70px;resize:vertical}
 </style>
 
-<!-- Summary stats -->
-<div class="stat-row">
-  <div class="stat-box"><div class="stat-n" style="color:#ef4444">2</div><div class="stat-l">Bugs / Fixes</div></div>
-  <div class="stat-box"><div class="stat-n" style="color:#22c55e">3</div><div class="stat-l">Pequenas</div></div>
-  <div class="stat-box"><div class="stat-n" style="color:#f59e0b">5</div><div class="stat-l">Médias</div></div>
-  <div class="stat-box"><div class="stat-n" style="color:var(--accent)">2</div><div class="stat-l">Grandes</div></div>
-  <div class="stat-box"><div class="stat-n" style="color:#8b5cf6">1</div><div class="stat-l">Épicas</div></div>
-  <div class="stat-box"><div class="stat-n" style="color:var(--success)">✓ 12</div><div class="stat-l">Concluídas</div></div>
-</div>
+<div class="stat-row" id="statsRow"></div>
+<div id="backlogContainer"></div>
 
-<!-- CONCLUÍDAS -->
-<div class="road-section">
-  <div class="road-label">✅ Concluídas recentemente</div>
-  <div class="road-grid">
-    <div class="road-card road-done"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Calendário — gravar evento</div><div class="road-sub">Erro None.strip e sessão corrigidos</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Calendário multi-dia</div><div class="road-sub">Eventos com início/fim mostram barra contínua</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Pesquisa de fornecedor no evento</div><div class="road-sub">Campo com sugestões do PHC</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Reposição server-side</div><div class="road-sub">Paginação, pesquisa e ordenação rápidas</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Análise IA por artigo</div><div class="road-sub">Recomendação com justificação detalhada</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Histórico vendas com nº factura</div><div class="road-sub">Data, factura e cliente por linha</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Ajuda interactiva nos filtros</div><div class="road-sub">Modal com exemplos para cada parâmetro</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Agrupamento por fornecedor</div><div class="road-sub">Artigos a encomendar agrupados por fornecedor PHC</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Barra de estado "Por Fornecedor"</div><div class="road-sub">Loading modal funcional</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Ligação PHC tabela fn/fo</div><div class="road-sub">Fornecedor real por artigo via facturas de compra</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">API reposição com paginação</div><div class="road-sub">Endpoint server-side com filtros e sort</div></div></div>
-    <div class="road-card road-done"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Modal loading global</div><div class="road-sub">Barra de progresso em base.html</div></div></div>
+<div class="bl-modal" id="blModal" onclick="if(event.target===this)fecharModal()">
+  <div class="bl-modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div style="font-size:15px;font-weight:700" id="blModalTitle">Novo Item</div>
+      <button onclick="fecharModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)">x</button>
+    </div>
+    <input type="hidden" id="blId">
+    <div class="bl-field"><label>Titulo</label><input id="blTitulo" type="text" placeholder="Nome da funcionalidade"></div>
+    <div class="bl-field"><label>Descricao</label><textarea id="blDescricao" placeholder="Detalhe do que vai ser implementado"></textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="bl-field"><label>Tipo</label>
+        <select id="blTipo">
+          <option value="bug">Bug / Fix</option>
+          <option value="small">Pequeno</option>
+          <option value="medium" selected>Medio</option>
+          <option value="large">Grande</option>
+          <option value="epic">Epica</option>
+        </select>
+      </div>
+      <div class="bl-field"><label>Estado</label>
+        <select id="blEstado">
+          <option value="pending">Pendente</option>
+          <option value="in_progress">Em progresso</option>
+          <option value="done">Concluido</option>
+        </select>
+      </div>
+    </div>
+    <div class="bl-field"><label>Prioridade (1 = mais alta)</label><input id="blPrioridade" type="number" min="1" max="999" value="10"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+      <button id="blBtnApagar" onclick="apagarItem()" class="btn btn-ghost btn-sm" style="display:none;color:var(--danger)">Apagar</button>
+      <button onclick="fecharModal()" class="btn btn-ghost btn-sm">Cancelar</button>
+      <button onclick="guardarItem()" class="btn btn-primary btn-sm">Guardar</button>
+    </div>
   </div>
 </div>
 
-<!-- BUGS / FIXES -->
-<div class="road-section">
-  <div class="road-label">🔴 Fixes pendentes</div>
-  <div class="road-grid">
-    <div class="road-card"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Auto-update ao iniciar servidor</div><div class="road-sub">Servidor puxa actualizações do GitHub antes de arrancar, sem intervenção manual</div></div></div>
-    <div class="road-card"><span class="road-badge b-bug">Fix</span><div class="road-info"><div class="road-title">Histórico de versões desactualizado</div><div class="road-sub">Changelog parado na v1.8 — actualizar com todas as funcionalidades recentes</div></div></div>
-  </div>
-</div>
-
-<!-- PEQUENAS -->
-<div class="road-section">
-  <div class="road-label">🟢 Pequenas melhorias</div>
-  <div class="road-grid">
-    <div class="road-card"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Editor de logotipo melhorado</div><div class="road-sub">Controlo de posição, tamanho, filtros e preview em tempo real</div></div></div>
-    <div class="road-card"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Assinatura de email</div><div class="road-sub">Editor de assinatura com suporte a imagens para emails de consulta</div></div></div>
-    <div class="road-card"><span class="road-badge b-small">Pequeno</span><div class="road-info"><div class="road-title">Score e alertas no artigo</div><div class="road-sub">Badge de score mais visual e alertas de mono-cliente, preço alto</div></div></div>
-  </div>
-</div>
-
-<!-- MÉDIAS -->
-<div class="road-section">
-  <div class="road-label">🟡 Médio prazo</div>
-  <div class="road-grid">
-    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Email de consulta ao fornecedor</div><div class="road-sub">Janela com assunto, designações, quantidades e envio directo. Gerada a partir da lista de compras de um fornecedor</div></div></div>
-    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Menu Embarcações</div><div class="road-sub">Associar cliente + dados do motor (marca, modelo, nº série) e caixa redutora. Listagem de artigos frequentes por embarcação</div></div></div>
-    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Menu Técnico — Catálogos PDF</div><div class="road-sub">Upload de PDFs de peças associados a nº de série. Pesquisa por nº série → catálogos disponíveis, visualização e download</div></div></div>
-    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">Análise de stock — Excesso e Obsoletos</div><div class="road-sub">Identifica artigos com stock excessivo, sem vendas recentes e classificação ABC automática</div></div></div>
-    <div class="road-card"><span class="road-badge b-medium">Médio</span><div class="road-info"><div class="road-title">IA global de reposição</div><div class="road-sub">Análise de toda a carteira de artigos com recomendações priorizadas, não apenas artigo a artigo</div></div></div>
-  </div>
-</div>
-
-<!-- GRANDES -->
-<div class="road-section">
-  <div class="road-label">🔵 Grandes funcionalidades</div>
-  <div class="road-grid">
-    <div class="road-card"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Painel global de gestão de stock</div><div class="road-sub">20+ métricas: valor total (custo/venda), margem, GMROI, DIO, rotação, ABC, top/bottom produtos, fornecedores, alertas automáticos</div></div></div>
-    <div class="road-card"><span class="road-badge b-large">Grande</span><div class="road-info"><div class="road-title">Dashboard financeiro</div><div class="road-sub">KPIs financeiros avançados: capital imobilizado, stock parado, ROI, sell-through rate, variação de preços por fornecedor</div></div></div>
-  </div>
-</div>
-
-<!-- ÉPICAS -->
-<div class="road-section">
-  <div class="road-label">🟣 Épicas (longo prazo)</div>
-  <div class="road-grid">
-    <div class="road-card"><span class="road-badge b-epic">Épica</span><div class="road-info"><div class="road-title">Motor de previsão avançado</div><div class="road-sub">Previsão de vendas com machine learning, sazonalidade automática, alertas preditivos e optimização de encomendas por horizonte temporal</div></div></div>
-  </div>
-</div>
-
-<div style="margin-top:24px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--text-muted);line-height:1.6">
-  💡 <strong style="color:var(--text)">Como sugerir:</strong> Use o chat de IA integrado ou contacte o desenvolvimento. As prioridades são ajustadas em função das necessidades operacionais.
-</div>
+<script>
+const TIPOS={bug:{label:'Bug / Fix',cls:'b-bug',icon:'🔴'},small:{label:'Pequeno',cls:'b-small',icon:'🟢'},medium:{label:'Medio',cls:'b-medium',icon:'🟡'},large:{label:'Grande',cls:'b-large',icon:'🔵'},epic:{label:'Epica',cls:'b-epic',icon:'🟣'}};
+const SECCOES=[{key:'in_progress',label:'🔄 Em progresso'},{key:'bug',label:'🔴 Fixes',tipo:'bug'},{key:'small',label:'🟢 Pequenas melhorias',tipo:'small'},{key:'medium',label:'🟡 Medio prazo',tipo:'medium'},{key:'large',label:'🔵 Grandes funcionalidades',tipo:'large'},{key:'epic',label:'🟣 Epicas',tipo:'epic'},{key:'done',label:'Concluidas'}];
+let items=[];
+async function carregarItems(){const r=await fetch('/api/backlog');items=await r.json();renderizar();}
+function renderizar(){
+  const t={bug:0,small:0,medium:0,large:0,epic:0,done:0};
+  items.forEach(i=>{if(i.estado==='done')t.done++;else t[i.tipo]=(t[i.tipo]||0)+1;});
+  document.getElementById('statsRow').innerHTML=[{n:t.bug,l:'Fixes',c:'#ef4444'},{n:t.small,l:'Pequenas',c:'#22c55e'},{n:t.medium,l:'Medias',c:'#f59e0b'},{n:t.large,l:'Grandes',c:'var(--accent)'},{n:t.epic,l:'Epicas',c:'#8b5cf6'},{n:t.done,l:'Concluidas',c:'var(--success)'}].map(s=>`<div class="stat-box"><div class="stat-n" style="color:${s.c}">${s.n}</div><div class="stat-l">${s.l}</div></div>`).join('');
+  let html='';
+  SECCOES.forEach(sec=>{
+    let lista=sec.key==='done'?items.filter(i=>i.estado==='done'):sec.key==='in_progress'?items.filter(i=>i.estado==='in_progress'):items.filter(i=>i.tipo===sec.tipo&&i.estado==='pending');
+    if(!lista.length)return;
+    lista.sort((a,b)=>a.prioridade-b.prioridade);
+    html+=`<div class="bl-section"><div class="bl-label">${sec.label}</div><div class="bl-grid">`;
+    lista.forEach(item=>{
+      const tp=TIPOS[item.tipo]||TIPOS.medium;
+      html+=`<div class="bl-card${item.estado==='done'?' bl-done':''}"><span class="badge ${tp.cls}" onclick="editarItem(${item.id})">${tp.icon} ${tp.label}</span><div class="bl-info"><div class="bl-title">${item.titulo}</div>${item.descricao?`<div class="bl-sub">${item.descricao}</div>`:''}</div><div class="bl-actions"><button class="bl-btn-sm" onclick="editarItem(${item.id})">editar</button>${item.estado!=='done'?`<button class="bl-btn-sm" onclick="marcarConcluido(${item.id})">done</button>`:''}</div></div>`;
+    });
+    html+='</div></div>';
+  });
+  document.getElementById('backlogContainer').innerHTML=html||'<div style="text-align:center;padding:40px;color:var(--text-muted)">Sem itens. Clique em + Novo Item.</div>';
+}
+function abrirNovoItem(){document.getElementById('blModalTitle').textContent='Novo Item';document.getElementById('blId').value='';document.getElementById('blTitulo').value='';document.getElementById('blDescricao').value='';document.getElementById('blTipo').value='medium';document.getElementById('blEstado').value='pending';document.getElementById('blPrioridade').value=10;document.getElementById('blBtnApagar').style.display='none';document.getElementById('blModal').style.display='flex';}
+function editarItem(id){const item=items.find(i=>i.id===id);if(!item)return;document.getElementById('blModalTitle').textContent='Editar Item';document.getElementById('blId').value=id;document.getElementById('blTitulo').value=item.titulo;document.getElementById('blDescricao').value=item.descricao||'';document.getElementById('blTipo').value=item.tipo;document.getElementById('blEstado').value=item.estado;document.getElementById('blPrioridade').value=item.prioridade;document.getElementById('blBtnApagar').style.display='inline-flex';document.getElementById('blModal').style.display='flex';}
+function fecharModal(){document.getElementById('blModal').style.display='none';}
+async function guardarItem(){const id=document.getElementById('blId').value;const dados={titulo:document.getElementById('blTitulo').value.trim(),descricao:document.getElementById('blDescricao').value.trim(),tipo:document.getElementById('blTipo').value,estado:document.getElementById('blEstado').value,prioridade:parseInt(document.getElementById('blPrioridade').value)||10};if(!dados.titulo){alert('Preencha o titulo.');return;}const r=await fetch(id?`/api/backlog/${id}`:'/api/backlog',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dados)});const d=await r.json();if(d.ok){fecharModal();carregarItems();}else alert('Erro: '+(d.error||'?'));}
+async function apagarItem(){const id=document.getElementById('blId').value;if(!id||!confirm('Apagar?'))return;const r=await fetch(`/api/backlog/${id}`,{method:'DELETE'});const d=await r.json();if(d.ok){fecharModal();carregarItems();}}
+async function marcarConcluido(id){await fetch(`/api/backlog/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado:'done'})});carregarItems();}
+carregarItems();
+</script>
 {% endblock %}

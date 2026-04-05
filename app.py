@@ -2508,6 +2508,65 @@ def roadmap():
     return render_template('roadmap.html')
 
 
+class BacklogItem(db.Model):
+    __tablename__ = 'backlog_item'
+    id         = db.Column(db.Integer, primary_key=True)
+    titulo     = db.Column(db.String(200), nullable=False)
+    descricao  = db.Column(db.Text, default='')
+    tipo       = db.Column(db.String(20), default='medium')  # bug/small/medium/large/epic
+    estado     = db.Column(db.String(20), default='pending') # pending/in_progress/done
+    prioridade = db.Column(db.Integer, default=10)
+    criado_em  = db.Column(db.DateTime, default=datetime.now)
+    atualizado_em = db.Column(db.DateTime, default=datetime.now)
+
+
+@app.route('/api/backlog', methods=['GET'])
+@login_required
+def api_backlog_list():
+    items = BacklogItem.query.order_by(BacklogItem.prioridade, BacklogItem.id).all()
+    return jsonify([{
+        'id': i.id, 'titulo': i.titulo, 'descricao': i.descricao,
+        'tipo': i.tipo, 'estado': i.estado, 'prioridade': i.prioridade
+    } for i in items])
+
+@app.route('/api/backlog', methods=['POST'])
+@login_required
+def api_backlog_criar():
+    d = request.get_json() or {}
+    item = BacklogItem(
+        titulo=d.get('titulo','').strip() or 'Sem titulo',
+        descricao=d.get('descricao','').strip(),
+        tipo=d.get('tipo','medium'),
+        estado=d.get('estado','pending'),
+        prioridade=int(d.get('prioridade',10)),
+    )
+    db.session.add(item)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': item.id})
+
+@app.route('/api/backlog/<int:bid>', methods=['PUT'])
+@login_required
+def api_backlog_atualizar(bid):
+    item = BacklogItem.query.get_or_404(bid)
+    d = request.get_json() or {}
+    if 'titulo'     in d: item.titulo     = d['titulo']
+    if 'descricao'  in d: item.descricao  = d['descricao']
+    if 'tipo'       in d: item.tipo       = d['tipo']
+    if 'estado'     in d: item.estado     = d['estado']
+    if 'prioridade' in d: item.prioridade = int(d['prioridade'])
+    item.atualizado_em = datetime.now()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/backlog/<int:bid>', methods=['DELETE'])
+@login_required
+def api_backlog_apagar(bid):
+    item = BacklogItem.query.get_or_404(bid)
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():

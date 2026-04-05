@@ -57,8 +57,18 @@
       <div class="form-group"><label>Hora</label>
         <input type="time" id="evHora"></div>
     </div>
-    <div class="form-group"><label>Fornecedor</label>
-      <input type="text" id="evFornecedor" placeholder="Nome do fornecedor"></div>
+    <div class="form-group"><label>Fornecedor (PHC)</label>
+      <div style="position:relative">
+        <input type="text" id="evFornecedor" placeholder="Pesquisar fornecedor PHC..." oninput="pesquisarFornecedorEv(this.value)" autocomplete="off" style="width:100%">
+        <div id="evFornecedorResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1001;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:160px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.4)"></div>
+      </div>
+    </div>
+    <div class="form-group"><label>Cliente (PHC)</label>
+      <div style="position:relative">
+        <input type="text" id="evCliente" placeholder="Pesquisar cliente PHC..." oninput="pesquisarClienteEv(this.value)" autocomplete="off" style="width:100%">
+        <div id="evClienteResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1001;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:160px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.4)"></div>
+      </div>
+    </div>
     <div class="form-group">
       <label>Artigos PHC</label>
       <div style="position:relative">
@@ -329,6 +339,7 @@ function abrirNovoEvento(date='') {
   document.getElementById('evDataFim').value  = '';
   document.getElementById('evHora').value     = '';
   document.getElementById('evFornecedor').value = '';
+  document.getElementById('evCliente').value = '';
   document.getElementById('evDescricao').value  = '';
   document.getElementById('evArtigoSearch').value = '';
   document.getElementById('evConcluido').checked  = false;
@@ -367,6 +378,7 @@ function guardarEvento() {
     hora:        document.getElementById('evHora').value||null,
     descricao:   document.getElementById('evDescricao').value,
     fornecedor:  document.getElementById('evFornecedor').value,
+    cliente:     document.getElementById('evCliente').value,
     concluido:   document.getElementById('evConcluido').checked,
     artigos:     evArtigos,
   };
@@ -405,6 +417,25 @@ function pesquisarFornecedorEv(q) {
 function selecionarFornecedorEv(nome) {
   document.getElementById('evFornecedor').value = nome;
   document.getElementById('evFornecedorResults').style.display = 'none';
+}
+
+function pesquisarClienteEv(q) {
+  clearTimeout(evSearchTimer);
+  const res = document.getElementById('evClienteResults');
+  if (q.length < 2) { res.style.display='none'; return; }
+  evSearchTimer = setTimeout(()=>{
+    fetch('/api/clientes?q='+encodeURIComponent(q))
+      .then(r=>r.json())
+      .then(data=>{
+        if(!data.length){res.style.display='none';return;}
+        res.style.display='block';
+        res.innerHTML=data.slice(0,8).map(c=>`<div onclick="selecionarClienteEv('${(c.nome||'').replace(/'/g,"\\'")}')" style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${c.nome}</div>`).join('');
+      }).catch(()=>res.style.display='none');
+  }, 250);
+}
+function selecionarClienteEv(nome) {
+  document.getElementById('evCliente').value = nome;
+  document.getElementById('evClienteResults').style.display = 'none';
 }
 
 function pesquisarArtigoEv(q) {
