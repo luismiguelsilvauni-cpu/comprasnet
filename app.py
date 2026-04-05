@@ -637,7 +637,7 @@ def analisar_artigo(ref):
                                'num_facturas': int(row[1] or 0)}
             conn.close()
         except Exception as e:
-            logger.warning(f"PHC error: {e}")
+            app.logger.warning(f'PHC error analisar_artigo: {e}')
 
     stock  = artigo.stock_atual or 0
     preco  = artigo.preco_custo_ponderado or artigo.preco_custo or 0
