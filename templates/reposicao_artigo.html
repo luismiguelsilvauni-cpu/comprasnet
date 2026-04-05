@@ -4,7 +4,6 @@
 {% block topbar_actions %}
   <a href="{{ url_for('reposicao') }}?analise=1" class="btn btn-ghost btn-sm">← Voltar à Lista</a>
   <a href="{{ url_for('stock_artigo', ref=artigo.referencia) }}" class="btn btn-ghost btn-sm">📦 Ficha</a>
-{% endif %}
 {% endblock %}
 
 {% block content %}
