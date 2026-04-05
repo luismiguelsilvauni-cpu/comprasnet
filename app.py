@@ -2703,19 +2703,31 @@ def api_fornecedores():
     q = request.args.get('q','').strip()
     if not q or len(q) < 2:
         return jsonify([])
+    # Try local FornecedorPHC table first
+    try:
+        local = FornecedorPHC.query.filter(
+            FornecedorPHC.nome.ilike(f'%{q}%')
+        ).limit(10).all()
+        if local:
+            return jsonify([{'no': f.no, 'nome': f.nome} for f in local])
+    except Exception:
+        pass
+    # Fallback: query PHC cl table directly (fornecedores are in cl with ncont)
     try:
         cfg_phc = ConfigPHC.query.first()
         if cfg_phc and cfg_phc.ultima_sync:
             from phc_sync import get_phc_connection
             conn = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
+            # Search in cl table - all entities including suppliers
             cursor.execute(
-                "SELECT TOP 10 fo.no, fo.nome FROM PHC_Uniao..fo WHERE fo.nome LIKE ? ORDER BY fo.nome",
+                "SELECT TOP 10 cl.no, cl.nome FROM PHC_Uniao..cl WHERE cl.nome LIKE ? AND ISNULL(cl.inactivo,0)=0 ORDER BY cl.nome",
                 (f'%{q}%',)
             )
             rows = cursor.fetchall()
             conn.close()
-            return jsonify([{'no': r[0], 'nome': r[1]} for r in rows])
+            if rows:
+                return jsonify([{'no': r[0], 'nome': r[1]} for r in rows])
     except Exception as e:
         app.logger.warning(f"PHC fornecedores search error: {e}")
     return jsonify([])
