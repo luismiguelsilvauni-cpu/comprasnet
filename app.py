@@ -2490,6 +2490,18 @@ def api_reposicao_resultados():
     })
 
 
+@app.route('/api/clientes')
+@login_required
+def api_clientes():
+    q = request.args.get('q','').strip()
+    if not q or len(q) < 2:
+        return jsonify([])
+    clientes = ClientePHC.query.filter(
+        ClientePHC.nome.ilike(f'%{q}%')
+    ).limit(10).all()
+    return jsonify([{'no': c.no, 'nome': c.nome} for c in clientes])
+
+
 def init_db():
     """Run migrations then seed default admin. Safe to call on every startup."""
     with app.app_context():

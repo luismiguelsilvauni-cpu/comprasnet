@@ -275,8 +275,20 @@ function renderCalendario(eventos) {
   const first = new Date(calYear,calMonth-1,1).getDay();
   const days  = new Date(calYear,calMonth,0).getDate();
   const today = new Date().toISOString().split('T')[0];
+  // Build map of events per day (including multi-day spans)
   const byDate = {};
-  eventos.forEach(e=>{ if(!byDate[e.data_inicio])byDate[e.data_inicio]=[]; byDate[e.data_inicio].push(e); });
+  eventos.forEach(e=>{
+    const start = e.data_inicio;
+    const end   = e.data_fim || e.data_inicio;
+    let cur = new Date(start + 'T00:00:00');
+    const endD = new Date(end + 'T00:00:00');
+    while(cur <= endD) {
+      const ds = cur.toISOString().split('T')[0];
+      if(!byDate[ds]) byDate[ds]=[];
+      byDate[ds].push({...e, _isStart: ds===start, _isEnd: ds===end, _span: start!==end});
+      cur.setDate(cur.getDate()+1);
+    }
+  });
   grid.innerHTML = '';
   for(let i=0;i<first;i++) grid.insertAdjacentHTML('beforeend','<div style="min-height:56px"></div>');
   for(let d=1;d<=days;d++) {
@@ -289,8 +301,12 @@ function renderCalendario(eventos) {
     (byDate[ds]||[]).forEach(e=>{
       const cor = CORES[e.tipo]||CORES.manual;
       const tag = document.createElement('div');
-      tag.style.cssText=`background:${cor.bg};border-left:2px solid ${cor.border};border-radius:3px;padding:1px 4px;font-size:10px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;${e.concluido?'opacity:.4;text-decoration:line-through':''}`;
-      tag.textContent=e.titulo; tag.title=e.titulo;
+      // Multi-day: show bar with rounded ends only at start/end
+      const rStart = e._isStart ? '3px' : '0';
+      const rEnd   = e._isEnd   ? '3px' : '0';
+      const label  = e._isStart ? e.titulo : (e._isEnd ? '↳ '+e.titulo : '');
+      tag.style.cssText=`background:${cor.bg};border-left:${e._isStart?'2px solid '+cor.border:'none'};border-right:${e._isEnd?'none':'none'};border-radius:${rStart} ${rEnd} ${rEnd} ${rStart};padding:1px 4px;font-size:10px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;${e.concluido?'opacity:.4;text-decoration:line-through':''}${e._span&&!e._isStart?';margin-left:-4px;margin-right:-4px;padding-left:4px':''};`;
+      tag.textContent = label || '·'; tag.title=e.titulo;
       tag.onclick=ev=>{ev.stopPropagation();abrirDetalheEvento(e);};
       cell.appendChild(tag);
     });
@@ -370,6 +386,25 @@ function apagarEvento() {
   const id = document.getElementById('evId').value;
   if (!id||!confirm('Apagar?')) return;
   fetch(`/api/calendario/eventos/${id}`,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.ok){fecharEvModal();window._calInit=false;carregarCalendario();}});
+}
+
+function pesquisarFornecedorEv(q) {
+  clearTimeout(evSearchTimer);
+  const res = document.getElementById('evFornecedorResults');
+  if (q.length < 2) { res.style.display='none'; return; }
+  evSearchTimer = setTimeout(()=>{
+    fetch('/api/clientes?q='+encodeURIComponent(q)+'&fornecedor=1')
+      .then(r=>r.json())
+      .then(data=>{
+        if(!data.length){res.style.display='none';return;}
+        res.style.display='block';
+        res.innerHTML=data.slice(0,8).map(f=>`<div onclick="selecionarFornecedorEv('${(f.nome||'').replace(/'/g,"\'")}'); " style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${f.nome}</div>`).join('');
+      }).catch(()=>res.style.display='none');
+  }, 250);
+}
+function selecionarFornecedorEv(nome) {
+  document.getElementById('evFornecedor').value = nome;
+  document.getElementById('evFornecedorResults').style.display = 'none';
 }
 
 function pesquisarArtigoEv(q) {
