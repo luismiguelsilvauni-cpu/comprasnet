@@ -109,6 +109,125 @@ document.getElementById('btnFornecedor').addEventListener('click', function(e) {
 });
 </script>
 
+{% endblock %}
+{% block page_title %}Reposição de Stock
+<!-- Progress modal -->
+<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
+    <div style="font-size:32px;margin-bottom:16px">📊</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
+    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
+      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
+    </div>
+    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
+  </div>
+</div>
+
+<script>
+function iniciarAnalise() {
+  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
+  window.location.href = '{{ url_for("reposicao") }}?analise=1';
+}
+
+function guardarEAnalisar(e) {
+  e.preventDefault();
+  const form = e.target.closest('form');
+  mostrarProgresso();
+  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
+  form.submit();
+}
+
+function mostrarProgresso() {
+  const modal = document.getElementById('progressModal');
+  const bar   = document.getElementById('progressBar');
+  const pct   = document.getElementById('progressPct');
+  const msg   = document.getElementById('progressMsg');
+  modal.style.display = 'flex';
+
+  const steps = [
+    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
+    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
+    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
+    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
+    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
+    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
+    {pct: 95, msg: 'A preparar resultados...', t: 25000},
+  ];
+
+  steps.forEach(s => setTimeout(() => {
+    bar.style.width = s.pct + '%';
+    pct.textContent = s.pct + '%';
+    msg.textContent = s.msg;
+  }, s.t));
+}
+</script>
+
+{% endblock %}
+{% block topbar_actions %}
+  <button onclick="iniciarAnalise()" class="btn btn-primary btn-sm" id="btnAnalisar">🔍 Analisar</button>
+  <a href="{{ url_for('reposicao_por_fornecedor') }}" class="btn btn-ghost btn-sm"
+     onclick="showLoading('🏭','A analisar por fornecedor...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:1500},{p:35,m:'A calcular metricas...',t:5000},{p:55,m:'A aplicar filtros...',t:10000},{p:70,m:'A identificar fornecedores...',t:15000},{p:85,m:'A agrupar artigos...',t:20000},{p:95,m:'A preparar resultados...',t:25000}])">
+     🏭 Por Fornecedor</a>
+
+<!-- Progress modal -->
+<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
+    <div style="font-size:32px;margin-bottom:16px">📊</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
+    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
+      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
+    </div>
+    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
+  </div>
+</div>
+
+<script>
+function iniciarAnalise() {
+  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
+  window.location.href = '{{ url_for("reposicao") }}?analise=1';
+}
+
+function guardarEAnalisar(e) {
+  e.preventDefault();
+  const form = e.target.closest('form');
+  mostrarProgresso();
+  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
+  form.submit();
+}
+
+function mostrarProgresso() {
+  const modal = document.getElementById('progressModal');
+  const bar   = document.getElementById('progressBar');
+  const pct   = document.getElementById('progressPct');
+  const msg   = document.getElementById('progressMsg');
+  modal.style.display = 'flex';
+
+  const steps = [
+    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
+    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
+    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
+    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
+    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
+    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
+    {pct: 95, msg: 'A preparar resultados...', t: 25000},
+  ];
+
+  steps.forEach(s => setTimeout(() => {
+    bar.style.width = s.pct + '%';
+    pct.textContent = s.pct + '%';
+    msg.textContent = s.msg;
+  }, s.t));
+}
+</script>
+
+{% endblock %}
+
+{% block content %}
+
 
 <!-- Help modal -->
 <div id="ajudaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)fecharAjuda()">
@@ -248,124 +367,6 @@ function fecharAjuda() {
 }
 </script>
 
-{% endblock %}
-{% block page_title %}Reposição de Stock
-<!-- Progress modal -->
-<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
-    <div style="font-size:32px;margin-bottom:16px">📊</div>
-    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
-    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
-      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
-    </div>
-    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
-  </div>
-</div>
-
-<script>
-function iniciarAnalise() {
-  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
-  window.location.href = '{{ url_for("reposicao") }}?analise=1';
-}
-
-function guardarEAnalisar(e) {
-  e.preventDefault();
-  const form = e.target.closest('form');
-  mostrarProgresso();
-  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
-  form.submit();
-}
-
-function mostrarProgresso() {
-  const modal = document.getElementById('progressModal');
-  const bar   = document.getElementById('progressBar');
-  const pct   = document.getElementById('progressPct');
-  const msg   = document.getElementById('progressMsg');
-  modal.style.display = 'flex';
-
-  const steps = [
-    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
-    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
-    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
-    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
-    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
-    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
-    {pct: 95, msg: 'A preparar resultados...', t: 25000},
-  ];
-
-  steps.forEach(s => setTimeout(() => {
-    bar.style.width = s.pct + '%';
-    pct.textContent = s.pct + '%';
-    msg.textContent = s.msg;
-  }, s.t));
-}
-</script>
-
-{% endblock %}
-{% block topbar_actions %}
-  <button onclick="iniciarAnalise()" class="btn btn-primary btn-sm" id="btnAnalisar">🔍 Analisar</button>
-  <a href="{{ url_for('reposicao_por_fornecedor') }}" class="btn btn-ghost btn-sm"
-     onclick="showLoading('🏭','A analisar por fornecedor...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:1500},{p:35,m:'A calcular metricas...',t:5000},{p:55,m:'A aplicar filtros...',t:10000},{p:70,m:'A identificar fornecedores...',t:15000},{p:85,m:'A agrupar artigos...',t:20000},{p:95,m:'A preparar resultados...',t:25000}])">
-     🏭 Por Fornecedor</a>
-
-<!-- Progress modal -->
-<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;text-align:center">
-    <div style="font-size:32px;margin-bottom:16px">📊</div>
-    <div style="font-size:15px;font-weight:600;margin-bottom:8px">A analisar artigos...</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px" id="progressMsg">A carregar histórico de vendas do PHC...</div>
-    <div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px">
-      <div id="progressBar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .5s;width:0%"></div>
-    </div>
-    <div id="progressPct" style="font-size:13px;font-weight:700;color:var(--accent)">0%</div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Este processo pode demorar alguns minutos dependendo do volume de dados.</div>
-  </div>
-</div>
-
-<script>
-function iniciarAnalise() {
-  showLoading('📊','A analisar artigos...',[{p:5,m:'A ligar ao SQL Server...',t:300},{p:15,m:'A carregar historico de vendas PHC...',t:2000},{p:40,m:'A processar dados de vendas...',t:6000},{p:65,m:'A aplicar filtros de relevancia...',t:12000},{p:80,m:'A calcular ROP e EOQ...',t:18000},{p:95,m:'A preparar resultados...',t:24000}]);
-  window.location.href = '{{ url_for("reposicao") }}?analise=1';
-}
-
-function guardarEAnalisar(e) {
-  e.preventDefault();
-  const form = e.target.closest('form');
-  mostrarProgresso();
-  form.action = '{{ url_for("salvar_config_reposicao") }}?redirect_analise=1';
-  form.submit();
-}
-
-function mostrarProgresso() {
-  const modal = document.getElementById('progressModal');
-  const bar   = document.getElementById('progressBar');
-  const pct   = document.getElementById('progressPct');
-  const msg   = document.getElementById('progressMsg');
-  modal.style.display = 'flex';
-
-  const steps = [
-    {pct: 5,  msg: 'A ligar ao SQL Server...', t: 500},
-    {pct: 15, msg: 'A carregar histórico de vendas PHC (pode demorar)...', t: 2000},
-    {pct: 40, msg: 'A processar dados de vendas...', t: 5000},
-    {pct: 60, msg: 'A calcular médias e períodos...', t: 10000},
-    {pct: 75, msg: 'A aplicar filtros de relevância...', t: 15000},
-    {pct: 85, msg: 'A calcular ROP e EOQ...', t: 20000},
-    {pct: 95, msg: 'A preparar resultados...', t: 25000},
-  ];
-
-  steps.forEach(s => setTimeout(() => {
-    bar.style.width = s.pct + '%';
-    pct.textContent = s.pct + '%';
-    msg.textContent = s.msg;
-  }, s.t));
-}
-</script>
-
-{% endblock %}
-
-{% block content %}
 
 <!-- Config panel -->
 <div class="card mb-16">
