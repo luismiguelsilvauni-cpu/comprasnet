@@ -1,19 +1,30 @@
-import sys, os
-sys.path.insert(0, '.')
+import sqlite3, os
 
-from app import app, db, init_db
+# Flask usa instance/compras.db com sqlite:///
+paths = ['instance/compras.db', 'compras.db']
+db_path = None
+for p in paths:
+    if os.path.exists(p):
+        db_path = p
+        break
 
-with app.app_context():
-    # Get DB path
-    uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
-    print("DB URI:", uri)
-    
-    # Create all tables including backlog_item
-    db.create_all()
-    print("db.create_all() done")
-    
-    # Check
-    from sqlalchemy import text
-    with db.engine.connect() as conn:
-        n = conn.execute(text("SELECT COUNT(*) FROM backlog_item")).fetchone()[0]
-        print("Items:", n)
+if not db_path:
+    print("ERRO: BD nao encontrada em", paths)
+    exit(1)
+
+print("BD encontrada:", db_path)
+conn = sqlite3.connect(db_path)
+conn.execute("""CREATE TABLE IF NOT EXISTS backlog_item (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo TEXT NOT NULL,
+    descricao TEXT DEFAULT '',
+    tipo TEXT DEFAULT 'medium',
+    estado TEXT DEFAULT 'pending',
+    prioridade INTEGER DEFAULT 10,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+)""")
+conn.commit()
+n = conn.execute('SELECT COUNT(*) FROM backlog_item').fetchone()[0]
+print('OK. Items na BD:', n)
+conn.close()
