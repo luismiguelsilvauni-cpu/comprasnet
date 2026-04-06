@@ -264,7 +264,7 @@
             <a href="{{ url_for('clientes') }}" class="nav-item {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
                 <span class="icon">👥</span><span>Clientes</span>
             </a>
-            <a href="{{ url_for('pedidos') }}" class="nav-item {% if 'pedido' in request.endpoint and 'reposicao' not in request.endpoint %}active{% endif %}">
+            <a href="{{ url_for('pedidos', estado='aberto') }}" class="nav-item {% if 'pedido' in request.endpoint and 'reposicao' not in request.endpoint %}active{% endif %}">
                 <span class="icon">📋</span><span>Pedidos de Compra</span>
             </a>
             <a href="{{ url_for('stock') }}" class="nav-item {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
