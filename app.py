@@ -2823,6 +2823,213 @@ def api_backlog_count():
         return jsonify({'pending': 0})
 
 
+@app.route('/inventario')
+@login_required
+def inventario():
+    return render_template('inventario.html')
+
+
+@app.route('/api/inventario/kpis')
+@login_required
+def api_inventario_kpis():
+    """Calculate inventory KPIs from PHC data."""
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if not cfg_phc:
+            return jsonify({'error': 'PHC nao configurado'}), 400
+        from phc_sync import get_phc_connection
+        conn = get_phc_connection(cfg_phc)
+        cur = conn.cursor()
+
+        # --- Base stock data ---
+        cur.execute("""
+            SELECT st.ref, st.design, ISNULL(st.stock,0) AS stock,
+                   ISNULL(st.epcusto,0) AS custo, ISNULL(st.epcpond,0) AS custo_pond,
+                   ISNULL(st.epv1,0) AS pvp, ISNULL(st.famillia,'') AS familia,
+                   ISNULL(st.unidade,'un') AS unidade
+            FROM st
+            WHERE ISNULL(st.inactivo,0)=0 AND st.ref IS NOT NULL AND st.ref <> ''
+        """)
+        artigos = cur.fetchall()
+
+        # --- Sales last 12 months ---
+        cur.execute("""
+            SELECT fi.ref, SUM(fi.qtt) AS total_vendido,
+                   SUM(fi.qtt * ISNULL(fi.epv,0)) AS total_faturado,
+                   COUNT(DISTINCT ft.ftstamp) AS num_facturas,
+                   MAX(ft.fdata) AS ultima_venda
+            FROM fi
+            INNER JOIN ft ON ft.ftstamp = fi.ftstamp
+            WHERE ft.tipodoc = 1 AND ft.anulado = 0
+              AND ft.fdata >= DATEADD(month, -12, GETDATE())
+              AND fi.qtt > 0
+            GROUP BY fi.ref
+        """)
+        vendas = {r[0].strip(): {
+            'vendido': float(r[1] or 0),
+            'faturado': float(r[2] or 0),
+            'facturas': int(r[3] or 0),
+            'ultima_venda': r[4].strftime('%Y-%m-%d') if r[4] else None
+        } for r in cur.fetchall()}
+
+        # --- Purchases last 12 months ---
+        cur.execute("""
+            SELECT RTRIM(fn.ref), SUM(fn.qtt) AS total_comprado,
+                   SUM(fn.qtt * ISNULL(fn.prunit,0)) AS total_compras
+            FROM fn
+            INNER JOIN fo ON fo.fostamp = fn.fostamp
+            WHERE fo.data >= DATEADD(month, -12, GETDATE())
+              AND fn.qtt > 0
+            GROUP BY RTRIM(fn.ref)
+        """)
+        compras = {r[0]: {'comprado': float(r[1] or 0), 'valor_compras': float(r[2] or 0)}
+                   for r in cur.fetchall()}
+
+        conn.close()
+
+        # --- Calculate metrics per article ---
+        items = []
+        total_valor_custo = 0
+        total_valor_pvp = 0
+        total_margem = 0
+        sem_movimento = 0
+        stock_negativo = 0
+        total_artigos = 0
+
+        for r in artigos:
+            ref = (r[0] or '').strip()
+            design = (r[1] or '').strip()
+            stock = float(r[2])
+            custo = float(r[3]) or float(r[4])  # epcusto or epcpond
+            pvp = float(r[5])
+            familia = (r[6] or '').strip()
+
+            v = vendas.get(ref, {})
+            c = compras.get(ref, {})
+
+            vendido_12m = v.get('vendido', 0)
+            faturado_12m = v.get('faturado', 0)
+            ultima_venda = v.get('ultima_venda')
+
+            valor_stock_custo = stock * custo
+            valor_stock_pvp = stock * pvp
+            margem_pct = ((pvp - custo) / pvp * 100) if pvp > 0 else 0
+            margem_valor = (pvp - custo) * vendido_12m if vendido_12m > 0 else 0
+
+            # Days without movement
+            dias_sem_venda = None
+            if ultima_venda:
+                from datetime import datetime
+                dias_sem_venda = (datetime.now() - datetime.strptime(ultima_venda, '%Y-%m-%d')).days
+
+            total_valor_custo += max(0, valor_stock_custo)
+            total_valor_pvp += max(0, valor_stock_pvp)
+            total_margem += margem_valor
+            total_artigos += 1
+
+            if stock < 0: stock_negativo += 1
+            if not ultima_venda or (dias_sem_venda and dias_sem_venda > 180): sem_movimento += 1
+
+            items.append({
+                'ref': ref,
+                'design': design,
+                'stock': stock,
+                'custo': custo,
+                'pvp': pvp,
+                'familia': familia,
+                'valor_custo': valor_stock_custo,
+                'valor_pvp': valor_stock_pvp,
+                'margem_pct': round(margem_pct, 1),
+                'vendido_12m': vendido_12m,
+                'faturado_12m': faturado_12m,
+                'margem_valor': round(margem_valor, 2),
+                'ultima_venda': ultima_venda,
+                'dias_sem_venda': dias_sem_venda,
+                'num_facturas': v.get('facturas', 0),
+            })
+
+        # --- ABC Classification by revenue ---
+        items_com_venda = sorted([i for i in items if i['faturado_12m'] > 0],
+                                  key=lambda x: x['faturado_12m'], reverse=True)
+        total_fat = sum(i['faturado_12m'] for i in items_com_venda)
+        acum = 0
+        abc_counts = {'A': 0, 'B': 0, 'C': 0}
+        for item in items_com_venda:
+            acum += item['faturado_12m']
+            pct = acum / total_fat if total_fat else 0
+            if pct <= 0.7:
+                item['abc'] = 'A'
+                abc_counts['A'] += 1
+            elif pct <= 0.9:
+                item['abc'] = 'B'
+                abc_counts['B'] += 1
+            else:
+                item['abc'] = 'C'
+                abc_counts['C'] += 1
+        for item in items:
+            if 'abc' not in item:
+                item['abc'] = '-'
+
+        # --- GMROI ---
+        gmroi = (total_margem / total_valor_custo * 100) if total_valor_custo > 0 else 0
+
+        # --- Top performers ---
+        top_faturacao = sorted(items, key=lambda x: x['faturado_12m'], reverse=True)[:10]
+        top_margem = sorted([i for i in items if i['margem_valor'] > 0],
+                             key=lambda x: x['margem_valor'], reverse=True)[:10]
+        sem_vendas = sorted([i for i in items if i['vendido_12m'] == 0 and i['stock'] > 0],
+                             key=lambda x: x['valor_custo'], reverse=True)[:10]
+        excesso = sorted([i for i in items if i['vendido_12m'] > 0 and i['stock'] > 0],
+                          key=lambda x: x['stock'] / (i['vendido_12m']/12) if i['vendido_12m'] > 0 else 0,
+                          reverse=True)[:10]
+
+        # --- Alerts ---
+        alertas = []
+        for i in items:
+            if i['stock'] < 0:
+                alertas.append({'tipo': 'negativo', 'ref': i['ref'], 'design': i['design'][:50], 'valor': i['stock']})
+            elif i['stock'] > 0 and i['dias_sem_venda'] and i['dias_sem_venda'] > 365:
+                alertas.append({'tipo': 'obsoleto', 'ref': i['ref'], 'design': i['design'][:50], 'valor': i['dias_sem_venda']})
+            elif i['margem_pct'] < 0 and i['vendido_12m'] > 0:
+                alertas.append({'tipo': 'margem_neg', 'ref': i['ref'], 'design': i['design'][:50], 'valor': i['margem_pct']})
+
+        # --- Families breakdown ---
+        familias = {}
+        for i in items:
+            f = i['familia'] or 'Sem familia'
+            if f not in familias:
+                familias[f] = {'artigos': 0, 'valor_custo': 0, 'faturado': 0}
+            familias[f]['artigos'] += 1
+            familias[f]['valor_custo'] += max(0, i['valor_custo'])
+            familias[f]['faturado'] += i['faturado_12m']
+        top_familias = sorted(familias.items(), key=lambda x: x[1]['faturado'], reverse=True)[:8]
+
+        return jsonify({
+            'kpis': {
+                'total_artigos': total_artigos,
+                'artigos_com_stock': len([i for i in items if i['stock'] > 0]),
+                'artigos_sem_stock': len([i for i in items if i['stock'] <= 0]),
+                'stock_negativo': stock_negativo,
+                'sem_movimento_180d': sem_movimento,
+                'valor_stock_custo': round(total_valor_custo, 2),
+                'valor_stock_pvp': round(total_valor_pvp, 2),
+                'margem_total': round(total_margem, 2),
+                'gmroi': round(gmroi, 1),
+                'faturacao_12m': round(sum(i['faturado_12m'] for i in items), 2),
+            },
+            'abc': abc_counts,
+            'alertas': alertas[:20],
+            'top_faturacao': top_faturacao,
+            'top_margem': top_margem,
+            'sem_vendas': sem_vendas,
+            'familias': [{'familia': k, **v} for k, v in top_familias],
+        })
+
+    except Exception as e:
+        app.logger.error(f"inventario KPIs error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():
