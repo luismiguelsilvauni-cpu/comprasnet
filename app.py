@@ -2875,7 +2875,7 @@ def api_inventario_kpis():
         # --- Purchases last 12 months ---
         cur.execute("""
             SELECT RTRIM(fn.ref), SUM(fn.qtt) AS total_comprado,
-                   SUM(fn.qtt * ISNULL(fn.prunit,0)) AS total_compras
+                   0 AS total_compras
             FROM fn
             INNER JOIN fo ON fo.fostamp = fn.fostamp
             WHERE fo.data >= DATEADD(month, -12, GETDATE())
