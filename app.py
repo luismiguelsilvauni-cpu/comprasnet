@@ -2845,7 +2845,7 @@ def api_inventario_kpis():
         cur.execute("""
             SELECT st.ref, st.design, ISNULL(st.stock,0) AS stock,
                    ISNULL(st.epcusto,0) AS custo, ISNULL(st.epcpond,0) AS custo_pond,
-                   ISNULL(st.epv1,0) AS pvp, ISNULL(st.famillia,'') AS familia,
+                   ISNULL(st.epv1,0) AS pvp, ISNULL(st.familia,'') AS familia,
                    ISNULL(st.unidade,'un') AS unidade
             FROM st
             WHERE ISNULL(st.inactivo,0)=0 AND st.ref IS NOT NULL AND st.ref <> ''
