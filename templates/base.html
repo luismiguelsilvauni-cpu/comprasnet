@@ -462,27 +462,12 @@ function showLoading(icon, title, steps) {
 
 
 <script>
-// Load backlog pending count for sidebar badge
 (function(){
-  fetch('/api/backlog/count')
-    .then(r=>r.json())
-    .then(d=>{
-      const el = document.getElementById('backlog-badge');
-      if(el && d.pending > 0){ el.textContent = d.pending; el.style.display='inline'; }
-    }).catch(()=>{});
-})();
-</script>
-
-
-<script>
-(function(){
-  fetch('/api/backlog').then(r=>r.json()).then(items=>{
-    const n = items.filter(i=>i.estado!=='done').length;
-    if(n>0){
-      const b = document.getElementById('backlog-badge');
-      if(b){b.textContent=n;b.style.display='inline';}
-    }
-  }).catch(()=>{});
+  fetch('/api/backlog').then(function(r){return r.json();}).then(function(items){
+    var n=items.filter(function(i){return i.estado!=='done';}).length;
+    var b=document.getElementById('backlog-badge');
+    if(b&&n>0){b.textContent=n;b.style.display='inline';}
+  }).catch(function(){});
 })();
 </script>
 
