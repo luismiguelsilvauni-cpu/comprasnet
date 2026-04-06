@@ -2974,14 +2974,11 @@ def api_inventario_kpis():
         gmroi = (total_margem / total_valor_custo * 100) if total_valor_custo > 0 else 0
 
         # --- Top performers ---
+        def rot(x): return (x['stock'] / (x['vendido_12m']/12)) if x['vendido_12m'] > 0 else 0
         top_faturacao = sorted(items, key=lambda x: x['faturado_12m'], reverse=True)[:10]
-        top_margem = sorted([i for i in items if i['margem_valor'] > 0],
-                             key=lambda x: x['margem_valor'], reverse=True)[:10]
-        sem_vendas = sorted([i for i in items if i['vendido_12m'] == 0 and i['stock'] > 0],
-                             key=lambda x: x['valor_custo'], reverse=True)[:10]
-        excesso = sorted([i for i in items if i['vendido_12m'] > 0 and i['stock'] > 0],
-                          key=lambda x: (x['stock'] / (x['vendido_12m']/12)) if x['vendido_12m'] > 0 else 0,
-                          reverse=True)[:10]
+        top_margem    = sorted([a for a in items if a['margem_valor'] > 0], key=lambda x: x['margem_valor'], reverse=True)[:10]
+        sem_vendas    = sorted([a for a in items if a['vendido_12m'] == 0 and a['stock'] > 0], key=lambda x: x['valor_custo'], reverse=True)[:10]
+        excesso       = sorted([a for a in items if a['vendido_12m'] > 0 and a['stock'] > 0], key=rot, reverse=True)[:10]
 
         # --- Alerts ---
         alertas = []
