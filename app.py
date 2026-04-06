@@ -2980,7 +2980,7 @@ def api_inventario_kpis():
         sem_vendas = sorted([i for i in items if i['vendido_12m'] == 0 and i['stock'] > 0],
                              key=lambda x: x['valor_custo'], reverse=True)[:10]
         excesso = sorted([i for i in items if i['vendido_12m'] > 0 and i['stock'] > 0],
-                          key=lambda x: x['stock'] / (i['vendido_12m']/12) if i['vendido_12m'] > 0 else 0,
+                          key=lambda x: (x['stock'] / (x['vendido_12m']/12)) if x['vendido_12m'] > 0 else 0,
                           reverse=True)[:10]
 
         # --- Alerts ---
