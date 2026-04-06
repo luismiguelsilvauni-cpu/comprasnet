@@ -473,5 +473,18 @@ function showLoading(icon, title, steps) {
 })();
 </script>
 
+
+<script>
+(function(){
+  fetch('/api/backlog').then(r=>r.json()).then(items=>{
+    const n = items.filter(i=>i.estado!=='done').length;
+    if(n>0){
+      const b = document.getElementById('backlogBadge');
+      if(b){b.textContent=n;b.style.display='inline';}
+    }
+  }).catch(()=>{});
+})();
+</script>
+
 </body>
 </html>
