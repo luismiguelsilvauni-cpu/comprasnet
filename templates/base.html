@@ -321,7 +321,7 @@
             <span class="icon">🩺</span><span>Estado do Sistema</span>
         </a>
         <a href="{{ url_for('roadmap') }}" class="nav-item {% if request.endpoint == 'roadmap' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">📋</span><span>Backlog</span>
+            <span class="icon">📋</span><span>Backlog</span><span id="backlog-badge" style="margin-left:auto;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(245,158,11,.2);color:#f59e0b;display:none"></span>
         </a>
         <a href="{{ url_for('changelog') }}" class="nav-item {% if request.endpoint == 'changelog' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">📋</span><span>Versions</span>
@@ -458,6 +458,19 @@ function showLoading(icon, title, steps) {
     }, s.t);
   });
 }
+</script>
+
+
+<script>
+// Load backlog pending count for sidebar badge
+(function(){
+  fetch('/api/backlog/count')
+    .then(r=>r.json())
+    .then(d=>{
+      const el = document.getElementById('backlog-badge');
+      if(el && d.pending > 0){ el.textContent = d.pending; el.style.display='inline'; }
+    }).catch(()=>{});
+})();
 </script>
 
 </body>

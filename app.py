@@ -101,7 +101,7 @@ def dashboard():
     pedidos_abertos  = PedidoCompra.query.filter_by(estado='aberto').count()
     pedidos_aprovados= PedidoCompra.query.filter_by(estado='aprovado').count()
     total_orcamentos = Orcamento.query.count()
-    pedidos_recentes = PedidoCompra.query.order_by(PedidoCompra.data_criacao.desc()).limit(8).all()
+    pedidos_recentes = PedidoCompra.query.filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente'])).order_by(PedidoCompra.data_criacao.desc()).limit(8).all()
     # Stock baixo: stock > 0 mas abaixo de threshold (excluir negativos)
     artigos_stock_baixo = ArtigoPHC.query.filter(
         ArtigoPHC.stock_atual > 0,
@@ -2811,6 +2811,16 @@ def ensure_sqlserver_running():
     except Exception as e:
         _log.warning(f"⚠️  Erro ao verificar SQL Server: {e}")
         return False
+
+
+@app.route('/api/backlog/count')
+@login_required
+def api_backlog_count():
+    try:
+        pending = BacklogItem.query.filter(BacklogItem.estado != 'done').count()
+        return jsonify({'pending': pending})
+    except Exception:
+        return jsonify({'pending': 0})
 
 
 def init_db():
