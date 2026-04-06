@@ -2813,6 +2813,13 @@ def ensure_sqlserver_running():
         return False
 
 
+def init_db():
+    """Create all database tables."""
+    with app.app_context():
+        db.create_all()
+
+
+
 if __name__ == '__main__':
     ensure_sqlserver_running()
     init_db()
