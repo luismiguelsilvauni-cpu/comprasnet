@@ -120,9 +120,9 @@ def dashboard():
 @app.route('/pedidos')
 @login_required
 def pedidos():
-    estado = request.args.get('estado','')
+    estado = request.args.get('estado','aberto')
     q = PedidoCompra.query
-    if estado: q = q.filter_by(estado=estado)
+    if estado and estado != 'todos': q = q.filter_by(estado=estado)
     return render_template('pedidos.html', pedidos=q.order_by(PedidoCompra.data_criacao.desc()).all(), estado_filtro=estado)
 
 @app.route('/pedidos/novo', methods=['GET','POST'])

@@ -9,8 +9,8 @@
 <div class="card mb-16" style="padding: 12px 20px;">
     <div class="flex items-center gap-8">
         <span style="font-size:12px; color:var(--text-muted); font-weight:600">FILTRAR:</span>
-        <a href="{{ url_for('pedidos') }}" class="badge {% if not estado_filtro %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Todos</a>
-        <a href="{{ url_for('pedidos', estado='aberto') }}" class="badge {% if estado_filtro == 'aberto' %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Abertos</a>
+        <a href="{{ url_for('pedidos', estado='todos') }}" class="badge {% if estado_filtro == 'todos' %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Todos</a>
+        <a href="{{ url_for('pedidos', estado='aberto') }}" class="badge {% if estado_filtro == 'aberto' or not estado_filtro %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Abertos</a>
         <a href="{{ url_for('pedidos', estado='em_analise') }}" class="badge {% if estado_filtro == 'em_analise' %}badge-yellow{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Em Análise</a>
         <a href="{{ url_for('pedidos', estado='aprovado') }}" class="badge {% if estado_filtro == 'aprovado' %}badge-green{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Aprovados</a>
         <a href="{{ url_for('pedidos', estado='cancelado') }}" class="badge {% if estado_filtro == 'cancelado' %}badge-red{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Cancelados</a>
