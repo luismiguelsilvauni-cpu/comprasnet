@@ -479,7 +479,7 @@ function showLoading(icon, title, steps) {
   fetch('/api/backlog').then(r=>r.json()).then(items=>{
     const n = items.filter(i=>i.estado!=='done').length;
     if(n>0){
-      const b = document.getElementById('backlogBadge');
+      const b = document.getElementById('backlog-badge');
       if(b){b.textContent=n;b.style.display='inline';}
     }
   }).catch(()=>{});
