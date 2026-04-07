@@ -1,113 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{% if equipamento %}Editar{% else %}Novo{% endif %} · Técnico
-
-
-<script>
-let _ct = null;
-function pesquisarCliente(q) {
-  clearTimeout(_ct);
-  const res = document.getElementById('clienteResults');
-  if (q.length < 2) { res.style.display='none'; return; }
-  _ct = setTimeout(() => {
-    fetch('/api/clientes?q=' + encodeURIComponent(q))
-      .then(r => r.json())
-      .then(data => {
-        if (!data.length) { res.style.display='none'; return; }
-        res.style.display = 'block';
-        res.innerHTML = data.map(c =>
-          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
-            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-            onmouseover="this.style.background='var(--surface2)'"
-            onmouseout="this.style.background=''">${c.nome}</div>`
-        ).join('');
-      }).catch(() => res.style.display='none');
-  }, 250);
-}
-function selCliente(nome) {
-  document.getElementById('clienteInput').value = nome;
-  document.getElementById('clienteResults').style.display = 'none';
-}
-document.addEventListener('click', e => {
-  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
-    document.getElementById('clienteResults').style.display = 'none';
-});
-</script>
-
-{% endblock %}
-{% block page_title %}{% if equipamento %}Editar Equipamento{% else %}Novo Equipamento{% endif %}
-
-
-<script>
-let _ct = null;
-function pesquisarCliente(q) {
-  clearTimeout(_ct);
-  const res = document.getElementById('clienteResults');
-  if (q.length < 2) { res.style.display='none'; return; }
-  _ct = setTimeout(() => {
-    fetch('/api/clientes?q=' + encodeURIComponent(q))
-      .then(r => r.json())
-      .then(data => {
-        if (!data.length) { res.style.display='none'; return; }
-        res.style.display = 'block';
-        res.innerHTML = data.map(c =>
-          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
-            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-            onmouseover="this.style.background='var(--surface2)'"
-            onmouseout="this.style.background=''">${c.nome}</div>`
-        ).join('');
-      }).catch(() => res.style.display='none');
-  }, 250);
-}
-function selCliente(nome) {
-  document.getElementById('clienteInput').value = nome;
-  document.getElementById('clienteResults').style.display = 'none';
-}
-document.addEventListener('click', e => {
-  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
-    document.getElementById('clienteResults').style.display = 'none';
-});
-</script>
-
-{% endblock %}
+{% block title %}{% if equipamento %}Editar{% else %}Novo{% endif %} · Técnico{% endblock %}
+{% block page_title %}{% if equipamento %}Editar Equipamento{% else %}Novo Equipamento{% endif %}{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">Cancelar</a>
-
-
-<script>
-let _ct = null;
-function pesquisarCliente(q) {
-  clearTimeout(_ct);
-  const res = document.getElementById('clienteResults');
-  if (q.length < 2) { res.style.display='none'; return; }
-  _ct = setTimeout(() => {
-    fetch('/api/clientes?q=' + encodeURIComponent(q))
-      .then(r => r.json())
-      .then(data => {
-        if (!data.length) { res.style.display='none'; return; }
-        res.style.display = 'block';
-        res.innerHTML = data.map(c =>
-          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
-            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-            onmouseover="this.style.background='var(--surface2)'"
-            onmouseout="this.style.background=''">${c.nome}</div>`
-        ).join('');
-      }).catch(() => res.style.display='none');
-  }, 250);
-}
-function selCliente(nome) {
-  document.getElementById('clienteInput').value = nome;
-  document.getElementById('clienteResults').style.display = 'none';
-}
-document.addEventListener('click', e => {
-  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
-    document.getElementById('clienteResults').style.display = 'none';
-});
-</script>
-
 {% endblock %}
 {% block content %}
 <div class="card" style="max-width:700px">
   <form method="post">
+
     <!-- Cliente / Embarcacao -->
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Cliente / Embarcação</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
@@ -118,7 +18,7 @@ document.addEventListener('click', e => {
             value="{{ equipamento.cliente_nome if equipamento else '' }}"
             class="input" placeholder="Pesquisar cliente PHC..."
             oninput="pesquisarCliente(this.value)" autocomplete="off">
-          <div id="clienteResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
+          <div id="clienteResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
         </div>
       </div>
       <div class="form-group" style="margin:0">
@@ -126,6 +26,7 @@ document.addEventListener('click', e => {
         <input type="text" name="embarcacao" value="{{ equipamento.embarcacao if equipamento else '' }}" class="input" placeholder="Nome da embarcação">
       </div>
     </div>
+
     <!-- Motor -->
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Motor</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
@@ -154,6 +55,7 @@ document.addEventListener('click', e => {
         <input type="text" name="material" value="{{ equipamento.material if equipamento else '' }}" class="input" placeholder="Material">
       </div>
     </div>
+
     <!-- Caixa Redutora -->
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Caixa Inversora / Redutora</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
@@ -170,10 +72,12 @@ document.addEventListener('click', e => {
         <input type="text" name="caixa_serial" value="{{ equipamento.caixa_serial if equipamento else '' }}" class="input" placeholder="Serial Number">
       </div>
     </div>
+
     <div class="form-group">
       <label>Notas</label>
       <textarea name="notas" rows="3" class="input" placeholder="Observações...">{{ equipamento.notas if equipamento else '' }}</textarea>
     </div>
+
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
       {% if equipamento %}
       <form method="post" action="{{ url_for('tecnico_apagar', eid=equipamento.id) }}"
@@ -186,36 +90,34 @@ document.addEventListener('click', e => {
   </form>
 </div>
 
-
 <script>
 let _ct = null;
 function pesquisarCliente(q) {
   clearTimeout(_ct);
   const res = document.getElementById('clienteResults');
-  if (q.length < 2) { res.style.display='none'; return; }
+  if (!q || q.length < 2) { res.style.display = 'none'; return; }
   _ct = setTimeout(() => {
     fetch('/api/clientes?q=' + encodeURIComponent(q))
       .then(r => r.json())
       .then(data => {
-        if (!data.length) { res.style.display='none'; return; }
+        if (!data.length) { res.style.display = 'none'; return; }
         res.style.display = 'block';
         res.innerHTML = data.map(c =>
-          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
-            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-            onmouseover="this.style.background='var(--surface2)'"
-            onmouseout="this.style.background=''">${c.nome}</div>`
+          '<div onclick="selCliente(\'' + (c.nome||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')" ' +
+          'style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" ' +
+          'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+          (c.nome||'') + '</div>'
         ).join('');
-      }).catch(() => res.style.display='none');
-  }, 250);
+      }).catch(() => res.style.display = 'none');
+  }, 300);
 }
 function selCliente(nome) {
   document.getElementById('clienteInput').value = nome;
   document.getElementById('clienteResults').style.display = 'none';
 }
-document.addEventListener('click', e => {
+document.addEventListener('click', function(e) {
   if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
     document.getElementById('clienteResults').style.display = 'none';
 });
 </script>
-
 {% endblock %}
