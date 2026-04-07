@@ -3409,6 +3409,91 @@ def tecnico_opcoes_apagar_bulk(eid):
     return redirect(url_for('tecnico_detalhe', eid=eid))
 
 
+@app.route('/tecnico/importar-excel', methods=['GET', 'POST'])
+@login_required
+def tecnico_importar_excel():
+    if request.method == 'GET':
+        return render_template('tecnico_importar_excel.html')
+    
+    f = request.files.get('excel_file')
+    if not f:
+        flash('Nenhum ficheiro enviado.', 'error')
+        return redirect(url_for('tecnico_importar_excel'))
+    
+    try:
+        import openpyxl
+        from io import BytesIO
+        
+        wb = openpyxl.load_workbook(BytesIO(f.read()), data_only=True)
+        ws = wb.active
+        
+        # Read headers from first row
+        headers = []
+        for cell in ws[1]:
+            headers.append((cell.value or '').strip().lower())
+        
+        app.logger.info(f"Excel headers: {headers}")
+        
+        # Map columns - flexible matching
+        def find_col(names):
+            for name in names:
+                for i, h in enumerate(headers):
+                    if name in h:
+                        return i
+            return None
+
+        col_embarcacao  = find_col(['embarca'])
+        col_modelo      = find_col(['modelo']) 
+        col_cv          = find_col(['cv', 'potencia', 'pot'])
+        col_rpm         = find_col(['rpm'])
+        col_serie       = find_col(['série', 'serie', 'nº série', 'n serie'])
+        col_eq          = find_col(['eq', 'base code', 'base'])
+        col_caixa       = find_col(['modelo2', 'caixa'])
+        col_ratio       = find_col(['ratio'])
+        col_serie_caixa = find_col(['série3', 'serie3', 'nº série3', 'n serie3'])
+        col_obs         = find_col(['obs', 'nota'])
+
+        app.logger.info(f"Cols: emb={col_embarcacao} mod={col_modelo} cv={col_cv} serie={col_serie} eq={col_eq}")
+
+        added = 0
+        errors = []
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not any(row):
+                continue
+            
+            def get(col):
+                if col is None or col >= len(row): return ''
+                v = row[col]
+                return str(v).strip() if v is not None else ''
+            
+            embarcacao = get(col_embarcacao)
+            if not embarcacao:
+                continue  # skip empty rows
+            
+            e = Equipamento(
+                embarcacao      = embarcacao,
+                motor_modelo    = get(col_modelo),
+                motor_potencia  = get(col_cv) + (' CV' if get(col_cv) and 'cv' not in get(col_cv).lower() else ''),
+                serial_number   = get(col_serie),
+                base_code       = get(col_eq),
+                caixa_modelo    = get(col_caixa),
+                caixa_ratio     = get(col_ratio),
+                caixa_serial    = get(col_serie_caixa),
+                notas           = get(col_obs),
+            )
+            db.session.add(e)
+            added += 1
+        
+        db.session.commit()
+        flash(f'✅ {added} equipamentos importados com sucesso.', 'success')
+        return redirect(url_for('tecnico'))
+    
+    except Exception as e:
+        app.logger.error(f"Excel import error: {e}")
+        flash(f'Erro ao processar Excel: {e}', 'error')
+        return redirect(url_for('tecnico_importar_excel'))
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():

@@ -3,6 +3,7 @@
 {% block page_title %}Gestão Técnica{% endblock %}
 
 {% block topbar_actions %}
+  <a href="{{ url_for('tecnico_importar_excel') }}" class="btn btn-ghost btn-sm">📥 Importar Excel</a>
   <a href="{{ url_for('tecnico_novo') }}" class="btn btn-primary btn-sm">+ Novo</a>
 {% endblock %}
 

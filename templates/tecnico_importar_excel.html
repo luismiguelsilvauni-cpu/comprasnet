@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Importar Excel · Técnico{% endblock %}
+{% block page_title %}Importar Equipamentos de Excel{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<div class="card" style="max-width:600px;padding:24px">
+  <div style="font-size:14px;font-weight:600;margin-bottom:16px">📥 Importar de ficheiro Excel</div>
+  
+  <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:20px;font-size:13px">
+    <div style="font-weight:600;margin-bottom:8px;color:var(--text-muted)">Colunas esperadas (1ª linha do Excel):</div>
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text-muted)">Coluna Excel</th>
+          <th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text-muted)">Campo no Sistema</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, field in [
+          ('Embarcação', 'Embarcação'),
+          ('Modelo', 'Motor — Modelo'),
+          ('CV', 'Motor — Potência (CV)'),
+          ('RPM', 'ignorado'),
+          ('Nº Série', 'Motor — Nº Série'),
+          ('EQ / Base Code', 'Motor — Base Code'),
+          ('Modelo2', 'Caixa Red. — Modelo'),
+          ('Ratio', 'Caixa Red. — Ratio'),
+          ('Nº Série3', 'Caixa Red. — Nº Série'),
+          ('Obs', 'Notas'),
+        ] %}
+        <tr>
+          <td style="padding:4px 8px;font-family:monospace;color:var(--accent)">{{ col }}</td>
+          <td style="padding:4px 8px;color:{{ 'var(--text-muted)' if field == 'ignorado' else 'var(--text)' }}">{{ field }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">
+      A 1ª linha deve ter os cabeçalhos. O sistema é flexível com os nomes das colunas.<br>
+      O campo <strong>Embarcação</strong> é obrigatório — linhas sem embarcação são ignoradas.
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+    <div class="form-group">
+      <label>Ficheiro Excel (.xlsx)</label>
+      <input type="file" name="excel_file" accept=".xlsx,.xls" required class="input">
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button type="submit" class="btn btn-primary">Importar</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
