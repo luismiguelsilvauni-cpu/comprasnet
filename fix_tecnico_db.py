@@ -33,3 +33,10 @@ with app.app_context():
         db.create_all()
     
     print("Concluido. Reinicie o servidor.")
+
+    # Create equipamento_motor_aux table
+    if 'equipamento_motor_aux' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela equipamento_motor_aux criada")
+    else:
+        print("OK: equipamento_motor_aux ja existe")

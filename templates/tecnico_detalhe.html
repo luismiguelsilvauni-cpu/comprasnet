@@ -129,6 +129,97 @@ function apagarSelecionados() {
   {% endif %}
 </div>
 
+
+<!-- Motores Auxiliares -->
+<div id="motores-aux" style="margin-top:24px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:600">⚙️ Motores Auxiliares
+      <span style="color:var(--text-muted);font-weight:400">({{ motores_aux|length }})</span>
+    </div>
+    <button onclick="document.getElementById('formNovoMotorAux').style.display=document.getElementById('formNovoMotorAux').style.display==='none'?'block':'none'"
+      class="btn btn-ghost btn-sm">+ Adicionar Motor Aux</button>
+  </div>
+
+  <!-- Add form -->
+  <div id="formNovoMotorAux" style="display:none;margin-bottom:12px">
+    <div class="card" style="padding:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:12px">Novo Motor Auxiliar</div>
+      <form method="post" action="{{ url_for('tecnico_motor_aux_criar', eid=equipamento.id) }}">
+        <div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="form-group" style="margin:0"><label>Nº</label><input type="number" name="numero" value="{{ motores_aux|length + 1 }}" min="1" class="input"></div>
+          <div class="form-group" style="margin:0"><label>Marca</label><input type="text" name="marca" class="input" placeholder="Ex: Volvo"></div>
+          <div class="form-group" style="margin:0"><label>Modelo</label><input type="text" name="modelo" class="input" placeholder="Ex: D4-180"></div>
+          <div class="form-group" style="margin:0"><label>Nº Série</label><input type="text" name="serial_number" class="input"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:10px;margin-bottom:10px">
+          <div class="form-group" style="margin:0"><label>Potência</label><input type="text" name="potencia" class="input" placeholder="Ex: 180 CV"></div>
+          <div class="form-group" style="margin:0"><label>RPM</label><input type="text" name="rpm" class="input" placeholder="Ex: 3600"></div>
+          <div class="form-group" style="margin:0"><label>Ano</label><input type="text" name="ano" class="input" placeholder="Ex: 2018"></div>
+          <div class="form-group" style="margin:0"><label>Notas</label><input type="text" name="notas" class="input" placeholder="Observações..."></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end"><button type="submit" class="btn btn-primary btn-sm">Adicionar</button></div>
+      </form>
+    </div>
+  </div>
+
+  {% if motores_aux %}
+  <div class="card" style="padding:0">
+    <table class="table" style="font-size:13px">
+      <thead><tr>
+        <th style="width:40px">Nº</th>
+        <th>Marca</th><th>Modelo</th><th>Nº Série</th>
+        <th>Potência</th><th>RPM</th><th>Ano</th><th>Notas</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for m in motores_aux %}
+      <tr id="maux-row-{{ m.id }}">
+        <td style="font-weight:700;color:var(--accent)">{{ m.numero }}</td>
+        <td>{{ m.marca or '—' }}</td>
+        <td style="font-weight:500">{{ m.modelo or '—' }}</td>
+        <td class="mono" style="font-size:12px">{{ m.serial_number or '—' }}</td>
+        <td>{{ m.potencia or '—' }}</td>
+        <td>{{ m.rpm or '—' }}</td>
+        <td>{{ m.ano or '—' }}</td>
+        <td style="font-size:12px;color:var(--text-muted)">{{ m.notas or '' }}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button onclick="mostrarEdicaoAux({{ m.id }})" class="btn btn-ghost btn-sm">✏️</button>
+          <form method="post" action="{{ url_for('tecnico_motor_aux_apagar', mid=m.id) }}"
+            onsubmit="return confirm('Apagar motor aux {{ m.numero }}?')" style="display:inline">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+          </form>
+        </td>
+      </tr>
+      <tr id="maux-edit-{{ m.id }}" style="display:none;background:var(--surface2)">
+        <td colspan="9" style="padding:10px">
+          <form method="post" action="{{ url_for('tecnico_motor_aux_editar', mid=m.id) }}">
+            <div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr 1fr 1fr 1fr 2fr;gap:8px;align-items:end">
+              <input type="number" name="numero" value="{{ m.numero }}" class="input" style="font-size:12px" placeholder="Nº">
+              <input type="text" name="marca" value="{{ m.marca or '' }}" class="input" style="font-size:12px" placeholder="Marca">
+              <input type="text" name="modelo" value="{{ m.modelo or '' }}" class="input" style="font-size:12px" placeholder="Modelo">
+              <input type="text" name="serial_number" value="{{ m.serial_number or '' }}" class="input" style="font-size:12px" placeholder="Nº Série">
+              <input type="text" name="potencia" value="{{ m.potencia or '' }}" class="input" style="font-size:12px" placeholder="Potência">
+              <input type="text" name="rpm" value="{{ m.rpm or '' }}" class="input" style="font-size:12px" placeholder="RPM">
+              <input type="text" name="ano" value="{{ m.ano or '' }}" class="input" style="font-size:12px" placeholder="Ano">
+              <input type="text" name="notas" value="{{ m.notas or '' }}" class="input" style="font-size:12px" placeholder="Notas">
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+              <button type="button" onclick="mostrarEdicaoAux({{ m.id }})" class="btn btn-ghost btn-sm">Cancelar</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:20px;border-style:dashed;font-size:13px;color:var(--text-muted)">
+    Sem motores auxiliares. Clique em + Adicionar Motor Aux.
+  </div>
+  {% endif %}
+</div>
+
 <!-- Import HTML + Add row actions -->
 <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
   <div style="font-size:13px;font-weight:600;flex:1">Option Codes <span style="color:var(--text-muted);font-weight:400">({{ opcoes|length }} linhas)</span></div>
@@ -272,6 +363,15 @@ function apagarSelecionados() {
 {% endif %}
 
 <script>
+
+function mostrarEdicaoAux(id) {
+  const row = document.getElementById('maux-row-'+id);
+  const edit = document.getElementById('maux-edit-'+id);
+  const shown = edit.style.display !== 'none';
+  edit.style.display = shown ? 'none' : 'table-row';
+  row.style.opacity = shown ? '1' : '.4';
+}
+
 function mostrarUpload(id) {
   const el = document.getElementById('upload-'+id);
   el.style.display = el.style.display === 'none' ? 'block' : 'none';

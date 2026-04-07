@@ -2582,6 +2582,7 @@ class Equipamento(db.Model):
     criado_em       = db.Column(db.DateTime, default=datetime.now)
     opcoes          = db.relationship('EquipamentoOpcao', backref='equipamento', lazy=True, cascade='all, delete-orphan')
     consumiveis     = db.relationship('EquipamentoConsumivel', backref='equipamento', lazy=True, cascade='all, delete-orphan')
+    motores_aux     = db.relationship('EquipamentoMotorAux', backref='equipamento', lazy=True, cascade='all, delete-orphan', order_by='EquipamentoMotorAux.numero')
 
 class EquipamentoConsumivel(db.Model):
     __tablename__ = 'equipamento_consumivel'
@@ -2592,6 +2593,21 @@ class EquipamentoConsumivel(db.Model):
     unidade         = db.Column(db.String(20))
     quantidade      = db.Column(db.Float, default=1)
     notas           = db.Column(db.String(300))
+    ordem           = db.Column(db.Integer, default=0)
+
+
+class EquipamentoMotorAux(db.Model):
+    __tablename__ = 'equipamento_motor_aux'
+    id              = db.Column(db.Integer, primary_key=True)
+    equipamento_id  = db.Column(db.Integer, db.ForeignKey('equipamento.id'), nullable=False)
+    numero          = db.Column(db.Integer, default=1)   # Motor Aux 1, 2, 3...
+    marca           = db.Column(db.String(100))
+    modelo          = db.Column(db.String(200))
+    serial_number   = db.Column(db.String(100))
+    potencia        = db.Column(db.String(50))
+    rpm             = db.Column(db.String(50))
+    ano             = db.Column(db.String(20))
+    notas           = db.Column(db.Text, default='')
     ordem           = db.Column(db.Integer, default=0)
 
 
@@ -3179,7 +3195,8 @@ def tecnico_novo():
 def tecnico_detalhe(eid):
     e = Equipamento.query.get_or_404(eid)
     opcoes = EquipamentoOpcao.query.filter_by(equipamento_id=eid).order_by(EquipamentoOpcao.ordem).all()
-    return render_template('tecnico_detalhe.html', equipamento=e, opcoes=opcoes)
+    motores_aux = EquipamentoMotorAux.query.filter_by(equipamento_id=eid).order_by(EquipamentoMotorAux.numero).all()
+    return render_template('tecnico_detalhe.html', equipamento=e, opcoes=opcoes, motores_aux=motores_aux)
 
 @app.route('/tecnico/<int:eid>/editar', methods=['GET', 'POST'])
 @login_required
@@ -3492,6 +3509,52 @@ def tecnico_importar_excel():
         app.logger.error(f"Excel import error: {e}")
         flash(f'Erro ao processar Excel: {e}', 'error')
         return redirect(url_for('tecnico_importar_excel'))
+
+
+@app.route('/tecnico/<int:eid>/motor-aux', methods=['POST'])
+@login_required
+def tecnico_motor_aux_criar(eid):
+    Equipamento.query.get_or_404(eid)
+    n = EquipamentoMotorAux.query.filter_by(equipamento_id=eid).count() + 1
+    m = EquipamentoMotorAux(
+        equipamento_id=eid,
+        numero=int(request.form.get('numero', n)),
+        marca=request.form.get('marca','').strip(),
+        modelo=request.form.get('modelo','').strip(),
+        serial_number=request.form.get('serial_number','').strip(),
+        potencia=request.form.get('potencia','').strip(),
+        rpm=request.form.get('rpm','').strip(),
+        ano=request.form.get('ano','').strip(),
+        notas=request.form.get('notas','').strip(),
+        ordem=n,
+    )
+    db.session.add(m)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=eid) + '#motores-aux')
+
+@app.route('/tecnico/motor-aux/<int:mid>/editar', methods=['POST'])
+@login_required
+def tecnico_motor_aux_editar(mid):
+    m = EquipamentoMotorAux.query.get_or_404(mid)
+    m.numero        = int(request.form.get('numero', m.numero))
+    m.marca         = request.form.get('marca', m.marca or '').strip()
+    m.modelo        = request.form.get('modelo', m.modelo or '').strip()
+    m.serial_number = request.form.get('serial_number', m.serial_number or '').strip()
+    m.potencia      = request.form.get('potencia', m.potencia or '').strip()
+    m.rpm           = request.form.get('rpm', m.rpm or '').strip()
+    m.ano           = request.form.get('ano', m.ano or '').strip()
+    m.notas         = request.form.get('notas', m.notas or '').strip()
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=m.equipamento_id) + '#motores-aux')
+
+@app.route('/tecnico/motor-aux/<int:mid>/apagar', methods=['POST'])
+@login_required
+def tecnico_motor_aux_apagar(mid):
+    m = EquipamentoMotorAux.query.get_or_404(mid)
+    eid = m.equipamento_id
+    db.session.delete(m)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=eid) + '#motores-aux')
 
 
 def init_db():
