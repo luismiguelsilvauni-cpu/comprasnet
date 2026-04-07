@@ -3156,10 +3156,17 @@ def tecnico():
 def tecnico_novo():
     if request.method == 'POST':
         e = Equipamento(
+            cliente_nome=request.form.get('cliente_nome','').strip(),
+            embarcacao=request.form.get('embarcacao','').strip(),
+            motor_modelo=request.form.get('motor_modelo','').strip(),
+            motor_potencia=request.form.get('motor_potencia','').strip(),
             serial_number=request.form.get('serial_number','').strip(),
             base_code=request.form.get('base_code','').strip(),
-            material=request.form.get('material','').strip(),
             manufactured_date=request.form.get('manufactured_date','').strip(),
+            material=request.form.get('material','').strip(),
+            caixa_modelo=request.form.get('caixa_modelo','').strip(),
+            caixa_ratio=request.form.get('caixa_ratio','').strip(),
+            caixa_serial=request.form.get('caixa_serial','').strip(),
             notas=request.form.get('notas','').strip(),
         )
         db.session.add(e)
