@@ -3272,159 +3272,105 @@ def tecnico_opcao_pdf_download(oid):
 @app.route('/tecnico/<int:eid>/importar-html', methods=['POST'])
 @login_required
 def tecnico_importar_html(eid):
-    """Parse HTML file and extract Option Codes automatically."""
+    """Parse John Deere JDPS HTML and extract Option Codes from table#optioninfo."""
     Equipamento.query.get_or_404(eid)
     f = request.files.get('html_file')
     if not f:
         flash('Nenhum ficheiro enviado.', 'error')
         return redirect(url_for('tecnico_detalhe', eid=eid))
     try:
-        from html.parser import HTMLParser
         raw = f.read()
-        # Try multiple encodings
-        for enc in ('utf-8', 'latin-1', 'cp1252', 'utf-16'):
-            try:
-                content = raw.decode(enc, errors='replace')
-                break
-            except Exception:
-                content = raw.decode('latin-1', errors='replace')
-        
-        app.logger.info(f"HTML import: {len(content)} chars, preview: {content[:200]}")
+        for enc in ('utf-8', 'latin-1', 'cp1252'):
+            try: content = raw.decode(enc); break
+            except Exception: content = raw.decode('latin-1', errors='replace')
 
-        class OptionParser(HTMLParser):
+        from html.parser import HTMLParser
+
+        class JDPSParser(HTMLParser):
             def __init__(self):
                 super().__init__()
                 self.rows = []
-                self.in_table = False
-                self.in_row = False
-                self.current_row = []
+                self.in_optioninfo = False
+                self.table_depth = 0
+                self.current_row = None
                 self.in_td = False
+                self.current_attrs = {}
                 self.current_text = ''
-                self.headers = []
-                self.header_row = True
 
             def handle_starttag(self, tag, attrs):
-                attrs = dict(attrs)
-                if tag == 'table': self.in_table = True
-                if tag == 'tr' and self.in_table:
-                    self.in_row = True
-                    self.current_row = []
-                if tag in ('td', 'th') and self.in_row:
-                    self.in_td = True
-                    self.current_text = ''
+                a = dict(attrs)
+                if tag == 'table':
+                    if a.get('id') == 'optioninfo':
+                        self.in_optioninfo = True
+                        self.table_depth = 1
+                    elif self.in_optioninfo:
+                        self.table_depth += 1
+                if self.in_optioninfo and self.table_depth == 1:
+                    if tag == 'tr':
+                        self.current_row = {'option':'','ordered':'','factory':'','distributor':''}
+                    if tag == 'td':
+                        self.in_td = True
+                        self.current_attrs = a
+                        self.current_text = ''
 
             def handle_endtag(self, tag):
-                if tag in ('td', 'th') and self.in_td:
-                    self.current_row.append(self.current_text.strip())
-                    self.in_td = False
-                if tag == 'tr' and self.in_row:
-                    if self.header_row:
-                        self.headers = self.current_row
-                        self.header_row = False
-                    else:
-                        if self.current_row:
-                            self.rows.append(self.current_row)
-                    self.in_row = False
-                if tag == 'table': self.in_table = False
+                if tag == 'table' and self.in_optioninfo:
+                    self.table_depth -= 1
+                    if self.table_depth == 0:
+                        self.in_optioninfo = False
+                if self.in_optioninfo and self.table_depth == 1:
+                    if tag == 'td' and self.in_td:
+                        self.in_td = False
+                        text = self.current_text.strip()
+                        a = self.current_attrs
+                        if a.get('trans') == 'en_US' and text:
+                            self.current_row['option'] = text
+                        elif a.get('trans') == 'other':
+                            pass
+                        elif a.get('name2') == 'viewDistribOption':
+                            d = text.replace('*','').strip()
+                            if d: self.current_row['distributor'] = d
+                        elif a.get('name2') == 'editDistribOption':
+                            pass
+                        elif a.get('width') == '100px':
+                            pass
+                        elif self.current_row.get('option') and not a.get('trans') and not a.get('name2'):
+                            if not self.current_row['ordered']:
+                                self.current_row['ordered'] = text
+                    if tag == 'tr' and self.current_row and self.current_row.get('option'):
+                        self.rows.append(self.current_row)
+                        self.current_row = None
 
             def handle_data(self, data):
                 if self.in_td:
                     self.current_text += data
 
-        parser = OptionParser()
+        parser = JDPSParser()
         parser.feed(content)
-        
-        app.logger.info(f"HTML parsed: headers={parser.headers}, rows={len(parser.rows)}")
-        if parser.rows:
-            app.logger.info(f"First row sample: {parser.rows[0]}")
-
-        # Map columns - flexible matching
-        hdrs = [h.lower().strip() for h in parser.headers]
-        def col(row, names):
-            for n in names:
-                for i, h in enumerate(hdrs):
-                    if n in h and i < len(row):
-                        return row[i].strip()
-            # Fallback: no headers, use positional
-            return ''
+        app.logger.info(f"JDPS parse: {len(parser.rows)} rows")
 
         added = 0
         ordem_start = EquipamentoOpcao.query.filter_by(equipamento_id=eid).count()
-        
-        # If no headers detected, treat all rows as data with positional columns
-        rows_to_process = parser.rows
-        if not parser.headers and parser.rows:
-            # No header row - first col = option_name, second = ordered, third = factory
-            for row in rows_to_process:
-                if row and any(cell.strip() for cell in row):
-                    o = EquipamentoOpcao(
-                        equipamento_id=eid,
-                        option_name=row[0].strip() if len(row) > 0 else '',
-                        ordered=row[1].strip() if len(row) > 1 else '',
-                        factory=row[2].strip() if len(row) > 2 else '',
-                        distributor=row[3].strip() if len(row) > 3 else '',
-                        ordem=ordem_start + added,
-                    )
-                    if o.option_name:
-                        db.session.add(o)
-                        added += 1
-        else:
-            for row in rows_to_process:
-                opt = col(row, ['option', 'name', 'code', 'descri', 'item'])
-                ord_ = col(row, ['ordered', 'order', 'spec'])
-                fac  = col(row, ['factory', 'plant', 'std'])
-                dist = col(row, ['distribut', 'dealer', 'dist'])
-                # If no header match, use positional
-                if not opt and row:
-                    opt  = row[0].strip() if len(row) > 0 else ''
-                    ord_ = row[1].strip() if len(row) > 1 else ''
-                    fac  = row[2].strip() if len(row) > 2 else ''
-                    dist = row[3].strip() if len(row) > 3 else ''
-                if opt:
-                    o = EquipamentoOpcao(
-                        equipamento_id=eid,
-                        option_name=opt,
-                        ordered=ord_,
-                        factory=fac,
-                        distributor=dist,
-                        ordem=ordem_start + added,
-                    )
-                    db.session.add(o)
-                    added += 1
-
+        for row in parser.rows:
+            opt = row['option'].strip()
+            if not opt: continue
+            o = EquipamentoOpcao(
+                equipamento_id=eid,
+                option_name=opt,
+                ordered=row['ordered'].strip(),
+                factory=row['factory'].strip(),
+                distributor=row['distributor'].strip(),
+                ordem=ordem_start + added,
+            )
+            db.session.add(o)
+            added += 1
         db.session.commit()
-        flash(f'✅ {added} linhas importadas com sucesso.', 'success')
+        flash(f'Importados {added} option codes com sucesso.', 'success')
     except Exception as e:
-        flash(f'Erro ao processar HTML: {e}', 'error')
+        app.logger.error(f"JDPS import error: {e}")
+        flash(f'Erro: {e}', 'error')
     return redirect(url_for('tecnico_detalhe', eid=eid))
 
-
-def init_db():
-    """Create all database tables."""
-    with app.app_context():
-        db.create_all()
-
-
-
-if __name__ == '__main__':
-    ensure_sqlserver_running()
-    init_db()
-    # Run startup health check with auto-fix
-    try:
-        from health_check import startup_check
-        startup_check(app, auto_fix=True)
-    except Exception as e:
-        print(f"⚠️  Health check error: {e}")
-    # Start backup scheduler
-    try:
-        from backup_manager import iniciar_scheduler
-        iniciar_scheduler(app)
-    except Exception as e:
-        print(f"⚠️  Backup scheduler não iniciado: {e}")
-    print("🚀 ComprasNet em http://0.0.0.0:5000")
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
-import threading as _threading
-_sync_status = {'running': False, 'pct': 0, 'steps': [], 'done': False, 'error': None}
 
 @app.route('/admin/phc/sync-start', methods=['POST'])
 @login_required
