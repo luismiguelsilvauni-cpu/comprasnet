@@ -5,17 +5,17 @@ from sqlalchemy import text, inspect as sa_inspect
 
 with app.app_context():
     uri = app.config.get('SQLALCHEMY_DATABASE_URI','')
-    print("BD:", uri.replace('sqlite:///',''))
+    print("BD:", uri)
     
     db.create_all()
+    print("db.create_all() OK")
     
     insp = sa_inspect(db.engine)
-    tbls = insp.get_table_names()
     
-    # equipamento new columns
-    if 'equipamento' in tbls:
-        cols = [c['name'] for c in insp.get_columns('equipamento')]
-        print("Colunas actuais:", cols)
+    # Add columns to equipamento
+    if 'equipamento' in insp.get_table_names():
+        existing = [c['name'] for c in insp.get_columns('equipamento')]
+        print("Colunas actuais:", existing)
         new_cols = [
             ('cliente_nome','TEXT'),('embarcacao','TEXT'),
             ('motor_modelo','TEXT'),('motor_potencia','TEXT'),
@@ -23,16 +23,13 @@ with app.app_context():
         ]
         with db.engine.begin() as conn:
             for col, typ in new_cols:
-                if col not in cols:
+                if col not in existing:
                     conn.execute(text(f"ALTER TABLE equipamento ADD COLUMN {col} {typ}"))
-                    print(f"OK: equipamento.{col} adicionado")
+                    print(f"OK: {col} adicionado")
                 else:
                     print(f"OK: {col} ja existe")
+    else:
+        print("Tabela equipamento nao existe - a criar...")
+        db.create_all()
     
-    # Create missing tables
-    db.create_all()
-    tbls2 = sa_inspect(db.engine).get_table_names()
-    for t in ['equipamento','equipamento_opcao','equipamento_consumivel','backlog_item','changelog_entry']:
-        print(f"{'OK' if t in tbls2 else 'MISSING'}: {t}")
-
-print("Concluido. Reinicie o servidor.")
+    print("Concluido. Reinicie o servidor.")
