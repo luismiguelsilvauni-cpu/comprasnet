@@ -3282,6 +3282,118 @@ def tecnico_opcao_pdf_download(oid):
                                as_attachment=True, download_name=o.pdf_filename)
 
 
+@app.route('/tecnico/<int:eid>/importar-html', methods=['POST'])
+@login_required
+def tecnico_importar_html(eid):
+    """Parse John Deere JDPS HTML - table#optioninfo."""
+    Equipamento.query.get_or_404(eid)
+    f = request.files.get('html_file')
+    if not f:
+        flash('Nenhum ficheiro enviado.', 'error')
+        return redirect(url_for('tecnico_detalhe', eid=eid))
+    try:
+        raw = f.read()
+        for enc in ('utf-8', 'latin-1', 'cp1252'):
+            try: content = raw.decode(enc); break
+            except Exception: content = raw.decode('latin-1', errors='replace')
+
+        from html.parser import HTMLParser
+
+        class JDPSParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.rows = []
+                self.in_table = False
+                self.table_depth = 0
+                self.in_tr = False
+                self.cells = []
+                self.in_td = False
+                self.cur_attrs = {}
+                self.cur_text = ''
+
+            def handle_starttag(self, tag, attrs):
+                a = dict(attrs)
+                if tag == 'table':
+                    if a.get('id') == 'optioninfo':
+                        self.in_table = True
+                        self.table_depth = 1
+                    elif self.in_table:
+                        self.table_depth += 1
+                if self.in_table and self.table_depth == 1:
+                    if tag == 'tr':
+                        self.in_tr = True
+                        self.cells = []
+                    elif tag == 'td' and self.in_tr:
+                        self.in_td = True
+                        self.cur_attrs = a
+                        self.cur_text = ''
+
+            def handle_endtag(self, tag):
+                if tag == 'table' and self.in_table:
+                    self.table_depth -= 1
+                    if self.table_depth == 0:
+                        self.in_table = False
+                if self.in_table and self.table_depth == 1:
+                    if tag == 'td' and self.in_td:
+                        self.in_td = False
+                        self.cells.append((dict(self.cur_attrs), self.cur_text.strip()))
+                    elif tag == 'tr' and self.in_tr:
+                        self.in_tr = False
+                        self._process_row()
+
+            def handle_data(self, data):
+                if self.in_td:
+                    self.cur_text += data
+
+            def _process_row(self):
+                option_name = ordered = factory = distributor = ''
+                for a, t in self.cells:
+                    clean = t.replace('*', '').strip()
+                    if a.get('trans') == 'en_US':
+                        option_name = clean
+                    elif a.get('trans') == 'other':
+                        continue
+                    elif a.get('name2') == 'viewDistribOption':
+                        distributor = clean
+                    elif a.get('name2') == 'editDistribOption':
+                        continue
+                    elif a.get('width') == '100px' and a.get('align') == 'center':
+                        continue
+                    elif option_name and not a.get('trans') and not a.get('name2'):
+                        if not ordered:
+                            ordered = clean
+                        elif not factory:
+                            factory = clean
+                if option_name:
+                    self.rows.append({'option': option_name, 'ordered': ordered,
+                                      'factory': factory, 'distributor': distributor})
+
+        parser = JDPSParser()
+        parser.feed(content)
+        app.logger.info(f"JDPS: {len(parser.rows)} rows")
+
+        added = 0
+        ordem_start = EquipamentoOpcao.query.filter_by(equipamento_id=eid).count()
+        for row in parser.rows:
+            if not row['option']: continue
+            o = EquipamentoOpcao(
+                equipamento_id=eid,
+                option_name=row['option'],
+                ordered=row['ordered'],
+                factory=row['factory'],
+                distributor=row['distributor'],
+                ordem=ordem_start + added,
+            )
+            db.session.add(o)
+            added += 1
+        db.session.commit()
+        flash(f'Importados {added} option codes com sucesso.', 'success')
+    except Exception as e:
+        app.logger.error(f"JDPS import error: {e}")
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():
