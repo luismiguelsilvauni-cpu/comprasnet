@@ -80,5 +80,5 @@ if errorlevel 1 (
 )
 echo.
 
-venv\Scripts\python.exe app.py
+venv\Scripts\python.exe run.py
 pause
