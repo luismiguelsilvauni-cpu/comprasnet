@@ -3158,7 +3158,6 @@ def tecnico_novo():
         e = Equipamento(
             serial_number=request.form.get('serial_number','').strip(),
             base_code=request.form.get('base_code','').strip(),
-            model=request.form.get('model','').strip(),
             material=request.form.get('material','').strip(),
             manufactured_date=request.form.get('manufactured_date','').strip(),
             notas=request.form.get('notas','').strip(),
@@ -3182,7 +3181,6 @@ def tecnico_editar(eid):
     if request.method == 'POST':
         e.serial_number = request.form.get('serial_number','').strip()
         e.base_code = request.form.get('base_code','').strip()
-        e.model = request.form.get('model','').strip()
         e.material = request.form.get('material','').strip()
         e.manufactured_date = request.form.get('manufactured_date','').strip()
         e.notas = request.form.get('notas','').strip()
