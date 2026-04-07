@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{% if equipamento %}Editar{% else %}Novo{% endif %} · Técnico
+
+
 <script>
 let _ct = null;
 function pesquisarCliente(q) {
@@ -33,6 +35,8 @@ document.addEventListener('click', e => {
 
 {% endblock %}
 {% block page_title %}{% if equipamento %}Editar Equipamento{% else %}Novo Equipamento{% endif %}
+
+
 <script>
 let _ct = null;
 function pesquisarCliente(q) {
@@ -67,6 +71,7 @@ document.addEventListener('click', e => {
 {% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">Cancelar</a>
+
 
 <script>
 let _ct = null;
@@ -180,6 +185,7 @@ document.addEventListener('click', e => {
     </div>
   </form>
 </div>
+
 
 <script>
 let _ct = null;

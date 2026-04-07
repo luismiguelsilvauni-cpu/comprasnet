@@ -3284,6 +3284,328 @@ def tecnico_opcao_pdf_download(oid):
 @app.route('/tecnico/<int:eid>/importar-html', methods=['POST'])
 @login_required
 def tecnico_importar_html(eid):
+    """Parse John Deere JDPS HTML - table#optioninfo."""
+    Equipamento.query.get_or_404(eid)
+    f = request.files.get('html_file')
+    if not f:
+        flash('Nenhum ficheiro enviado.', 'error')
+        return redirect(url_for('tecnico_detalhe', eid=eid))
+    try:
+        raw = f.read()
+        for enc in ('utf-8', 'latin-1', 'cp1252'):
+            try: content = raw.decode(enc); break
+            except Exception: content = raw.decode('latin-1', errors='replace')
+
+        from html.parser import HTMLParser
+
+        class JDPSParser(HTMLParser):
+            """
+            Each <tr class="no-break"> has these TDs in order:
+            0: option name (trans=en_US)
+            1: hidden (trans=other, display:none) - skip
+            2: Ordered (plain td, e.g. 1550)
+            3: Factory (td with <a> link, e.g. 1550)
+            4: Distributor (td name2=viewDistribOption, e.g. 1524)
+            5+: hidden edit inputs - skip
+            """
+            def __init__(self):
+                super().__init__()
+                self.rows = []
+                self.in_table = False
+                self.table_depth = 0
+                self.in_tr = False
+                self.cells = []   # list of (attrs_dict, text)
+                self.in_td = False
+                self.cur_attrs = {}
+                self.cur_text = ''
+
+            def handle_starttag(self, tag, attrs):
+                a = dict(attrs)
+                if tag == 'table':
+                    if a.get('id') == 'optioninfo':
+                        self.in_table = True
+                        self.table_depth = 1
+                    elif self.in_table:
+                        self.table_depth += 1
+                if self.in_table and self.table_depth == 1:
+                    if tag == 'tr':
+                        self.in_tr = True
+                        self.cells = []
+                    elif tag == 'td' and self.in_tr:
+                        self.in_td = True
+                        self.cur_attrs = a
+                        self.cur_text = ''
+
+            def handle_endtag(self, tag):
+                if tag == 'table' and self.in_table:
+                    self.table_depth -= 1
+                    if self.table_depth == 0:
+                        self.in_table = False
+                if self.in_table and self.table_depth == 1:
+                    if tag == 'td' and self.in_td:
+                        self.in_td = False
+                        self.cells.append((dict(self.cur_attrs), self.cur_text.strip()))
+                    elif tag == 'tr' and self.in_tr:
+                        self.in_tr = False
+                        self._process_row()
+
+            def handle_data(self, data):
+                if self.in_td:
+                    self.cur_text += data
+
+            def _process_row(self):
+                # Filter out hidden cells (trans=other or name2=editDistribOption or width=100px)
+                visible = [(a, t) for a, t in self.cells
+                           if a.get('trans') != 'other'
+                           and a.get('name2') != 'editDistribOption'
+                           and not (a.get('width') == '100px' and a.get('align') == 'center')]
+
+                if len(visible) < 2:
+                    return
+
+                option_name = ''
+                ordered = ''
+                factory = ''
+                distributor = ''
+
+                for a, t in visible:
+                    clean = t.replace('*', '').strip()
+                    if a.get('trans') == 'en_US':
+                        option_name = clean
+                    elif a.get('name2') == 'viewDistribOption':
+                        distributor = clean
+                    elif option_name and not ordered and not a.get('trans') and not a.get('name2'):
+                        ordered = clean
+                    elif option_name and ordered and not factory and not a.get('trans') and not a.get('name2'):
+                        factory = clean
+
+                if option_name:
+                    self.rows.append({
+                        'option': option_name,
+                        'ordered': ordered,
+                        'factory': factory,
+                        'distributor': distributor,
+                    })
+
+        parser = JDPSParser()
+        parser.feed(content)
+        app.logger.info(f"JDPS: {len(parser.rows)} rows. First: {parser.rows[0] if parser.rows else None}")
+
+        added = 0
+        ordem_start = EquipamentoOpcao.query.filter_by(equipamento_id=eid).count()
+        for row in parser.rows:
+            if not row['option']: continue
+            o = EquipamentoOpcao(
+                equipamento_id=eid,
+                option_name=row['option'],
+                ordered=row['ordered'],
+                factory=row['factory'],
+                distributor=row['distributor'],
+                ordem=ordem_start + added,
+            )
+            db.session.add(o)
+            added += 1
+        db.session.commit()
+        flash(f'Importados {added} option codes com sucesso.', 'success')
+    except Exception as e:
+        app.logger.error(f"JDPS import error: {e}")
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+
+def tecnico_consumivel_adicionar(eid):
+    Equipamento.query.get_or_404(eid)
+    c = EquipamentoConsumivel(
+        equipamento_id=eid,
+        ref=request.form.get('ref','').strip(),
+        designacao=request.form.get('designacao','').strip(),
+        unidade=request.form.get('unidade','un').strip(),
+        quantidade=float(request.form.get('quantidade', 1) or 1),
+        notas=request.form.get('notas','').strip(),
+        ordem=EquipamentoConsumivel.query.filter_by(equipamento_id=eid).count(),
+    )
+    db.session.add(c)
+    db.session.commit()
+    return redirect(url_for('tecnico_consumiveis', eid=eid))
+
+@app.route('/tecnico/consumivel/<int:cid>/apagar', methods=['POST'])
+@login_required
+def tecnico_consumivel_apagar(cid):
+    c = EquipamentoConsumivel.query.get_or_404(cid)
+    eid = c.equipamento_id
+    db.session.delete(c)
+    db.session.commit()
+    return redirect(url_for('tecnico_consumiveis', eid=eid))
+
+@app.route('/tecnico/consumivel/<int:cid>/editar', methods=['POST'])
+@login_required
+def tecnico_consumivel_editar(cid):
+    c = EquipamentoConsumivel.query.get_or_404(cid)
+    c.ref        = request.form.get('ref', c.ref)
+    c.designacao = request.form.get('designacao', c.designacao)
+    c.unidade    = request.form.get('unidade', c.unidade)
+    c.quantidade = float(request.form.get('quantidade', c.quantidade) or 1)
+    c.notas      = request.form.get('notas', c.notas)
+    db.session.commit()
+    return redirect(url_for('tecnico_consumiveis', eid=c.equipamento_id))
+
+
+# ── MÓDULO TÉCNICO — GESTÃO DE EQUIPAMENTOS ────────────────────────────────
+
+UPLOAD_TECNICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'tecnico')
+
+def ensure_upload_dir():
+    os.makedirs(UPLOAD_TECNICO, exist_ok=True)
+
+@app.route('/tecnico')
+@login_required
+def tecnico():
+    q = request.args.get('q', '').strip()
+    query = Equipamento.query
+    if q:
+        query = query.filter(
+            db.or_(
+                Equipamento.serial_number.ilike(f'%{q}%'),
+                Equipamento.model.ilike(f'%{q}%'),
+                Equipamento.base_code.ilike(f'%{q}%'),
+            )
+        )
+    equipamentos = query.order_by(Equipamento.criado_em.desc()).all()
+    return render_template('tecnico.html', equipamentos=equipamentos, q=q)
+
+@app.route('/tecnico/novo', methods=['GET', 'POST'])
+@login_required
+def tecnico_novo():
+    if request.method == 'POST':
+        e = Equipamento(
+            cliente_nome=request.form.get('cliente_nome','').strip(),
+            embarcacao=request.form.get('embarcacao','').strip(),
+            motor_modelo=request.form.get('motor_modelo','').strip(),
+            motor_potencia=request.form.get('motor_potencia','').strip(),
+            serial_number=request.form.get('serial_number','').strip(),
+            base_code=request.form.get('base_code','').strip(),
+            manufactured_date=request.form.get('manufactured_date','').strip(),
+            material=request.form.get('material','').strip(),
+            caixa_modelo=request.form.get('caixa_modelo','').strip(),
+            caixa_ratio=request.form.get('caixa_ratio','').strip(),
+            caixa_serial=request.form.get('caixa_serial','').strip(),
+            notas=request.form.get('notas','').strip(),
+        )
+        db.session.add(e)
+        db.session.commit()
+        return redirect(url_for('tecnico_detalhe', eid=e.id))
+    return render_template('tecnico_form.html', equipamento=None)
+
+@app.route('/tecnico/<int:eid>')
+@login_required
+def tecnico_detalhe(eid):
+    e = Equipamento.query.get_or_404(eid)
+    opcoes = EquipamentoOpcao.query.filter_by(equipamento_id=eid).order_by(EquipamentoOpcao.ordem).all()
+    return render_template('tecnico_detalhe.html', equipamento=e, opcoes=opcoes)
+
+@app.route('/tecnico/<int:eid>/editar', methods=['GET', 'POST'])
+@login_required
+def tecnico_editar(eid):
+    e = Equipamento.query.get_or_404(eid)
+    if request.method == 'POST':
+        e.cliente_nome      = request.form.get('cliente_nome','').strip()
+        e.embarcacao        = request.form.get('embarcacao','').strip()
+        e.motor_modelo      = request.form.get('motor_modelo','').strip()
+        e.motor_potencia    = request.form.get('motor_potencia','').strip()
+        e.serial_number     = request.form.get('serial_number','').strip()
+        e.base_code         = request.form.get('base_code','').strip()
+        e.manufactured_date = request.form.get('manufactured_date','').strip()
+        e.material          = request.form.get('material','').strip()
+        e.caixa_modelo      = request.form.get('caixa_modelo','').strip()
+        e.caixa_ratio       = request.form.get('caixa_ratio','').strip()
+        e.caixa_serial      = request.form.get('caixa_serial','').strip()
+        e.notas             = request.form.get('notas','').strip()
+        db.session.commit()
+        return redirect(url_for('tecnico_detalhe', eid=eid))
+    return render_template('tecnico_form.html', equipamento=e)
+
+@app.route('/tecnico/<int:eid>/apagar', methods=['POST'])
+@login_required
+def tecnico_apagar(eid):
+    e = Equipamento.query.get_or_404(eid)
+    db.session.delete(e)
+    db.session.commit()
+    return redirect(url_for('tecnico'))
+
+@app.route('/tecnico/<int:eid>/opcao', methods=['POST'])
+@login_required
+def tecnico_opcao_criar(eid):
+    Equipamento.query.get_or_404(eid)
+    o = EquipamentoOpcao(
+        equipamento_id=eid,
+        option_name=request.form.get('option_name','').strip(),
+        ordered=request.form.get('ordered','').strip(),
+        factory=request.form.get('factory','').strip(),
+        distributor=request.form.get('distributor','').strip(),
+        ordem=EquipamentoOpcao.query.filter_by(equipamento_id=eid).count(),
+    )
+    db.session.add(o)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+@app.route('/tecnico/opcao/<int:oid>/editar', methods=['POST'])
+@login_required
+def tecnico_opcao_editar(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    o.option_name  = request.form.get('option_name', o.option_name)
+    o.ordered      = request.form.get('ordered', o.ordered)
+    o.factory      = request.form.get('factory', o.factory)
+    o.distributor  = request.form.get('distributor', o.distributor)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+
+@app.route('/tecnico/opcao/<int:oid>/apagar', methods=['POST'])
+@login_required
+def tecnico_opcao_apagar(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    eid = o.equipamento_id
+    db.session.delete(o)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+@app.route('/tecnico/opcao/<int:oid>/upload', methods=['POST'])
+@login_required
+def tecnico_opcao_upload(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    f = request.files.get('pdf')
+    if not f or not f.filename.lower().endswith('.pdf'):
+        flash('Ficheiro inválido — apenas PDF.', 'error')
+        return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+    ensure_upload_dir()
+    safe = f"{oid}_{f.filename.replace(' ','_')}"
+    path = os.path.join(UPLOAD_TECNICO, safe)
+    f.save(path)
+    o.pdf_filename = f.filename
+    o.pdf_path = safe
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+
+@app.route('/tecnico/opcao/<int:oid>/pdf')
+@login_required
+def tecnico_opcao_pdf(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    if not o.pdf_path:
+        return 'Sem PDF', 404
+    return send_from_directory(UPLOAD_TECNICO, o.pdf_path,
+                               as_attachment=False, download_name=o.pdf_filename)
+
+@app.route('/tecnico/opcao/<int:oid>/pdf/download')
+@login_required
+def tecnico_opcao_pdf_download(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    if not o.pdf_path:
+        return 'Sem PDF', 404
+    return send_from_directory(UPLOAD_TECNICO, o.pdf_path,
+                               as_attachment=True, download_name=o.pdf_filename)
+
+@app.route('/tecnico/<int:eid>/importar-html', methods=['POST'])
+@login_required
+def tecnico_importar_html(eid):
     """Parse JDPS HTML and extract Option Codes."""
     Equipamento.query.get_or_404(eid)
     f = request.files.get('html_file')
