@@ -1,11 +1,74 @@
 {% extends "base.html" %}
-{% block title %}{{ equipamento.serial_number }} · Técnico{% endblock %}
-{% block page_title %}Option Codes{% endblock %}
+{% block title %}{{ equipamento.serial_number }} · Técnico
+<script>
+function apagarSelecionados() {
+  const checked = Array.from(document.querySelectorAll('.row-check:checked'));
+  if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
+  if (!confirm('Apagar ' + checked.length + ' linha(s)?')) return;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
+  checked.forEach(c => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'opcao_ids';
+    input.value = c.value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+
+{% endblock %}
+{% block page_title %}Option Codes
+<script>
+function apagarSelecionados() {
+  const checked = Array.from(document.querySelectorAll('.row-check:checked'));
+  if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
+  if (!confirm('Apagar ' + checked.length + ' linha(s)?')) return;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
+  checked.forEach(c => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'opcao_ids';
+    input.value = c.value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+
+{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">← Voltar</a>
   <a href="{{ url_for('tecnico_consumiveis', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📋 Consumíveis ({{ equipamento.consumiveis|length }})</a>
   <a href="{{ url_for('tecnico_editar', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">Editar</a>
+
+<script>
+function apagarSelecionados() {
+  const checked = Array.from(document.querySelectorAll('.row-check:checked'));
+  if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
+  if (!confirm('Apagar ' + checked.length + ' linha(s)?')) return;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
+  checked.forEach(c => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'opcao_ids';
+    input.value = c.value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+
 {% endblock %}
 
 {% block content %}
@@ -123,11 +186,10 @@
 
 <!-- Option Codes table -->
 {% if opcoes %}
-<form method="post" action="{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}" id="bulkForm">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
   <input type="checkbox" id="selectAll" onchange="document.querySelectorAll('.row-check').forEach(c=>c.checked=this.checked)" title="Seleccionar todos">
   <label for="selectAll" style="font-size:12px;color:var(--text-muted)">Seleccionar todos</label>
-  <button type="submit" onclick="return confirm('Apagar seleccionados?')" class="btn btn-ghost btn-sm" style="color:var(--danger);margin-left:8px">🗑 Apagar seleccionados</button>
+  <button type="button" onclick="apagarSelecionados()" class="btn btn-ghost btn-sm" style="color:var(--danger);margin-left:8px">🗑 Apagar seleccionados</button>
 </div>
 <div class="card" style="padding:0;overflow:hidden">
   <table class="table" style="font-size:13px">
@@ -203,7 +265,6 @@
     </tbody>
   </table>
 </div>
-</form>
 {% else %}
 <div class="card" style="text-align:center;padding:32px;border-style:dashed">
   <div style="font-size:13px;color:var(--text-muted)">Sem option codes. Adicione manualmente ou importe de um ficheiro HTML.</div>
@@ -227,4 +288,25 @@ function imprimirPDF(oid) {
   win.onload = function() { win.print(); };
 }
 </script>
+
+<script>
+function apagarSelecionados() {
+  const checked = Array.from(document.querySelectorAll('.row-check:checked'));
+  if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
+  if (!confirm('Apagar ' + checked.length + ' linha(s)?')) return;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
+  checked.forEach(c => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'opcao_ids';
+    input.value = c.value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+
 {% endblock %}
