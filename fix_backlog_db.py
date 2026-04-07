@@ -39,3 +39,18 @@ with app.app_context():
         print("OK: tabela changelog_entry criada")
     else:
         print("OK: changelog_entry ja existe")
+
+    # Add new columns to equipamento if missing
+    eq_cols = [c['name'] for c in insp.get_columns('equipamento')] if 'equipamento' in insp.get_table_names() else []
+    new_cols = [
+        ('cliente_nome', 'TEXT'), ('embarcacao', 'TEXT'), ('motor_modelo', 'TEXT'),
+        ('motor_potencia', 'TEXT'), ('caixa_modelo', 'TEXT'), ('caixa_ratio', 'TEXT'), ('caixa_serial', 'TEXT'),
+    ]
+    for col, typ in new_cols:
+        if col not in eq_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE equipamento ADD COLUMN {col} {typ}"))
+                conn.commit()
+                print(f"OK: equipamento.{col} adicionado")
+            except Exception as e:
+                print(f"equipamento.{col}: {e}")

@@ -4,6 +4,7 @@
 
 {% block topbar_actions %}
   <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+  <a href="{{ url_for('tecnico_consumiveis', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📋 Consumíveis ({{ equipamento.consumiveis|length }})</a>
   <a href="{{ url_for('tecnico_editar', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">Editar</a>
 {% endblock %}
 
@@ -18,26 +19,46 @@
 
 <!-- Equipment Header -->
 <div class="card mb-16" style="padding:16px 20px">
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">
     <div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Serial Number</div>
-      <div style="font-size:16px;font-weight:700;font-family:monospace;color:var(--accent)">{{ equipamento.serial_number }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">Cliente</div>
+      <div style="font-weight:600;font-size:13px">{{ equipamento.cliente_nome or '—' }}</div>
     </div>
     <div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Base Code</div>
-      <div style="font-size:14px;font-weight:600">{{ equipamento.base_code or '—' }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">Embarcação</div>
+      <div style="font-weight:600;font-size:13px;color:var(--accent)">{{ equipamento.embarcacao or '—' }}</div>
     </div>
     <div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Model</div>
-      <div style="font-size:14px;font-weight:600">{{ equipamento.model or '—' }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">Motor</div>
+      <div style="font-size:13px">{{ equipamento.motor_modelo or '—' }}</div>
     </div>
     <div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Material</div>
-      <div style="font-size:13px;color:var(--text-muted)">{{ equipamento.material or '—' }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">Potência</div>
+      <div style="font-size:13px">{{ equipamento.motor_potencia or '—' }}</div>
     </div>
     <div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Manufactured Date</div>
+      <div style="font-size:10px;color:var(--text-muted)">Nº Série Motor</div>
+      <div class="mono" style="font-size:13px;color:var(--accent)">{{ equipamento.serial_number or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--text-muted)">Base Code</div>
+      <div class="mono" style="font-size:13px">{{ equipamento.base_code or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--text-muted)">Data Fabricação</div>
       <div style="font-size:13px">{{ equipamento.manufactured_date or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--text-muted)">Caixa Red.</div>
+      <div style="font-size:13px">{{ equipamento.caixa_modelo or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--text-muted)">Ratio</div>
+      <div class="mono" style="font-size:13px">{{ equipamento.caixa_ratio or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--text-muted)">Nº Série Caixa</div>
+      <div class="mono" style="font-size:13px">{{ equipamento.caixa_serial or '—' }}</div>
     </div>
   </div>
   {% if equipamento.notas %}

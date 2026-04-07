@@ -2563,14 +2563,37 @@ class ChangelogEntry(db.Model):
 class Equipamento(db.Model):
     __tablename__ = 'equipamento'
     id              = db.Column(db.Integer, primary_key=True)
-    serial_number   = db.Column(db.String(100), nullable=False, index=True)
+    # Cliente / Embarcacao
+    cliente_nome    = db.Column(db.String(200))
+    embarcacao      = db.Column(db.String(200))
+    # Motor
+    motor_modelo    = db.Column(db.String(200))
+    motor_potencia  = db.Column(db.String(50))
+    serial_number   = db.Column(db.String(100), index=True)
     base_code       = db.Column(db.String(100))
-    model           = db.Column(db.String(200))
-    material        = db.Column(db.String(200))
     manufactured_date = db.Column(db.String(50))
+    # Caixa Redutora
+    caixa_modelo    = db.Column(db.String(200))
+    caixa_ratio     = db.Column(db.String(50))
+    caixa_serial    = db.Column(db.String(100))
+    # Legacy / outros
+    material        = db.Column(db.String(200))
     notas           = db.Column(db.Text, default='')
     criado_em       = db.Column(db.DateTime, default=datetime.now)
     opcoes          = db.relationship('EquipamentoOpcao', backref='equipamento', lazy=True, cascade='all, delete-orphan')
+    consumiveis     = db.relationship('EquipamentoConsumivel', backref='equipamento', lazy=True, cascade='all, delete-orphan')
+
+class EquipamentoConsumivel(db.Model):
+    __tablename__ = 'equipamento_consumivel'
+    id              = db.Column(db.Integer, primary_key=True)
+    equipamento_id  = db.Column(db.Integer, db.ForeignKey('equipamento.id'), nullable=False)
+    ref             = db.Column(db.String(50))
+    designacao      = db.Column(db.String(300))
+    unidade         = db.Column(db.String(20))
+    quantidade      = db.Column(db.Float, default=1)
+    notas           = db.Column(db.String(300))
+    ordem           = db.Column(db.Integer, default=0)
+
 
 class EquipamentoOpcao(db.Model):
     __tablename__ = 'equipamento_opcao'
@@ -3050,6 +3073,59 @@ def api_inventario_kpis():
     except Exception as e:
         app.logger.error(f"inventario KPIs error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/tecnico/<int:eid>/consumiveis')
+@login_required
+def tecnico_consumiveis(eid):
+    e = Equipamento.query.get_or_404(eid)
+    consumiveis = EquipamentoConsumivel.query.filter_by(equipamento_id=eid).order_by(EquipamentoConsumivel.ordem).all()
+    q = request.args.get('q', '').strip()
+    artigos_sugeridos = []
+    if q and len(q) >= 2:
+        artigos_sugeridos = ArtigoPHC.query.filter(
+            db.or_(ArtigoPHC.referencia.ilike(f'%{q}%'), ArtigoPHC.designacao.ilike(f'%{q}%'))
+        ).limit(10).all()
+    return render_template('tecnico_consumiveis.html', equipamento=e, consumiveis=consumiveis,
+                           artigos_sugeridos=artigos_sugeridos, q=q)
+
+@app.route('/tecnico/<int:eid>/consumiveis/adicionar', methods=['POST'])
+@login_required
+def tecnico_consumivel_adicionar(eid):
+    Equipamento.query.get_or_404(eid)
+    c = EquipamentoConsumivel(
+        equipamento_id=eid,
+        ref=request.form.get('ref','').strip(),
+        designacao=request.form.get('designacao','').strip(),
+        unidade=request.form.get('unidade','un').strip(),
+        quantidade=float(request.form.get('quantidade', 1) or 1),
+        notas=request.form.get('notas','').strip(),
+        ordem=EquipamentoConsumivel.query.filter_by(equipamento_id=eid).count(),
+    )
+    db.session.add(c)
+    db.session.commit()
+    return redirect(url_for('tecnico_consumiveis', eid=eid))
+
+@app.route('/tecnico/consumivel/<int:cid>/apagar', methods=['POST'])
+@login_required
+def tecnico_consumivel_apagar(cid):
+    c = EquipamentoConsumivel.query.get_or_404(cid)
+    eid = c.equipamento_id
+    db.session.delete(c)
+    db.session.commit()
+    return redirect(url_for('tecnico_consumiveis', eid=eid))
+
+@app.route('/tecnico/consumivel/<int:cid>/editar', methods=['POST'])
+@login_required
+def tecnico_consumivel_editar(cid):
+    c = EquipamentoConsumivel.query.get_or_404(cid)
+    c.ref        = request.form.get('ref', c.ref)
+    c.designacao = request.form.get('designacao', c.designacao)
+    c.unidade    = request.form.get('unidade', c.unidade)
+    c.quantidade = float(request.form.get('quantidade', c.quantidade) or 1)
+    c.notas      = request.form.get('notas', c.notas)
+    db.session.commit()
+    return redirect(url_for('tecnico_consumiveis', eid=c.equipamento_id))
 
 
 # ── MÓDULO TÉCNICO — GESTÃO DE EQUIPAMENTOS ────────────────────────────────

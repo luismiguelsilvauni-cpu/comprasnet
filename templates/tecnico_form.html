@@ -1,49 +1,76 @@
 {% extends "base.html" %}
-{% block title %}{% if equipamento %}Editar{% else %}Novo{% endif %} Equipamento · ComprasNet{% endblock %}
+{% block title %}{% if equipamento %}Editar{% else %}Novo{% endif %} · Técnico{% endblock %}
 {% block page_title %}{% if equipamento %}Editar Equipamento{% else %}Novo Equipamento{% endif %}{% endblock %}
-
 {% block topbar_actions %}
   <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">Cancelar</a>
 {% endblock %}
-
 {% block content %}
-<div class="card" style="max-width:600px">
+<div class="card" style="max-width:700px">
   <form method="post">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div class="form-group" style="grid-column:span 2">
-        <label>Serial Number *</label>
-        <input type="text" name="serial_number" value="{{ equipamento.serial_number if equipamento else '' }}"
-          required class="input" placeholder="Ex: SN-2024-001234">
+    <!-- Cliente / Embarcacao -->
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Cliente / Embarcação</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="form-group" style="margin:0">
+        <label>Cliente</label>
+        <input type="text" name="cliente_nome" value="{{ equipamento.cliente_nome if equipamento else '' }}" class="input" placeholder="Nome do cliente">
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin:0">
+        <label>Embarcação</label>
+        <input type="text" name="embarcacao" value="{{ equipamento.embarcacao if equipamento else '' }}" class="input" placeholder="Nome da embarcação">
+      </div>
+    </div>
+    <!-- Motor -->
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Motor</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="form-group" style="margin:0">
+        <label>Modelo</label>
+        <input type="text" name="motor_modelo" value="{{ equipamento.motor_modelo if equipamento else '' }}" class="input" placeholder="Ex: Volvo D13K">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Potência</label>
+        <input type="text" name="motor_potencia" value="{{ equipamento.motor_potencia if equipamento else '' }}" class="input" placeholder="Ex: 500 CV">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Nº Série</label>
+        <input type="text" name="serial_number" value="{{ equipamento.serial_number if equipamento else '' }}" class="input" placeholder="Serial Number">
+      </div>
+      <div class="form-group" style="margin:0">
         <label>Base Code</label>
-        <input type="text" name="base_code" value="{{ equipamento.base_code if equipamento else '' }}"
-          class="input" placeholder="Ex: BC-450">
+        <input type="text" name="base_code" value="{{ equipamento.base_code if equipamento else '' }}" class="input" placeholder="Base Code">
       </div>
-      <div class="form-group">
-        <label>Model</label>
-        <input type="text" name="model" value="{{ equipamento.model if equipamento else '' }}"
-          class="input" placeholder="Ex: Volvo D13K">
+      <div class="form-group" style="margin:0">
+        <label>Data Fabricação</label>
+        <input type="text" name="manufactured_date" value="{{ equipamento.manufactured_date if equipamento else '' }}" class="input" placeholder="Ex: 2023-08">
       </div>
-      <div class="form-group" style="grid-column:span 2">
+      <div class="form-group" style="margin:0">
         <label>Material</label>
-        <input type="text" name="material" value="{{ equipamento.material if equipamento else '' }}"
-          class="input" placeholder="Ex: Inox 316L">
+        <input type="text" name="material" value="{{ equipamento.material if equipamento else '' }}" class="input" placeholder="Material">
       </div>
-      <div class="form-group">
-        <label>Manufactured Date</label>
-        <input type="text" name="manufactured_date" value="{{ equipamento.manufactured_date if equipamento else '' }}"
-          class="input" placeholder="Ex: 2023-08-15">
+    </div>
+    <!-- Caixa Redutora -->
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Caixa Inversora / Redutora</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="form-group" style="margin:0">
+        <label>Marca / Modelo</label>
+        <input type="text" name="caixa_modelo" value="{{ equipamento.caixa_modelo if equipamento else '' }}" class="input" placeholder="Ex: ZF 280A">
       </div>
-      <div class="form-group" style="grid-column:span 2">
-        <label>Notas</label>
-        <textarea name="notas" rows="3" class="input" placeholder="Observações...">{{ equipamento.notas if equipamento else '' }}</textarea>
+      <div class="form-group" style="margin:0">
+        <label>Ratio / Redução</label>
+        <input type="text" name="caixa_ratio" value="{{ equipamento.caixa_ratio if equipamento else '' }}" class="input" placeholder="Ex: 2.50:1">
       </div>
+      <div class="form-group" style="margin:0">
+        <label>Nº Série Caixa</label>
+        <input type="text" name="caixa_serial" value="{{ equipamento.caixa_serial if equipamento else '' }}" class="input" placeholder="Serial Number">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notas</label>
+      <textarea name="notas" rows="3" class="input" placeholder="Observações...">{{ equipamento.notas if equipamento else '' }}</textarea>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
       {% if equipamento %}
       <form method="post" action="{{ url_for('tecnico_apagar', eid=equipamento.id) }}"
-        onsubmit="return confirm('Apagar este equipamento e todas as opções?')" style="margin:0">
+        onsubmit="return confirm('Apagar?')" style="margin:0">
         <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">Apagar</button>
       </form>
       {% endif %}
