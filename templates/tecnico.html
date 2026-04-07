@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Técnico · ComprasNet{% endblock %}
+{% block page_title %}Gestão Técnica{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('tecnico_novo') }}" class="btn btn-primary btn-sm">+ Novo Equipamento</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:16px">
+  <form method="get" style="display:flex;gap:8px;flex:1">
+    <input type="text" name="q" value="{{ q }}" placeholder="Pesquisar por nº série, modelo ou base code..."
+      class="input" style="flex:1">
+    <button type="submit" class="btn btn-ghost btn-sm">Pesquisar</button>
+    {% if q %}<a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">Limpar</a>{% endif %}
+  </form>
+</div>
+
+{% if equipamentos %}
+<div class="card" style="padding:0">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Serial Number</th>
+        <th>Base Code</th>
+        <th>Model</th>
+        <th>Material</th>
+        <th>Manufactured Date</th>
+        <th>PDFs</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in equipamentos %}
+      <tr>
+        <td class="mono" style="color:var(--accent);font-weight:600">
+          <a href="{{ url_for('tecnico_detalhe', eid=e.id) }}">{{ e.serial_number }}</a>
+        </td>
+        <td class="mono">{{ e.base_code or '-' }}</td>
+        <td>{{ e.model or '-' }}</td>
+        <td style="font-size:12px;color:var(--text-muted)">{{ e.material or '-' }}</td>
+        <td style="font-size:12px">{{ e.manufactured_date or '-' }}</td>
+        <td>
+          {% set pdfs = e.opcoes|selectattr('pdf_path')|list %}
+          {% if pdfs %}
+          <span style="font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(59,110,240,.15);color:var(--accent)">
+            {{ pdfs|length }} PDF{{ 's' if pdfs|length > 1 else '' }}
+          </span>
+          {% else %}-{% endif %}
+        </td>
+        <td style="text-align:right">
+          <a href="{{ url_for('tecnico_detalhe', eid=e.id) }}" class="btn btn-ghost btn-sm">Ver</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px">
+  <div style="font-size:40px;margin-bottom:12px">🔧</div>
+  <div style="font-weight:600;margin-bottom:6px">Sem equipamentos{% if q %} para "{{ q }}"{% endif %}</div>
+  <div style="color:var(--text-muted);font-size:13px;margin-bottom:16px">
+    Adicione um equipamento para começar a gerir documentação técnica.
+  </div>
+  <a href="{{ url_for('tecnico_novo') }}" class="btn btn-primary btn-sm">+ Novo Equipamento</a>
+</div>
+{% endif %}
+{% endblock %}

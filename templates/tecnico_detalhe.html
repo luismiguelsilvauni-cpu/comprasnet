@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}{{ equipamento.serial_number }} · Técnico{% endblock %}
+{% block page_title %}Option Codes{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+  <a href="{{ url_for('tecnico_editar', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">Editar</a>
+{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- Equipment Header -->
+<div class="card mb-16" style="padding:16px 20px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px">
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Serial Number</div>
+      <div style="font-size:16px;font-weight:700;font-family:monospace;color:var(--accent)">{{ equipamento.serial_number }}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Base Code</div>
+      <div style="font-size:14px;font-weight:600">{{ equipamento.base_code or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Model</div>
+      <div style="font-size:14px;font-weight:600">{{ equipamento.model or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Material</div>
+      <div style="font-size:13px;color:var(--text-muted)">{{ equipamento.material or '—' }}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Manufactured Date</div>
+      <div style="font-size:13px">{{ equipamento.manufactured_date or '—' }}</div>
+    </div>
+  </div>
+  {% if equipamento.notas %}
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted)">{{ equipamento.notas }}</div>
+  {% endif %}
+</div>
+
+<!-- Import HTML + Add row actions -->
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+  <div style="font-size:13px;font-weight:600;flex:1">Option Codes <span style="color:var(--text-muted);font-weight:400">({{ opcoes|length }} linhas)</span></div>
+  <button onclick="document.getElementById('formAddOpcao').style.display=document.getElementById('formAddOpcao').style.display==='none'?'block':'none'"
+    class="btn btn-ghost btn-sm">+ Adicionar linha</button>
+  <button onclick="document.getElementById('formImportHTML').style.display=document.getElementById('formImportHTML').style.display==='none'?'block':'none'"
+    class="btn btn-ghost btn-sm">📥 Importar HTML</button>
+</div>
+
+<!-- Add option form -->
+<div id="formAddOpcao" style="display:none;margin-bottom:12px">
+  <div class="card" style="padding:14px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">Nova Linha</div>
+    <form method="post" action="{{ url_for('tecnico_opcao_criar', eid=equipamento.id) }}">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;align-items:end">
+        <div class="form-group" style="margin:0">
+          <label>Option Name *</label>
+          <input type="text" name="option_name" required class="input" placeholder="Ex: Engine Type">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Ordered</label>
+          <input type="text" name="ordered" class="input" placeholder="Ex: D13K500">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Factory</label>
+          <input type="text" name="factory" class="input" placeholder="Ex: STD">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Distributor</label>
+          <input type="text" name="distributor" class="input" placeholder="Opcional">
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:flex-end">
+        <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Import HTML form -->
+<div id="formImportHTML" style="display:none;margin-bottom:12px">
+  <div class="card" style="padding:14px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px">Importar Option Codes de HTML</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+      O sistema vai analisar o ficheiro HTML e extrair automaticamente as colunas <strong>Option Name</strong>, <strong>Ordered</strong> e <strong>Factory</strong>.
+    </div>
+    <form method="post" action="{{ url_for('tecnico_importar_html', eid=equipamento.id) }}" enctype="multipart/form-data">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" name="html_file" accept=".html,.htm" required class="input" style="flex:1">
+        <button type="submit" class="btn btn-primary btn-sm">Importar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Option Codes table -->
+{% if opcoes %}
+<div class="card" style="padding:0;overflow:hidden">
+  <table class="table" style="font-size:13px">
+    <thead>
+      <tr>
+        <th style="width:32px">#</th>
+        <th>Option Name</th>
+        <th>Ordered</th>
+        <th>Factory</th>
+        <th>Distributor</th>
+        <th>PDF</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in opcoes %}
+      <tr id="row-{{ o.id }}">
+        <td style="color:var(--text-muted);font-size:11px">{{ loop.index }}</td>
+        <td style="font-weight:600">{{ o.option_name }}</td>
+        <td class="mono" style="font-size:12px">{{ o.ordered or '—' }}</td>
+        <td class="mono" style="font-size:12px">{{ o.factory or '—' }}</td>
+        <td style="font-size:12px;color:var(--text-muted)">{{ o.distributor or '—' }}</td>
+        <td>
+          {% if o.pdf_path %}
+          <div style="display:flex;gap:4px">
+            <a href="{{ url_for('tecnico_opcao_pdf', oid=o.id) }}" target="_blank"
+              class="btn btn-ghost btn-sm" title="Visualizar">👁</a>
+            <a href="{{ url_for('tecnico_opcao_pdf_download', oid=o.id) }}"
+              class="btn btn-ghost btn-sm" title="Download">⬇</a>
+            <button onclick="imprimirPDF({{ o.id }})" class="btn btn-ghost btn-sm" title="Imprimir">🖨</button>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px">{{ o.pdf_filename }}</div>
+          {% else %}
+          <button onclick="mostrarUpload({{ o.id }})" class="btn btn-ghost btn-sm" style="font-size:11px">+ PDF</button>
+          <div id="upload-{{ o.id }}" style="display:none;margin-top:4px">
+            <form method="post" action="{{ url_for('tecnico_opcao_upload', oid=o.id) }}" enctype="multipart/form-data">
+              <input type="file" name="pdf" accept=".pdf" required style="font-size:11px;width:180px">
+              <button type="submit" class="btn btn-primary btn-sm" style="margin-top:4px">Upload</button>
+            </form>
+          </div>
+          {% endif %}
+        </td>
+        <td style="text-align:right">
+          <button onclick="mostrarEdicao({{ o.id }})" class="btn btn-ghost btn-sm" title="Editar">✏️</button>
+          <form method="post" action="{{ url_for('tecnico_opcao_apagar', oid=o.id) }}"
+            onsubmit="return confirm('Apagar esta linha?')" style="display:inline">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+          </form>
+        </td>
+      </tr>
+      <!-- Edit row -->
+      <tr id="edit-{{ o.id }}" style="display:none;background:var(--surface2)">
+        <td></td>
+        <td colspan="5">
+          <form method="post" action="{{ url_for('tecnico_opcao_editar', oid=o.id) }}">
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:8px 0">
+              <input type="text" name="option_name" value="{{ o.option_name }}" class="input" style="font-size:12px">
+              <input type="text" name="ordered" value="{{ o.ordered or '' }}" class="input" style="font-size:12px" placeholder="Ordered">
+              <input type="text" name="factory" value="{{ o.factory or '' }}" class="input" style="font-size:12px" placeholder="Factory">
+              <input type="text" name="distributor" value="{{ o.distributor or '' }}" class="input" style="font-size:12px" placeholder="Distributor">
+            </div>
+            <div style="display:flex;gap:6px;padding-bottom:6px">
+              <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+              <button type="button" onclick="mostrarEdicao({{ o.id }})" class="btn btn-ghost btn-sm">Cancelar</button>
+            </div>
+          </form>
+        </td>
+        <td></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:32px;border-style:dashed">
+  <div style="font-size:13px;color:var(--text-muted)">Sem option codes. Adicione manualmente ou importe de um ficheiro HTML.</div>
+</div>
+{% endif %}
+
+<script>
+function mostrarUpload(id) {
+  const el = document.getElementById('upload-'+id);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function mostrarEdicao(id) {
+  const row = document.getElementById('row-'+id);
+  const edit = document.getElementById('edit-'+id);
+  const shown = edit.style.display !== 'none';
+  edit.style.display = shown ? 'none' : 'table-row';
+  row.style.opacity = shown ? '1' : '.4';
+}
+function imprimirPDF(oid) {
+  const win = window.open('/tecnico/opcao/'+oid+'/pdf', '_blank');
+  win.onload = function() { win.print(); };
+}
+</script>
+{% endblock %}

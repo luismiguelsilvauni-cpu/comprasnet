@@ -270,6 +270,9 @@
             <a href="{{ url_for('stock') }}" class="nav-item {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
                 <span class="icon">📊</span><span>Stock</span>
             </a>
+            <a href="{{ url_for('tecnico') }}" class="nav-item {% if 'tecnico' in request.endpoint %}active{% endif %}">
+                <span class="icon">🔧</span><span>Técnico</span>
+            </a>
             <a href="{{ url_for('inventario') }}" class="nav-item {% if request.endpoint == 'inventario' %}active{% endif %}">
                 <span class="icon">📊</span><span>Análise de Inventário</span>
             </a>

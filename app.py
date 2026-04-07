@@ -2560,6 +2560,31 @@ class ChangelogEntry(db.Model):
     criado_em   = db.Column(db.DateTime, default=datetime.now)
 
 
+class Equipamento(db.Model):
+    __tablename__ = 'equipamento'
+    id              = db.Column(db.Integer, primary_key=True)
+    serial_number   = db.Column(db.String(100), nullable=False, index=True)
+    base_code       = db.Column(db.String(100))
+    model           = db.Column(db.String(200))
+    material        = db.Column(db.String(200))
+    manufactured_date = db.Column(db.String(50))
+    notas           = db.Column(db.Text, default='')
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
+    opcoes          = db.relationship('EquipamentoOpcao', backref='equipamento', lazy=True, cascade='all, delete-orphan')
+
+class EquipamentoOpcao(db.Model):
+    __tablename__ = 'equipamento_opcao'
+    id              = db.Column(db.Integer, primary_key=True)
+    equipamento_id  = db.Column(db.Integer, db.ForeignKey('equipamento.id'), nullable=False)
+    option_name     = db.Column(db.String(200), nullable=False)
+    ordered         = db.Column(db.String(200))
+    factory         = db.Column(db.String(200))
+    distributor     = db.Column(db.String(200))
+    pdf_filename    = db.Column(db.String(500))
+    pdf_path        = db.Column(db.String(1000))
+    ordem           = db.Column(db.Integer, default=0)
+
+
 class BacklogItem(db.Model):
     __tablename__ = 'backlog_item'
     id         = db.Column(db.Integer, primary_key=True)
@@ -3025,6 +3050,238 @@ def api_inventario_kpis():
     except Exception as e:
         app.logger.error(f"inventario KPIs error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+# ── MÓDULO TÉCNICO — GESTÃO DE EQUIPAMENTOS ────────────────────────────────
+
+UPLOAD_TECNICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'tecnico')
+
+def ensure_upload_dir():
+    os.makedirs(UPLOAD_TECNICO, exist_ok=True)
+
+@app.route('/tecnico')
+@login_required
+def tecnico():
+    q = request.args.get('q', '').strip()
+    query = Equipamento.query
+    if q:
+        query = query.filter(
+            db.or_(
+                Equipamento.serial_number.ilike(f'%{q}%'),
+                Equipamento.model.ilike(f'%{q}%'),
+                Equipamento.base_code.ilike(f'%{q}%'),
+            )
+        )
+    equipamentos = query.order_by(Equipamento.criado_em.desc()).all()
+    return render_template('tecnico.html', equipamentos=equipamentos, q=q)
+
+@app.route('/tecnico/novo', methods=['GET', 'POST'])
+@login_required
+def tecnico_novo():
+    if request.method == 'POST':
+        e = Equipamento(
+            serial_number=request.form.get('serial_number','').strip(),
+            base_code=request.form.get('base_code','').strip(),
+            model=request.form.get('model','').strip(),
+            material=request.form.get('material','').strip(),
+            manufactured_date=request.form.get('manufactured_date','').strip(),
+            notas=request.form.get('notas','').strip(),
+        )
+        db.session.add(e)
+        db.session.commit()
+        return redirect(url_for('tecnico_detalhe', eid=e.id))
+    return render_template('tecnico_form.html', equipamento=None)
+
+@app.route('/tecnico/<int:eid>')
+@login_required
+def tecnico_detalhe(eid):
+    e = Equipamento.query.get_or_404(eid)
+    opcoes = EquipamentoOpcao.query.filter_by(equipamento_id=eid).order_by(EquipamentoOpcao.ordem).all()
+    return render_template('tecnico_detalhe.html', equipamento=e, opcoes=opcoes)
+
+@app.route('/tecnico/<int:eid>/editar', methods=['GET', 'POST'])
+@login_required
+def tecnico_editar(eid):
+    e = Equipamento.query.get_or_404(eid)
+    if request.method == 'POST':
+        e.serial_number = request.form.get('serial_number','').strip()
+        e.base_code = request.form.get('base_code','').strip()
+        e.model = request.form.get('model','').strip()
+        e.material = request.form.get('material','').strip()
+        e.manufactured_date = request.form.get('manufactured_date','').strip()
+        e.notas = request.form.get('notas','').strip()
+        db.session.commit()
+        return redirect(url_for('tecnico_detalhe', eid=eid))
+    return render_template('tecnico_form.html', equipamento=e)
+
+@app.route('/tecnico/<int:eid>/apagar', methods=['POST'])
+@login_required
+def tecnico_apagar(eid):
+    e = Equipamento.query.get_or_404(eid)
+    db.session.delete(e)
+    db.session.commit()
+    return redirect(url_for('tecnico'))
+
+@app.route('/tecnico/<int:eid>/opcao', methods=['POST'])
+@login_required
+def tecnico_opcao_criar(eid):
+    Equipamento.query.get_or_404(eid)
+    o = EquipamentoOpcao(
+        equipamento_id=eid,
+        option_name=request.form.get('option_name','').strip(),
+        ordered=request.form.get('ordered','').strip(),
+        factory=request.form.get('factory','').strip(),
+        distributor=request.form.get('distributor','').strip(),
+        ordem=EquipamentoOpcao.query.filter_by(equipamento_id=eid).count(),
+    )
+    db.session.add(o)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+@app.route('/tecnico/opcao/<int:oid>/editar', methods=['POST'])
+@login_required
+def tecnico_opcao_editar(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    o.option_name  = request.form.get('option_name', o.option_name)
+    o.ordered      = request.form.get('ordered', o.ordered)
+    o.factory      = request.form.get('factory', o.factory)
+    o.distributor  = request.form.get('distributor', o.distributor)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+
+@app.route('/tecnico/opcao/<int:oid>/apagar', methods=['POST'])
+@login_required
+def tecnico_opcao_apagar(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    eid = o.equipamento_id
+    db.session.delete(o)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+@app.route('/tecnico/opcao/<int:oid>/upload', methods=['POST'])
+@login_required
+def tecnico_opcao_upload(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    f = request.files.get('pdf')
+    if not f or not f.filename.lower().endswith('.pdf'):
+        flash('Ficheiro inválido — apenas PDF.', 'error')
+        return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+    ensure_upload_dir()
+    safe = f"{oid}_{f.filename.replace(' ','_')}"
+    path = os.path.join(UPLOAD_TECNICO, safe)
+    f.save(path)
+    o.pdf_filename = f.filename
+    o.pdf_path = safe
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+
+@app.route('/tecnico/opcao/<int:oid>/pdf')
+@login_required
+def tecnico_opcao_pdf(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    if not o.pdf_path:
+        return 'Sem PDF', 404
+    return send_from_directory(UPLOAD_TECNICO, o.pdf_path,
+                               as_attachment=False, download_name=o.pdf_filename)
+
+@app.route('/tecnico/opcao/<int:oid>/pdf/download')
+@login_required
+def tecnico_opcao_pdf_download(oid):
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    if not o.pdf_path:
+        return 'Sem PDF', 404
+    return send_from_directory(UPLOAD_TECNICO, o.pdf_path,
+                               as_attachment=True, download_name=o.pdf_filename)
+
+@app.route('/tecnico/<int:eid>/importar-html', methods=['POST'])
+@login_required
+def tecnico_importar_html(eid):
+    """Parse HTML file and extract Option Codes automatically."""
+    Equipamento.query.get_or_404(eid)
+    f = request.files.get('html_file')
+    if not f:
+        flash('Nenhum ficheiro enviado.', 'error')
+        return redirect(url_for('tecnico_detalhe', eid=eid))
+    try:
+        from html.parser import HTMLParser
+        content = f.read().decode('utf-8', errors='replace')
+
+        class OptionParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.rows = []
+                self.in_table = False
+                self.in_row = False
+                self.current_row = []
+                self.in_td = False
+                self.current_text = ''
+                self.headers = []
+                self.header_row = True
+
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == 'table': self.in_table = True
+                if tag == 'tr' and self.in_table:
+                    self.in_row = True
+                    self.current_row = []
+                if tag in ('td', 'th') and self.in_row:
+                    self.in_td = True
+                    self.current_text = ''
+
+            def handle_endtag(self, tag):
+                if tag in ('td', 'th') and self.in_td:
+                    self.current_row.append(self.current_text.strip())
+                    self.in_td = False
+                if tag == 'tr' and self.in_row:
+                    if self.header_row:
+                        self.headers = self.current_row
+                        self.header_row = False
+                    else:
+                        if self.current_row:
+                            self.rows.append(self.current_row)
+                    self.in_row = False
+                if tag == 'table': self.in_table = False
+
+            def handle_data(self, data):
+                if self.in_td:
+                    self.current_text += data
+
+        parser = OptionParser()
+        parser.feed(content)
+
+        # Map columns
+        hdrs = [h.lower().strip() for h in parser.headers]
+        def col(row, names):
+            for n in names:
+                for i, h in enumerate(hdrs):
+                    if n in h and i < len(row):
+                        return row[i]
+            return ''
+
+        added = 0
+        ordem_start = EquipamentoOpcao.query.filter_by(equipamento_id=eid).count()
+        for row in parser.rows:
+            opt = col(row, ['option', 'name', 'code', 'descri'])
+            ord_ = col(row, ['ordered', 'order'])
+            fac  = col(row, ['factory', 'plant'])
+            dist = col(row, ['distribut', 'dealer'])
+            if opt:
+                o = EquipamentoOpcao(
+                    equipamento_id=eid,
+                    option_name=opt,
+                    ordered=ord_,
+                    factory=fac,
+                    distributor=dist,
+                    ordem=ordem_start + added,
+                )
+                db.session.add(o)
+                added += 1
+
+        db.session.commit()
+        flash(f'✅ {added} linhas importadas com sucesso.', 'success')
+    except Exception as e:
+        flash(f'Erro ao processar HTML: {e}', 'error')
+    return redirect(url_for('tecnico_detalhe', eid=eid))
 
 
 def init_db():
