@@ -123,10 +123,17 @@
 
 <!-- Option Codes table -->
 {% if opcoes %}
+<form method="post" action="{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}" id="bulkForm">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+  <input type="checkbox" id="selectAll" onchange="document.querySelectorAll('.row-check').forEach(c=>c.checked=this.checked)" title="Seleccionar todos">
+  <label for="selectAll" style="font-size:12px;color:var(--text-muted)">Seleccionar todos</label>
+  <button type="submit" onclick="return confirm('Apagar seleccionados?')" class="btn btn-ghost btn-sm" style="color:var(--danger);margin-left:8px">🗑 Apagar seleccionados</button>
+</div>
 <div class="card" style="padding:0;overflow:hidden">
   <table class="table" style="font-size:13px">
     <thead>
       <tr>
+        <th style="width:24px"></th>
         <th style="width:32px">#</th>
         <th>Option Name</th>
         <th>Ordered</th>
@@ -139,6 +146,7 @@
     <tbody>
       {% for o in opcoes %}
       <tr id="row-{{ o.id }}">
+        <td><input type="checkbox" name="opcao_ids" value="{{ o.id }}" class="row-check"></td>
         <td style="color:var(--text-muted);font-size:11px">{{ loop.index }}</td>
         <td style="font-weight:600">{{ o.option_name }}</td>
         <td class="mono" style="font-size:12px">{{ o.ordered or '—' }}</td>
@@ -195,6 +203,7 @@
     </tbody>
   </table>
 </div>
+</form>
 {% else %}
 <div class="card" style="text-align:center;padding:32px;border-style:dashed">
   <div style="font-size:13px;color:var(--text-muted)">Sem option codes. Adicione manualmente ou importe de um ficheiro HTML.</div>

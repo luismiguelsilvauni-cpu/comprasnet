@@ -3394,6 +3394,21 @@ def tecnico_importar_html(eid):
     return redirect(url_for('tecnico_detalhe', eid=eid))
 
 
+@app.route('/tecnico/<int:eid>/opcoes/apagar-bulk', methods=['POST'])
+@login_required
+def tecnico_opcoes_apagar_bulk(eid):
+    Equipamento.query.get_or_404(eid)
+    ids = request.form.getlist('opcao_ids')
+    if ids:
+        EquipamentoOpcao.query.filter(
+            EquipamentoOpcao.id.in_([int(i) for i in ids]),
+            EquipamentoOpcao.equipamento_id == eid
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        flash(f'{len(ids)} linhas eliminadas.', 'success')
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():
