@@ -130,6 +130,88 @@ function apagarSelecionados() {
 </div>
 
 
+<!-- Component Badges Navigation -->
+<div id="comp-badges" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+  <!-- Motor Propulsor always shown -->
+  <button onclick="activarBadge('motor')" id="badge-motor"
+    class="badge-comp active-badge">🔧 Motor Propulsor</button>
+  <button onclick="activarBadge('caixa')" id="badge-caixa"
+    class="badge-comp">⚙️ Caixa Inv./Redutora</button>
+  {% for m in motores_aux %}
+  <button onclick="activarBadge('aux_{{ m.numero }}')" id="badge-aux_{{ m.numero }}"
+    class="badge-comp">⚙️ Motor Aux. {{ m.numero }}</button>
+  {% endfor %}
+  <button onclick="activarBadge('outros')" id="badge-outros"
+    class="badge-comp">📄 Outros Documentos</button>
+</div>
+
+<!-- Component Panels -->
+{% set comp_docs = {} %}
+{% for d in documentos %}
+  {% if d.componente not in comp_docs %}
+    {% set _ = comp_docs.update({d.componente: []}) %}
+  {% endif %}
+{% endfor %}
+
+<style>
+.badge-comp {
+  padding:8px 16px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;
+  border:2px solid var(--border);background:var(--surface);color:var(--text-muted);
+  transition:all .15s;
+}
+.badge-comp:hover { border-color:var(--accent);color:var(--text); }
+.active-badge { border-color:var(--accent);background:var(--accent);color:#fff !important; }
+.comp-panel { display:none; }
+.comp-panel.active { display:block; }
+.doc-card { display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:8px; }
+.doc-icon { font-size:24px;flex-shrink:0; }
+.doc-info { flex:1;min-width:0; }
+.doc-title { font-size:13px;font-weight:600; }
+.doc-sub { font-size:11px;color:var(--text-muted);margin-top:2px; }
+.doc-actions { display:flex;gap:4px;flex-shrink:0; }
+</style>
+
+<!-- Motor Panel -->
+<div class="comp-panel active" id="panel-motor">
+  {% set comp = 'motor' %}
+  {% set comp_label = 'Motor Propulsor' %}
+  {% include 'tecnico_comp_panel.html' %}
+</div>
+
+<!-- Caixa Panel -->
+<div class="comp-panel" id="panel-caixa">
+  {% set comp = 'caixa' %}
+  {% set comp_label = 'Caixa Inv./Redutora' %}
+  {% include 'tecnico_comp_panel.html' %}
+</div>
+
+<!-- Motor Aux Panels -->
+{% for m in motores_aux %}
+<div class="comp-panel" id="panel-aux_{{ m.numero }}">
+  {% set comp = 'aux_' + m.numero|string %}
+  {% set comp_label = 'Motor Auxiliar ' + m.numero|string %}
+  {% include 'tecnico_comp_panel.html' %}
+</div>
+{% endfor %}
+
+<!-- Outros Panel -->
+<div class="comp-panel" id="panel-outros">
+  {% set comp = 'outros' %}
+  {% set comp_label = 'Outros Documentos' %}
+  {% include 'tecnico_comp_panel.html' %}
+</div>
+
+<script>
+function activarBadge(comp) {
+  document.querySelectorAll('.badge-comp').forEach(b => b.classList.remove('active-badge'));
+  document.querySelectorAll('.comp-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('badge-'+comp).classList.add('active-badge');
+  document.getElementById('panel-'+comp).classList.add('active');
+}
+</script>
+
+<hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+
 <!-- Motores Auxiliares -->
 <div id="motores-aux" style="margin-top:24px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">

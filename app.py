@@ -2582,6 +2582,7 @@ class Equipamento(db.Model):
     criado_em       = db.Column(db.DateTime, default=datetime.now)
     opcoes          = db.relationship('EquipamentoOpcao', backref='equipamento', lazy=True, cascade='all, delete-orphan')
     consumiveis     = db.relationship('EquipamentoConsumivel', backref='equipamento', lazy=True, cascade='all, delete-orphan')
+    documentos      = db.relationship('EquipamentoDocumento', backref='equipamento', lazy=True, cascade='all, delete-orphan')
     motores_aux     = db.relationship('EquipamentoMotorAux', backref='equipamento', lazy=True, cascade='all, delete-orphan', order_by='EquipamentoMotorAux.numero')
 
 class EquipamentoConsumivel(db.Model):
@@ -2594,6 +2595,18 @@ class EquipamentoConsumivel(db.Model):
     quantidade      = db.Column(db.Float, default=1)
     notas           = db.Column(db.String(300))
     ordem           = db.Column(db.Integer, default=0)
+
+
+class EquipamentoDocumento(db.Model):
+    __tablename__ = 'equipamento_documento'
+    id              = db.Column(db.Integer, primary_key=True)
+    equipamento_id  = db.Column(db.Integer, db.ForeignKey('equipamento.id'), nullable=False)
+    componente      = db.Column(db.String(100), nullable=False)  # 'motor', 'caixa', 'aux_1', etc
+    titulo          = db.Column(db.String(300), nullable=False)
+    pdf_filename    = db.Column(db.String(500))
+    pdf_path        = db.Column(db.String(1000))
+    notas           = db.Column(db.Text, default='')
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
 
 
 class EquipamentoMotorAux(db.Model):
@@ -3196,7 +3209,8 @@ def tecnico_detalhe(eid):
     e = Equipamento.query.get_or_404(eid)
     opcoes = EquipamentoOpcao.query.filter_by(equipamento_id=eid).order_by(EquipamentoOpcao.ordem).all()
     motores_aux = EquipamentoMotorAux.query.filter_by(equipamento_id=eid).order_by(EquipamentoMotorAux.numero).all()
-    return render_template('tecnico_detalhe.html', equipamento=e, opcoes=opcoes, motores_aux=motores_aux)
+    documentos = EquipamentoDocumento.query.filter_by(equipamento_id=eid).order_by(EquipamentoDocumento.componente, EquipamentoDocumento.criado_em).all()
+    return render_template('tecnico_detalhe.html', equipamento=e, opcoes=opcoes, motores_aux=motores_aux, documentos=documentos)
 
 @app.route('/tecnico/<int:eid>/editar', methods=['GET', 'POST'])
 @login_required
@@ -3555,6 +3569,62 @@ def tecnico_motor_aux_apagar(mid):
     db.session.delete(m)
     db.session.commit()
     return redirect(url_for('tecnico_detalhe', eid=eid) + '#motores-aux')
+
+
+@app.route('/tecnico/<int:eid>/documento/upload', methods=['POST'])
+@login_required
+def tecnico_doc_upload(eid):
+    e = Equipamento.query.get_or_404(eid)
+    f = request.files.get('doc_file')
+    componente = request.form.get('componente', '').strip()
+    titulo = request.form.get('titulo', '').strip()
+    notas = request.form.get('notas', '').strip()
+    if not f or not componente or not titulo:
+        flash('Preencha todos os campos e seleccione um ficheiro.', 'error')
+        return redirect(url_for('tecnico_detalhe', eid=eid))
+    ensure_upload_dir()
+    safe = f"{eid}_{componente}_{f.filename.replace(' ','_')}"
+    path = os.path.join(UPLOAD_TECNICO, safe)
+    f.save(path)
+    doc = EquipamentoDocumento(
+        equipamento_id=eid,
+        componente=componente,
+        titulo=titulo,
+        pdf_filename=f.filename,
+        pdf_path=safe,
+        notas=notas,
+    )
+    db.session.add(doc)
+    db.session.commit()
+    flash('Documento adicionado.', 'success')
+    return redirect(url_for('tecnico_detalhe', eid=eid))
+
+@app.route('/tecnico/documento/<int:did>/ver')
+@login_required
+def tecnico_doc_ver(did):
+    d = EquipamentoDocumento.query.get_or_404(did)
+    return send_from_directory(UPLOAD_TECNICO, d.pdf_path,
+                               as_attachment=False, download_name=d.pdf_filename)
+
+@app.route('/tecnico/documento/<int:did>/download')
+@login_required
+def tecnico_doc_download(did):
+    d = EquipamentoDocumento.query.get_or_404(did)
+    return send_from_directory(UPLOAD_TECNICO, d.pdf_path,
+                               as_attachment=True, download_name=d.pdf_filename)
+
+@app.route('/tecnico/documento/<int:did>/apagar', methods=['POST'])
+@login_required
+def tecnico_doc_apagar(did):
+    d = EquipamentoDocumento.query.get_or_404(did)
+    eid = d.equipamento_id
+    try:
+        path = os.path.join(UPLOAD_TECNICO, d.pdf_path)
+        if os.path.exists(path): os.remove(path)
+    except Exception: pass
+    db.session.delete(d)
+    db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=eid))
 
 
 def init_db():

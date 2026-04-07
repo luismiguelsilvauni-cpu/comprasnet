@@ -1,0 +1,104 @@
+<!-- Component Panel: {{ comp_label }} -->
+<div style="margin-bottom:16px">
+
+  <!-- Sub-badges: Option Codes / Documentos -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+    <button onclick="activarSubBadge('{{ comp }}','opcodes')" id="sub-{{ comp }}-opcodes"
+      class="sub-badge {% if comp == 'motor' %}active-sub{% endif %}"
+      style="padding:5px 14px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:{% if comp == 'motor' %}var(--accent){% else %}var(--surface){% endif %};color:{% if comp == 'motor' %}#fff{% else %}var(--text-muted){% endif %}">
+      📋 Option Codes
+    </button>
+    <button onclick="activarSubBadge('{{ comp }}','docs')" id="sub-{{ comp }}-docs"
+      class="sub-badge"
+      style="padding:5px 14px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text-muted)">
+      📄 Docs / PDFs
+    </button>
+  </div>
+
+  <!-- Option Codes sub-panel (only for motor propulsor) -->
+  <div id="sub-{{ comp }}-opcodes-panel" style="{% if comp != 'motor' %}display:none{% endif %}">
+    {% if comp == 'motor' %}
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+      Os Option Codes do motor propulsor estão na secção abaixo ↓
+    </p>
+    {% else %}
+    <p style="font-size:12px;color:var(--text-muted)">Option Codes não disponíveis para este componente.</p>
+    {% endif %}
+  </div>
+
+  <!-- Docs sub-panel -->
+  <div id="sub-{{ comp }}-docs-panel" style="display:none">
+
+    <!-- Upload form -->
+    <div style="margin-bottom:12px">
+      <button onclick="document.getElementById('upload-form-{{ comp }}').style.display=document.getElementById('upload-form-{{ comp }}').style.display==='none'?'block':'none'"
+        class="btn btn-ghost btn-sm">+ Adicionar Documento</button>
+      <div id="upload-form-{{ comp }}" style="display:none;margin-top:10px">
+        <div class="card" style="padding:14px">
+          <form method="post" action="{{ url_for('tecnico_doc_upload', eid=equipamento.id) }}" enctype="multipart/form-data">
+            <input type="hidden" name="componente" value="{{ comp }}">
+            <div style="display:grid;grid-template-columns:2fr 2fr;gap:10px;margin-bottom:10px">
+              <div class="form-group" style="margin:0">
+                <label>Título do Documento *</label>
+                <input type="text" name="titulo" required class="input" placeholder="Ex: Manual de Serviço, Esquema Hidráulico...">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label>Notas</label>
+                <input type="text" name="notas" class="input" placeholder="Observações...">
+              </div>
+            </div>
+            <div class="form-group" style="margin:0 0 10px">
+              <label>Ficheiro (PDF, imagem, etc.)</label>
+              <input type="file" name="doc_file" required class="input">
+            </div>
+            <div style="display:flex;justify-content:flex-end">
+              <button type="submit" class="btn btn-primary btn-sm">Fazer Upload</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document list -->
+    {% set comp_docs_list = documentos | selectattr('componente', 'equalto', comp) | list %}
+    {% if comp_docs_list %}
+      {% for d in comp_docs_list %}
+      <div class="doc-card">
+        <div class="doc-icon">📄</div>
+        <div class="doc-info">
+          <div class="doc-title">{{ d.titulo }}</div>
+          <div class="doc-sub">{{ d.pdf_filename }} {% if d.notas %}· {{ d.notas }}{% endif %}</div>
+        </div>
+        <div class="doc-actions">
+          <a href="{{ url_for('tecnico_doc_ver', did=d.id) }}" target="_blank" class="btn btn-ghost btn-sm" title="Visualizar">👁</a>
+          <a href="{{ url_for('tecnico_doc_download', did=d.id) }}" class="btn btn-ghost btn-sm" title="Download">⬇</a>
+          <button onclick="window.open('{{ url_for('tecnico_doc_ver', did=d.id) }}').print()" class="btn btn-ghost btn-sm" title="Imprimir">🖨</button>
+          <form method="post" action="{{ url_for('tecnico_doc_apagar', did=d.id) }}"
+            onsubmit="return confirm('Apagar este documento?')" style="display:inline">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:8px">
+        Sem documentos para {{ comp_label }}. Clique em + Adicionar Documento.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function activarSubBadge(comp, sub) {
+  document.querySelectorAll('#panel-'+comp+' .sub-badge').forEach(b => {
+    b.style.background = 'var(--surface)';
+    b.style.color = 'var(--text-muted)';
+    b.style.borderColor = 'var(--border)';
+  });
+  document.querySelectorAll('#panel-'+comp+' [id$="-panel"]').forEach(p => p.style.display='none');
+  const btn = document.getElementById('sub-'+comp+'-'+sub);
+  if (btn) { btn.style.background='var(--accent)'; btn.style.color='#fff'; btn.style.borderColor='var(--accent)'; }
+  const panel = document.getElementById('sub-'+comp+'-'+sub+'-panel');
+  if (panel) panel.style.display='block';
+}
+</script>
