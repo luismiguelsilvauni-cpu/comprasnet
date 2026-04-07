@@ -3280,7 +3280,16 @@ def tecnico_importar_html(eid):
         return redirect(url_for('tecnico_detalhe', eid=eid))
     try:
         from html.parser import HTMLParser
-        content = f.read().decode('utf-8', errors='replace')
+        raw = f.read()
+        # Try multiple encodings
+        for enc in ('utf-8', 'latin-1', 'cp1252', 'utf-16'):
+            try:
+                content = raw.decode(enc, errors='replace')
+                break
+            except Exception:
+                content = raw.decode('latin-1', errors='replace')
+        
+        app.logger.info(f"HTML import: {len(content)} chars, preview: {content[:200]}")
 
         class OptionParser(HTMLParser):
             def __init__(self):
@@ -3324,34 +3333,64 @@ def tecnico_importar_html(eid):
 
         parser = OptionParser()
         parser.feed(content)
+        
+        app.logger.info(f"HTML parsed: headers={parser.headers}, rows={len(parser.rows)}")
+        if parser.rows:
+            app.logger.info(f"First row sample: {parser.rows[0]}")
 
-        # Map columns
+        # Map columns - flexible matching
         hdrs = [h.lower().strip() for h in parser.headers]
         def col(row, names):
             for n in names:
                 for i, h in enumerate(hdrs):
                     if n in h and i < len(row):
-                        return row[i]
+                        return row[i].strip()
+            # Fallback: no headers, use positional
             return ''
 
         added = 0
         ordem_start = EquipamentoOpcao.query.filter_by(equipamento_id=eid).count()
-        for row in parser.rows:
-            opt = col(row, ['option', 'name', 'code', 'descri'])
-            ord_ = col(row, ['ordered', 'order'])
-            fac  = col(row, ['factory', 'plant'])
-            dist = col(row, ['distribut', 'dealer'])
-            if opt:
-                o = EquipamentoOpcao(
-                    equipamento_id=eid,
-                    option_name=opt,
-                    ordered=ord_,
-                    factory=fac,
-                    distributor=dist,
-                    ordem=ordem_start + added,
-                )
-                db.session.add(o)
-                added += 1
+        
+        # If no headers detected, treat all rows as data with positional columns
+        rows_to_process = parser.rows
+        if not parser.headers and parser.rows:
+            # No header row - first col = option_name, second = ordered, third = factory
+            for row in rows_to_process:
+                if row and any(cell.strip() for cell in row):
+                    o = EquipamentoOpcao(
+                        equipamento_id=eid,
+                        option_name=row[0].strip() if len(row) > 0 else '',
+                        ordered=row[1].strip() if len(row) > 1 else '',
+                        factory=row[2].strip() if len(row) > 2 else '',
+                        distributor=row[3].strip() if len(row) > 3 else '',
+                        ordem=ordem_start + added,
+                    )
+                    if o.option_name:
+                        db.session.add(o)
+                        added += 1
+        else:
+            for row in rows_to_process:
+                opt = col(row, ['option', 'name', 'code', 'descri', 'item'])
+                ord_ = col(row, ['ordered', 'order', 'spec'])
+                fac  = col(row, ['factory', 'plant', 'std'])
+                dist = col(row, ['distribut', 'dealer', 'dist'])
+                # If no header match, use positional
+                if not opt and row:
+                    opt  = row[0].strip() if len(row) > 0 else ''
+                    ord_ = row[1].strip() if len(row) > 1 else ''
+                    fac  = row[2].strip() if len(row) > 2 else ''
+                    dist = row[3].strip() if len(row) > 3 else ''
+                if opt:
+                    o = EquipamentoOpcao(
+                        equipamento_id=eid,
+                        option_name=opt,
+                        ordered=ord_,
+                        factory=fac,
+                        distributor=dist,
+                        ordem=ordem_start + added,
+                    )
+                    db.session.add(o)
+                    added += 1
 
         db.session.commit()
         flash(f'✅ {added} linhas importadas com sucesso.', 'success')

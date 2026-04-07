@@ -1,8 +1,104 @@
 {% extends "base.html" %}
-{% block title %}{% if equipamento %}Editar{% else %}Novo{% endif %} · Técnico{% endblock %}
-{% block page_title %}{% if equipamento %}Editar Equipamento{% else %}Novo Equipamento{% endif %}{% endblock %}
+{% block title %}{% if equipamento %}Editar{% else %}Novo{% endif %} · Técnico
+<script>
+let _ct = null;
+function pesquisarCliente(q) {
+  clearTimeout(_ct);
+  const res = document.getElementById('clienteResults');
+  if (q.length < 2) { res.style.display='none'; return; }
+  _ct = setTimeout(() => {
+    fetch('/api/clientes?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { res.style.display='none'; return; }
+        res.style.display = 'block';
+        res.innerHTML = data.map(c =>
+          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
+            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+            onmouseover="this.style.background='var(--surface2)'"
+            onmouseout="this.style.background=''">${c.nome}</div>`
+        ).join('');
+      }).catch(() => res.style.display='none');
+  }, 250);
+}
+function selCliente(nome) {
+  document.getElementById('clienteInput').value = nome;
+  document.getElementById('clienteResults').style.display = 'none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
+    document.getElementById('clienteResults').style.display = 'none';
+});
+</script>
+
+{% endblock %}
+{% block page_title %}{% if equipamento %}Editar Equipamento{% else %}Novo Equipamento{% endif %}
+<script>
+let _ct = null;
+function pesquisarCliente(q) {
+  clearTimeout(_ct);
+  const res = document.getElementById('clienteResults');
+  if (q.length < 2) { res.style.display='none'; return; }
+  _ct = setTimeout(() => {
+    fetch('/api/clientes?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { res.style.display='none'; return; }
+        res.style.display = 'block';
+        res.innerHTML = data.map(c =>
+          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
+            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+            onmouseover="this.style.background='var(--surface2)'"
+            onmouseout="this.style.background=''">${c.nome}</div>`
+        ).join('');
+      }).catch(() => res.style.display='none');
+  }, 250);
+}
+function selCliente(nome) {
+  document.getElementById('clienteInput').value = nome;
+  document.getElementById('clienteResults').style.display = 'none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
+    document.getElementById('clienteResults').style.display = 'none';
+});
+</script>
+
+{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">Cancelar</a>
+
+<script>
+let _ct = null;
+function pesquisarCliente(q) {
+  clearTimeout(_ct);
+  const res = document.getElementById('clienteResults');
+  if (q.length < 2) { res.style.display='none'; return; }
+  _ct = setTimeout(() => {
+    fetch('/api/clientes?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { res.style.display='none'; return; }
+        res.style.display = 'block';
+        res.innerHTML = data.map(c =>
+          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
+            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+            onmouseover="this.style.background='var(--surface2)'"
+            onmouseout="this.style.background=''">${c.nome}</div>`
+        ).join('');
+      }).catch(() => res.style.display='none');
+  }, 250);
+}
+function selCliente(nome) {
+  document.getElementById('clienteInput').value = nome;
+  document.getElementById('clienteResults').style.display = 'none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
+    document.getElementById('clienteResults').style.display = 'none';
+});
+</script>
+
 {% endblock %}
 {% block content %}
 <div class="card" style="max-width:700px">
@@ -11,8 +107,14 @@
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Cliente / Embarcação</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
       <div class="form-group" style="margin:0">
-        <label>Cliente</label>
-        <input type="text" name="cliente_nome" value="{{ equipamento.cliente_nome if equipamento else '' }}" class="input" placeholder="Nome do cliente">
+        <label>Cliente (PHC)</label>
+        <div style="position:relative">
+          <input type="text" id="clienteInput" name="cliente_nome"
+            value="{{ equipamento.cliente_nome if equipamento else '' }}"
+            class="input" placeholder="Pesquisar cliente PHC..."
+            oninput="pesquisarCliente(this.value)" autocomplete="off">
+          <div id="clienteResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
+        </div>
       </div>
       <div class="form-group" style="margin:0">
         <label>Embarcação</label>
@@ -78,4 +180,36 @@
     </div>
   </form>
 </div>
+
+<script>
+let _ct = null;
+function pesquisarCliente(q) {
+  clearTimeout(_ct);
+  const res = document.getElementById('clienteResults');
+  if (q.length < 2) { res.style.display='none'; return; }
+  _ct = setTimeout(() => {
+    fetch('/api/clientes?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { res.style.display='none'; return; }
+        res.style.display = 'block';
+        res.innerHTML = data.map(c =>
+          `<div onclick="selCliente('${(c.nome||'').replace(/'/g,"\'")}')"
+            style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+            onmouseover="this.style.background='var(--surface2)'"
+            onmouseout="this.style.background=''">${c.nome}</div>`
+        ).join('');
+      }).catch(() => res.style.display='none');
+  }, 250);
+}
+function selCliente(nome) {
+  document.getElementById('clienteInput').value = nome;
+  document.getElementById('clienteResults').style.display = 'none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResults'))
+    document.getElementById('clienteResults').style.display = 'none';
+});
+</script>
+
 {% endblock %}
