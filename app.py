@@ -3272,7 +3272,7 @@ def tecnico_opcao_pdf_download(oid):
 @app.route('/tecnico/<int:eid>/importar-html', methods=['POST'])
 @login_required
 def tecnico_importar_html(eid):
-    """Parse John Deere JDPS HTML and extract Option Codes from table#optioninfo."""
+    """Parse JDPS HTML and extract Option Codes."""
     Equipamento.query.get_or_404(eid)
     f = request.files.get('html_file')
     if not f:
@@ -3281,94 +3281,117 @@ def tecnico_importar_html(eid):
     try:
         raw = f.read()
         for enc in ('utf-8', 'latin-1', 'cp1252'):
-            try: content = raw.decode(enc); break
-            except Exception: content = raw.decode('latin-1', errors='replace')
+            try:
+                content = raw.decode(enc)
+                break
+            except Exception:
+                content = raw.decode('latin-1', errors='replace')
 
+        # Use BeautifulSoup-like approach with html.parser
         from html.parser import HTMLParser
 
         class JDPSParser(HTMLParser):
             def __init__(self):
                 super().__init__()
-                self.rows = []
                 self.in_optioninfo = False
-                self.table_depth = 0
-                self.current_row = None
-                self.in_td = False
-                self.current_attrs = {}
+                self.rows = []
+                self.current_row = []
+                self.current_td = None
                 self.current_text = ''
+                self.td_attrs = {}
+                self.depth = 0
 
             def handle_starttag(self, tag, attrs):
-                a = dict(attrs)
-                if tag == 'table':
-                    if a.get('id') == 'optioninfo':
-                        self.in_optioninfo = True
-                        self.table_depth = 1
-                    elif self.in_optioninfo:
-                        self.table_depth += 1
-                if self.in_optioninfo and self.table_depth == 1:
-                    if tag == 'tr':
-                        self.current_row = {'option':'','ordered':'','factory':'','distributor':''}
-                    if tag == 'td':
-                        self.in_td = True
-                        self.current_attrs = a
-                        self.current_text = ''
+                attrs = dict(attrs)
+                if tag == 'table' and attrs.get('id') == 'optioninfo':
+                    self.in_optioninfo = True
+                    self.depth = 1
+                elif tag == 'table' and self.in_optioninfo:
+                    self.depth += 1
+                if tag == 'tr' and self.in_optioninfo and self.depth == 1:
+                    self.current_row = []
+                if tag == 'td' and self.in_optioninfo and self.depth == 1:
+                    self.current_td = attrs
+                    self.current_text = ''
 
             def handle_endtag(self, tag):
                 if tag == 'table' and self.in_optioninfo:
-                    self.table_depth -= 1
-                    if self.table_depth == 0:
+                    self.depth -= 1
+                    if self.depth == 0:
                         self.in_optioninfo = False
-                if self.in_optioninfo and self.table_depth == 1:
-                    if tag == 'td' and self.in_td:
-                        self.in_td = False
-                        text = self.current_text.strip()
-                        a = self.current_attrs
-                        if a.get('trans') == 'en_US' and text:
-                            self.current_row['option'] = text
-                        elif a.get('trans') == 'other':
-                            pass
-                        elif a.get('name2') == 'viewDistribOption':
-                            d = text.replace('*','').strip()
-                            if d: self.current_row['distributor'] = d
-                        elif a.get('name2') == 'editDistribOption':
-                            pass
-                        elif a.get('width') == '100px':
-                            pass
-                        elif self.current_row.get('option') and not a.get('trans') and not a.get('name2'):
-                            if not self.current_row['ordered']:
-                                self.current_row['ordered'] = text
-                    if tag == 'tr' and self.current_row and self.current_row.get('option'):
+                if tag == 'td' and self.in_optioninfo and self.depth == 1:
+                    if self.current_td is not None:
+                        self.current_row.append({
+                            'attrs': self.current_td,
+                            'text': self.current_text.strip()
+                        })
+                    self.current_td = None
+                if tag == 'tr' and self.in_optioninfo and self.depth == 1:
+                    if self.current_row:
                         self.rows.append(self.current_row)
-                        self.current_row = None
+                    self.current_row = []
 
             def handle_data(self, data):
-                if self.in_td:
+                if self.current_td is not None and self.in_optioninfo:
                     self.current_text += data
 
         parser = JDPSParser()
         parser.feed(content)
-        app.logger.info(f"JDPS parse: {len(parser.rows)} rows")
 
         added = 0
+        skipped = 0
         ordem_start = EquipamentoOpcao.query.filter_by(equipamento_id=eid).count()
+
         for row in parser.rows:
-            opt = row['option'].strip()
-            if not opt: continue
+            # Skip header rows (th elements) - they have no relevant attrs
+            # Option Name: td with trans="en_US"
+            # Ordered: 3rd visible td (index 2 in our collection, after hidden td)
+            # Factory: 4th td with visible link or text
+            # Structure per row: [option_name_td(trans=en_US), hidden_td(trans=other), ordered_td, factory_td, distributor_td, ...]
+
+            option_name = ''
+            ordered = ''
+            factory = ''
+            distributor = ''
+
+            for cell in row:
+                a = cell['attrs']
+                t = cell['text']
+                # Option Name: has trans="en_US" attribute
+                if a.get('trans') == 'en_US' and t:
+                    option_name = t
+                # Ordered: no trans attr, no name2 attr, has numeric/alphanumeric text, comes after option_name
+                elif (not a.get('trans') and not a.get('name2') and
+                      not a.get('style','').find('display: none') > -1 and
+                      t and option_name and not ordered):
+                    ordered = t
+                # Factory: name2="viewDistribOption" with text
+                elif a.get('name2') == 'viewDistribOption' and t and not factory:
+                    factory = t.replace('*', '').strip()
+
+            # Skip if hidden (display:none) rows or empty
+            if not option_name:
+                skipped += 1
+                continue
+
             o = EquipamentoOpcao(
                 equipamento_id=eid,
-                option_name=opt,
-                ordered=row['ordered'].strip(),
-                factory=row['factory'].strip(),
-                distributor=row['distributor'].strip(),
+                option_name=option_name,
+                ordered=ordered or '',
+                factory=factory or '',
+                distributor=distributor or '',
                 ordem=ordem_start + added,
             )
             db.session.add(o)
             added += 1
+
         db.session.commit()
-        flash(f'Importados {added} option codes com sucesso.', 'success')
+        flash(f'Importacao concluida: {added} option codes importados.', 'success')
+        app.logger.info(f"JDPS import: {added} added, {skipped} skipped")
+
     except Exception as e:
-        app.logger.error(f"JDPS import error: {e}")
-        flash(f'Erro: {e}', 'error')
+        app.logger.error(f"HTML import error: {e}", exc_info=True)
+        flash(f'Erro ao processar HTML: {e}', 'error')
     return redirect(url_for('tecnico_detalhe', eid=eid))
 
 
