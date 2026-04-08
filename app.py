@@ -3480,14 +3480,9 @@ def tecnico_importar_excel():
         wb = openpyxl.load_workbook(BytesIO(f.read()), data_only=True)
         ws = wb.active
         
-        # Read headers from first row
-        headers = []
-        for cell in ws[1]:
-            headers.append((cell.value or '').strip().lower())
-        
+        headers = [str(cell.value or '').strip().lower() for cell in ws[1]]
         app.logger.info(f"Excel headers: {headers}")
         
-        # Map columns - flexible matching
         def find_col(names):
             for name in names:
                 for i, h in enumerate(headers):
@@ -3495,23 +3490,25 @@ def tecnico_importar_excel():
                         return i
             return None
 
-        col_embarcacao  = find_col(['embarca'])
-        col_modelo      = find_col(['modelo']) 
-        col_cv          = find_col(['cv', 'potencia', 'pot'])
-        col_rpm         = find_col(['rpm'])
-        col_serie       = find_col(['série', 'serie', 'nº série', 'n serie'])
-        col_eq          = find_col(['eq', 'base code', 'base'])
-        col_caixa       = find_col(['modelo2', 'caixa'])
-        col_ratio       = find_col(['ratio'])
-        col_serie_caixa = find_col(['série3', 'serie3', 'nº série3', 'n serie3'])
-        col_obs         = find_col(['obs', 'nota'])
+        col_emb    = find_col(['embarca'])
+        col_mod    = find_col(['modelo motor', 'modelo m', 'motor'])
+        col_pot    = find_col(['pot', 'cv', 'kw'])
+        col_rpm    = find_col(['rpm'])
+        col_serie  = find_col(['série motor', 'serie motor', 'nº série m', 'n serie m', 'série m', 'serie m'])
+        col_marca_cx = find_col(['marca caixa', 'marca c'])
+        col_mod_cx = find_col(['modelo caixa', 'modelo c'])
+        col_ratio  = find_col(['ratio'])
+        col_serie_cx = find_col(['série caixa', 'serie caixa', 'nº série c', 'n serie c', 'série c', 'serie c'])
+        col_obs    = find_col(['obs', 'nota'])
 
-        app.logger.info(f"Cols: emb={col_embarcacao} mod={col_modelo} cv={col_cv} serie={col_serie} eq={col_eq}")
+        app.logger.info(f"Cols: emb={col_emb} mod={col_mod} serie={col_serie} cx={col_mod_cx}")
 
         added = 0
-        errors = []
+        duplicados = 0
+        erros = []
+        
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            if not any(row):
+            if not any(v for v in row if v is not None):
                 continue
             
             def get(col):
@@ -3519,31 +3516,56 @@ def tecnico_importar_excel():
                 v = row[col]
                 return str(v).strip() if v is not None else ''
             
-            embarcacao = get(col_embarcacao)
+            embarcacao = get(col_emb)
             if not embarcacao:
-                continue  # skip empty rows
+                continue
+
+            serial = get(col_serie)
+            
+            # Check duplicate by embarcacao + serial
+            dup_query = Equipamento.query.filter_by(embarcacao=embarcacao)
+            if serial:
+                dup_query = dup_query.filter_by(serial_number=serial)
+            if dup_query.first():
+                duplicados += 1
+                erros.append(f"Linha {row_idx}: {embarcacao} (já existe)")
+                continue
+            
+            pot = get(col_pot)
+            if pot and 'cv' not in pot.lower() and 'kw' not in pot.lower():
+                pot = pot + ' CV'
             
             e = Equipamento(
                 embarcacao      = embarcacao,
-                motor_modelo    = get(col_modelo),
-                motor_potencia  = get(col_cv) + (' CV' if get(col_cv) and 'cv' not in get(col_cv).lower() else ''),
-                serial_number   = get(col_serie),
-                base_code       = get(col_eq),
-                caixa_modelo    = get(col_caixa),
+                motor_modelo    = get(col_mod),
+                motor_potencia  = pot,
+                serial_number   = serial,
+                caixa_modelo    = get(col_mod_cx),
                 caixa_ratio     = get(col_ratio),
-                caixa_serial    = get(col_serie_caixa),
+                caixa_serial    = get(col_serie_cx),
                 notas           = get(col_obs),
             )
+            # Try to set marca caixa in caixa_modelo if separate
+            marca_cx = get(col_marca_cx)
+            if marca_cx and not e.caixa_modelo:
+                e.caixa_modelo = marca_cx
+            elif marca_cx and e.caixa_modelo and marca_cx not in e.caixa_modelo:
+                e.caixa_modelo = marca_cx + ' ' + e.caixa_modelo
+            
             db.session.add(e)
             added += 1
         
         db.session.commit()
-        flash(f'✅ {added} equipamentos importados com sucesso.', 'success')
+        
+        msg = f'✅ {added} equipamentos importados.'
+        if duplicados:
+            msg += f' {duplicados} duplicados ignorados: {", ".join(erros[:5])}'
+        flash(msg, 'success')
         return redirect(url_for('tecnico'))
     
     except Exception as e:
         app.logger.error(f"Excel import error: {e}")
-        flash(f'Erro ao processar Excel: {e}', 'error')
+        flash(f'Erro: {e}', 'error')
         return redirect(url_for('tecnico_importar_excel'))
 
 

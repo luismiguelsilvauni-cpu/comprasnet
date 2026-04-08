@@ -44,8 +44,8 @@
         <td style="color:var(--accent)">{{ e.embarcacao or '—' }}</td>
         <td>{{ e.motor_modelo or '—' }}</td>
         <td>{{ e.motor_potencia or '—' }}</td>
-        <td class="mono" style="color:var(--accent)">
-          <a href="{{ url_for('tecnico_detalhe', eid=e.id) }}">{{ e.serial_number or '—' }}</a>
+        <td class="mono" style="color:#f59e0b">
+          <a href="{{ url_for('tecnico_detalhe', eid=e.id) }}" style="color:#f59e0b">{{ e.serial_number or '—' }}</a>
         </td>
         <td class="mono">{{ e.base_code or '—' }}</td>
         <td>{{ e.manufactured_date or '—' }}</td>
