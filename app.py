@@ -2624,6 +2624,16 @@ class EquipamentoMotorAux(db.Model):
     ordem           = db.Column(db.Integer, default=0)
 
 
+class FactoryCodePDF(db.Model):
+    __tablename__ = 'factory_code_pdf'
+    id           = db.Column(db.Integer, primary_key=True)
+    factory_code = db.Column(db.String(50), nullable=False, index=True)
+    titulo       = db.Column(db.String(300))
+    pdf_filename = db.Column(db.String(500))
+    pdf_path     = db.Column(db.String(1000))
+    criado_em    = db.Column(db.DateTime, default=datetime.now)
+
+
 class EquipamentoOpcao(db.Model):
     __tablename__ = 'equipamento_opcao'
     id              = db.Column(db.Integer, primary_key=True)
@@ -3625,6 +3635,118 @@ def tecnico_doc_apagar(did):
     db.session.delete(d)
     db.session.commit()
     return redirect(url_for('tecnico_detalhe', eid=eid))
+
+
+# ── BIBLIOTECA DE FACTORY CODE PDFs ─────────────────────────────────────────
+
+@app.route('/api/factory-code/<code>/pdf')
+@login_required
+def api_factory_code_pdf(code):
+    """Return PDF info for a factory code from the central library."""
+    pdf = FactoryCodePDF.query.filter_by(factory_code=code).order_by(FactoryCodePDF.criado_em.desc()).first()
+    if not pdf:
+        return jsonify({'found': False})
+    return jsonify({
+        'found': True,
+        'id': pdf.id,
+        'titulo': pdf.titulo,
+        'pdf_filename': pdf.pdf_filename,
+        'ver_url': url_for('factory_code_pdf_ver', pid=pdf.id),
+        'download_url': url_for('factory_code_pdf_download', pid=pdf.id),
+    })
+
+@app.route('/factory-code/pdf/<int:pid>/ver')
+@login_required
+def factory_code_pdf_ver(pid):
+    p = FactoryCodePDF.query.get_or_404(pid)
+    return send_from_directory(UPLOAD_TECNICO, p.pdf_path,
+                               as_attachment=False, download_name=p.pdf_filename)
+
+@app.route('/factory-code/pdf/<int:pid>/download')
+@login_required
+def factory_code_pdf_download(pid):
+    p = FactoryCodePDF.query.get_or_404(pid)
+    return send_from_directory(UPLOAD_TECNICO, p.pdf_path,
+                               as_attachment=True, download_name=p.pdf_filename)
+
+@app.route('/tecnico/opcao/<int:oid>/upload-factory', methods=['POST'])
+@login_required
+def tecnico_opcao_upload_factory(oid):
+    """Upload PDF for an option code — saves to central library by factory code."""
+    o = EquipamentoOpcao.query.get_or_404(oid)
+    f = request.files.get('pdf')
+    if not f or not f.filename:
+        flash('Seleccione um ficheiro.', 'error')
+        return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+
+    ensure_upload_dir()
+    factory_code = (o.factory or o.ordered or '').strip()
+    safe = f"factory_{factory_code}_{f.filename.replace(' ','_')}"
+    path = os.path.join(UPLOAD_TECNICO, safe)
+    f.save(path)
+
+    # Save/update central library entry
+    if factory_code:
+        existing = FactoryCodePDF.query.filter_by(factory_code=factory_code).first()
+        if existing:
+            # Update existing — replace file
+            try:
+                old = os.path.join(UPLOAD_TECNICO, existing.pdf_path)
+                if os.path.exists(old) and old != path: os.remove(old)
+            except Exception: pass
+            existing.pdf_filename = f.filename
+            existing.pdf_path = safe
+            existing.titulo = f.filename
+        else:
+            db.session.add(FactoryCodePDF(
+                factory_code=factory_code,
+                titulo=f.filename,
+                pdf_filename=f.filename,
+                pdf_path=safe,
+            ))
+
+    # Also link directly to this option
+    o.pdf_filename = f.filename
+    o.pdf_path = safe
+    db.session.commit()
+
+    # Count how many other options share this factory code
+    if factory_code:
+        others = EquipamentoOpcao.query.filter(
+            EquipamentoOpcao.factory == factory_code,
+            EquipamentoOpcao.id != oid
+        ).count()
+        if others:
+            flash(f'PDF guardado e disponível automaticamente para {others} outras linhas com factory code {factory_code}.', 'success')
+        else:
+            flash('PDF guardado na biblioteca central.', 'success')
+    else:
+        flash('PDF guardado.', 'success')
+
+    return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
+
+@app.route('/biblioteca-factory')
+@login_required
+def biblioteca_factory():
+    """List all factory code PDFs in the central library."""
+    pdfs = FactoryCodePDF.query.order_by(FactoryCodePDF.factory_code).all()
+    equipamentos = Equipamento.query.options(
+        db.joinedload(Equipamento.opcoes)
+    ).all()
+    return render_template('biblioteca_factory.html', pdfs=pdfs, equipamentos=equipamentos)
+
+@app.route('/biblioteca-factory/<int:pid>/apagar', methods=['POST'])
+@login_required
+def biblioteca_factory_apagar(pid):
+    p = FactoryCodePDF.query.get_or_404(pid)
+    try:
+        path = os.path.join(UPLOAD_TECNICO, p.pdf_path)
+        if os.path.exists(path): os.remove(path)
+    except Exception: pass
+    db.session.delete(p)
+    db.session.commit()
+    flash('PDF removido da biblioteca.', 'success')
+    return redirect(url_for('biblioteca_factory'))
 
 
 def init_db():

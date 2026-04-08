@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Biblioteca Factory Codes · ComprasNet{% endblock %}
+{% block page_title %}Biblioteca de PDFs por Factory Code{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:16px;font-size:13px;color:var(--text-muted)">
+  PDFs partilhados automaticamente entre todos os motores que tenham o mesmo Factory Code.
+</div>
+
+{% if pdfs %}
+<div class="card" style="padding:0">
+  <table class="table" style="font-size:13px">
+    <thead>
+      <tr>
+        <th>Factory Code</th>
+        <th>Ficheiro</th>
+        <th>Data Upload</th>
+        <th>Motores com este código</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pdfs %}
+      <tr>
+        <td class="mono" style="font-weight:700;color:var(--accent);font-size:14px">{{ p.factory_code }}</td>
+        <td>
+          <div style="font-weight:500">{{ p.titulo or p.pdf_filename }}</div>
+          <div style="font-size:11px;color:var(--text-muted)">{{ p.pdf_filename }}</div>
+        </td>
+        <td style="font-size:12px;color:var(--text-muted)">{{ p.criado_em.strftime('%d/%m/%Y') }}</td>
+        <td>
+          {% set count = namespace(n=0) %}
+          {% for eq in equipamentos %}
+            {% for op in eq.opcoes %}
+              {% if op.factory == p.factory_code or op.ordered == p.factory_code %}
+                {% set count.n = count.n + 1 %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          <span style="font-size:12px;color:var(--text-muted)">{{ count.n }} ocorrência(s)</span>
+        </td>
+        <td style="text-align:right">
+          <a href="{{ url_for('factory_code_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm">👁 Ver</a>
+          <a href="{{ url_for('factory_code_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm">⬇</a>
+          <form method="post" action="{{ url_for('biblioteca_factory_apagar', pid=p.id) }}"
+            onsubmit="return confirm('Remover da biblioteca?')" style="display:inline">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:40px">
+  <div style="font-size:32px;margin-bottom:12px">📚</div>
+  <div style="font-weight:600;margin-bottom:6px">Biblioteca vazia</div>
+  <div style="font-size:13px;color:var(--text-muted)">
+    Os PDFs são adicionados automaticamente quando faz upload numa linha de Option Codes com Factory Code preenchido.
+  </div>
+</div>
+{% endif %}
+{% endblock %}

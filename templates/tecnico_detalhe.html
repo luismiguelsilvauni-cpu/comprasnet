@@ -191,13 +191,17 @@
         <td class="mono" style="font-size:12px">{{ o.factory or '—' }}</td>
         <td style="font-size:12px;color:var(--text-muted)">{{ o.distributor or '—' }}</td>
         <td>
+          {% set fc = o.factory or o.ordered or '' %}
           {% if o.pdf_path %}
-          <a href="{{ url_for('tecnico_opcao_pdf', oid=o.id) }}" target="_blank" class="btn btn-ghost btn-sm">👁</a>
-          <a href="{{ url_for('tecnico_opcao_pdf_download', oid=o.id) }}" class="btn btn-ghost btn-sm">⬇</a>
+          <a href="{{ url_for('tecnico_opcao_pdf', oid=o.id) }}" target="_blank" class="btn btn-ghost btn-sm" title="Visualizar">👁</a>
+          <a href="{{ url_for('tecnico_opcao_pdf_download', oid=o.id) }}" class="btn btn-ghost btn-sm" title="Download">⬇</a>
           {% else %}
-          <button onclick="tog('oup-{{ o.id }}')" class="btn btn-ghost btn-sm" style="font-size:11px">+PDF</button>
+          <button onclick="verificarFactory('{{ fc }}','oup-{{ o.id }}')" class="btn btn-ghost btn-sm" style="font-size:11px">+PDF</button>
           <div id="oup-{{ o.id }}" style="display:none;margin-top:4px">
-            <form method="post" action="{{ url_for('tecnico_opcao_upload', oid=o.id) }}" enctype="multipart/form-data">
+            <div id="fc-info-{{ o.id }}" style="display:none;margin-bottom:6px;font-size:11px;padding:6px 8px;background:rgba(34,197,94,.1);border-radius:6px;color:var(--success)">
+              ✅ <span id="fc-msg-{{ o.id }}"></span>
+            </div>
+            <form method="post" action="{{ url_for('tecnico_opcao_upload_factory', oid=o.id) }}" enctype="multipart/form-data">
               <input type="file" name="pdf" accept=".pdf" required style="font-size:11px;width:160px">
               <button type="submit" class="btn btn-primary btn-sm" style="margin-top:4px">Upload</button>
             </form>
@@ -391,6 +395,25 @@ function selSub(c,s){
   var cp=document.getElementById('cp-'+c+'-'+s);
   if(cp){cp.classList.add('vis');setTimeout(()=>cp.scrollIntoView({behavior:'smooth',block:'start'}),50);}
 }
+
+function verificarFactory(fc, divId) {
+  tog(divId);
+  if (!fc) return;
+  fetch('/api/factory-code/' + encodeURIComponent(fc) + '/pdf')
+    .then(r => r.json())
+    .then(d => {
+      var infoDiv = document.getElementById('fc-info-' + divId.replace('oup-',''));
+      var msgDiv  = document.getElementById('fc-msg-'  + divId.replace('oup-',''));
+      if (d.found && infoDiv && msgDiv) {
+        msgDiv.innerHTML = 'Factory code <strong>' + fc + '</strong> já tem PDF na biblioteca: <strong>' + d.pdf_filename + '</strong> — ' +
+          '<a href="' + d.ver_url + '" target="_blank">Ver</a> | ' +
+          '<a href="' + d.download_url + '">Download</a>. ' +
+          'Faça upload apenas se quiser actualizar.';
+        infoDiv.style.display = 'block';
+      }
+    }).catch(() => {});
+}
+
 function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
 function togEdit(eId,rId){
   var e=document.getElementById(eId),r=document.getElementById(rId);

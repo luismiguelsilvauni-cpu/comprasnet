@@ -5,3 +5,10 @@
         print("OK: tabela equipamento_documento criada")
     else:
         print("OK: equipamento_documento ja existe")
+
+    # Create factory_code_pdf table
+    if 'factory_code_pdf' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela factory_code_pdf criada")
+    else:
+        print("OK: factory_code_pdf ja existe")
