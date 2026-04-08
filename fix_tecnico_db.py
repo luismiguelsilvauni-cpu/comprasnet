@@ -12,3 +12,10 @@
         print("OK: tabela factory_code_pdf criada")
     else:
         print("OK: factory_code_pdf ja existe")
+
+    # Create modelo_pdf table
+    if 'modelo_pdf' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela modelo_pdf criada")
+    else:
+        print("OK: modelo_pdf ja existe")

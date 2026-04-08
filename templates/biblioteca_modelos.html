@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Biblioteca de Modelos · ComprasNet{% endblock %}
+{% block page_title %}Biblioteca de Documentos por Modelo{% endblock %}
+{% block content %}
+<div style="margin-bottom:14px;font-size:13px;color:var(--text-muted)">
+  Documentos partilhados automaticamente por todos os equipamentos com o mesmo modelo de componente.
+</div>
+{% if pdfs %}
+{% set current_key = namespace(v='') %}
+{% for p in pdfs %}
+{% set key = p.tipo_componente + ':' + p.modelo_codigo %}
+{% if key != current_key.v %}
+{% set current_key.v = key %}
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:16px 0 8px;display:flex;align-items:center;gap:8px">
+  {% if p.tipo_componente == 'caixa' %}⚙️{% elif p.tipo_componente == 'motor' %}🔧{% else %}⚡{% endif %}
+  {{ p.tipo_componente|title }} — {{ p.modelo_codigo }}
+  <span style="flex:1;height:1px;background:var(--border);display:block"></span>
+</div>
+{% endif %}
+<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+  <div style="font-size:24px">📄</div>
+  <div style="flex:1">
+    <div style="font-size:13px;font-weight:600">{{ p.titulo }}</div>
+    <div style="font-size:11px;color:var(--text-muted)">{{ p.pdf_filename }} · {{ p.criado_em.strftime('%d/%m/%Y') }}</div>
+  </div>
+  <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm">👁</a>
+  <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm">⬇</a>
+  <form method="post" action="{{ url_for('modelo_pdf_apagar', pid=p.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
+    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+  </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="card" style="text-align:center;padding:40px">
+  <div style="font-size:32px;margin-bottom:12px">📚</div>
+  <div style="font-weight:600;margin-bottom:6px">Biblioteca vazia</div>
+  <div style="font-size:13px;color:var(--text-muted)">Os documentos partilhados aparecem aqui quando os adiciona nos painéis de componente.</div>
+</div>
+{% endif %}
+{% endblock %}

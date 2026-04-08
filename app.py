@@ -2624,6 +2624,18 @@ class EquipamentoMotorAux(db.Model):
     ordem           = db.Column(db.Integer, default=0)
 
 
+class ModeloPDF(db.Model):
+    """Central library of PDFs shared by component model (caixa TM170, motor D13K, etc.)"""
+    __tablename__ = 'modelo_pdf'
+    id              = db.Column(db.Integer, primary_key=True)
+    tipo_componente = db.Column(db.String(50), nullable=False)  # 'caixa', 'motor', 'aux', 'factory_code'
+    modelo_codigo   = db.Column(db.String(100), nullable=False, index=True)  # e.g. 'TM170', '1152'
+    titulo          = db.Column(db.String(300), nullable=False)
+    pdf_filename    = db.Column(db.String(500))
+    pdf_path        = db.Column(db.String(1000))
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
+
+
 class FactoryCodePDF(db.Model):
     __tablename__ = 'factory_code_pdf'
     id           = db.Column(db.Integer, primary_key=True)
@@ -3747,6 +3759,113 @@ def biblioteca_factory_apagar(pid):
     db.session.commit()
     flash('PDF removido da biblioteca.', 'success')
     return redirect(url_for('biblioteca_factory'))
+
+
+# ── BIBLIOTECA DE MODELO PDFs (partilhados por modelo de componente) ─────────
+
+@app.route('/api/modelo-pdf/<tipo>/<path:modelo>')
+@login_required
+def api_modelo_pdf_list(tipo, modelo):
+    """Return all PDFs for a component model."""
+    pdfs = ModeloPDF.query.filter_by(tipo_componente=tipo, modelo_codigo=modelo).order_by(ModeloPDF.titulo).all()
+    return jsonify([{
+        'id': p.id, 'titulo': p.titulo, 'pdf_filename': p.pdf_filename,
+        'ver_url': url_for('modelo_pdf_ver', pid=p.id),
+        'download_url': url_for('modelo_pdf_download', pid=p.id),
+        'criado_em': p.criado_em.strftime('%d/%m/%Y'),
+    } for p in pdfs])
+
+@app.route('/modelo-pdf/<int:pid>/ver')
+@login_required
+def modelo_pdf_ver(pid):
+    p = ModeloPDF.query.get_or_404(pid)
+    return send_from_directory(UPLOAD_TECNICO, p.pdf_path,
+                               as_attachment=False, download_name=p.pdf_filename)
+
+@app.route('/modelo-pdf/<int:pid>/download')
+@login_required
+def modelo_pdf_download(pid):
+    p = ModeloPDF.query.get_or_404(pid)
+    return send_from_directory(UPLOAD_TECNICO, p.pdf_path,
+                               as_attachment=True, download_name=p.pdf_filename)
+
+@app.route('/modelo-pdf/<int:pid>/editar', methods=['POST'])
+@login_required
+def modelo_pdf_editar(pid):
+    p = ModeloPDF.query.get_or_404(pid)
+    novo_titulo = request.form.get('titulo', '').strip()
+    if novo_titulo:
+        p.titulo = novo_titulo
+        db.session.commit()
+    return redirect(request.referrer or url_for('biblioteca_modelos'))
+
+@app.route('/modelo-pdf/<int:pid>/apagar', methods=['POST'])
+@login_required
+def modelo_pdf_apagar(pid):
+    p = ModeloPDF.query.get_or_404(pid)
+    try:
+        path = os.path.join(UPLOAD_TECNICO, p.pdf_path)
+        if os.path.exists(path): os.remove(path)
+    except Exception: pass
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/tecnico/<int:eid>/upload-modelo', methods=['POST'])
+@login_required
+def tecnico_upload_modelo(eid):
+    """Upload PDF to central model library (for caixa/motor model sharing)."""
+    e = Equipamento.query.get_or_404(eid)
+    f = request.files.get('pdf')
+    tipo = request.form.get('tipo', '').strip()
+    modelo = request.form.get('modelo', '').strip()
+    titulo = request.form.get('titulo', '').strip()
+
+    if not f or not tipo or not modelo or not titulo:
+        return jsonify({'ok': False, 'error': 'Campos em falta'}), 400
+
+    ensure_upload_dir()
+    safe = f"modelo_{tipo}_{modelo}_{f.filename.replace(' ','_')}"
+    path = os.path.join(UPLOAD_TECNICO, safe)
+    f.save(path)
+
+    p = ModeloPDF(
+        tipo_componente=tipo,
+        modelo_codigo=modelo,
+        titulo=titulo,
+        pdf_filename=f.filename,
+        pdf_path=safe,
+    )
+    db.session.add(p)
+    db.session.commit()
+
+    # Count how many equipamentos share this model
+    if tipo == 'caixa':
+        count = Equipamento.query.filter_by(caixa_modelo=modelo).count()
+    elif tipo == 'motor':
+        count = Equipamento.query.filter_by(motor_modelo=modelo).count()
+    else:
+        count = 0
+
+    return jsonify({'ok': True, 'id': p.id, 'count': count, 'titulo': titulo})
+
+@app.route('/biblioteca-modelos')
+@login_required
+def biblioteca_modelos():
+    """Central model PDF library."""
+    pdfs = ModeloPDF.query.order_by(ModeloPDF.tipo_componente, ModeloPDF.modelo_codigo, ModeloPDF.titulo).all()
+    return render_template('biblioteca_modelos.html', pdfs=pdfs)
+
+# Also update EquipamentoDocumento editar title
+@app.route('/tecnico/documento/<int:did>/editar-titulo', methods=['POST'])
+@login_required
+def tecnico_doc_editar_titulo(did):
+    d = EquipamentoDocumento.query.get_or_404(did)
+    novo = request.form.get('titulo', '').strip()
+    if novo:
+        d.titulo = novo
+        db.session.commit()
+    return redirect(url_for('tecnico_detalhe', eid=d.equipamento_id))
 
 
 def init_db():
