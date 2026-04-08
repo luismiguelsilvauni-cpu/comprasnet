@@ -1,0 +1,58 @@
+<!-- Doc Panel for {{ comp_label }} -->
+<div style="margin-bottom:10px">
+  <button onclick="(function(){var f=document.getElementById('doc-upload-{{ comp }}');f.style.display=f.style.display==='none'?'block':'none';})()" class="btn btn-ghost btn-sm">+ Adicionar Documento</button>
+</div>
+
+<div id="doc-upload-{{ comp }}" style="display:none;margin-bottom:14px">
+  <div class="card" style="padding:14px">
+    <form method="post" action="{{ url_for('tecnico_doc_upload', eid=equipamento.id) }}" enctype="multipart/form-data">
+      <input type="hidden" name="componente" value="{{ comp }}">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0">
+          <label>Título *</label>
+          <input type="text" name="titulo" required class="input" placeholder="Ex: Manual de Serviço, Esquema Eléctrico...">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Notas</label>
+          <input type="text" name="notas" class="input" placeholder="Observações...">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0 0 10px">
+        <label>Ficheiro</label>
+        <input type="file" name="doc_file" required class="input">
+      </div>
+      <div style="display:flex;justify-content:flex-end">
+        <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% set comp_docs_list = documentos | selectattr('componente', 'equalto', comp) | list %}
+{% if comp_docs_list %}
+  {% for d in comp_docs_list %}
+  <div class="doc-card">
+    <div class="doc-icon">
+      {% if d.pdf_filename and d.pdf_filename.lower().endswith('.pdf') %}📄
+      {% elif d.pdf_filename and d.pdf_filename.lower().split('.')[-1] in ['jpg','jpeg','png','gif'] %}🖼️
+      {% else %}📎{% endif %}
+    </div>
+    <div class="doc-info">
+      <div class="doc-title">{{ d.titulo }}</div>
+      <div class="doc-sub">{{ d.pdf_filename }}{% if d.notas %} · {{ d.notas }}{% endif %} · {{ d.criado_em.strftime('%d/%m/%Y') }}</div>
+    </div>
+    <div class="doc-actions">
+      <a href="{{ url_for('tecnico_doc_ver', did=d.id) }}" target="_blank" class="btn btn-ghost btn-sm" title="Visualizar">👁</a>
+      <a href="{{ url_for('tecnico_doc_download', did=d.id) }}" class="btn btn-ghost btn-sm" title="Download">⬇</a>
+      <form method="post" action="{{ url_for('tecnico_doc_apagar', did=d.id) }}"
+        onsubmit="return confirm('Apagar este documento?')" style="display:inline">
+        <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div style="text-align:center;padding:28px;color:var(--text-muted);border:1px dashed var(--border);border-radius:8px;font-size:13px">
+    Sem documentos para {{ comp_label }}. Clique em + Adicionar Documento.
+  </div>
+{% endif %}

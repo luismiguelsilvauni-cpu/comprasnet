@@ -1,243 +1,431 @@
 {% extends "base.html" %}
-{% block title %}{{ equipamento.serial_number }} · Técnico
-<script>
-function apagarSelecionados() {
-  const checked = Array.from(document.querySelectorAll('.row-check:checked'));
-  if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
-  if (!confirm('Apagar ' + checked.length + ' linha(s)?')) return;
-  const form = document.createElement('form');
-  form.method = 'post';
-  form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
-  checked.forEach(c => {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'opcao_ids';
-    input.value = c.value;
-    form.appendChild(input);
-  });
-  document.body.appendChild(form);
-  form.submit();
-}
-</script>
-
-{% endblock %}
-{% block page_title %}Option Codes
-<script>
-function apagarSelecionados() {
-  const checked = Array.from(document.querySelectorAll('.row-check:checked'));
-  if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
-  if (!confirm('Apagar ' + checked.length + ' linha(s)?')) return;
-  const form = document.createElement('form');
-  form.method = 'post';
-  form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
-  checked.forEach(c => {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'opcao_ids';
-    input.value = c.value;
-    form.appendChild(input);
-  });
-  document.body.appendChild(form);
-  form.submit();
-}
-</script>
-
-{% endblock %}
+{% block title %}{{ equipamento.embarcacao or equipamento.serial_number }} · Técnico{% endblock %}
+{% block page_title %}Ficha Técnica{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">← Voltar</a>
-  <a href="{{ url_for('tecnico_consumiveis', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📋 Consumíveis ({{ equipamento.consumiveis|length }})</a>
+  <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">← Lista</a>
   <a href="{{ url_for('tecnico_editar', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">Editar</a>
-
-<script>
-function apagarSelecionados() {
-  const checked = Array.from(document.querySelectorAll('.row-check:checked'));
-  if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
-  if (!confirm('Apagar ' + checked.length + ' linha(s)?')) return;
-  const form = document.createElement('form');
-  form.method = 'post';
-  form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
-  checked.forEach(c => {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'opcao_ids';
-    input.value = c.value;
-    form.appendChild(input);
-  });
-  document.body.appendChild(form);
-  form.submit();
-}
-</script>
-
+  <a href="{{ url_for('tecnico_consumiveis', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📋 Consumíveis</a>
 {% endblock %}
 
 {% block content %}
 {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for cat, msg in messages %}
+  {% if messages %}{% for cat, msg in messages %}
     <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
-    {% endfor %}
-  {% endif %}
+  {% endfor %}{% endif %}
 {% endwith %}
 
-<!-- Equipment Header -->
-<div class="card mb-16" style="padding:16px 20px">
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Cliente</div>
-      <div style="font-weight:600;font-size:13px">{{ equipamento.cliente_nome or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Embarcação</div>
-      <div style="font-weight:600;font-size:13px;color:var(--accent)">{{ equipamento.embarcacao or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Motor</div>
-      <div style="font-size:13px">{{ equipamento.motor_modelo or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Potência</div>
-      <div style="font-size:13px">{{ equipamento.motor_potencia or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Nº Série Motor</div>
-      <div class="mono" style="font-size:13px;color:var(--accent)">{{ equipamento.serial_number or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Base Code</div>
-      <div class="mono" style="font-size:13px">{{ equipamento.base_code or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Data Fabricação</div>
-      <div style="font-size:13px">{{ equipamento.manufactured_date or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Caixa Red.</div>
-      <div style="font-size:13px">{{ equipamento.caixa_modelo or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Ratio</div>
-      <div class="mono" style="font-size:13px">{{ equipamento.caixa_ratio or '—' }}</div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text-muted)">Nº Série Caixa</div>
-      <div class="mono" style="font-size:13px">{{ equipamento.caixa_serial or '—' }}</div>
-    </div>
-  </div>
-  {% if equipamento.notas %}
-  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted)">{{ equipamento.notas }}</div>
-  {% endif %}
-</div>
-
-
-<!-- Component Badges Navigation -->
-<div id="comp-badges" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-  <!-- Motor Propulsor always shown -->
-  <button onclick="activarBadge('motor')" id="badge-motor"
-    class="badge-comp active-badge">🔧 Motor Propulsor</button>
-  <button onclick="activarBadge('caixa')" id="badge-caixa"
-    class="badge-comp">⚙️ Caixa Inv./Redutora</button>
-  {% for m in motores_aux %}
-  <button onclick="activarBadge('aux_{{ m.numero }}')" id="badge-aux_{{ m.numero }}"
-    class="badge-comp">⚙️ Motor Aux. {{ m.numero }}</button>
-  {% endfor %}
-  <button onclick="activarBadge('outros')" id="badge-outros"
-    class="badge-comp">📄 Outros Documentos</button>
-</div>
-
-<!-- Component Panels -->
-{% set comp_docs = {} %}
-{% for d in documentos %}
-  {% if d.componente not in comp_docs %}
-    {% set _ = comp_docs.update({d.componente: []}) %}
-  {% endif %}
-{% endfor %}
-
 <style>
-.badge-comp {
-  padding:8px 16px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;
-  border:2px solid var(--border);background:var(--surface);color:var(--text-muted);
-  transition:all .15s;
+/* ── Equipment Header ── */
+.eq-header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: center;
 }
-.badge-comp:hover { border-color:var(--accent);color:var(--text); }
-.active-badge { border-color:var(--accent);background:var(--accent);color:#fff !important; }
-.comp-panel { display:none; }
-.comp-panel.active { display:block; }
-.doc-card { display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:8px; }
-.doc-icon { font-size:24px;flex-shrink:0; }
-.doc-info { flex:1;min-width:0; }
-.doc-title { font-size:13px;font-weight:600; }
-.doc-sub { font-size:11px;color:var(--text-muted);margin-top:2px; }
-.doc-actions { display:flex;gap:4px;flex-shrink:0; }
+.eq-field { min-width: 100px; }
+.eq-field-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 3px; }
+.eq-field-val { font-size: 14px; font-weight: 600; color: var(--text); }
+.eq-field-val.mono { font-family: monospace; color: var(--accent); }
+
+/* ── Big Component Badges ── */
+.comp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.comp-badge {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 18px;
+  cursor: pointer;
+  text-align: center;
+  transition: all .18s;
+  position: relative;
+  overflow: hidden;
+}
+.comp-badge:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+}
+.comp-badge.active {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(59,110,240,.12), rgba(59,110,240,.04));
+}
+.comp-badge .badge-icon { font-size: 32px; margin-bottom: 10px; display: block; }
+.comp-badge .badge-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.comp-badge .badge-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.comp-badge .badge-count {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 10px; font-weight: 700;
+  background: var(--accent); color: #fff;
+  padding: 2px 6px; border-radius: 8px;
+  display: none;
+}
+.comp-badge .badge-count.show { display: block; }
+
+/* ── Sub-navigation ── */
+.sub-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+.sub-tab {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  transition: all .15s;
+}
+.sub-tab:hover { border-color: var(--accent); color: var(--text); }
+.sub-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── Content panels ── */
+.comp-panel { display: none; }
+.comp-panel.active { display: block; }
+.sub-panel { display: none; }
+.sub-panel.active { display: block; }
+
+/* ── Option Codes table ── */
+.mini-table { width:100%;border-collapse:collapse;font-size:13px }
+.mini-table th { text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700 }
+.mini-table td { padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text) }
+.mini-table tr:last-child td { border-bottom:none }
+.mini-table tr:hover td { background:var(--surface2) }
+
+/* ── Doc cards ── */
+.doc-card { display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;transition:border-color .15s }
+.doc-card:hover { border-color:var(--accent) }
+.doc-icon { font-size:28px;flex-shrink:0 }
+.doc-info { flex:1;min-width:0 }
+.doc-title { font-size:13px;font-weight:600 }
+.doc-sub { font-size:11px;color:var(--text-muted);margin-top:2px }
+.doc-actions { display:flex;gap:4px }
 </style>
 
-<!-- Motor Panel -->
+<!-- Equipment Header -->
+<div class="eq-header">
+  <div class="eq-field">
+    <div class="eq-field-lbl">Cliente</div>
+    <div class="eq-field-val">{{ equipamento.cliente_nome or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Embarcação</div>
+    <div class="eq-field-val" style="color:var(--accent)">{{ equipamento.embarcacao or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Motor</div>
+    <div class="eq-field-val">{{ equipamento.motor_modelo or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Potência</div>
+    <div class="eq-field-val">{{ equipamento.motor_potencia or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Nº Série Motor</div>
+    <div class="eq-field-val mono">{{ equipamento.serial_number or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Base Code</div>
+    <div class="eq-field-val mono">{{ equipamento.base_code or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Data Fab.</div>
+    <div class="eq-field-val">{{ equipamento.manufactured_date or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Caixa Red.</div>
+    <div class="eq-field-val">{{ equipamento.caixa_modelo or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Ratio</div>
+    <div class="eq-field-val mono">{{ equipamento.caixa_ratio or '—' }}</div>
+  </div>
+  <div class="eq-field">
+    <div class="eq-field-lbl">Série Caixa</div>
+    <div class="eq-field-val mono">{{ equipamento.caixa_serial or '—' }}</div>
+  </div>
+  {% if equipamento.notas %}
+  <div class="eq-field" style="flex-basis:100%">
+    <div class="eq-field-lbl">Notas</div>
+    <div style="font-size:12px;color:var(--text-muted)">{{ equipamento.notas }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Big Component Badges -->
+<div class="comp-grid">
+  {% set motor_docs = documentos | selectattr('componente', 'equalto', 'motor') | list %}
+  <div class="comp-badge active" id="badge-motor" onclick="activarComp('motor')">
+    <span class="badge-count {{ 'show' if motor_docs }} ">{{ motor_docs|length + opcoes|length }}</span>
+    <span class="badge-icon">🔧</span>
+    <div class="badge-title">Motor Propulsor</div>
+    <div class="badge-sub">{{ equipamento.motor_modelo or 'Option codes + Docs' }}</div>
+  </div>
+
+  {% set caixa_docs = documentos | selectattr('componente', 'equalto', 'caixa') | list %}
+  <div class="comp-badge" id="badge-caixa" onclick="activarComp('caixa')">
+    <span class="badge-count {{ 'show' if caixa_docs }}">{{ caixa_docs|length }}</span>
+    <span class="badge-icon">⚙️</span>
+    <div class="badge-title">Caixa Inv./Redutora</div>
+    <div class="badge-sub">{{ equipamento.caixa_modelo or '—' }}</div>
+  </div>
+
+  {% for m in motores_aux %}
+  {% set aux_docs = documentos | selectattr('componente', 'equalto', 'aux_' + m.numero|string) | list %}
+  <div class="comp-badge" id="badge-aux_{{ m.numero }}" onclick="activarComp('aux_{{ m.numero }}')">
+    <span class="badge-count {{ 'show' if aux_docs }}">{{ aux_docs|length }}</span>
+    <span class="badge-icon">⚡</span>
+    <div class="badge-title">Motor Auxiliar {{ m.numero }}</div>
+    <div class="badge-sub">{{ m.modelo or m.marca or '—' }}</div>
+  </div>
+  {% endfor %}
+
+  {% set outros_docs = documentos | selectattr('componente', 'equalto', 'outros') | list %}
+  <div class="comp-badge" id="badge-outros" onclick="activarComp('outros')">
+    <span class="badge-count {{ 'show' if outros_docs }}">{{ outros_docs|length }}</span>
+    <span class="badge-icon">📁</span>
+    <div class="badge-title">Outros Documentos</div>
+    <div class="badge-sub">Informação geral</div>
+  </div>
+
+  <div class="comp-badge" id="badge-motores_aux_mgmt" onclick="activarComp('motores_aux_mgmt')">
+    <span class="badge-icon">🛠️</span>
+    <div class="badge-title">Motores Auxiliares</div>
+    <div class="badge-sub">Gerir {{ motores_aux|length }} motor(es)</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ PANELS ══════════════════════════════════ -->
+
+<!-- MOTOR PROPULSOR -->
 <div class="comp-panel active" id="panel-motor">
-  {% set comp = 'motor' %}
-  {% set comp_label = 'Motor Propulsor' %}
-  {% include 'tecnico_comp_panel.html' %}
+  <div class="sub-nav">
+    <button class="sub-tab active" id="stab-motor-opcodes" onclick="activarSub('motor','opcodes')">📋 Option Codes ({{ opcoes|length }})</button>
+    <button class="sub-tab" id="stab-motor-docs" onclick="activarSub('motor','docs')">📄 Documentos ({{ motor_docs|length }})</button>
+  </div>
+
+  <!-- Option Codes -->
+  <div class="sub-panel active" id="spanel-motor-opcodes">
+    <!-- Toolbar -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="selectAll" onchange="document.querySelectorAll('.row-check').forEach(c=>c.checked=this.checked)">
+        <label for="selectAll" style="font-size:12px;color:var(--text-muted)">Todos</label>
+        <button type="button" onclick="apagarSelecionados()" class="btn btn-ghost btn-sm" style="color:var(--danger)">🗑 Apagar sel.</button>
+      </div>
+      <div style="flex:1"></div>
+      <button onclick="document.getElementById('formAddOpcao').style.display=document.getElementById('formAddOpcao').style.display==='none'?'block':'none'" class="btn btn-ghost btn-sm">+ Adicionar linha</button>
+      <button onclick="document.getElementById('formImportHTML').style.display=document.getElementById('formImportHTML').style.display==='none'?'block':'none'" class="btn btn-ghost btn-sm">📥 Importar HTML</button>
+    </div>
+
+    <!-- Add option form -->
+    <div id="formAddOpcao" style="display:none;margin-bottom:12px">
+      <div class="card" style="padding:14px">
+        <form method="post" action="{{ url_for('tecnico_opcao_criar', eid=equipamento.id) }}">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;align-items:end">
+            <div class="form-group" style="margin:0"><label>Option Name *</label><input type="text" name="option_name" required class="input"></div>
+            <div class="form-group" style="margin:0"><label>Ordered</label><input type="text" name="ordered" class="input"></div>
+            <div class="form-group" style="margin:0"><label>Factory</label><input type="text" name="factory" class="input"></div>
+            <div class="form-group" style="margin:0"><label>Distributor</label><input type="text" name="distributor" class="input"></div>
+          </div>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end"><button type="submit" class="btn btn-primary btn-sm">Adicionar</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Import HTML form -->
+    <div id="formImportHTML" style="display:none;margin-bottom:12px">
+      <div class="card" style="padding:14px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">Importar de HTML (John Deere JDPS)</div>
+        <form method="post" action="{{ url_for('tecnico_importar_html', eid=equipamento.id) }}" enctype="multipart/form-data">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="file" name="html_file" accept=".html,.htm" required class="input" style="flex:1">
+            <button type="submit" class="btn btn-primary btn-sm">Importar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Option Codes Table -->
+    {% if opcoes %}
+    <div class="card" style="padding:0">
+      <table class="mini-table">
+        <thead><tr>
+          <th style="width:24px"></th>
+          <th style="width:32px">#</th>
+          <th>Option Name</th>
+          <th>Ordered</th><th>Factory</th><th>Distributor</th>
+          <th>PDF</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for o in opcoes %}
+        <tr id="row-{{ o.id }}">
+          <td><input type="checkbox" class="row-check" value="{{ o.id }}"></td>
+          <td style="color:var(--text-muted);font-size:11px">{{ loop.index }}</td>
+          <td style="font-weight:500">{{ o.option_name }}</td>
+          <td class="mono" style="font-size:12px">{{ o.ordered or '—' }}</td>
+          <td class="mono" style="font-size:12px">{{ o.factory or '—' }}</td>
+          <td style="font-size:12px;color:var(--text-muted)">{{ o.distributor or '—' }}</td>
+          <td>
+            {% if o.pdf_path %}
+            <div style="display:flex;gap:3px">
+              <a href="{{ url_for('tecnico_opcao_pdf', oid=o.id) }}" target="_blank" class="btn btn-ghost btn-sm">👁</a>
+              <a href="{{ url_for('tecnico_opcao_pdf_download', oid=o.id) }}" class="btn btn-ghost btn-sm">⬇</a>
+            </div>
+            {% else %}
+            <button onclick="mostrarUpload({{ o.id }})" class="btn btn-ghost btn-sm" style="font-size:11px">+ PDF</button>
+            <div id="upload-{{ o.id }}" style="display:none;margin-top:4px">
+              <form method="post" action="{{ url_for('tecnico_opcao_upload', oid=o.id) }}" enctype="multipart/form-data">
+                <input type="file" name="pdf" accept=".pdf" required style="font-size:11px;width:160px">
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:4px">Upload</button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+          <td style="text-align:right">
+            <button onclick="mostrarEdicao({{ o.id }})" class="btn btn-ghost btn-sm">✏️</button>
+            <form method="post" action="{{ url_for('tecnico_opcao_apagar', oid=o.id) }}"
+              onsubmit="return confirm('Apagar?')" style="display:inline">
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+            </form>
+          </td>
+        </tr>
+        <tr id="edit-{{ o.id }}" style="display:none;background:var(--surface2)">
+          <td></td><td></td>
+          <td colspan="5">
+            <form method="post" action="{{ url_for('tecnico_opcao_editar', oid=o.id) }}">
+              <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:8px 0">
+                <input type="text" name="option_name" value="{{ o.option_name }}" class="input" style="font-size:12px">
+                <input type="text" name="ordered" value="{{ o.ordered or '' }}" class="input" style="font-size:12px">
+                <input type="text" name="factory" value="{{ o.factory or '' }}" class="input" style="font-size:12px">
+                <input type="text" name="distributor" value="{{ o.distributor or '' }}" class="input" style="font-size:12px">
+              </div>
+              <div style="display:flex;gap:6px;padding-bottom:6px">
+                <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+                <button type="button" onclick="mostrarEdicao({{ o.id }})" class="btn btn-ghost btn-sm">Cancelar</button>
+              </div>
+            </form>
+          </td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:32px;border-style:dashed;color:var(--text-muted)">
+      Sem option codes. Adicione manualmente ou importe de HTML.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Motor Docs -->
+  <div class="sub-panel" id="spanel-motor-docs">
+    {% set comp = 'motor' %}{% set comp_label = 'Motor Propulsor' %}
+    {% include 'tecnico_doc_panel.html' %}
+  </div>
 </div>
 
-<!-- Caixa Panel -->
+<!-- CAIXA -->
 <div class="comp-panel" id="panel-caixa">
-  {% set comp = 'caixa' %}
-  {% set comp_label = 'Caixa Inv./Redutora' %}
-  {% include 'tecnico_comp_panel.html' %}
+  <div class="sub-nav">
+    <button class="sub-tab active" id="stab-caixa-info" onclick="activarSub('caixa','info')">ℹ️ Informação</button>
+    <button class="sub-tab" id="stab-caixa-docs" onclick="activarSub('caixa','docs')">📄 Documentos ({{ caixa_docs|length }})</button>
+  </div>
+  <div class="sub-panel active" id="spanel-caixa-info">
+    <div class="card" style="padding:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">
+        <div><div class="eq-field-lbl">Modelo</div><div class="eq-field-val">{{ equipamento.caixa_modelo or '—' }}</div></div>
+        <div><div class="eq-field-lbl">Ratio</div><div class="eq-field-val mono">{{ equipamento.caixa_ratio or '—' }}</div></div>
+        <div><div class="eq-field-lbl">Nº Série</div><div class="eq-field-val mono">{{ equipamento.caixa_serial or '—' }}</div></div>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--text-muted)">
+        Para editar estes campos clique em <strong>Editar</strong> no topo da página.
+      </div>
+    </div>
+  </div>
+  <div class="sub-panel" id="spanel-caixa-docs">
+    {% set comp = 'caixa' %}{% set comp_label = 'Caixa Inv./Redutora' %}
+    {% include 'tecnico_doc_panel.html' %}
+  </div>
 </div>
 
-<!-- Motor Aux Panels -->
+<!-- MOTORES AUXILIARES PANELS -->
 {% for m in motores_aux %}
-<div class="comp-panel" id="panel-aux_{{ m.numero }}">
-  {% set comp = 'aux_' + m.numero|string %}
-  {% set comp_label = 'Motor Auxiliar ' + m.numero|string %}
-  {% include 'tecnico_comp_panel.html' %}
+{% set aux_key = 'aux_' + m.numero|string %}
+{% set aux_docs = documentos | selectattr('componente', 'equalto', aux_key) | list %}
+<div class="comp-panel" id="panel-{{ aux_key }}">
+  <div class="sub-nav">
+    <button class="sub-tab active" id="stab-{{ aux_key }}-info" onclick="activarSub('{{ aux_key }}','info')">ℹ️ Informação</button>
+    <button class="sub-tab" id="stab-{{ aux_key }}-docs" onclick="activarSub('{{ aux_key }}','docs')">📄 Documentos ({{ aux_docs|length }})</button>
+  </div>
+  <div class="sub-panel active" id="spanel-{{ aux_key }}-info">
+    <div class="card" style="padding:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px">
+        <div><div class="eq-field-lbl">Marca</div><div class="eq-field-val">{{ m.marca or '—' }}</div></div>
+        <div><div class="eq-field-lbl">Modelo</div><div class="eq-field-val">{{ m.modelo or '—' }}</div></div>
+        <div><div class="eq-field-lbl">Nº Série</div><div class="eq-field-val mono">{{ m.serial_number or '—' }}</div></div>
+        <div><div class="eq-field-lbl">Potência</div><div class="eq-field-val">{{ m.potencia or '—' }}</div></div>
+        <div><div class="eq-field-lbl">RPM</div><div class="eq-field-val">{{ m.rpm or '—' }}</div></div>
+        <div><div class="eq-field-lbl">Ano</div><div class="eq-field-val">{{ m.ano or '—' }}</div></div>
+      </div>
+      {% if m.notas %}<div style="margin-top:10px;font-size:12px;color:var(--text-muted)">{{ m.notas }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="sub-panel" id="spanel-{{ aux_key }}-docs">
+    {% set comp = aux_key %}{% set comp_label = 'Motor Auxiliar ' + m.numero|string %}
+    {% include 'tecnico_doc_panel.html' %}
+  </div>
 </div>
 {% endfor %}
 
-<!-- Outros Panel -->
+<!-- OUTROS -->
 <div class="comp-panel" id="panel-outros">
-  {% set comp = 'outros' %}
-  {% set comp_label = 'Outros Documentos' %}
-  {% include 'tecnico_comp_panel.html' %}
+  <div class="sub-nav">
+    <button class="sub-tab active" id="stab-outros-docs" onclick="activarSub('outros','docs')">📄 Documentos ({{ outros_docs|length }})</button>
+  </div>
+  <div class="sub-panel active" id="spanel-outros-docs">
+    {% set comp = 'outros' %}{% set comp_label = 'Outros Documentos' %}
+    {% include 'tecnico_doc_panel.html' %}
+  </div>
 </div>
 
-<script>
-function activarBadge(comp) {
-  document.querySelectorAll('.badge-comp').forEach(b => b.classList.remove('active-badge'));
-  document.querySelectorAll('.comp-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('badge-'+comp).classList.add('active-badge');
-  document.getElementById('panel-'+comp).classList.add('active');
-}
-</script>
-
-<hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
-
-<!-- Motores Auxiliares -->
-<div id="motores-aux" style="margin-top:24px">
+<!-- GESTÃO MOTORES AUXILIARES -->
+<div class="comp-panel" id="panel-motores_aux_mgmt">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-    <div style="font-size:13px;font-weight:600">⚙️ Motores Auxiliares
-      <span style="color:var(--text-muted);font-weight:400">({{ motores_aux|length }})</span>
-    </div>
-    <button onclick="document.getElementById('formNovoMotorAux').style.display=document.getElementById('formNovoMotorAux').style.display==='none'?'block':'none'"
-      class="btn btn-ghost btn-sm">+ Adicionar Motor Aux</button>
+    <div style="font-size:13px;font-weight:600">Motores Auxiliares</div>
+    <button onclick="document.getElementById('formNovoMotorAux').style.display=document.getElementById('formNovoMotorAux').style.display==='none'?'block':'none'" class="btn btn-ghost btn-sm">+ Adicionar</button>
   </div>
 
-  <!-- Add form -->
   <div id="formNovoMotorAux" style="display:none;margin-bottom:12px">
     <div class="card" style="padding:14px">
-      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:12px">Novo Motor Auxiliar</div>
       <form method="post" action="{{ url_for('tecnico_motor_aux_criar', eid=equipamento.id) }}">
         <div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
           <div class="form-group" style="margin:0"><label>Nº</label><input type="number" name="numero" value="{{ motores_aux|length + 1 }}" min="1" class="input"></div>
-          <div class="form-group" style="margin:0"><label>Marca</label><input type="text" name="marca" class="input" placeholder="Ex: Volvo"></div>
-          <div class="form-group" style="margin:0"><label>Modelo</label><input type="text" name="modelo" class="input" placeholder="Ex: D4-180"></div>
+          <div class="form-group" style="margin:0"><label>Marca</label><input type="text" name="marca" class="input"></div>
+          <div class="form-group" style="margin:0"><label>Modelo</label><input type="text" name="modelo" class="input"></div>
           <div class="form-group" style="margin:0"><label>Nº Série</label><input type="text" name="serial_number" class="input"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:10px;margin-bottom:10px">
-          <div class="form-group" style="margin:0"><label>Potência</label><input type="text" name="potencia" class="input" placeholder="Ex: 180 CV"></div>
-          <div class="form-group" style="margin:0"><label>RPM</label><input type="text" name="rpm" class="input" placeholder="Ex: 3600"></div>
-          <div class="form-group" style="margin:0"><label>Ano</label><input type="text" name="ano" class="input" placeholder="Ex: 2018"></div>
-          <div class="form-group" style="margin:0"><label>Notas</label><input type="text" name="notas" class="input" placeholder="Observações..."></div>
+          <div class="form-group" style="margin:0"><label>Potência</label><input type="text" name="potencia" class="input"></div>
+          <div class="form-group" style="margin:0"><label>RPM</label><input type="text" name="rpm" class="input"></div>
+          <div class="form-group" style="margin:0"><label>Ano</label><input type="text" name="ano" class="input"></div>
+          <div class="form-group" style="margin:0"><label>Notas</label><input type="text" name="notas" class="input"></div>
         </div>
         <div style="display:flex;justify-content:flex-end"><button type="submit" class="btn btn-primary btn-sm">Adicionar</button></div>
       </form>
@@ -246,36 +434,28 @@ function activarBadge(comp) {
 
   {% if motores_aux %}
   <div class="card" style="padding:0">
-    <table class="table" style="font-size:13px">
-      <thead><tr>
-        <th style="width:40px">Nº</th>
-        <th>Marca</th><th>Modelo</th><th>Nº Série</th>
-        <th>Potência</th><th>RPM</th><th>Ano</th><th>Notas</th><th></th>
-      </tr></thead>
+    <table class="mini-table">
+      <thead><tr><th>Nº</th><th>Marca</th><th>Modelo</th><th>Nº Série</th><th>Potência</th><th>RPM</th><th>Ano</th><th></th></tr></thead>
       <tbody>
       {% for m in motores_aux %}
       <tr id="maux-row-{{ m.id }}">
         <td style="font-weight:700;color:var(--accent)">{{ m.numero }}</td>
-        <td>{{ m.marca or '—' }}</td>
-        <td style="font-weight:500">{{ m.modelo or '—' }}</td>
+        <td>{{ m.marca or '—' }}</td><td>{{ m.modelo or '—' }}</td>
         <td class="mono" style="font-size:12px">{{ m.serial_number or '—' }}</td>
-        <td>{{ m.potencia or '—' }}</td>
-        <td>{{ m.rpm or '—' }}</td>
-        <td>{{ m.ano or '—' }}</td>
-        <td style="font-size:12px;color:var(--text-muted)">{{ m.notas or '' }}</td>
-        <td style="text-align:right;white-space:nowrap">
+        <td>{{ m.potencia or '—' }}</td><td>{{ m.rpm or '—' }}</td><td>{{ m.ano or '—' }}</td>
+        <td style="text-align:right">
           <button onclick="mostrarEdicaoAux({{ m.id }})" class="btn btn-ghost btn-sm">✏️</button>
           <form method="post" action="{{ url_for('tecnico_motor_aux_apagar', mid=m.id) }}"
-            onsubmit="return confirm('Apagar motor aux {{ m.numero }}?')" style="display:inline">
+            onsubmit="return confirm('Apagar?')" style="display:inline">
             <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
           </form>
         </td>
       </tr>
       <tr id="maux-edit-{{ m.id }}" style="display:none;background:var(--surface2)">
-        <td colspan="9" style="padding:10px">
+        <td colspan="8" style="padding:10px">
           <form method="post" action="{{ url_for('tecnico_motor_aux_editar', mid=m.id) }}">
             <div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr 1fr 1fr 1fr 2fr;gap:8px;align-items:end">
-              <input type="number" name="numero" value="{{ m.numero }}" class="input" style="font-size:12px" placeholder="Nº">
+              <input type="number" name="numero" value="{{ m.numero }}" class="input" style="font-size:12px">
               <input type="text" name="marca" value="{{ m.marca or '' }}" class="input" style="font-size:12px" placeholder="Marca">
               <input type="text" name="modelo" value="{{ m.modelo or '' }}" class="input" style="font-size:12px" placeholder="Modelo">
               <input type="text" name="serial_number" value="{{ m.serial_number or '' }}" class="input" style="font-size:12px" placeholder="Nº Série">
@@ -296,162 +476,27 @@ function activarBadge(comp) {
     </table>
   </div>
   {% else %}
-  <div class="card" style="text-align:center;padding:20px;border-style:dashed;font-size:13px;color:var(--text-muted)">
-    Sem motores auxiliares. Clique em + Adicionar Motor Aux.
-  </div>
+  <div class="card" style="text-align:center;padding:24px;border-style:dashed;color:var(--text-muted)">Sem motores auxiliares.</div>
   {% endif %}
 </div>
 
-<!-- Import HTML + Add row actions -->
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-  <div style="font-size:13px;font-weight:600;flex:1">Option Codes <span style="color:var(--text-muted);font-weight:400">({{ opcoes|length }} linhas)</span></div>
-  <button onclick="document.getElementById('formAddOpcao').style.display=document.getElementById('formAddOpcao').style.display==='none'?'block':'none'"
-    class="btn btn-ghost btn-sm">+ Adicionar linha</button>
-  <button onclick="document.getElementById('formImportHTML').style.display=document.getElementById('formImportHTML').style.display==='none'?'block':'none'"
-    class="btn btn-ghost btn-sm">📥 Importar HTML</button>
-</div>
-
-<!-- Add option form -->
-<div id="formAddOpcao" style="display:none;margin-bottom:12px">
-  <div class="card" style="padding:14px">
-    <div style="font-size:13px;font-weight:600;margin-bottom:12px">Nova Linha</div>
-    <form method="post" action="{{ url_for('tecnico_opcao_criar', eid=equipamento.id) }}">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;align-items:end">
-        <div class="form-group" style="margin:0">
-          <label>Option Name *</label>
-          <input type="text" name="option_name" required class="input" placeholder="Ex: Engine Type">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Ordered</label>
-          <input type="text" name="ordered" class="input" placeholder="Ex: D13K500">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Factory</label>
-          <input type="text" name="factory" class="input" placeholder="Ex: STD">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Distributor</label>
-          <input type="text" name="distributor" class="input" placeholder="Opcional">
-        </div>
-      </div>
-      <div style="margin-top:10px;display:flex;justify-content:flex-end">
-        <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Import HTML form -->
-<div id="formImportHTML" style="display:none;margin-bottom:12px">
-  <div class="card" style="padding:14px">
-    <div style="font-size:13px;font-weight:600;margin-bottom:6px">Importar Option Codes de HTML</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
-      O sistema vai analisar o ficheiro HTML e extrair automaticamente as colunas <strong>Option Name</strong>, <strong>Ordered</strong> e <strong>Factory</strong>.
-    </div>
-    <form method="post" action="{{ url_for('tecnico_importar_html', eid=equipamento.id) }}" enctype="multipart/form-data">
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="file" name="html_file" accept=".html,.htm" required class="input" style="flex:1">
-        <button type="submit" class="btn btn-primary btn-sm">Importar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Option Codes table -->
-{% if opcoes %}
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-  <input type="checkbox" id="selectAll" onchange="document.querySelectorAll('.row-check').forEach(c=>c.checked=this.checked)" title="Seleccionar todos">
-  <label for="selectAll" style="font-size:12px;color:var(--text-muted)">Seleccionar todos</label>
-  <button type="button" onclick="apagarSelecionados()" class="btn btn-ghost btn-sm" style="color:var(--danger);margin-left:8px">🗑 Apagar seleccionados</button>
-</div>
-<div class="card" style="padding:0;overflow:hidden">
-  <table class="table" style="font-size:13px">
-    <thead>
-      <tr>
-        <th style="width:24px"></th>
-        <th style="width:32px">#</th>
-        <th>Option Name</th>
-        <th>Ordered</th>
-        <th>Factory</th>
-        <th>Distributor</th>
-        <th>PDF</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for o in opcoes %}
-      <tr id="row-{{ o.id }}">
-        <td><input type="checkbox" name="opcao_ids" value="{{ o.id }}" class="row-check"></td>
-        <td style="color:var(--text-muted);font-size:11px">{{ loop.index }}</td>
-        <td style="font-weight:600">{{ o.option_name }}</td>
-        <td class="mono" style="font-size:12px">{{ o.ordered or '—' }}</td>
-        <td class="mono" style="font-size:12px">{{ o.factory or '—' }}</td>
-        <td style="font-size:12px;color:var(--text-muted)">{{ o.distributor or '—' }}</td>
-        <td>
-          {% if o.pdf_path %}
-          <div style="display:flex;gap:4px">
-            <a href="{{ url_for('tecnico_opcao_pdf', oid=o.id) }}" target="_blank"
-              class="btn btn-ghost btn-sm" title="Visualizar">👁</a>
-            <a href="{{ url_for('tecnico_opcao_pdf_download', oid=o.id) }}"
-              class="btn btn-ghost btn-sm" title="Download">⬇</a>
-            <button onclick="imprimirPDF({{ o.id }})" class="btn btn-ghost btn-sm" title="Imprimir">🖨</button>
-          </div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:2px">{{ o.pdf_filename }}</div>
-          {% else %}
-          <button onclick="mostrarUpload({{ o.id }})" class="btn btn-ghost btn-sm" style="font-size:11px">+ PDF</button>
-          <div id="upload-{{ o.id }}" style="display:none;margin-top:4px">
-            <form method="post" action="{{ url_for('tecnico_opcao_upload', oid=o.id) }}" enctype="multipart/form-data">
-              <input type="file" name="pdf" accept=".pdf" required style="font-size:11px;width:180px">
-              <button type="submit" class="btn btn-primary btn-sm" style="margin-top:4px">Upload</button>
-            </form>
-          </div>
-          {% endif %}
-        </td>
-        <td style="text-align:right">
-          <button onclick="mostrarEdicao({{ o.id }})" class="btn btn-ghost btn-sm" title="Editar">✏️</button>
-          <form method="post" action="{{ url_for('tecnico_opcao_apagar', oid=o.id) }}"
-            onsubmit="return confirm('Apagar esta linha?')" style="display:inline">
-            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
-          </form>
-        </td>
-      </tr>
-      <!-- Edit row -->
-      <tr id="edit-{{ o.id }}" style="display:none;background:var(--surface2)">
-        <td></td>
-        <td colspan="5">
-          <form method="post" action="{{ url_for('tecnico_opcao_editar', oid=o.id) }}">
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:8px 0">
-              <input type="text" name="option_name" value="{{ o.option_name }}" class="input" style="font-size:12px">
-              <input type="text" name="ordered" value="{{ o.ordered or '' }}" class="input" style="font-size:12px" placeholder="Ordered">
-              <input type="text" name="factory" value="{{ o.factory or '' }}" class="input" style="font-size:12px" placeholder="Factory">
-              <input type="text" name="distributor" value="{{ o.distributor or '' }}" class="input" style="font-size:12px" placeholder="Distributor">
-            </div>
-            <div style="display:flex;gap:6px;padding-bottom:6px">
-              <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
-              <button type="button" onclick="mostrarEdicao({{ o.id }})" class="btn btn-ghost btn-sm">Cancelar</button>
-            </div>
-          </form>
-        </td>
-        <td></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% else %}
-<div class="card" style="text-align:center;padding:32px;border-style:dashed">
-  <div style="font-size:13px;color:var(--text-muted)">Sem option codes. Adicione manualmente ou importe de um ficheiro HTML.</div>
-</div>
-{% endif %}
-
 <script>
+function activarComp(comp) {
+  document.querySelectorAll('.comp-badge').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.comp-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('badge-'+comp).classList.add('active');
+  document.getElementById('panel-'+comp).classList.add('active');
+  window.scrollTo({top: document.getElementById('badge-'+comp).offsetTop - 80, behavior:'smooth'});
+}
 
-function mostrarEdicaoAux(id) {
-  const row = document.getElementById('maux-row-'+id);
-  const edit = document.getElementById('maux-edit-'+id);
-  const shown = edit.style.display !== 'none';
-  edit.style.display = shown ? 'none' : 'table-row';
-  row.style.opacity = shown ? '1' : '.4';
+function activarSub(comp, sub) {
+  const panel = document.getElementById('panel-'+comp);
+  panel.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  panel.querySelectorAll('.sub-panel').forEach(p => p.classList.remove('active'));
+  const tab = document.getElementById('stab-'+comp+'-'+sub);
+  const sp  = document.getElementById('spanel-'+comp+'-'+sub);
+  if (tab) tab.classList.add('active');
+  if (sp)  sp.classList.add('active');
 }
 
 function mostrarUpload(id) {
@@ -459,19 +504,23 @@ function mostrarUpload(id) {
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 function mostrarEdicao(id) {
-  const row = document.getElementById('row-'+id);
-  const edit = document.getElementById('edit-'+id);
-  const shown = edit.style.display !== 'none';
-  edit.style.display = shown ? 'none' : 'table-row';
-  row.style.opacity = shown ? '1' : '.4';
+  const r = document.getElementById('row-'+id);
+  const e = document.getElementById('edit-'+id);
+  const s = e.style.display !== 'none';
+  e.style.display = s ? 'none' : 'table-row';
+  r.style.opacity = s ? '1' : '.4';
+}
+function mostrarEdicaoAux(id) {
+  const r = document.getElementById('maux-row-'+id);
+  const e = document.getElementById('maux-edit-'+id);
+  const s = e.style.display !== 'none';
+  e.style.display = s ? 'none' : 'table-row';
+  r.style.opacity = s ? '1' : '.4';
 }
 function imprimirPDF(oid) {
-  const win = window.open('/tecnico/opcao/'+oid+'/pdf', '_blank');
-  win.onload = function() { win.print(); };
+  const w = window.open('/tecnico/opcao/'+oid+'/pdf','_blank');
+  w.onload = () => w.print();
 }
-</script>
-
-<script>
 function apagarSelecionados() {
   const checked = Array.from(document.querySelectorAll('.row-check:checked'));
   if (!checked.length) { alert('Seleccione pelo menos uma linha.'); return; }
@@ -480,15 +529,12 @@ function apagarSelecionados() {
   form.method = 'post';
   form.action = "{{ url_for('tecnico_opcoes_apagar_bulk', eid=equipamento.id) }}";
   checked.forEach(c => {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'opcao_ids';
-    input.value = c.value;
-    form.appendChild(input);
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'opcao_ids'; inp.value = c.value;
+    form.appendChild(inp);
   });
   document.body.appendChild(form);
   form.submit();
 }
 </script>
-
 {% endblock %}
