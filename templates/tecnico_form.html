@@ -17,7 +17,8 @@
           <input type="text" id="clienteInput" name="cliente_nome"
             value="{{ equipamento.cliente_nome if equipamento else '' }}"
             class="input" placeholder="Pesquisar cliente PHC..."
-            oninput="pesquisarCliente(this.value)" autocomplete="off">
+            oninput="pesquisarCliente(this.value)" autocomplete="off"
+            placeholder="Escreva pelo menos 2 caracteres para pesquisar...">
           <div id="clienteResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
         </div>
       </div>
