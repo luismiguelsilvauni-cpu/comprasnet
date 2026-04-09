@@ -3657,6 +3657,8 @@ def tecnico_doc_upload(eid):
     safe = f"{eid}_{componente}_{f.filename.replace(' ','_')}"
     path = os.path.join(UPLOAD_TECNICO, safe)
     f.save(path)
+
+    # Link to this equipment
     doc = EquipamentoDocumento(
         equipamento_id=eid,
         componente=componente,
@@ -3666,8 +3668,53 @@ def tecnico_doc_upload(eid):
         notas=notas,
     )
     db.session.add(doc)
+
+    # Determine model key for sharing
+    tipo_comp = None
+    modelo_val = None
+    if componente == 'caixa' and e.caixa_modelo:
+        tipo_comp = 'caixa'
+        modelo_val = e.caixa_modelo.strip()
+    elif componente == 'motor' and e.motor_modelo:
+        tipo_comp = 'motor'
+        modelo_val = e.motor_modelo.strip()
+    elif componente.startswith('aux_'):
+        # find the aux motor model
+        num = int(componente.split('_')[1]) if '_' in componente else 1
+        aux = EquipamentoMotorAux.query.filter_by(equipamento_id=eid, numero=num).first()
+        if aux and aux.modelo:
+            tipo_comp = 'aux'
+            modelo_val = aux.modelo.strip()
+
+    # Save to shared library if model identified
+    if tipo_comp and modelo_val:
+        existing = ModeloPDF.query.filter_by(tipo_componente=tipo_comp,
+                                             modelo_codigo=modelo_val,
+                                             titulo=titulo).first()
+        if not existing:
+            mp = ModeloPDF(
+                tipo_componente=tipo_comp,
+                modelo_codigo=modelo_val,
+                titulo=titulo,
+                pdf_filename=f.filename,
+                pdf_path=safe,
+            )
+            db.session.add(mp)
+
     db.session.commit()
-    flash('Documento adicionado.', 'success')
+
+    msg = f'Documento adicionado.'
+    if tipo_comp and modelo_val:
+        count = Equipamento.query
+        if tipo_comp == 'caixa':
+            count = count.filter_by(caixa_modelo=modelo_val).count()
+        elif tipo_comp == 'motor':
+            count = count.filter_by(motor_modelo=modelo_val).count()
+        else:
+            count = 1
+        if count > 1:
+            msg = f'Documento guardado e partilhado com {count} equipamentos com {modelo_val}.'
+    flash(msg, 'success')
     return redirect(url_for('tecnico_detalhe', eid=eid))
 
 @app.route('/tecnico/documento/<int:did>/ver')
