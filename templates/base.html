@@ -270,7 +270,7 @@
             <a href="{{ url_for('stock') }}" class="nav-item {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
                 <span class="icon">📊</span><span>Stock</span>
             </a>
-            <a href="{{ url_for('biblioteca_factory') }}" class="nav-item {% if request.endpoint == 'biblioteca_factory' or 'factory' in (request.endpoint or '') %}active{% endif %}">
+            <a href="{{ url_for('biblioteca_modelos') }}" class="nav-item {% if 'biblioteca' in (request.endpoint or '') %}active{% endif %}">
                 <span class="icon">📚</span><span>Biblioteca PDF</span>
             </a>
             <a href="{{ url_for('tecnico') }}" class="nav-item {% if 'tecnico' in request.endpoint %}active{% endif %}">
