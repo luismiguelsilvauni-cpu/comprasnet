@@ -3528,8 +3528,8 @@ def tecnico_importar_excel():
         if col_pot is None:      col_pot      = o + 2
         if col_rpm is None:      col_rpm      = o + 3
         if col_serie is None:    col_serie    = o + 4
-        if col_base is None:     col_base     = o + 5
-        if col_data_fab is None: col_data_fab = o + 6
+        col_base = None  # not used
+        col_data_fab = None  # not used
         if col_mod_cx is None:   col_mod_cx   = o + 8
         if col_ratio is None:    col_ratio    = o + 9
         if col_serie_cx is None: col_serie_cx = o + 10
@@ -3582,8 +3582,6 @@ def tecnico_importar_excel():
                 motor_modelo    = get(col_mod),
                 motor_potencia  = pot,
                 serial_number   = serial,
-                base_code       = get(col_base),
-                manufactured_date = get(col_data_fab),
                 caixa_modelo    = get(col_mod_cx),
                 caixa_ratio     = get(col_ratio),
                 caixa_serial    = get(col_serie_cx),
