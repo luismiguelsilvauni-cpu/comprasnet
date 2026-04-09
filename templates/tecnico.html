@@ -27,8 +27,6 @@
         <th>Modelo Motor</th>
         <th>Potência</th>
         <th>Nº Série</th>
-        <th>Base Code</th>
-        <th>Data Fab.</th>
         <th>Caixa Red.</th>
         <th>Ratio</th>
         <th>Série Caixa</th>
@@ -47,8 +45,6 @@
         <td class="mono" style="color:#f59e0b">
           <a href="{{ url_for('tecnico_detalhe', eid=e.id) }}" style="color:#f59e0b">{{ e.serial_number or '—' }}</a>
         </td>
-        <td class="mono">{{ e.base_code or '—' }}</td>
-        <td>{{ e.manufactured_date or '—' }}</td>
         <td>{{ e.caixa_modelo or '—' }}</td>
         <td class="mono">{{ e.caixa_ratio or '—' }}</td>
         <td class="mono">{{ e.caixa_serial or '—' }}</td>
