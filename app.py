@@ -3523,6 +3523,11 @@ def tecnico_importar_excel():
         if col_obs is None and ncols >= 12:    col_obs      = 11
 
         app.logger.info(f"Cols mapped: emb={col_emb} mod={col_mod} pot={col_pot} serie={col_serie} base={col_base} cx={col_mod_cx} ratio={col_ratio}")
+        
+        # Log first data row for debug
+        first_row = next(ws.iter_rows(min_row=2, max_row=2, values_only=True), None)
+        app.logger.info(f"First data row: {first_row}")
+        app.logger.info(f"Total rows: {ws.max_row}")
 
         added = 0
         duplicados = 0
@@ -3539,8 +3544,10 @@ def tecnico_importar_excel():
                 return str(v).strip()
             
             embarcacao = get(col_emb)
-            if not embarcacao or embarcacao.lower() in ('none','nan',''):
+            if not embarcacao or embarcacao.lower() in ('none','nan','','null'):
+                app.logger.info(f'Row {row_idx}: skipped (empty embarcacao)')
                 continue
+            app.logger.info(f'Row {row_idx}: embarcacao={embarcacao}')
 
             serial = get(col_serie)
             
