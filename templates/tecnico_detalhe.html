@@ -62,9 +62,19 @@
 {% set motor_docs = documentos|selectattr('componente','equalto','motor')|list %}
 {% set caixa_docs = documentos|selectattr('componente','equalto','caixa')|list %}
 {% set outros_docs = documentos|selectattr('componente','equalto','outros')|list %}
+{% set is_aux = equipamento.tipo_motor == 'auxiliar' %}
 
-<!-- L1: Component Badges -->
+<!-- L1: Component Badges — adapts to motor type -->
 <div class="comp-grid">
+  {% if is_aux %}
+  <!-- AUXILIAR: só motor auxiliar + docs -->
+  <div class="comp-badge" id="cb-motor" onclick="selComp('motor')">
+    {% if opcoes|length + motor_docs|length > 0 %}<div class="cn">{{ opcoes|length + motor_docs|length }}</div>{% endif %}
+    <span class="ci">⚡</span><div class="ct">Motor Auxiliar</div>
+    <div class="cs">{{ equipamento.motor_modelo or 'Option codes · Docs' }}</div>
+  </div>
+  {% else %}
+  <!-- PRINCIPAL: motor + caixa + motores aux -->
   <div class="comp-badge" id="cb-motor" onclick="selComp('motor')">
     {% if opcoes|length + motor_docs|length > 0 %}<div class="cn">{{ opcoes|length + motor_docs|length }}</div>{% endif %}
     <span class="ci">🔧</span><div class="ct">Motor Propulsor</div>
@@ -84,15 +94,16 @@
     <div class="cs">{{ m.modelo or m.marca or '—' }}</div>
   </div>
   {% endfor %}
-  <div class="comp-badge" id="cb-outros" onclick="selComp('outros')">
-    {% if outros_docs %}<div class="cn">{{ outros_docs|length }}</div>{% endif %}
-    <span class="ci">📁</span><div class="ct">Outros Docs</div>
-    <div class="cs">Informação geral</div>
-  </div>
   <div class="comp-badge" id="cb-mgmt" onclick="selComp('mgmt')">
     {% if motores_aux %}<div class="cn">{{ motores_aux|length }}</div>{% endif %}
     <span class="ci">🛠️</span><div class="ct">Motores Aux.</div>
     <div class="cs">Gerir lista</div>
+  </div>
+  {% endif %}
+  <div class="comp-badge" id="cb-outros" onclick="selComp('outros')">
+    {% if outros_docs %}<div class="cn">{{ outros_docs|length }}</div>{% endif %}
+    <span class="ci">📁</span><div class="ct">Outros Docs</div>
+    <div class="cs">Informação geral</div>
   </div>
 </div>
 

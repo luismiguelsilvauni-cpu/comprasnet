@@ -3917,6 +3917,16 @@ def tecnico_doc_editar_titulo(did):
     return redirect(url_for('tecnico_detalhe', eid=d.equipamento_id))
 
 
+@app.route('/api/tecnico/<int:eid>/tipo', methods=['POST'])
+@login_required
+def api_tecnico_tipo(eid):
+    e = Equipamento.query.get_or_404(eid)
+    novo = request.get_json().get('tipo', 'principal')
+    e.tipo_motor = novo
+    db.session.commit()
+    return jsonify({'ok': True, 'tipo': novo})
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():

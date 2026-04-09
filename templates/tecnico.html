@@ -75,11 +75,12 @@ th.desc::after { content:' ↓';color:var(--accent) }
           data-serie="{{ e.serial_number or '' }}"
           data-caixa="{{ e.caixa_modelo or '' }}">
         <td>
-          {% if e.tipo_motor == 'auxiliar' %}
-          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(245,158,11,.15);color:#f59e0b">⚡ Auxiliar</span>
-          {% else %}
-          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,.15);color:#22c55e">⚙️ Principal</span>
-          {% endif %}
+          <button onclick="toggleTipo({{ e.id }}, this)"
+            data-tipo="{{ e.tipo_motor or 'principal' }}"
+            style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;cursor:pointer;border:none;
+            {% if e.tipo_motor == 'auxiliar' %}background:rgba(245,158,11,.15);color:#f59e0b{% else %}background:rgba(34,197,94,.15);color:#22c55e{% endif %}">
+            {% if e.tipo_motor == 'auxiliar' %}⚡ Auxiliar{% else %}⚙️ Principal{% endif %}
+          </button>
         </td>
         <td>{{ e.cliente_nome or '—' }}</td>
         <td style="font-weight:600;color:var(--accent)">{{ e.embarcacao or '—' }}</td>
@@ -116,6 +117,31 @@ th.desc::after { content:' ↓';color:var(--accent) }
 
 <script>
 var sortDir = {};
+
+function toggleTipo(eid, btn) {
+  var atual = btn.dataset.tipo;
+  var novo = atual === 'principal' ? 'auxiliar' : 'principal';
+  fetch('/api/tecnico/' + eid + '/tipo', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tipo: novo})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      btn.dataset.tipo = novo;
+      if (novo === 'auxiliar') {
+        btn.textContent = '⚡ Auxiliar';
+        btn.style.background = 'rgba(245,158,11,.15)';
+        btn.style.color = '#f59e0b';
+      } else {
+        btn.textContent = '⚙️ Principal';
+        btn.style.background = 'rgba(34,197,94,.15)';
+        btn.style.color = '#22c55e';
+      }
+      btn.closest('tr').dataset.tipo = novo;
+      filtrar();
+    }
+  });
+}
 
 function filtrar() {
   var q = document.getElementById('searchInput').value.toLowerCase();
