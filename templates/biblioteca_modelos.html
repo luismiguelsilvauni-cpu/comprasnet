@@ -1,40 +1,132 @@
 {% extends "base.html" %}
-{% block title %}Biblioteca de Modelos · ComprasNet{% endblock %}
-{% block page_title %}Biblioteca de Documentos por Modelo{% endblock %}
+{% block title %}Biblioteca PDF · ComprasNet{% endblock %}
+{% block page_title %}Biblioteca de Documentos Técnicos{% endblock %}
+{% block topbar_actions %}
+  <button onclick="tog('uploadForm')" class="btn btn-primary btn-sm">+ Adicionar PDF</button>
+{% endblock %}
 {% block content %}
-<div style="margin-bottom:14px;font-size:13px;color:var(--text-muted)">
-  Documentos partilhados automaticamente por todos os equipamentos com o mesmo modelo de componente.
-</div>
-{% if pdfs %}
-{% set current_key = namespace(v='') %}
-{% for p in pdfs %}
-{% set key = p.tipo_componente + ':' + p.modelo_codigo %}
-{% if key != current_key.v %}
-{% set current_key.v = key %}
-<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:16px 0 8px;display:flex;align-items:center;gap:8px">
-  {% if p.tipo_componente == 'caixa' %}⚙️{% elif p.tipo_componente == 'motor' %}🔧{% else %}⚡{% endif %}
-  {{ p.tipo_componente|title }} — {{ p.modelo_codigo }}
-  <span style="flex:1;height:1px;background:var(--border);display:block"></span>
-</div>
-{% endif %}
-<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
-  <div style="font-size:24px">📄</div>
-  <div style="flex:1">
-    <div style="font-size:13px;font-weight:600">{{ p.titulo }}</div>
-    <div style="font-size:11px;color:var(--text-muted)">{{ p.pdf_filename }} · {{ p.criado_em.strftime('%d/%m/%Y') }}</div>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+<style>
+.badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px}
+.pdf-badge{background:var(--surface);border:2px solid var(--border);border-radius:14px;overflow:hidden;transition:all .2s;position:relative}
+.pdf-badge:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.pdf-preview{width:100%;height:130px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1f2e,#0f1117);border-bottom:1px solid var(--border);overflow:hidden;position:relative;cursor:pointer}
+.pdf-preview img{width:100%;height:100%;object-fit:cover;object-position:top}
+.pdf-preview .nothumb{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%}
+.pdf-preview .nothumb .ic{font-size:44px}
+.pdf-preview .nothumb .ex{font-size:10px;font-weight:700;background:var(--accent);color:#fff;padding:2px 7px;border-radius:4px;margin-top:4px}
+.model-tag{position:absolute;bottom:6px;left:6px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;backdrop-filter:blur(4px)}
+.pdf-body{padding:10px 12px}
+.pdf-title{font-size:12px;font-weight:700;color:var(--text);line-height:1.3;word-break:break-word;margin-bottom:3px}
+.pdf-sub{font-size:10px;color:var(--text-muted);line-height:1.4}
+.pdf-acts{display:flex;gap:3px;margin-top:8px;flex-wrap:wrap}
+.sec-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+</style>
+
+<!-- Upload form -->
+<div id="uploadForm" style="display:none;margin-bottom:20px">
+  <div class="card" style="padding:18px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px">📄 Adicionar Documento</div>
+    <form method="post" enctype="multipart/form-data">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input" placeholder="Ex: Manual Serviço TM170..."></div>
+        <div class="form-group" style="margin:0"><label>Tipo</label>
+          <select name="tipo_componente" class="input" onchange="updateModelos(this.value)" id="tipoSel">
+            <option value="geral">Geral</option>
+            <option value="caixa">Caixa Red./Inv.</option>
+            <option value="motor">Motor</option>
+            <option value="factory_code">Factory Code</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0"><label>Modelo / Código</label>
+          <input type="text" name="modelo_codigo" id="modeloCodigo" class="input" list="modelosList" placeholder="Ex: TM170...">
+          <datalist id="modelosList"></datalist>
+        </div>
+      </div>
+      <div class="form-group"><label>Ficheiro PDF *</label><input type="file" name="pdf" accept=".pdf,.PDF" required class="input"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="tog('uploadForm')" class="btn btn-ghost btn-sm">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+      </div>
+    </form>
   </div>
-  <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm">👁</a>
-  <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm">⬇</a>
-  <form method="post" action="{{ url_for('modelo_pdf_apagar', pid=p.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
-    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
-  </form>
+</div>
+
+<!-- Search -->
+<form method="get" style="display:flex;gap:8px;margin-bottom:18px">
+  <input type="text" name="q" value="{{ q }}" placeholder="🔍 Pesquisar título, modelo..." style="flex:1;padding:9px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text)">
+  <button type="submit" class="btn btn-ghost btn-sm">Pesquisar</button>
+  {% if q %}<a href="{{ url_for('biblioteca_modelos') }}" class="btn btn-ghost btn-sm">Limpar</a>{% endif %}
+</form>
+
+<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">{{ pdfs|length }} documento(s)</div>
+
+{% if pdfs %}
+{% set tipos = [('caixa','⚙️ Caixas Inversoras / Redutoras'),('motor','🔧 Motores'),('factory_code','🔢 Factory Codes'),('aux','⚡ Motores Auxiliares'),('geral','📁 Geral')] %}
+{% for tipo_key, tipo_label in tipos %}
+{% set grupo = pdfs|selectattr('tipo_componente','equalto',tipo_key)|list %}
+{% if grupo %}
+<div class="sec-lbl">{{ tipo_label }} <span style="font-weight:400;font-size:10px;margin-left:4px">({{ grupo|length }})</span></div>
+<div class="badge-grid" style="margin-bottom:8px">
+{% for p in grupo %}
+<div class="pdf-badge" id="pb-{{ p.id }}">
+  <div class="pdf-preview" onclick="window.open('{{ url_for('modelo_pdf_ver', pid=p.id) }}','_blank')">
+    {% if p.thumb_path %}
+    <img src="{{ url_for('biblioteca_thumb', pid=p.id) }}" alt="preview" loading="lazy">
+    {% else %}
+    <div class="nothumb"><span class="ic">📄</span><span class="ex">PDF</span></div>
+    {% endif %}
+    {% if p.modelo_codigo %}<div class="model-tag">{{ p.modelo_codigo }}</div>{% endif %}
+  </div>
+  <div class="pdf-body">
+    <div class="pdf-title">{{ p.titulo }}</div>
+    <div class="pdf-sub">{{ p.pdf_filename }}<br>{{ p.criado_em.strftime('%d/%m/%Y') }}</div>
+    <div id="pedit-{{ p.id }}" style="display:none;margin-top:6px">
+      <form method="post" action="{{ url_for('modelo_pdf_editar', pid=p.id) }}">
+        <input type="text" name="titulo" value="{{ p.titulo }}" class="input" style="font-size:11px;padding:4px 6px;margin-bottom:4px">
+        <div style="display:flex;gap:3px">
+          <button type="submit" class="btn btn-primary btn-sm" style="font-size:10px;padding:2px 7px">OK</button>
+          <button type="button" onclick="document.getElementById('pedit-{{ p.id }}').style.display='none'" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px">✕</button>
+        </div>
+      </form>
+    </div>
+    <div class="pdf-acts">
+      <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
+      <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
+      <button onclick="document.getElementById('pedit-{{ p.id }}').style.display=document.getElementById('pedit-{{ p.id }}').style.display==='none'?'block':'none'" class="btn btn-ghost btn-sm" style="font-size:11px">✏️</button>
+      <button onclick="apagarBib({{ p.id }})" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+    </div>
+  </div>
 </div>
 {% endfor %}
-{% else %}
-<div class="card" style="text-align:center;padding:40px">
-  <div style="font-size:32px;margin-bottom:12px">📚</div>
-  <div style="font-weight:600;margin-bottom:6px">Biblioteca vazia</div>
-  <div style="font-size:13px;color:var(--text-muted)">Os documentos partilhados aparecem aqui quando os adiciona nos painéis de componente.</div>
 </div>
 {% endif %}
+{% endfor %}
+{% else %}
+<div style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:48px;margin-bottom:16px">📚</div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:8px">{% if q %}Sem resultados para "{{ q }}"{% else %}Biblioteca vazia{% endif %}</div>
+  {% if not q %}<button onclick="tog('uploadForm')" class="btn btn-primary btn-sm">+ Adicionar primeiro documento</button>{% endif %}
+</div>
+{% endif %}
+
+<script>
+var caixas = {{ caixas|tojson }};
+var motores = {{ motores|tojson }};
+function updateModelos(tipo) {
+  var dl = document.getElementById('modelosList');
+  var vals = tipo==='caixa'?caixas:tipo==='motor'?motores:[];
+  dl.innerHTML = vals.map(v=>'<option value="'+v+'">').join('');
+}
+function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
+function apagarBib(pid){
+  if(!confirm('Remover da biblioteca?'))return;
+  fetch('/modelo-pdf/'+pid+'/apagar',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.ok)document.getElementById('pb-'+pid).remove();});
+}
+</script>
 {% endblock %}

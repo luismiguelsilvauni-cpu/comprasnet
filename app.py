@@ -2634,6 +2634,7 @@ class ModeloPDF(db.Model):
     titulo          = db.Column(db.String(300), nullable=False)
     pdf_filename    = db.Column(db.String(500))
     pdf_path        = db.Column(db.String(1000))
+    thumb_path      = db.Column(db.String(1000))
     criado_em       = db.Column(db.DateTime, default=datetime.now)
 
 
@@ -3945,14 +3946,87 @@ def tecnico_upload_modelo(eid):
 
     return jsonify({'ok': True, 'id': p.id, 'count': count, 'titulo': titulo})
 
-@app.route('/biblioteca-modelos')
+@app.route('/biblioteca-modelos', methods=['GET', 'POST'])
 @login_required
 def biblioteca_modelos():
-    """Central model PDF library."""
-    pdfs = ModeloPDF.query.order_by(ModeloPDF.tipo_componente, ModeloPDF.modelo_codigo, ModeloPDF.titulo).all()
-    return render_template('biblioteca_modelos.html', pdfs=pdfs)
+    q = request.args.get('q', '').strip()
+    
+    if request.method == 'POST':
+        f = request.files.get('pdf')
+        titulo = request.form.get('titulo', '').strip()
+        tipo_comp = request.form.get('tipo_componente', 'geral').strip()
+        modelo_cod = request.form.get('modelo_codigo', '').strip()
+        
+        if not f or not titulo:
+            flash('Título e ficheiro são obrigatórios.', 'error')
+            return redirect(url_for('biblioteca_modelos'))
+        
+        ensure_upload_dir()
+        safe = f"bib_{tipo_comp}_{modelo_cod}_{f.filename.replace(' ','_')}".replace('/','_')
+        path = os.path.join(UPLOAD_TECNICO, safe)
+        f.save(path)
+        
+        # Generate thumbnail of first page
+        thumb = None
+        try:
+            from pdf2image import convert_from_path
+            pages = convert_from_path(path, first_page=1, last_page=1, dpi=80)
+            if pages:
+                thumb_name = safe.replace('.pdf', '_thumb.jpg')
+                thumb_path = os.path.join(UPLOAD_TECNICO, thumb_name)
+                pages[0].save(thumb_path, 'JPEG', quality=70)
+                thumb = thumb_name
+        except Exception as ex:
+            app.logger.warning(f"Thumbnail error: {ex}")
+        
+        p = ModeloPDF(
+            tipo_componente=tipo_comp,
+            modelo_codigo=modelo_cod,
+            titulo=titulo,
+            pdf_filename=f.filename,
+            pdf_path=safe,
+        )
+        # Store thumb in notas field temporarily — we'll add a column
+        if thumb:
+            p.pdf_path = safe  # keep path
+        db.session.add(p)
+        db.session.commit()
+        
+        # Store thumbnail path
+        if thumb:
+            try:
+                from sqlalchemy import text
+                with db.engine.begin() as conn:
+                    conn.execute(text("UPDATE modelo_pdf SET thumb_path=:t WHERE id=:id"),
+                                {'t': thumb, 'id': p.id})
+            except Exception:
+                pass
+        
+        flash(f'"{titulo}" adicionado à biblioteca.', 'success')
+        return redirect(url_for('biblioteca_modelos'))
+    
+    query = ModeloPDF.query
+    if q:
+        query = query.filter(
+            db.or_(
+                ModeloPDF.titulo.ilike(f'%{q}%'),
+                ModeloPDF.modelo_codigo.ilike(f'%{q}%'),
+                ModeloPDF.tipo_componente.ilike(f'%{q}%'),
+            )
+        )
+    pdfs = query.order_by(ModeloPDF.tipo_componente, ModeloPDF.modelo_codigo, ModeloPDF.titulo).all()
+    
+    # Collect unique models for suggestions
+    caixas = db.session.query(Equipamento.caixa_modelo).filter(
+        Equipamento.caixa_modelo.isnot(None)).distinct().all()
+    motores = db.session.query(Equipamento.motor_modelo).filter(
+        Equipamento.motor_modelo.isnot(None)).distinct().all()
+    
+    return render_template('biblioteca_modelos.html', pdfs=pdfs, q=q,
+                           caixas=[c[0] for c in caixas if c[0]],
+                           motores=[m[0] for m in motores if m[0]])
 
-# Also update EquipamentoDocumento editar title
+
 @app.route('/tecnico/documento/<int:did>/editar-titulo', methods=['POST'])
 @login_required
 def tecnico_doc_editar_titulo(did):

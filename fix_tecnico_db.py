@@ -95,3 +95,11 @@ with app.app_context():
             print("OK: biblioteca partilhada ja actualizada")
     except Exception as ex:
         print(f"Biblioteca: {ex}")
+
+    # Add thumb_path to modelo_pdf
+    if 'modelo_pdf' in insp.get_table_names():
+        mp_cols = [c['name'] for c in insp.get_columns('modelo_pdf')]
+        if 'thumb_path' not in mp_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE modelo_pdf ADD COLUMN thumb_path TEXT"))
+            print("OK: modelo_pdf.thumb_path adicionado")
