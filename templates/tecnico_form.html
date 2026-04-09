@@ -23,6 +23,13 @@
         </div>
       </div>
       <div class="form-group" style="margin:0">
+        <label>Estado</label>
+        <select name="ativo" class="input">
+          <option value="1" {% if not equipamento or equipamento.ativo != False %}selected{% endif %}>✅ Activo / Current</option>
+          <option value="0" {% if equipamento and equipamento.ativo == False %}selected{% endif %}>🔴 Inactivo / Old</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
         <label>Tipo de Motor</label>
         <select name="tipo_motor" class="input">
           <option value="principal" {% if not equipamento or equipamento.tipo_motor != 'auxiliar' %}selected{% endif %}>⚙️ Motor Principal</option>

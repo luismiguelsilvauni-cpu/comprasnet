@@ -2522,10 +2522,13 @@ def api_clientes():
     q = request.args.get('q','').strip()
     if not q or len(q) < 2:
         return jsonify([])
-    # Try local DB first
-    clientes = ClientePHC.query.filter(ClientePHC.nome.ilike(f'%{q}%')).limit(10).all()
-    if clientes:
-        return jsonify([{'no': c.no, 'nome': c.nome} for c in clientes])
+    # Try local Cliente table first
+    try:
+        clientes = Cliente.query.filter(Cliente.nome.ilike(f'%{q}%')).limit(10).all()
+        if clientes:
+            return jsonify([{'no': c.no if hasattr(c,'no') else c.id, 'nome': c.nome} for c in clientes])
+    except Exception:
+        pass
     # Query PHC directly
     try:
         cfg_phc = ConfigPHC.query.first()
@@ -2534,7 +2537,7 @@ def api_clientes():
             conn = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT no, nome FROM PHC_Uniao..cl WHERE nome LIKE ? AND ISNULL(inactivo,0)=0 ORDER BY nome",
+                "SELECT no, nome FROM cl WHERE nome LIKE ? AND ISNULL(inactivo,0)=0 ORDER BY nome",
                 (f'%{q}%',)
             )
             rows = [{'no': r[0], 'nome': (r[1] or '').strip()} for r in cursor.fetchmany(10)]
@@ -2578,7 +2581,8 @@ class Equipamento(db.Model):
     caixa_serial    = db.Column(db.String(100))
     # Legacy / outros
     material        = db.Column(db.String(200))
-    tipo_motor      = db.Column(db.String(20), default='principal')  # principal / auxiliar
+    tipo_motor      = db.Column(db.String(20), default='principal')
+    ativo           = db.Column(db.Boolean, default=True)  # principal / auxiliar
     notas           = db.Column(db.Text, default='')
     criado_em       = db.Column(db.DateTime, default=datetime.now)
     opcoes          = db.relationship('EquipamentoOpcao', backref='equipamento', lazy=True, cascade='all, delete-orphan')
@@ -3243,6 +3247,7 @@ def tecnico_editar(eid):
         e.caixa_ratio       = request.form.get('caixa_ratio','').strip()
         e.caixa_serial      = request.form.get('caixa_serial','').strip()
         e.tipo_motor        = request.form.get('tipo_motor','principal')
+        e.ativo             = request.form.get('ativo') == '1'
         e.notas             = request.form.get('notas','').strip()
         db.session.commit()
         return redirect(url_for('tecnico_detalhe', eid=eid))
@@ -4046,6 +4051,15 @@ def api_tecnico_tipo(eid):
     e.tipo_motor = novo
     db.session.commit()
     return jsonify({'ok': True, 'tipo': novo})
+
+
+@app.route('/api/tecnico/<int:eid>/ativo', methods=['POST'])
+@login_required
+def api_tecnico_ativo(eid):
+    e = Equipamento.query.get_or_404(eid)
+    e.ativo = not e.ativo
+    db.session.commit()
+    return jsonify({'ok': True, 'ativo': e.ativo})
 
 
 def init_db():

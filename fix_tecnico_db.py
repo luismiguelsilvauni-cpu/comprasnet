@@ -103,3 +103,13 @@ with app.app_context():
             with db.engine.begin() as conn:
                 conn.execute(text("ALTER TABLE modelo_pdf ADD COLUMN thumb_path TEXT"))
             print("OK: modelo_pdf.thumb_path adicionado")
+
+    # Add ativo column to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        if 'ativo' not in eq_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE equipamento ADD COLUMN ativo BOOLEAN DEFAULT 1"))
+            print("OK: equipamento.ativo adicionado")
+        else:
+            print("OK: ativo ja existe")

@@ -40,6 +40,11 @@ th.desc::after { content:' ↓';color:var(--accent) }
     <option value="{{ m }}">{{ m }}</option>
     {% endfor %}
   </select>
+  <select id="filterAtivo" onchange="filtrar()">
+    <option value="">Todos os estados</option>
+    <option value="sim">✅ Activos</option>
+    <option value="nao">🔴 Inactivos</option>
+  </select>
   <select id="filterTipo" onchange="filtrar()">
     <option value="">Todos os tipos</option>
     <option value="principal">⚙️ Principal</option>
@@ -54,6 +59,7 @@ th.desc::after { content:' ↓';color:var(--accent) }
     <thead>
       <tr>
         <th class="sortable" onclick="sortTable(0)">Tipo</th>
+        <th>Estado</th>
         <th class="sortable" onclick="sortTable(1)">Cliente</th>
         <th class="sortable" onclick="sortTable(1)">Embarcação</th>
         <th class="sortable" onclick="sortTable(2)">Modelo Motor</th>
@@ -69,11 +75,20 @@ th.desc::after { content:' ↓';color:var(--accent) }
     </thead>
     <tbody id="tableBody">
       {% for e in equipamentos %}
-      <tr data-tipo="{{ e.tipo_motor or 'principal' }}" data-cliente="{{ e.cliente_nome or '' }}"
+      <tr data-ativo="{{ 'sim' if e.ativo != False else 'nao' }}" data-tipo="{{ e.tipo_motor or 'principal' }}" data-cliente="{{ e.cliente_nome or '' }}"
           data-emb="{{ e.embarcacao or '' }}"
           data-motor="{{ e.motor_modelo or '' }}"
           data-serie="{{ e.serial_number or '' }}"
           data-caixa="{{ e.caixa_modelo or '' }}">
+        <td>
+          <button onclick="toggleAtivo({{ e.id }}, this)"
+            data-ativo="{{ 'sim' if e.ativo != False else 'nao' }}"
+            title="Clique para alternar"
+            style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;cursor:pointer;border:none;
+            {% if e.ativo != False %}background:rgba(34,197,94,.15);color:#22c55e{% else %}background:rgba(239,68,68,.15);color:#ef4444{% endif %}">
+            {% if e.ativo != False %}✅ Activo{% else %}🔴 Inactivo{% endif %}
+          </button>
+        </td>
         <td>
           <button onclick="toggleTipo({{ e.id }}, this)"
             data-tipo="{{ e.tipo_motor or 'principal' }}"
@@ -118,6 +133,21 @@ th.desc::after { content:' ↓';color:var(--accent) }
 <script>
 var sortDir = {};
 
+function toggleAtivo(eid, btn) {
+  fetch('/api/tecnico/' + eid + '/ativo', {method: 'POST'})
+    .then(r => r.json()).then(d => {
+      if (d.ok) {
+        var ativo = d.ativo;
+        btn.dataset.ativo = ativo ? 'sim' : 'nao';
+        btn.closest('tr').dataset.ativo = ativo ? 'sim' : 'nao';
+        btn.textContent = ativo ? '✅ Activo' : '🔴 Inactivo';
+        btn.style.background = ativo ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)';
+        btn.style.color = ativo ? '#22c55e' : '#ef4444';
+        filtrar();
+      }
+    });
+}
+
 function toggleTipo(eid, btn) {
   var atual = btn.dataset.tipo;
   var novo = atual === 'principal' ? 'auxiliar' : 'principal';
@@ -145,6 +175,7 @@ function toggleTipo(eid, btn) {
 
 function filtrar() {
   var q = document.getElementById('searchInput').value.toLowerCase();
+  var av = document.getElementById('filterAtivo').value.toLowerCase();
   var tp = document.getElementById('filterTipo').value.toLowerCase();
   var cx = document.getElementById('filterCaixa').value.toLowerCase();
   var mt = document.getElementById('filterMotor').value.toLowerCase();
@@ -155,13 +186,15 @@ function filtrar() {
     var emb = r.dataset.emb.toLowerCase();
     var motor = r.dataset.motor.toLowerCase();
     var serie = r.dataset.serie.toLowerCase();
+    var ativo = (r.dataset.ativo || 'sim').toLowerCase();
     var tipo = (r.dataset.tipo || '').toLowerCase();
     var caixa = r.dataset.caixa.toLowerCase();
+    var matchAv = !av || ativo === av;
     var matchTp = !tp || tipo === tp;
     var matchQ = !q || [cliente,emb,motor,serie,caixa].some(function(v){ return v.includes(q); });
     var matchCx = !cx || caixa === cx;
     var matchMt = !mt || motor === mt;
-    var show = matchQ && matchCx && matchMt && matchTp;
+    var show = matchQ && matchCx && matchMt && matchTp && matchAv;
     r.style.display = show ? '' : 'none';
     if (show) visible++;
   });
