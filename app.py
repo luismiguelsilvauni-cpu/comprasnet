@@ -3482,26 +3482,47 @@ def tecnico_importar_excel():
         
         headers = [str(cell.value or '').strip().lower() for cell in ws[1]]
         app.logger.info(f"Excel headers: {headers}")
-        
+
         def find_col(names):
             for name in names:
                 for i, h in enumerate(headers):
-                    if name in h:
+                    # normalise: remove accents roughly
+                    hn = h.replace('ã','a').replace('á','a').replace('â','a').replace('é','e').replace('ê','e').replace('í','i').replace('ó','o').replace('ô','o').replace('ú','u').replace('ç','c').replace('º','').replace('ª','').replace('°','').strip()
+                    nm = name.replace('ã','a').replace('á','a').replace('â','a').replace('é','e').replace('ê','e').replace('í','i').replace('ó','o').replace('ô','o').replace('ú','u').replace('ç','c').replace('º','').replace('ª','').strip()
+                    if nm in hn:
                         return i
             return None
 
-        col_emb    = find_col(['embarca'])
-        col_mod    = find_col(['modelo motor', 'modelo m', 'motor'])
-        col_pot    = find_col(['pot', 'cv', 'kw'])
-        col_rpm    = find_col(['rpm'])
-        col_serie  = find_col(['série motor', 'serie motor', 'nº série m', 'n serie m', 'série m', 'serie m'])
-        col_marca_cx = find_col(['marca caixa', 'marca c'])
-        col_mod_cx = find_col(['modelo caixa', 'modelo c'])
-        col_ratio  = find_col(['ratio'])
-        col_serie_cx = find_col(['série caixa', 'serie caixa', 'nº série c', 'n serie c', 'série c', 'serie c'])
-        col_obs    = find_col(['obs', 'nota'])
+        # Try header-based detection first
+        col_emb      = find_col(['embarca'])
+        col_mod      = find_col(['modelo motor','motor mod','modelo m'])
+        col_pot      = find_col(['potencia','pot','cv','kw'])
+        col_rpm      = find_col(['rpm'])
+        col_serie    = find_col(['serie motor','n serie motor','n. serie motor','serie m','n serie m'])
+        col_base     = find_col(['base code','base cod','eq'])
+        col_data_fab = find_col(['data fab','data de fab','fab'])
+        col_marca_cx = find_col(['marca caixa','marca cai'])
+        col_mod_cx   = find_col(['modelo caixa','caixa mod','cai mod','modelo cai'])
+        col_ratio    = find_col(['ratio'])
+        col_serie_cx = find_col(['serie caixa','n serie caixa','serie cai','n serie cai'])
+        col_obs      = find_col(['obs','nota'])
 
-        app.logger.info(f"Cols: emb={col_emb} mod={col_mod} serie={col_serie} cx={col_mod_cx}")
+        # Fallback: use positional order if headers not detected
+        # Order: Embarcação Modelo Motor Potência RPM Nº Série Base Code Data Fab. Caixa Red. Ratio Série Caixa Obs
+        ncols = len(headers)
+        if col_emb is None and ncols >= 1:     col_emb      = 0
+        if col_mod is None and ncols >= 2:     col_mod      = 1
+        if col_pot is None and ncols >= 3:     col_pot      = 2
+        if col_rpm is None and ncols >= 4:     col_rpm      = 3
+        if col_serie is None and ncols >= 5:   col_serie    = 4
+        if col_base is None and ncols >= 6:    col_base     = 5
+        if col_data_fab is None and ncols >= 7: col_data_fab = 6
+        if col_mod_cx is None and ncols >= 9:  col_mod_cx   = 8
+        if col_ratio is None and ncols >= 10:  col_ratio    = 9
+        if col_serie_cx is None and ncols >= 11: col_serie_cx = 10
+        if col_obs is None and ncols >= 12:    col_obs      = 11
+
+        app.logger.info(f"Cols mapped: emb={col_emb} mod={col_mod} pot={col_pot} serie={col_serie} base={col_base} cx={col_mod_cx} ratio={col_ratio}")
 
         added = 0
         duplicados = 0
@@ -3514,25 +3535,26 @@ def tecnico_importar_excel():
             def get(col):
                 if col is None or col >= len(row): return ''
                 v = row[col]
-                return str(v).strip() if v is not None else ''
+                if v is None: return ''
+                return str(v).strip()
             
             embarcacao = get(col_emb)
-            if not embarcacao:
+            if not embarcacao or embarcacao.lower() in ('none','nan',''):
                 continue
 
             serial = get(col_serie)
             
-            # Check duplicate by embarcacao + serial
-            dup_query = Equipamento.query.filter_by(embarcacao=embarcacao)
+            # Check duplicate
+            dup = Equipamento.query.filter_by(embarcacao=embarcacao)
             if serial:
-                dup_query = dup_query.filter_by(serial_number=serial)
-            if dup_query.first():
+                dup = dup.filter_by(serial_number=serial)
+            if dup.first():
                 duplicados += 1
-                erros.append(f"Linha {row_idx}: {embarcacao} (já existe)")
+                erros.append(f"L{row_idx}: {embarcacao}")
                 continue
             
             pot = get(col_pot)
-            if pot and 'cv' not in pot.lower() and 'kw' not in pot.lower():
+            if pot and 'cv' not in pot.lower() and 'kw' not in pot.lower() and pot.replace('.','').replace(',','').isdigit():
                 pot = pot + ' CV'
             
             e = Equipamento(
@@ -3540,18 +3562,13 @@ def tecnico_importar_excel():
                 motor_modelo    = get(col_mod),
                 motor_potencia  = pot,
                 serial_number   = serial,
+                base_code       = get(col_base),
+                manufactured_date = get(col_data_fab),
                 caixa_modelo    = get(col_mod_cx),
                 caixa_ratio     = get(col_ratio),
                 caixa_serial    = get(col_serie_cx),
                 notas           = get(col_obs),
             )
-            # Try to set marca caixa in caixa_modelo if separate
-            marca_cx = get(col_marca_cx)
-            if marca_cx and not e.caixa_modelo:
-                e.caixa_modelo = marca_cx
-            elif marca_cx and e.caixa_modelo and marca_cx not in e.caixa_modelo:
-                e.caixa_modelo = marca_cx + ' ' + e.caixa_modelo
-            
             db.session.add(e)
             added += 1
         
@@ -3559,8 +3576,9 @@ def tecnico_importar_excel():
         
         msg = f'✅ {added} equipamentos importados.'
         if duplicados:
-            msg += f' {duplicados} duplicados ignorados: {", ".join(erros[:5])}'
-        flash(msg, 'success')
+            msg += f' {duplicados} duplicados ignorados ({", ".join(erros[:3])}{"..." if len(erros)>3 else ""}).'
+        flash(msg, 'success' if added > 0 else 'warning')
+        return redirect(url_for('tecnico'))        flash(msg, 'success')
         return redirect(url_for('tecnico'))
     
     except Exception as e:
