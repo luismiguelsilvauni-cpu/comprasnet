@@ -3578,7 +3578,6 @@ def tecnico_importar_excel():
         if duplicados:
             msg += f' {duplicados} duplicados ignorados ({", ".join(erros[:3])}{"..." if len(erros)>3 else ""}).'
         flash(msg, 'success' if added > 0 else 'warning')
-        return redirect(url_for('tecnico'))        flash(msg, 'success')
         return redirect(url_for('tecnico'))
     
     except Exception as e:
