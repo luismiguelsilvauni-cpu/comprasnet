@@ -2578,6 +2578,7 @@ class Equipamento(db.Model):
     caixa_serial    = db.Column(db.String(100))
     # Legacy / outros
     material        = db.Column(db.String(200))
+    tipo_motor      = db.Column(db.String(20), default='principal')  # principal / auxiliar
     notas           = db.Column(db.Text, default='')
     criado_em       = db.Column(db.DateTime, default=datetime.now)
     opcoes          = db.relationship('EquipamentoOpcao', backref='equipamento', lazy=True, cascade='all, delete-orphan')
@@ -3240,6 +3241,7 @@ def tecnico_editar(eid):
         e.caixa_modelo      = request.form.get('caixa_modelo','').strip()
         e.caixa_ratio       = request.form.get('caixa_ratio','').strip()
         e.caixa_serial      = request.form.get('caixa_serial','').strip()
+        e.tipo_motor        = request.form.get('tipo_motor','principal')
         e.notas             = request.form.get('notas','').strip()
         db.session.commit()
         return redirect(url_for('tecnico_detalhe', eid=eid))

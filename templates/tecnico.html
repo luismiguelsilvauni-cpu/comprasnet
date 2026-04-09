@@ -40,6 +40,11 @@ th.desc::after { content:' ↓';color:var(--accent) }
     <option value="{{ m }}">{{ m }}</option>
     {% endfor %}
   </select>
+  <select id="filterTipo" onchange="filtrar()">
+    <option value="">Todos os tipos</option>
+    <option value="principal">⚙️ Principal</option>
+    <option value="auxiliar">⚡ Auxiliar</option>
+  </select>
   <span id="countLabel" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
 </div>
 
@@ -48,7 +53,8 @@ th.desc::after { content:' ↓';color:var(--accent) }
   <table class="table" style="font-size:12px" id="mainTable">
     <thead>
       <tr>
-        <th class="sortable" onclick="sortTable(0)">Cliente</th>
+        <th class="sortable" onclick="sortTable(0)">Tipo</th>
+        <th class="sortable" onclick="sortTable(1)">Cliente</th>
         <th class="sortable" onclick="sortTable(1)">Embarcação</th>
         <th class="sortable" onclick="sortTable(2)">Modelo Motor</th>
         <th>Potência</th>
@@ -63,11 +69,18 @@ th.desc::after { content:' ↓';color:var(--accent) }
     </thead>
     <tbody id="tableBody">
       {% for e in equipamentos %}
-      <tr data-cliente="{{ e.cliente_nome or '' }}"
+      <tr data-tipo="{{ e.tipo_motor or 'principal' }}" data-cliente="{{ e.cliente_nome or '' }}"
           data-emb="{{ e.embarcacao or '' }}"
           data-motor="{{ e.motor_modelo or '' }}"
           data-serie="{{ e.serial_number or '' }}"
           data-caixa="{{ e.caixa_modelo or '' }}">
+        <td>
+          {% if e.tipo_motor == 'auxiliar' %}
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(245,158,11,.15);color:#f59e0b">⚡ Auxiliar</span>
+          {% else %}
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,.15);color:#22c55e">⚙️ Principal</span>
+          {% endif %}
+        </td>
         <td>{{ e.cliente_nome or '—' }}</td>
         <td style="font-weight:600;color:var(--accent)">{{ e.embarcacao or '—' }}</td>
         <td>{{ e.motor_modelo or '—' }}</td>
@@ -91,6 +104,9 @@ th.desc::after { content:' ↓';color:var(--accent) }
         </td>
         <td>
           <a href="{{ url_for('tecnico_detalhe', eid=e.id) }}" class="btn btn-ghost btn-sm">Ver</a>
+          <form method="post" action="{{ url_for('tecnico_apagar', eid=e.id) }}" onsubmit="return confirm('Eliminar este equipamento?')" style="display:inline">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
@@ -103,6 +119,7 @@ var sortDir = {};
 
 function filtrar() {
   var q = document.getElementById('searchInput').value.toLowerCase();
+  var tp = document.getElementById('filterTipo').value.toLowerCase();
   var cx = document.getElementById('filterCaixa').value.toLowerCase();
   var mt = document.getElementById('filterMotor').value.toLowerCase();
   var rows = document.querySelectorAll('#tableBody tr');
@@ -112,11 +129,13 @@ function filtrar() {
     var emb = r.dataset.emb.toLowerCase();
     var motor = r.dataset.motor.toLowerCase();
     var serie = r.dataset.serie.toLowerCase();
+    var tipo = (r.dataset.tipo || '').toLowerCase();
     var caixa = r.dataset.caixa.toLowerCase();
+    var matchTp = !tp || tipo === tp;
     var matchQ = !q || [cliente,emb,motor,serie,caixa].some(function(v){ return v.includes(q); });
     var matchCx = !cx || caixa === cx;
     var matchMt = !mt || motor === mt;
-    var show = matchQ && matchCx && matchMt;
+    var show = matchQ && matchCx && matchMt && matchTp;
     r.style.display = show ? '' : 'none';
     if (show) visible++;
   });

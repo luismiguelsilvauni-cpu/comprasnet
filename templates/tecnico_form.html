@@ -22,6 +22,13 @@
         </div>
       </div>
       <div class="form-group" style="margin:0">
+        <label>Tipo de Motor</label>
+        <select name="tipo_motor" class="input">
+          <option value="principal" {% if not equipamento or equipamento.tipo_motor != 'auxiliar' %}selected{% endif %}>⚙️ Motor Principal</option>
+          <option value="auxiliar" {% if equipamento and equipamento.tipo_motor == 'auxiliar' %}selected{% endif %}>⚡ Motor Auxiliar</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
         <label>Embarcação</label>
         <input type="text" name="embarcacao" value="{{ equipamento.embarcacao if equipamento else '' }}" class="input" placeholder="Nome da embarcação">
       </div>

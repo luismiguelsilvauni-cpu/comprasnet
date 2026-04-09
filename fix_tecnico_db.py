@@ -51,3 +51,13 @@ with app.app_context():
             print(f"CRIADO: {tbl}")
 
     print("Concluido. Reinicie o servidor.")
+
+    # Add tipo_motor to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        if 'tipo_motor' not in eq_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE equipamento ADD COLUMN tipo_motor TEXT DEFAULT 'principal'"))
+            print("OK: equipamento.tipo_motor adicionado")
+        else:
+            print("OK: tipo_motor ja existe")
