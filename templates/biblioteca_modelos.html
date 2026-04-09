@@ -1,8 +1,95 @@
 {% extends "base.html" %}
-{% block title %}Biblioteca PDF · ComprasNet{% endblock %}
-{% block page_title %}Biblioteca de Documentos Técnicos{% endblock %}
+{% block title %}Biblioteca PDF · ComprasNet{% set known_tipos = ['caixa','motor','factory_code','aux','outros','geral'] %}
+{% set outros_tipos = pdfs|map(attribute='tipo_componente')|unique|reject('in',known_tipos)|list %}
+{% for tipo_key in outros_tipos %}
+{% set grupo = pdfs|selectattr('tipo_componente','equalto',tipo_key)|list %}
+{% if grupo %}
+<div class="sec-lbl">📋 {{ tipo_key|title }} <span style="font-weight:400;font-size:10px;margin-left:4px">({{ grupo|length }})</span></div>
+<div class="badge-grid" style="margin-bottom:8px">
+{% for p in grupo %}
+<div class="pdf-badge" id="pb-{{ p.id }}">
+  <div class="pdf-preview" onclick="window.open('{{ url_for('modelo_pdf_ver', pid=p.id) }}','_blank')">
+    {% if p.thumb_path %}<img src="{{ url_for('biblioteca_thumb', pid=p.id) }}" alt="preview" loading="lazy">
+    {% else %}<div class="nothumb"><span class="ic">📄</span><span class="ex">PDF</span></div>{% endif %}
+    {% if p.modelo_codigo %}<div class="model-tag">{{ p.modelo_codigo }}</div>{% endif %}
+  </div>
+  <div class="pdf-body">
+    <div class="pdf-title">{{ p.titulo }}</div>
+    <div class="pdf-sub">{{ p.pdf_filename }}<br>{{ p.criado_em.strftime('%d/%m/%Y') }}</div>
+    <div class="pdf-acts">
+      <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
+      <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
+      <button onclick="apagarBib({{ p.id }})" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}
+{% block page_title %}Biblioteca de Documentos Técnicos{% set known_tipos = ['caixa','motor','factory_code','aux','outros','geral'] %}
+{% set outros_tipos = pdfs|map(attribute='tipo_componente')|unique|reject('in',known_tipos)|list %}
+{% for tipo_key in outros_tipos %}
+{% set grupo = pdfs|selectattr('tipo_componente','equalto',tipo_key)|list %}
+{% if grupo %}
+<div class="sec-lbl">📋 {{ tipo_key|title }} <span style="font-weight:400;font-size:10px;margin-left:4px">({{ grupo|length }})</span></div>
+<div class="badge-grid" style="margin-bottom:8px">
+{% for p in grupo %}
+<div class="pdf-badge" id="pb-{{ p.id }}">
+  <div class="pdf-preview" onclick="window.open('{{ url_for('modelo_pdf_ver', pid=p.id) }}','_blank')">
+    {% if p.thumb_path %}<img src="{{ url_for('biblioteca_thumb', pid=p.id) }}" alt="preview" loading="lazy">
+    {% else %}<div class="nothumb"><span class="ic">📄</span><span class="ex">PDF</span></div>{% endif %}
+    {% if p.modelo_codigo %}<div class="model-tag">{{ p.modelo_codigo }}</div>{% endif %}
+  </div>
+  <div class="pdf-body">
+    <div class="pdf-title">{{ p.titulo }}</div>
+    <div class="pdf-sub">{{ p.pdf_filename }}<br>{{ p.criado_em.strftime('%d/%m/%Y') }}</div>
+    <div class="pdf-acts">
+      <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
+      <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
+      <button onclick="apagarBib({{ p.id }})" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}
 {% block topbar_actions %}
   <button onclick="tog('uploadForm')" class="btn btn-primary btn-sm">+ Adicionar PDF</button>
+{% set known_tipos = ['caixa','motor','factory_code','aux','outros','geral'] %}
+{% set outros_tipos = pdfs|map(attribute='tipo_componente')|unique|reject('in',known_tipos)|list %}
+{% for tipo_key in outros_tipos %}
+{% set grupo = pdfs|selectattr('tipo_componente','equalto',tipo_key)|list %}
+{% if grupo %}
+<div class="sec-lbl">📋 {{ tipo_key|title }} <span style="font-weight:400;font-size:10px;margin-left:4px">({{ grupo|length }})</span></div>
+<div class="badge-grid" style="margin-bottom:8px">
+{% for p in grupo %}
+<div class="pdf-badge" id="pb-{{ p.id }}">
+  <div class="pdf-preview" onclick="window.open('{{ url_for('modelo_pdf_ver', pid=p.id) }}','_blank')">
+    {% if p.thumb_path %}<img src="{{ url_for('biblioteca_thumb', pid=p.id) }}" alt="preview" loading="lazy">
+    {% else %}<div class="nothumb"><span class="ic">📄</span><span class="ex">PDF</span></div>{% endif %}
+    {% if p.modelo_codigo %}<div class="model-tag">{{ p.modelo_codigo }}</div>{% endif %}
+  </div>
+  <div class="pdf-body">
+    <div class="pdf-title">{{ p.titulo }}</div>
+    <div class="pdf-sub">{{ p.pdf_filename }}<br>{{ p.criado_em.strftime('%d/%m/%Y') }}</div>
+    <div class="pdf-acts">
+      <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
+      <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
+      <button onclick="apagarBib({{ p.id }})" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+
 {% endblock %}
 {% block content %}
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -36,12 +123,15 @@
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input" placeholder="Ex: Manual Serviço TM170..."></div>
         <div class="form-group" style="margin:0"><label>Tipo</label>
-          <select name="tipo_componente" class="input" onchange="updateModelos(this.value)" id="tipoSel">
-            <option value="geral">Geral</option>
+          <input type="text" name="tipo_componente" id="tipoSel" class="input" list="tiposList"
+            placeholder="Tipo..." oninput="updateModelos(this.value)">
+          <datalist id="tiposList">
             <option value="caixa">Caixa Red./Inv.</option>
             <option value="motor">Motor</option>
             <option value="factory_code">Factory Code</option>
-          </select>
+            <option value="outros">Outros</option>
+            <option value="geral">Geral</option>
+          </datalist>
         </div>
         <div class="form-group" style="margin:0"><label>Modelo / Código</label>
           <input type="text" name="modelo_codigo" id="modeloCodigo" class="input" list="modelosList" placeholder="Ex: TM170...">
@@ -67,7 +157,7 @@
 <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">{{ pdfs|length }} documento(s)</div>
 
 {% if pdfs %}
-{% set tipos = [('caixa','⚙️ Caixas Inversoras / Redutoras'),('motor','🔧 Motores'),('factory_code','🔢 Factory Codes'),('aux','⚡ Motores Auxiliares'),('geral','📁 Geral')] %}
+{% set tipos = [('caixa','⚙️ Caixas Inversoras / Redutoras'),('motor','🔧 Motores'),('factory_code','🔢 Factory Codes'),('aux','⚡ Motores Auxiliares'),('outros','📂 Outros'),('geral','📁 Geral')] %}
 {% for tipo_key, tipo_label in tipos %}
 {% set grupo = pdfs|selectattr('tipo_componente','equalto',tipo_key)|list %}
 {% if grupo %}
@@ -129,4 +219,33 @@ function apagarBib(pid){
   fetch('/modelo-pdf/'+pid+'/apagar',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.ok)document.getElementById('pb-'+pid).remove();});
 }
 </script>
+{% set known_tipos = ['caixa','motor','factory_code','aux','outros','geral'] %}
+{% set outros_tipos = pdfs|map(attribute='tipo_componente')|unique|reject('in',known_tipos)|list %}
+{% for tipo_key in outros_tipos %}
+{% set grupo = pdfs|selectattr('tipo_componente','equalto',tipo_key)|list %}
+{% if grupo %}
+<div class="sec-lbl">📋 {{ tipo_key|title }} <span style="font-weight:400;font-size:10px;margin-left:4px">({{ grupo|length }})</span></div>
+<div class="badge-grid" style="margin-bottom:8px">
+{% for p in grupo %}
+<div class="pdf-badge" id="pb-{{ p.id }}">
+  <div class="pdf-preview" onclick="window.open('{{ url_for('modelo_pdf_ver', pid=p.id) }}','_blank')">
+    {% if p.thumb_path %}<img src="{{ url_for('biblioteca_thumb', pid=p.id) }}" alt="preview" loading="lazy">
+    {% else %}<div class="nothumb"><span class="ic">📄</span><span class="ex">PDF</span></div>{% endif %}
+    {% if p.modelo_codigo %}<div class="model-tag">{{ p.modelo_codigo }}</div>{% endif %}
+  </div>
+  <div class="pdf-body">
+    <div class="pdf-title">{{ p.titulo }}</div>
+    <div class="pdf-sub">{{ p.pdf_filename }}<br>{{ p.criado_em.strftime('%d/%m/%Y') }}</div>
+    <div class="pdf-acts">
+      <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
+      <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
+      <button onclick="apagarBib({{ p.id }})" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+
 {% endblock %}
