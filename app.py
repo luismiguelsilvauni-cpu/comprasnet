@@ -3480,8 +3480,20 @@ def tecnico_importar_excel():
         wb = openpyxl.load_workbook(BytesIO(f.read()), data_only=True)
         ws = wb.active
         
-        headers = [str(cell.value or '').strip().lower() for cell in ws[1]]
-        app.logger.info(f"Excel headers: {headers}")
+        # Find the actual header row and starting column (skip empty rows/cols)
+        header_row = 1
+        col_offset = 0
+        for row in ws.iter_rows(min_row=1, max_row=10, values_only=True):
+            vals = [str(v or '').strip() for v in row]
+            non_empty = [(i, v) for i, v in enumerate(vals) if v]
+            if len(non_empty) >= 3:  # found header row
+                header_row = list(ws.iter_rows(min_row=1, max_row=10, values_only=True)).index(row) + 1
+                col_offset = non_empty[0][0]
+                break
+        
+        header_cells = list(ws.iter_rows(min_row=header_row, max_row=header_row, values_only=True))[0]
+        headers = [str(v or '').strip().lower() for v in header_cells]
+        app.logger.info(f"Header row={header_row} offset={col_offset} headers={headers}")
 
         def find_col(names):
             for name in names:
@@ -3510,17 +3522,18 @@ def tecnico_importar_excel():
         # Fallback: use positional order if headers not detected
         # Order: Embarcação Modelo Motor Potência RPM Nº Série Base Code Data Fab. Caixa Red. Ratio Série Caixa Obs
         ncols = len(headers)
-        if col_emb is None and ncols >= 1:     col_emb      = 0
-        if col_mod is None and ncols >= 2:     col_mod      = 1
-        if col_pot is None and ncols >= 3:     col_pot      = 2
-        if col_rpm is None and ncols >= 4:     col_rpm      = 3
-        if col_serie is None and ncols >= 5:   col_serie    = 4
-        if col_base is None and ncols >= 6:    col_base     = 5
-        if col_data_fab is None and ncols >= 7: col_data_fab = 6
-        if col_mod_cx is None and ncols >= 9:  col_mod_cx   = 8
-        if col_ratio is None and ncols >= 10:  col_ratio    = 9
-        if col_serie_cx is None and ncols >= 11: col_serie_cx = 10
-        if col_obs is None and ncols >= 12:    col_obs      = 11
+        o = col_offset  # column offset
+        if col_emb is None:      col_emb      = o + 0
+        if col_mod is None:      col_mod      = o + 1
+        if col_pot is None:      col_pot      = o + 2
+        if col_rpm is None:      col_rpm      = o + 3
+        if col_serie is None:    col_serie    = o + 4
+        if col_base is None:     col_base     = o + 5
+        if col_data_fab is None: col_data_fab = o + 6
+        if col_mod_cx is None:   col_mod_cx   = o + 8
+        if col_ratio is None:    col_ratio    = o + 9
+        if col_serie_cx is None: col_serie_cx = o + 10
+        if col_obs is None:      col_obs      = o + 12
 
         app.logger.info(f"Cols mapped: emb={col_emb} mod={col_mod} pot={col_pot} serie={col_serie} base={col_base} cx={col_mod_cx} ratio={col_ratio}")
         
@@ -3533,7 +3546,7 @@ def tecnico_importar_excel():
         duplicados = 0
         erros = []
         
-        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        for row_idx, row in enumerate(ws.iter_rows(min_row=header_row+1, values_only=True), start=header_row+1):
             if not any(v for v in row if v is not None):
                 continue
             
