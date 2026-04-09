@@ -3189,18 +3189,8 @@ def ensure_upload_dir():
 @app.route('/tecnico')
 @login_required
 def tecnico():
-    q = request.args.get('q', '').strip()
-    query = Equipamento.query
-    if q:
-        query = query.filter(
-            db.or_(
-                Equipamento.serial_number.ilike(f'%{q}%'),
-                Equipamento.model.ilike(f'%{q}%'),
-                Equipamento.base_code.ilike(f'%{q}%'),
-            )
-        )
-    equipamentos = query.order_by(Equipamento.criado_em.desc()).all()
-    return render_template('tecnico.html', equipamentos=equipamentos, q=q)
+    equipamentos = Equipamento.query.order_by(Equipamento.embarcacao).all()
+    return render_template('tecnico.html', equipamentos=equipamentos)
 
 @app.route('/tecnico/novo', methods=['GET', 'POST'])
 @login_required

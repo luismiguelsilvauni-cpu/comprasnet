@@ -8,38 +8,68 @@
 {% endblock %}
 
 {% block content %}
-<div style="display:flex;gap:8px;margin-bottom:16px">
-  <form method="get" style="display:flex;gap:8px;flex:1">
-    <input type="text" name="q" value="{{ q }}" placeholder="Pesquisar por cliente, embarcação, série ou modelo..."
-      class="input" style="flex:1">
-    <button type="submit" class="btn btn-ghost btn-sm">Pesquisar</button>
-    {% if q %}<a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">Limpar</a>{% endif %}
-  </form>
+<style>
+.tbl-controls { display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center }
+.tbl-controls input, .tbl-controls select {
+  padding:7px 10px;background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;font-size:13px;color:var(--text);
+}
+.tbl-controls input { flex:1;min-width:200px }
+th.sortable { cursor:pointer;user-select:none;white-space:nowrap }
+th.sortable:hover { color:var(--accent) }
+th.sortable::after { content:' ⇅';font-size:10px;color:var(--text-muted) }
+th.asc::after { content:' ↑';color:var(--accent) }
+th.desc::after { content:' ↓';color:var(--accent) }
+.badge-doc { font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(59,110,240,.15);color:var(--accent) }
+</style>
+
+<!-- Filters -->
+<div class="tbl-controls">
+  <input type="text" id="searchInput" placeholder="🔍 Pesquisar cliente, embarcação, motor, série..." oninput="filtrar()">
+  <select id="filterCaixa" onchange="filtrar()">
+    <option value="">Todas as caixas</option>
+    {% set caixas = equipamentos|map(attribute='caixa_modelo')|select|unique|sort|list %}
+    {% for c in caixas %}
+    <option value="{{ c }}">{{ c }}</option>
+    {% endfor %}
+  </select>
+  <select id="filterMotor" onchange="filtrar()">
+    <option value="">Todos os motores</option>
+    {% set motores = equipamentos|map(attribute='motor_modelo')|select|unique|sort|list %}
+    {% for m in motores %}
+    <option value="{{ m }}">{{ m }}</option>
+    {% endfor %}
+  </select>
+  <span id="countLabel" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
 </div>
 
 {% if equipamentos %}
 <div class="card" style="padding:0;overflow-x:auto">
-  <table class="table" style="font-size:12px;white-space:nowrap">
+  <table class="table" style="font-size:12px" id="mainTable">
     <thead>
       <tr>
-        <th>Cliente</th>
-        <th>Embarcação</th>
-        <th>Modelo Motor</th>
+        <th class="sortable" onclick="sortTable(0)">Cliente</th>
+        <th class="sortable" onclick="sortTable(1)">Embarcação</th>
+        <th class="sortable" onclick="sortTable(2)">Modelo Motor</th>
         <th>Potência</th>
-        <th>Nº Série</th>
-        <th>Caixa Red.</th>
+        <th class="sortable" onclick="sortTable(4)" style="color:#f59e0b">Nº Série</th>
+        <th class="sortable" onclick="sortTable(5)">Caixa Red.</th>
         <th>Ratio</th>
-        <th>Série Caixa</th>
+        <th class="sortable" onclick="sortTable(7)">Série Caixa</th>
         <th>PDFs</th>
         <th>Consumíveis</th>
         <th></th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="tableBody">
       {% for e in equipamentos %}
-      <tr>
-        <td style="font-weight:600">{{ e.cliente_nome or '—' }}</td>
-        <td style="color:var(--accent)">{{ e.embarcacao or '—' }}</td>
+      <tr data-cliente="{{ e.cliente_nome or '' }}"
+          data-emb="{{ e.embarcacao or '' }}"
+          data-motor="{{ e.motor_modelo or '' }}"
+          data-serie="{{ e.serial_number or '' }}"
+          data-caixa="{{ e.caixa_modelo or '' }}">
+        <td>{{ e.cliente_nome or '—' }}</td>
+        <td style="font-weight:600;color:var(--accent)">{{ e.embarcacao or '—' }}</td>
         <td>{{ e.motor_modelo or '—' }}</td>
         <td>{{ e.motor_potencia or '—' }}</td>
         <td class="mono" style="color:#f59e0b">
@@ -47,15 +77,15 @@
         </td>
         <td>{{ e.caixa_modelo or '—' }}</td>
         <td class="mono">{{ e.caixa_ratio or '—' }}</td>
-        <td class="mono">{{ e.caixa_serial or '—' }}</td>
+        <td class="mono" style="font-size:11px">{{ e.caixa_serial or '—' }}</td>
         <td>
           {% set pdfs = e.opcoes|selectattr('pdf_path')|list %}
-          {% if pdfs %}
-          <span style="font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(59,110,240,.15);color:var(--accent)">{{ pdfs|length }}</span>
-          {% else %}—{% endif %}
+          {% set docs = e.documentos|list %}
+          {% set total = pdfs|length + docs|length %}
+          {% if total %}<span class="badge-doc">{{ total }}</span>{% else %}—{% endif %}
         </td>
         <td>
-          <a href="{{ url_for('tecnico_consumiveis', eid=e.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">
+          <a href="{{ url_for('tecnico_consumiveis', eid=e.id) }}" style="font-size:11px;color:var(--text-muted)">
             📋 {{ e.consumiveis|length }}
           </a>
         </td>
@@ -67,10 +97,62 @@
     </tbody>
   </table>
 </div>
+
+<script>
+var sortDir = {};
+
+function filtrar() {
+  var q = document.getElementById('searchInput').value.toLowerCase();
+  var cx = document.getElementById('filterCaixa').value.toLowerCase();
+  var mt = document.getElementById('filterMotor').value.toLowerCase();
+  var rows = document.querySelectorAll('#tableBody tr');
+  var visible = 0;
+  rows.forEach(function(r) {
+    var cliente = r.dataset.cliente.toLowerCase();
+    var emb = r.dataset.emb.toLowerCase();
+    var motor = r.dataset.motor.toLowerCase();
+    var serie = r.dataset.serie.toLowerCase();
+    var caixa = r.dataset.caixa.toLowerCase();
+    var matchQ = !q || [cliente,emb,motor,serie,caixa].some(function(v){ return v.includes(q); });
+    var matchCx = !cx || caixa === cx;
+    var matchMt = !mt || motor === mt;
+    var show = matchQ && matchCx && matchMt;
+    r.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('countLabel').textContent = visible + ' de ' + rows.length + ' registos';
+}
+
+function sortTable(col) {
+  var tbody = document.getElementById('tableBody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  var dir = sortDir[col] === 'asc' ? 'desc' : 'asc';
+  sortDir = {};
+  sortDir[col] = dir;
+  
+  // Update header arrows
+  document.querySelectorAll('#mainTable th').forEach(function(th,i) {
+    th.classList.remove('asc','desc');
+    if (i === col) th.classList.add(dir);
+  });
+
+  rows.sort(function(a, b) {
+    var av = a.cells[col] ? a.cells[col].textContent.trim() : '';
+    var bv = b.cells[col] ? b.cells[col].textContent.trim() : '';
+    var cmp = av.localeCompare(bv, 'pt', {sensitivity:'base'});
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  rows.forEach(function(r){ tbody.appendChild(r); });
+}
+
+// Init count
+filtrar();
+</script>
+
 {% else %}
 <div class="card" style="text-align:center;padding:48px">
   <div style="font-size:40px;margin-bottom:12px">🔧</div>
-  <div style="font-weight:600;margin-bottom:6px">Sem equipamentos{% if q %} para "{{ q }}"{% endif %}</div>
+  <div style="font-weight:600;margin-bottom:6px">Sem equipamentos</div>
   <a href="{{ url_for('tecnico_novo') }}" class="btn btn-primary btn-sm" style="margin-top:8px">+ Novo Equipamento</a>
 </div>
 {% endif %}
