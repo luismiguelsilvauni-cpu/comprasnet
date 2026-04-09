@@ -57,18 +57,18 @@
     </div>
 
     <!-- Caixa Redutora -->
-    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Caixa Inversora / Redutora</div>
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Caixa Inversora / Redutora / Alternador</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
       <div class="form-group" style="margin:0">
         <label>Marca / Modelo</label>
         <input type="text" name="caixa_modelo" value="{{ equipamento.caixa_modelo if equipamento else '' }}" class="input" placeholder="Ex: ZF 280A">
       </div>
       <div class="form-group" style="margin:0">
-        <label>Ratio / Redução</label>
+        <label>Ratio / Redução / Potência</label>
         <input type="text" name="caixa_ratio" value="{{ equipamento.caixa_ratio if equipamento else '' }}" class="input" placeholder="Ex: 2.50:1">
       </div>
       <div class="form-group" style="margin:0">
-        <label>Nº Série Caixa</label>
+        <label>Nº Série</label>
         <input type="text" name="caixa_serial" value="{{ equipamento.caixa_serial if equipamento else '' }}" class="input" placeholder="Serial Number">
       </div>
     </div>
