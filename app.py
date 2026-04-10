@@ -3346,33 +3346,27 @@ def tecnico_opcao_upload(oid):
     ref_code = dist or fac or ord_
     ref_type = 'distributor' if dist else ('factory' if fac else 'ordered' if ord_ else None)
 
-    # Get catalog of this equipment
+    # Get catalog of this equipment - REQUIRED for propagation
     eq = Equipamento.query.get(o.equipamento_id)
     catalogo = (eq.catalogo or '').strip().upper() if eq else None
 
     propagated = 0
-    if ref_code:
-        # Find all option lines with same code AND same catalog (if catalog set)
-        def match_others(col):
-            q = EquipamentoOpcao.query.filter(
-                EquipamentoOpcao.id != oid,
-                db.func.replace(db.func.replace(col,'*',''),' ','') == ref_code
-            )
-            if catalogo:
-                # Only match equipamentos with same catalog
-                eq_ids = [e.id for e in Equipamento.query.filter(
-                    db.func.upper(Equipamento.catalogo) == catalogo
-                ).all()]
-                if eq_ids:
-                    q = q.filter(EquipamentoOpcao.equipamento_id.in_(eq_ids))
-            return q.all()
+    if ref_code and catalogo:
+        # Only propagate if equipment has a catalog defined
+        eq_ids = [e.id for e in Equipamento.query.filter(
+            db.func.upper(Equipamento.catalogo) == catalogo
+        ).all()]
 
-        if dist:
-            others = match_others(EquipamentoOpcao.distributor)
-        elif fac:
-            others = match_others(EquipamentoOpcao.factory)
-        else:
-            others = match_others(EquipamentoOpcao.ordered)
+        def match_others(col):
+            return EquipamentoOpcao.query.filter(
+                EquipamentoOpcao.id != oid,
+                EquipamentoOpcao.equipamento_id.in_(eq_ids),
+                db.func.replace(db.func.replace(col,'*',''),' ','') == ref_code
+            ).all()
+
+        if dist:   others = match_others(EquipamentoOpcao.distributor)
+        elif fac:  others = match_others(EquipamentoOpcao.factory)
+        else:      others = match_others(EquipamentoOpcao.ordered)
 
         for other in others:
             other.pdf_filename = f.filename
@@ -3381,9 +3375,10 @@ def tecnico_opcao_upload(oid):
 
     db.session.commit()
 
-    cat_info = f' (catálogo {catalogo})' if catalogo else ''
     if propagated:
-        flash(f'✅ PDF associado e propagado para {propagated} linhas com {ref_type}={ref_code}{cat_info}.', 'success')
+        flash(f'✅ PDF propagado para {propagated} linhas com catálogo={catalogo} e {ref_type}={ref_code}.', 'success')
+    elif ref_code and not catalogo:
+        flash('PDF associado. ⚠️ Sem catálogo definido — não foi propagado a outras fichas.', 'warning')
     else:
         flash('PDF associado.', 'success')
 
@@ -4440,11 +4435,9 @@ def api_tecnico_sync_pdfs(eid):
         if not donor and fac:  donor = find_donor(EquipamentoOpcao.factory, fac)
         if not donor and ord_: donor = find_donor(EquipamentoOpcao.ordered, ord_)
 
-        # Fallback: search without catalog restriction
-        if not donor:
-            if dist:   donor = EquipamentoOpcao.query.filter(EquipamentoOpcao.id!=o.id, EquipamentoOpcao.pdf_path.isnot(None), db.func.replace(db.func.replace(EquipamentoOpcao.distributor,'*',''),' ','') == dist).first()
-            if not donor and fac: donor = EquipamentoOpcao.query.filter(EquipamentoOpcao.id!=o.id, EquipamentoOpcao.pdf_path.isnot(None), db.func.replace(db.func.replace(EquipamentoOpcao.factory,'*',''),' ','') == fac).first()
-            if not donor and ord_: donor = EquipamentoOpcao.query.filter(EquipamentoOpcao.id!=o.id, EquipamentoOpcao.pdf_path.isnot(None), db.func.replace(db.func.replace(EquipamentoOpcao.ordered,'*',''),' ','') == ord_).first()
+        # No fallback without catalog — skip if no match within same catalog
+        if not catalogo:
+            continue  # no catalog = no propagation
 
         if donor:
             o.pdf_filename = donor.pdf_filename
