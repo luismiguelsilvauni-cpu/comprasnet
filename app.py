@@ -4108,6 +4108,10 @@ def tecnico_upload_bulk(eid):
         outros_docs = EquipamentoDocumento.query.filter_by(
             equipamento_id=eid, componente='outros_bulk').order_by(
             EquipamentoDocumento.criado_em.desc()).all()
+        app.logger.warning(f"BULK GET eid={eid} outros_docs={len(outros_docs)}")
+        # Also check all docs for this equipment
+        all_docs = EquipamentoDocumento.query.filter_by(equipamento_id=eid).all()
+        app.logger.warning(f"ALL DOCS for eid={eid}: {[(d.id, d.componente, d.titulo) for d in all_docs]}")
         return render_template('tecnico_upload_bulk.html', equipamento=e, opcoes=opcoes, outros_docs=outros_docs)
     
     files = request.files.getlist('pdfs')
@@ -4146,6 +4150,7 @@ def tecnico_upload_bulk(eid):
             safe = f"outros_{eid}_{f.filename.replace(' ','_')}"
             path = os.path.join(UPLOAD_TECNICO, safe)
             f.save(path)
+            app.logger.warning(f'SAVING outros_bulk doc: {f.filename} safe={safe}')
             doc = EquipamentoDocumento(
                 equipamento_id=eid,
                 componente='outros_bulk',
