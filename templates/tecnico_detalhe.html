@@ -184,6 +184,9 @@
     <button onclick="tog('addOpcao')" class="btn btn-ghost btn-sm">+ Linha</button>
     <button onclick="tog('importHTML')" class="btn btn-ghost btn-sm">📥 Importar HTML</button>
     <a href="{{ url_for('tecnico_upload_bulk', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📂 Upload em Massa</a>
+    <button onclick="togOutros()" class="btn btn-ghost btn-sm" id="btnOutros" style="display:none">
+      📁 Outros Ficheiros <span id="outrosCount" style="background:rgba(245,158,11,.2);color:#f59e0b;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:4px"></span>
+    </button>
   </div>
   <div id="addOpcao" style="display:none;margin-bottom:10px">
     <div class="card" style="padding:12px">
@@ -272,6 +275,12 @@
   {% else %}
   <div class="card" style="text-align:center;padding:32px;border-style:dashed;color:var(--text-muted)">Sem option codes. Clique em + Linha ou 📥 Importar HTML.</div>
   {% endif %}
+</div>
+
+<!-- Outros Ficheiros (não associados) -->
+<div id="outrosSection" style="display:none;margin-top:12px">
+  <div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:10px">📁 Outros Ficheiros — sem associação a Option Code</div>
+  <div id="outrosList">A carregar...</div>
 </div>
 
 <!-- Motor · Docs -->
@@ -397,6 +406,18 @@
 
 <script>
 var _comp=null,_sub=null;
+
+// Load outros count on startup
+fetch('/api/tecnico/{{ equipamento.id }}/outros-docs')
+  .then(r=>r.json()).then(docs=>{
+    if (docs.length) {
+      var btn = document.getElementById('btnOutros');
+      btn.style.display = 'inline-flex';
+      document.getElementById('outrosCount').textContent = docs.length;
+      // Store opcoes sem pdf for dropdowns
+      window._opcoes_sem_pdf = {{ opcoes|rejectattr('pdf_path')|list|tojson }};
+    }
+  });
 function selComp(c){
   if(_comp===c){
     document.querySelectorAll('.comp-badge').forEach(b=>b.classList.remove('sel'));
@@ -452,6 +473,69 @@ function togEdit(eId,rId){
   var s=e.style.display!=='none';
   e.style.display=s?'none':'table-row';r.style.opacity=s?'1':'.4';
 }
+function togOutros() {
+  var sec = document.getElementById('outrosSection');
+  if (sec.style.display === 'none') {
+    sec.style.display = 'block';
+    carregarOutros();
+  } else {
+    sec.style.display = 'none';
+  }
+}
+
+function carregarOutros() {
+  fetch('/api/tecnico/{{ equipamento.id }}/outros-docs')
+    .then(r => r.json())
+    .then(docs => {
+      var list = document.getElementById('outrosList');
+      if (!docs.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px">Sem ficheiros por associar.</div>';
+        return;
+      }
+      list.innerHTML = docs.map(d => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:20px">📄</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">${d.titulo}</div>
+            <div style="font-size:10px;color:var(--text-muted)">${d.notas}</div>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+            <a href="${d.ver_url}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
+            <a href="${d.download_url}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
+            <select id="sel-${d.id}" class="input" style="font-size:11px;padding:3px 6px;min-width:200px">
+              <option value="">— Associar a Option Code —</option>
+              ${window._opcoes_sem_pdf ? window._opcoes_sem_pdf.map(o =>
+                `<option value="${o.id}">${o.option_name.substring(0,35)} | Fac:${o.factory}</option>`
+              ).join('') : ''}
+            </select>
+            <button onclick="associarOutro(${d.id})" class="btn btn-primary btn-sm" style="font-size:11px">Associar</button>
+            <button onclick="apagarOutro(${d.id})" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+          </div>
+        </div>
+      `).join('');
+    });
+}
+
+function associarOutro(did) {
+  var sel = document.getElementById('sel-'+did);
+  var oid = sel.value;
+  if (!oid) { alert('Seleccione um Option Code.'); return; }
+  fetch('/api/tecnico/{{ equipamento.id }}/associar-outro', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({doc_id: did, opcao_id: oid})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { carregarOutros(); location.reload(); }
+    else alert(d.error || 'Erro');
+  });
+}
+
+function apagarOutro(did) {
+  if (!confirm('Apagar este ficheiro?')) return;
+  fetch('/tecnico/documento/'+did+'/apagar', {method:'POST'})
+    .then(r => r.json()).then(d => { if (d.ok) carregarOutros(); });
+}
+
 function apagarSel(){
   var c=Array.from(document.querySelectorAll('.rc:checked'));
   if(!c.length){alert('Seleccione pelo menos uma linha.');return;}

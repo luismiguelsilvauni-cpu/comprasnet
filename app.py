@@ -4193,6 +4193,38 @@ def tecnico_upload_bulk_assign(eid):
     return redirect(url_for('tecnico_upload_bulk', eid=eid))
 
 
+@app.route('/api/tecnico/<int:eid>/outros-docs')
+@login_required
+def api_tecnico_outros_docs(eid):
+    docs = EquipamentoDocumento.query.filter_by(
+        equipamento_id=eid, componente='outros_bulk').order_by(
+        EquipamentoDocumento.criado_em.desc()).all()
+    return jsonify([{
+        'id': d.id,
+        'titulo': d.titulo,
+        'pdf_filename': d.pdf_filename,
+        'notas': d.notas or '',
+        'ver_url': url_for('tecnico_doc_ver', did=d.id),
+        'download_url': url_for('tecnico_doc_download', did=d.id),
+    } for d in docs])
+
+@app.route('/api/tecnico/<int:eid>/associar-outro', methods=['POST'])
+@login_required
+def api_tecnico_associar_outro(eid):
+    data = request.get_json()
+    did = data.get('doc_id')
+    oid = data.get('opcao_id')
+    doc = EquipamentoDocumento.query.get(int(did))
+    opcao = EquipamentoOpcao.query.get(int(oid))
+    if not doc or not opcao or opcao.equipamento_id != eid:
+        return jsonify({'ok': False, 'error': 'Não encontrado'})
+    opcao.pdf_filename = doc.pdf_filename
+    opcao.pdf_path = doc.pdf_path
+    db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():
