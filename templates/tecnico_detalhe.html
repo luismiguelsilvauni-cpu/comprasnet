@@ -474,11 +474,28 @@ function loadCampos(tipo, modelo) {
         list.innerHTML = '<div style="color:var(--text-muted);font-size:12px">Sem campos adicionais. Clique em + Adicionar campo.</div>';
         return;
       }
-      list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">' +
+      list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">' +
         campos.map(c => `
-          <div id="campo-${c.id}" style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+          <div id="campo-${c.id}" style="padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
             <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:3px">${c.titulo}</div>
-            <div id="campo-val-${c.id}" style="font-size:13px;font-weight:600">${c.valor || '—'}</div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">${c.valor || '—'}</div>
+            
+            ${c.pdf_filename ?
+              `<div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;padding:5px 7px;background:rgba(59,110,240,.08);border-radius:5px">
+                <span style="font-size:14px">📄</span>
+                <span style="font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.pdf_filename}</span>
+                <a href="/api/campos-tecnicos/${c.id}/ver" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:1px 5px">👁</a>
+                <a href="/api/campos-tecnicos/${c.id}/download" class="btn btn-ghost btn-sm" style="font-size:10px;padding:1px 5px">⬇</a>
+                <button onclick="removerFicheiroCampo(${c.id},'${tipo}','${modelo}')" class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--danger);padding:1px 5px">✕</button>
+              </div>` :
+              `<div id="upload-campo-${c.id}" style="margin-bottom:6px">
+                <label style="font-size:10px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;padding:4px 7px;border:1px dashed var(--border);border-radius:5px">
+                  <span>📎</span><span>Adicionar ficheiro</span>
+                  <input type="file" style="display:none" onchange="uploadFicheiroCampo(${c.id},'${tipo}','${modelo}',this)">
+                </label>
+              </div>`
+            }
+            
             <div id="campo-edit-${c.id}" style="display:none;margin-top:6px">
               <input type="text" id="campo-edit-titulo-${c.id}" value="${c.titulo}" class="input" style="font-size:11px;padding:3px 6px;margin-bottom:4px">
               <input type="text" id="campo-edit-valor-${c.id}" value="${c.valor}" class="input" style="font-size:11px;padding:3px 6px;margin-bottom:4px">
@@ -487,13 +504,28 @@ function loadCampos(tipo, modelo) {
                 <button onclick="document.getElementById('campo-edit-${c.id}').style.display='none'" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px">✕</button>
               </div>
             </div>
-            <div style="display:flex;gap:3px;margin-top:6px">
+            <div style="display:flex;gap:3px;margin-top:4px">
               <button onclick="document.getElementById('campo-edit-${c.id}').style.display='block'" class="btn btn-ghost btn-sm" style="font-size:10px">✏️</button>
               <button onclick="deleteCampo(${c.id},'${tipo}','${modelo}')" class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--danger)">✕</button>
             </div>
           </div>
         `).join('') + '</div>';
     });
+}
+
+function uploadFicheiroCampo(cid, tipo, modelo, input) {
+  var file = input.files[0];
+  if (!file) return;
+  var fd = new FormData();
+  fd.append('file', file);
+  fetch('/api/campos-tecnicos/'+cid+'/upload', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{ if(d.ok) loadCampos(tipo, modelo); });
+}
+
+function removerFicheiroCampo(cid, tipo, modelo) {
+  if (!confirm('Remover ficheiro?')) return;
+  fetch('/api/campos-tecnicos/'+cid+'/remover-ficheiro', {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) loadCampos(tipo, modelo); });
 }
 
 function updateCampo(cid, tipo, modelo) {

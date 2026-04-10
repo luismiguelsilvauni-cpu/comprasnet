@@ -136,3 +136,12 @@ with app.app_context():
         print("OK: tabela campo_tecnico_modelo criada")
     else:
         print("OK: campo_tecnico_modelo ja existe")
+
+    # Add pdf fields to campo_tecnico_modelo
+    if 'campo_tecnico_modelo' in insp.get_table_names():
+        ct_cols = [c['name'] for c in insp.get_columns('campo_tecnico_modelo')]
+        for col in ['pdf_filename', 'pdf_path']:
+            if col not in ct_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE campo_tecnico_modelo ADD COLUMN {col} TEXT"))
+                print(f"OK: campo_tecnico_modelo.{col} adicionado")

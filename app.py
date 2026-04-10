@@ -2656,6 +2656,8 @@ class CampoTecnicoModelo(db.Model):
     titulo          = db.Column(db.String(200), nullable=False)
     valor           = db.Column(db.Text, default='')
     ordem           = db.Column(db.Integer, default=0)
+    pdf_filename    = db.Column(db.String(500))
+    pdf_path        = db.Column(db.String(1000))
     criado_em       = db.Column(db.DateTime, default=datetime.now)
 
 
@@ -4246,7 +4248,8 @@ def api_campos_tecnicos(tipo, modelo):
         tipo_componente=tipo, modelo_codigo=modelo
     ).order_by(CampoTecnicoModelo.ordem, CampoTecnicoModelo.id).all()
     return jsonify([{
-        'id': c.id, 'titulo': c.titulo, 'valor': c.valor, 'ordem': c.ordem
+        'id': c.id, 'titulo': c.titulo, 'valor': c.valor, 'ordem': c.ordem,
+        'pdf_filename': c.pdf_filename, 'pdf_path': c.pdf_path
     } for c in campos])
 
 @app.route('/api/campos-tecnicos/<tipo>/<path:modelo>', methods=['POST'])
@@ -4281,6 +4284,57 @@ def api_campos_tecnicos_editar(cid):
 def api_campos_tecnicos_apagar(cid):
     c = CampoTecnicoModelo.query.get_or_404(cid)
     db.session.delete(c)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/campos-tecnicos/<int:cid>/upload', methods=['POST'])
+@login_required
+def api_campos_tecnicos_upload(cid):
+    c = CampoTecnicoModelo.query.get_or_404(cid)
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Nenhum ficheiro'})
+    ensure_upload_dir()
+    safe = f"campo_{cid}_{f.filename.replace(' ','_')}"
+    path = os.path.join(UPLOAD_TECNICO, safe)
+    f.save(path)
+    c.pdf_filename = f.filename
+    c.pdf_path = safe
+    db.session.commit()
+    return jsonify({'ok': True, 'filename': f.filename,
+                    'ver_url': url_for('api_campos_tecnicos_ver', cid=cid),
+                    'download_url': url_for('api_campos_tecnicos_download', cid=cid)})
+
+@app.route('/api/campos-tecnicos/<int:cid>/ver')
+@login_required
+def api_campos_tecnicos_ver(cid):
+    c = CampoTecnicoModelo.query.get_or_404(cid)
+    if not c.pdf_path:
+        return '', 404
+    return send_from_directory(UPLOAD_TECNICO, c.pdf_path,
+                               as_attachment=False, download_name=c.pdf_filename)
+
+@app.route('/api/campos-tecnicos/<int:cid>/download')
+@login_required
+def api_campos_tecnicos_download(cid):
+    c = CampoTecnicoModelo.query.get_or_404(cid)
+    if not c.pdf_path:
+        return '', 404
+    return send_from_directory(UPLOAD_TECNICO, c.pdf_path,
+                               as_attachment=True, download_name=c.pdf_filename)
+
+@app.route('/api/campos-tecnicos/<int:cid>/remover-ficheiro', methods=['POST'])
+@login_required
+def api_campos_tecnicos_remover_ficheiro(cid):
+    c = CampoTecnicoModelo.query.get_or_404(cid)
+    try:
+        if c.pdf_path:
+            path = os.path.join(UPLOAD_TECNICO, c.pdf_path)
+            if os.path.exists(path): os.remove(path)
+    except Exception: pass
+    c.pdf_filename = None
+    c.pdf_path = None
     db.session.commit()
     return jsonify({'ok': True})
 
