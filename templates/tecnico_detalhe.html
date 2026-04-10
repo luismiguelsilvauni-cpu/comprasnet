@@ -11,7 +11,10 @@
   <div style="background:var(--surface);border-radius:14px;max-width:760px;margin:40px auto;padding:24px;position:relative">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="font-size:15px;font-weight:700;color:#f59e0b">📁 Outros Ficheiros — sem associação</div>
-      <button onclick="document.getElementById('outrosModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="dedupOutros()" id="btnDedup" class="btn btn-ghost btn-sm" style="color:var(--danger)">🗑 Remover Duplicados</button>
+        <button onclick="document.getElementById('outrosModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+      </div>
     </div>
     <div id="outrosList">A carregar...</div>
   </div>
@@ -694,11 +697,16 @@ function carregarOutros() {
         list.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px">Sem ficheiros por associar.</div>';
         return;
       }
+      // Update dedup button count
+      var dups = docs.filter(d => d.is_duplicate).length;
+      var dedupBtn = document.getElementById('btnDedup');
+      if (dedupBtn) dedupBtn.textContent = dups > 0 ? '🗑 Remover ' + dups + ' Duplicado(s)' : '✓ Sem duplicados';
+
       list.innerHTML = docs.map(d => `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:${d.is_duplicate ? '1px solid var(--danger)' : '1px solid var(--border)'};border-radius:8px;margin-bottom:6px;flex-wrap:wrap;opacity:${d.is_duplicate ? '0.6' : '1'}">
           <span style="font-size:20px">📄</span>
           <div style="flex:1">
-            <div style="font-size:12px;font-weight:600">${d.titulo}</div>
+            <div style="font-size:12px;font-weight:600">${d.titulo} ${d.is_duplicate ? '<span style="font-size:10px;background:rgba(239,68,68,.15);color:#ef4444;padding:1px 5px;border-radius:3px;margin-left:4px">DUPLICADO</span>' : d.dup_count > 1 ? '<span style="font-size:10px;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:3px;margin-left:4px">' + d.dup_count + 'x</span>' : ''}</div>
             <div style="font-size:10px;color:var(--text-muted)">${d.notas}</div>
           </div>
           <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
@@ -732,6 +740,19 @@ function associarOutro(did) {
   });
 }
 
+function dedupOutros() {
+  var btn = document.getElementById('btnDedup');
+  if (!btn.textContent.includes('Remover')) return;
+  if (!confirm('Remover todos os duplicados? Fica apenas uma cópia de cada ficheiro.')) return;
+  fetch('/api/tecnico/{{ equipamento.id }}/outros-dedup', {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      if (d.ok) {
+        carregarOutros();
+        if (d.removed > 0) alert('✅ ' + d.removed + ' duplicado(s) removido(s).');
+      }
+    });
+}
+
 function apagarOutro(did) {
   if (!confirm('Apagar este ficheiro?')) return;
   fetch('/tecnico/documento/'+did+'/apagar', {method:'POST'})
@@ -753,7 +774,10 @@ function apagarSel(){
   <div style="background:var(--surface);border-radius:14px;max-width:760px;margin:40px auto;padding:24px;position:relative">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="font-size:15px;font-weight:700;color:#f59e0b">📁 Outros Ficheiros — sem associação</div>
-      <button onclick="document.getElementById('outrosModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="dedupOutros()" id="btnDedup" class="btn btn-ghost btn-sm" style="color:var(--danger)">🗑 Remover Duplicados</button>
+        <button onclick="document.getElementById('outrosModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+      </div>
     </div>
     <div id="outrosList">A carregar...</div>
   </div>

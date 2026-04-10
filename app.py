@@ -4267,15 +4267,60 @@ def tecnico_upload_bulk_assign(eid):
 def api_tecnico_outros_docs(eid):
     docs = EquipamentoDocumento.query.filter_by(
         equipamento_id=eid, componente='outros_bulk').order_by(
-        EquipamentoDocumento.criado_em.desc()).all()
-    return jsonify([{
-        'id': d.id,
-        'titulo': d.titulo,
-        'pdf_filename': d.pdf_filename,
-        'notas': d.notas or '',
-        'ver_url': url_for('tecnico_doc_ver', did=d.id),
-        'download_url': url_for('tecnico_doc_download', did=d.id),
-    } for d in docs])
+        EquipamentoDocumento.criado_em.asc()).all()
+
+    # Detect duplicates by pdf_filename
+    seen = {}
+    for d in docs:
+        key = (d.pdf_filename or '').strip().upper()
+        if key not in seen:
+            seen[key] = []
+        seen[key].append(d.id)
+
+    result = []
+    for d in docs:
+        key = (d.pdf_filename or '').strip().upper()
+        is_dup = len(seen[key]) > 1
+        is_kept = seen[key][0] == d.id  # keep first occurrence
+        result.append({
+            'id': d.id,
+            'titulo': d.titulo,
+            'pdf_filename': d.pdf_filename,
+            'notas': d.notas or '',
+            'ver_url': url_for('tecnico_doc_ver', did=d.id),
+            'download_url': url_for('tecnico_doc_download', did=d.id),
+            'is_duplicate': is_dup and not is_kept,
+            'dup_count': len(seen[key]),
+        })
+    return jsonify(result)
+
+@app.route('/api/tecnico/<int:eid>/outros-dedup', methods=['POST'])
+@login_required
+def api_tecnico_outros_dedup(eid):
+    """Remove duplicate outros_bulk docs, keeping the first occurrence of each filename."""
+    docs = EquipamentoDocumento.query.filter_by(
+        equipamento_id=eid, componente='outros_bulk').order_by(
+        EquipamentoDocumento.criado_em.asc()).all()
+
+    seen = {}
+    removed = 0
+    for d in docs:
+        key = (d.pdf_filename or '').strip().upper()
+        if key in seen:
+            # duplicate — delete
+            try:
+                path = os.path.join(UPLOAD_TECNICO, d.pdf_path) if d.pdf_path else None
+                # Don't delete the file if the kept copy uses the same path
+                if path and path != os.path.join(UPLOAD_TECNICO, seen[key].pdf_path or ''):
+                    if os.path.exists(path): os.remove(path)
+            except Exception: pass
+            db.session.delete(d)
+            removed += 1
+        else:
+            seen[key] = d
+
+    db.session.commit()
+    return jsonify({'ok': True, 'removed': removed})
 
 @app.route('/api/tecnico/<int:eid>/associar-outro', methods=['POST'])
 @login_required
