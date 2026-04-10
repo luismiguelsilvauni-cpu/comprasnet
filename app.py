@@ -4447,25 +4447,40 @@ def api_tecnico_sync_pdfs(eid):
 
         donor = find_donor(o, code)
 
+        def filename_matches(fname, cat, cod):
+            """Check if filename contains both catalog and code."""
+            if not fname: return False
+            n = fname.upper()
+            return cat.upper() in n and cod.upper() in n
+
         if not o.pdf_path:
-            # Missing PDF — try to fill
-            if donor:
+            # Missing PDF — try to fill with donor that has correct catalog in filename
+            if donor and filename_matches(donor.pdf_filename, catalogo, code):
                 o.pdf_filename = donor.pdf_filename
                 o.pdf_path = donor.pdf_path
                 matched += 1
-                details_new.append(f'✅ {o.option_name[:35]} ({typ}={code})')
+                details_new.append(f'✅ {o.option_name[:35]} ({typ}={code}) ← {donor.pdf_filename}')
             else:
                 missing += 1
                 details_missing.append(f'❌ {o.option_name[:35]} ({typ}={code})')
         else:
-            # Has PDF — verify it matches what others have
-            if donor and donor.pdf_path != o.pdf_path:
-                # There's a newer/different PDF for this code — update
-                old_name = o.pdf_filename
-                o.pdf_filename = donor.pdf_filename
-                o.pdf_path = donor.pdf_path
+            # Has PDF — verify filename contains correct catalog and code
+            if not filename_matches(o.pdf_filename, catalogo, code):
+                # Wrong catalog in this PDF
+                import re as _re2
+                detected = _re2.match(r'^([A-Z]{1,3}[0-9]{3,6})', (o.pdf_filename or '').upper())
+                detected_cat = detected.group(1) if detected else '?'
+                details_fixed.append(
+                    f'⚠️ {o.option_name[:30]} ({typ}={code}): '
+                    f'"{o.pdf_filename}" tem catálogo {detected_cat}, esperado {catalogo}'
+                )
                 corrected += 1
-                details_fixed.append(f'🔄 {o.option_name[:30]} ({typ}={code}): {old_name} → {donor.pdf_filename}')
+                # Try to replace with correct donor
+                if donor and filename_matches(donor.pdf_filename, catalogo, code):
+                    o.pdf_filename = donor.pdf_filename
+                    o.pdf_path = donor.pdf_path
+                    details_fixed[-1] += f' → corrigido para {donor.pdf_filename}'
+            # else: PDF filename looks correct
 
     db.session.commit()
 
