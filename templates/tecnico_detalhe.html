@@ -415,7 +415,9 @@ fetch('/api/tecnico/{{ equipamento.id }}/outros-docs')
       btn.style.display = 'inline-flex';
       document.getElementById('outrosCount').textContent = docs.length;
       // Store opcoes sem pdf for dropdowns
-      window._opcoes_sem_pdf = {{ opcoes|rejectattr('pdf_path')|list|tojson }};
+      window._opcoes_sem_pdf = {{ opcoes|rejectattr('pdf_path')|map(attribute='id')|list|tojson }};
+      window._opcoes_sem_pdf_data = {{ opcoes|rejectattr('pdf_path')|map(attribute='option_name')|list|tojson }};
+      window._opcoes_sem_pdf_factory = {{ opcoes|rejectattr('pdf_path')|map(attribute='factory')|list|tojson }};
     }
   });
 function selComp(c){
@@ -504,8 +506,8 @@ function carregarOutros() {
             <a href="${d.download_url}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
             <select id="sel-${d.id}" class="input" style="font-size:11px;padding:3px 6px;min-width:200px">
               <option value="">— Associar a Option Code —</option>
-              ${window._opcoes_sem_pdf ? window._opcoes_sem_pdf.map(o =>
-                `<option value="${o.id}">${o.option_name.substring(0,35)} | Fac:${o.factory}</option>`
+              ${window._opcoes_sem_pdf ? window._opcoes_sem_pdf.map((id, i) =>
+                `<option value="${id}">${(window._opcoes_sem_pdf_data[i]||'').substring(0,35)} | Fac:${window._opcoes_sem_pdf_factory[i]||''}</option>`
               ).join('') : ''}
             </select>
             <button onclick="associarOutro(${d.id})" class="btn btn-primary btn-sm" style="font-size:11px">Associar</button>
