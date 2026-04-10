@@ -2580,7 +2580,12 @@ class Equipamento(db.Model):
     caixa_ratio     = db.Column(db.String(50))
     caixa_serial    = db.Column(db.String(100))
     # Legacy / outros
-    material        = db.Column(db.String(200))
+    material           = db.Column(db.String(200))
+    manufacturing_date = db.Column(db.String(50))
+    base_engine_pt     = db.Column(db.String(300))
+    base_engine_eng    = db.Column(db.String(300))
+    fuel_system_pt     = db.Column(db.String(300))
+    fuel_system_eng    = db.Column(db.String(300))
     tipo_motor      = db.Column(db.String(20), default='principal')
     ativo           = db.Column(db.Boolean, default=True)  # principal / auxiliar
     notas           = db.Column(db.Text, default='')
