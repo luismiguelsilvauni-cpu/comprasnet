@@ -2580,6 +2580,7 @@ class Equipamento(db.Model):
     caixa_ratio     = db.Column(db.String(50))
     caixa_serial    = db.Column(db.String(100))
     # Legacy / outros
+    catalogo           = db.Column(db.String(100))
     material           = db.Column(db.String(200))
     manufacturing_date = db.Column(db.String(50))
     base_engine_pt     = db.Column(db.String(300))
