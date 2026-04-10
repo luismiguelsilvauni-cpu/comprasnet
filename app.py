@@ -4384,6 +4384,79 @@ def api_campos_tecnicos_remover_ficheiro(cid):
     return jsonify({'ok': True})
 
 
+@app.route('/api/tecnico/<int:eid>/sync-pdfs', methods=['POST'])
+@login_required
+def api_tecnico_sync_pdfs(eid):
+    """Check all option codes without PDF and try to match from existing uploaded PDFs."""
+    opcoes_sem_pdf = EquipamentoOpcao.query.filter_by(
+        equipamento_id=eid, pdf_path=None).all()
+
+    matched = 0
+    details = []
+
+    for o in opcoes_sem_pdf:
+        # Determine reference by priority: distributor > factory > ordered
+        dist = (o.distributor or '').strip().replace('*','').strip()
+        fac  = (o.factory    or '').strip().replace('*','').strip()
+        ord_ = (o.ordered    or '').strip().replace('*','').strip()
+
+        ref_code = dist or fac or ord_
+        ref_type = 'distributor' if dist else ('factory' if fac else 'ordered')
+
+        if not ref_code:
+            continue
+
+        # Look for any opcao (any equipment) with same code that HAS a PDF
+        donor = None
+        if dist:
+            donor = EquipamentoOpcao.query.filter(
+                EquipamentoOpcao.id != o.id,
+                EquipamentoOpcao.pdf_path.isnot(None),
+                db.func.replace(db.func.replace(EquipamentoOpcao.distributor,'*',''),' ','') == ref_code
+            ).first()
+        if not donor and fac:
+            donor = EquipamentoOpcao.query.filter(
+                EquipamentoOpcao.id != o.id,
+                EquipamentoOpcao.pdf_path.isnot(None),
+                db.func.replace(db.func.replace(EquipamentoOpcao.factory,'*',''),' ','') == ref_code
+            ).first()
+        if not donor and ord_:
+            donor = EquipamentoOpcao.query.filter(
+                EquipamentoOpcao.id != o.id,
+                EquipamentoOpcao.pdf_path.isnot(None),
+                db.func.replace(db.func.replace(EquipamentoOpcao.ordered,'*',''),' ','') == ref_code
+            ).first()
+
+        # Also check FactoryCodePDF library
+        if not donor:
+            lib = FactoryCodePDF.query.filter_by(factory_code=ref_code).first()
+            if lib:
+                o.pdf_filename = lib.pdf_filename
+                o.pdf_path = lib.pdf_path
+                matched += 1
+                details.append(f'{o.option_name[:30]} ({ref_type}={ref_code}) ← biblioteca')
+                continue
+
+        if donor:
+            o.pdf_filename = donor.pdf_filename
+            o.pdf_path = donor.pdf_path
+            matched += 1
+            details.append(f'{o.option_name[:30]} ({ref_type}={ref_code}) ← {donor.pdf_filename}')
+
+    db.session.commit()
+
+    total_sem = len(opcoes_sem_pdf)
+    still_missing = total_sem - matched
+
+    return jsonify({
+        'ok': True,
+        'matched': matched,
+        'still_missing': still_missing,
+        'total_checked': total_sem,
+        'details': details,
+    })
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():

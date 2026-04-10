@@ -196,10 +196,16 @@
     <button onclick="tog('addOpcao')" class="btn btn-ghost btn-sm">+ Linha</button>
     <button onclick="tog('importHTML')" class="btn btn-ghost btn-sm">📥 Importar HTML</button>
     <a href="{{ url_for('tecnico_upload_bulk', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📂 Upload em Massa</a>
+    <button onclick="syncPDFs()" class="btn btn-ghost btn-sm" id="btnSync">🔄 Sincronizar PDFs</button>
     <button onclick="togOutros()" class="btn btn-ghost btn-sm" id="btnOutros" style="display:none">
       📁 Outros Ficheiros <span id="outrosCount" style="background:rgba(245,158,11,.2);color:#f59e0b;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:4px"></span>
     </button>
   </div>
+  <!-- Sync result -->
+  <div id="syncResult" style="display:none;margin-bottom:10px;padding:12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border)">
+    <div id="syncResultContent"></div>
+  </div>
+
   <div id="addOpcao" style="display:none;margin-bottom:10px">
     <div class="card" style="padding:12px">
       <form method="post" action="{{ url_for('tecnico_opcao_criar', eid=equipamento.id) }}">
@@ -624,6 +630,35 @@ function togEdit(eId,rId){
   var s=e.style.display!=='none';
   e.style.display=s?'none':'table-row';r.style.opacity=s?'1':'.4';
 }
+function syncPDFs() {
+  var btn = document.getElementById('btnSync');
+  btn.textContent = '⏳ A verificar...';
+  btn.disabled = true;
+  fetch('/api/tecnico/{{ equipamento.id }}/sync-pdfs', {method:'POST'})
+    .then(r=>r.json())
+    .then(d=>{
+      btn.textContent = '🔄 Sincronizar PDFs';
+      btn.disabled = false;
+      var res = document.getElementById('syncResult');
+      var content = document.getElementById('syncResultContent');
+      res.style.display = 'block';
+      if (d.matched === 0) {
+        res.style.borderColor = 'var(--border)';
+        content.innerHTML = '<div style="font-size:13px;color:var(--text-muted)">✓ Nenhuma correspondência nova encontrada. ' +
+          d.still_missing + ' linha(s) continuam sem PDF.</div>';
+      } else {
+        res.style.borderColor = '#22c55e';
+        content.innerHTML =
+          '<div style="font-size:13px;font-weight:700;color:#22c55e;margin-bottom:8px">✅ ' + d.matched + ' PDF(s) associados automaticamente!</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">' + d.still_missing + ' linha(s) ainda sem PDF.</div>' +
+          '<div style="font-size:11px;margin-top:8px">' +
+          d.details.map(s => '<div style="padding:2px 0;border-bottom:1px solid var(--border)">• ' + s + '</div>').join('') +
+          '</div>' +
+          '<button onclick="location.reload()" class="btn btn-primary btn-sm" style="margin-top:10px">Recarregar página</button>';
+      }
+    });
+}
+
 function togOutros() {
   document.getElementById('outrosModal').style.display = 'flex';
   carregarOutros();
