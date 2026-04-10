@@ -59,8 +59,12 @@
       </div>
 
       <div class="form-group" style="margin:0">
-        <label>Material</label>
-        <input type="text" name="material" value="{{ equipamento.material if equipamento else '' }}" class="input" placeholder="Material">
+        <label>Catálogo</label>
+        <input type="text" name="catalogo" value="{{ equipamento.catalogo if equipamento else '' }}" class="input" placeholder="Ex: PC12295">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Base Code</label>
+        <input type="text" name="material" value="{{ equipamento.material if equipamento else '' }}" class="input" placeholder="Ex: 3071F">
       </div>
     </div>
 
