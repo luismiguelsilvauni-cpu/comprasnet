@@ -6,6 +6,18 @@
   <a href="{{ url_for('tecnico') }}" class="btn btn-ghost btn-sm">← Lista</a>
   <a href="{{ url_for('tecnico_editar', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">Editar</a>
   <a href="{{ url_for('tecnico_consumiveis', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📋 Consumíveis</a>
+<!-- Outros Ficheiros Modal -->
+<div id="outrosModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto">
+  <div style="background:var(--surface);border-radius:14px;max-width:760px;margin:40px auto;padding:24px;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:#f59e0b">📁 Outros Ficheiros — sem associação</div>
+      <button onclick="document.getElementById('outrosModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="outrosList">A carregar...</div>
+  </div>
+</div>
+
+
 {% endblock %}
 
 {% block content %}
@@ -471,13 +483,8 @@ function togEdit(eId,rId){
   e.style.display=s?'none':'table-row';r.style.opacity=s?'1':'.4';
 }
 function togOutros() {
-  var sec = document.getElementById('outrosSection');
-  if (sec.style.display === 'none') {
-    sec.style.display = 'block';
-    carregarOutros();
-  } else {
-    sec.style.display = 'none';
-  }
+  document.getElementById('outrosModal').style.display = 'flex';
+  carregarOutros();
 }
 
 function carregarOutros() {
@@ -543,4 +550,16 @@ function apagarSel(){
   document.body.appendChild(f);f.submit();
 }
 </script>
+<!-- Outros Ficheiros Modal -->
+<div id="outrosModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto">
+  <div style="background:var(--surface);border-radius:14px;max-width:760px;margin:40px auto;padding:24px;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:#f59e0b">📁 Outros Ficheiros — sem associação</div>
+      <button onclick="document.getElementById('outrosModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="outrosList">A carregar...</div>
+  </div>
+</div>
+
+
 {% endblock %}
