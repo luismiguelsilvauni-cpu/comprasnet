@@ -3403,11 +3403,13 @@ def tecnico_importar_html(eid):
                     self.cur_text += data
 
             def _process_row(self):
+                # Structure: trans=en_US=Option | trans=other=skip |
+                #            plain[0]=Ordered | plain[1]=Factory |
+                #            name2=viewDistribOption=Distributor | rest=skip
                 option_name = ordered = factory = distributor = ''
                 plain_cells = []
                 for a, t in self.cells:
-                    # Keep raw text - do NOT strip asterisks
-                    raw = t.strip()
+                    raw = t.strip()  # keep * as-is
                     if a.get('trans') == 'en_US':
                         option_name = raw
                     elif a.get('trans') == 'other':
@@ -3420,13 +3422,14 @@ def tecnico_importar_html(eid):
                         continue
                     elif not a.get('trans') and not a.get('name2') and option_name:
                         plain_cells.append(raw)
-                
-                # plain_cells[0] = Ordered, plain_cells[1] = Factory
+
+                # Cell 2 (plain[0]) = Ordered (e.g. * or code)
+                # Cell 3 (plain[1]) = Factory (e.g. 1102, 1299)
                 if len(plain_cells) >= 1:
-                    ordered = plain_cells[0]
+                    ordered = plain_cells[0]   # * or actual code
                 if len(plain_cells) >= 2:
-                    factory = plain_cells[1]
-                
+                    factory = plain_cells[1]   # factory code number
+
                 if option_name:
                     self.rows.append({'option': option_name, 'ordered': ordered,
                                       'factory': factory, 'distributor': distributor})
