@@ -183,6 +183,7 @@
     <div style="flex:1"></div>
     <button onclick="tog('addOpcao')" class="btn btn-ghost btn-sm">+ Linha</button>
     <button onclick="tog('importHTML')" class="btn btn-ghost btn-sm">📥 Importar HTML</button>
+    <a href="{{ url_for('tecnico_upload_bulk', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">📂 Upload em Massa</a>
   </div>
   <div id="addOpcao" style="display:none;margin-bottom:10px">
     <div class="card" style="padding:12px">

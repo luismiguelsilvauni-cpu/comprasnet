@@ -4082,6 +4082,111 @@ def api_tecnico_ativo(eid):
     return jsonify({'ok': True, 'ativo': e.ativo})
 
 
+import re as _re
+
+def extrair_factory_code(filename):
+    """Extract 4-5 char factory/ordered code from filename."""
+    name = filename.replace('.pdf','').replace('.PDF','')
+    patterns = [
+        r'[_\-]([A-Z0-9]{4,5})[_\-]',
+        r'[_\-]([A-Z0-9]{4,5})$',
+        r'^([A-Z0-9]{4,5})[_\-]',
+    ]
+    for pat in patterns:
+        m = _re.search(pat, name, _re.IGNORECASE)
+        if m:
+            return m.group(1).upper()
+    return None
+
+@app.route('/tecnico/<int:eid>/upload-bulk', methods=['GET', 'POST'])
+@login_required
+def tecnico_upload_bulk(eid):
+    e = Equipamento.query.get_or_404(eid)
+    opcoes = EquipamentoOpcao.query.filter_by(equipamento_id=eid).order_by(EquipamentoOpcao.ordem).all()
+    
+    if request.method == 'GET':
+        return render_template('tecnico_upload_bulk.html', equipamento=e, opcoes=opcoes)
+    
+    files = request.files.getlist('pdfs')
+    if not files:
+        flash('Nenhum ficheiro seleccionado.', 'error')
+        return redirect(url_for('tecnico_upload_bulk', eid=eid))
+    
+    ensure_upload_dir()
+    matched = 0
+    unmatched = []
+    
+    for f in files:
+        if not f or not f.filename:
+            continue
+        code = extrair_factory_code(f.filename)
+        opcao = None
+        
+        if code:
+            # Match against factory OR ordered columns
+            opcao = EquipamentoOpcao.query.filter_by(equipamento_id=eid).filter(
+                db.or_(
+                    EquipamentoOpcao.factory == code,
+                    EquipamentoOpcao.ordered == code,
+                )
+            ).first()
+        
+        if opcao:
+            safe = f"{eid}_opcao_{opcao.id}_{f.filename.replace(' ','_')}"
+            path = os.path.join(UPLOAD_TECNICO, safe)
+            f.save(path)
+            opcao.pdf_filename = f.filename
+            opcao.pdf_path = safe
+            matched += 1
+        else:
+            # Save file temporarily for manual assignment
+            safe = f"unmatched_{eid}_{f.filename.replace(' ','_')}"
+            path = os.path.join(UPLOAD_TECNICO, safe)
+            f.save(path)
+            unmatched.append({
+                'filename': f.filename,
+                'code': code or '?',
+                'safe': safe,
+            })
+    
+    db.session.commit()
+    
+    if matched:
+        flash(f'✅ {matched} PDFs associados automaticamente.', 'success')
+    if unmatched:
+        # Store unmatched in session for manual assignment
+        import json
+        from flask import session
+        session[f'unmatched_{eid}'] = unmatched
+        flash(f'⚠️ {len(unmatched)} ficheiro(s) sem correspondência — associe manualmente abaixo.', 'warning')
+    
+    return redirect(url_for('tecnico_upload_bulk', eid=eid))
+
+@app.route('/tecnico/<int:eid>/upload-bulk/assign', methods=['POST'])
+@login_required
+def tecnico_upload_bulk_assign(eid):
+    """Manually assign an unmatched file to an option code."""
+    safe = request.form.get('safe','')
+    oid = request.form.get('opcao_id','')
+    if not safe or not oid:
+        return redirect(url_for('tecnico_upload_bulk', eid=eid))
+    
+    opcao = EquipamentoOpcao.query.get(int(oid))
+    if opcao and opcao.equipamento_id == eid:
+        opcao.pdf_filename = safe.split('unmatched_'+str(eid)+'_')[-1].replace('_',' ',1) if 'unmatched' in safe else safe
+        opcao.pdf_path = safe
+        db.session.commit()
+        
+        # Remove from session
+        from flask import session
+        import json
+        unmatched = session.get(f'unmatched_{eid}', [])
+        session[f'unmatched_{eid}'] = [u for u in unmatched if u['safe'] != safe]
+        flash('PDF associado com sucesso.', 'success')
+    
+    return redirect(url_for('tecnico_upload_bulk', eid=eid))
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():

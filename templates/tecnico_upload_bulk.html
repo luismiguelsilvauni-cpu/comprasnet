@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Upload em Massa · {{ equipamento.embarcacao }}{% endblock %}
+{% block page_title %}Upload em Massa de PDFs{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('tecnico_detalhe', eid=equipamento.id) }}" class="btn btn-ghost btn-sm">← Voltar à Ficha</a>
+{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<style>
+.info-box { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px }
+.match-rule { display:flex;align-items:center;gap:10px;font-size:13px;margin-bottom:8px }
+.match-rule .ex { font-family:monospace;background:var(--surface2);padding:2px 8px;border-radius:4px;color:var(--accent) }
+.upload-zone { border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;transition:border-color .2s;cursor:pointer }
+.upload-zone:hover,.upload-zone.drag { border-color:var(--accent);background:rgba(59,110,240,.04) }
+.upload-zone input[type=file] { display:none }
+.unmatched-card { background:var(--surface);border:1px solid var(--warning, #f59e0b);border-radius:10px;padding:14px;margin-bottom:10px }
+</style>
+
+<!-- Equipment info -->
+<div class="info-box" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
+  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Embarcação</div><div style="font-weight:700;color:var(--accent)">{{ equipamento.embarcacao or '—' }}</div></div>
+  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Motor</div><div style="font-weight:600">{{ equipamento.motor_modelo or '—' }}</div></div>
+  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Option Codes</div><div style="font-weight:600">{{ opcoes|length }}</div></div>
+  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Com PDF</div><div style="font-weight:600;color:#22c55e">{{ opcoes|selectattr('pdf_path')|list|length }}</div></div>
+  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Sem PDF</div><div style="font-weight:600;color:#f59e0b">{{ opcoes|rejectattr('pdf_path')|list|length }}</div></div>
+</div>
+
+<!-- How it works -->
+<div class="info-box" style="margin-bottom:20px">
+  <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Como funciona</div>
+  <div class="match-rule">
+    <span>📄</span>
+    <span>O sistema extrai o Factory Code do nome do ficheiro e associa automaticamente</span>
+  </div>
+  <div class="match-rule">
+    <span>Exemplo:</span>
+    <span class="ex">PC12203_2123-ST618347.pdf</span>
+    <span>→ Factory Code</span>
+    <span class="ex">2123</span>
+    <span>→ associado à linha com Factory=2123</span>
+  </div>
+  <div class="match-rule">
+    <span>Exemplo:</span>
+    <span class="ex">16BG-specification.pdf</span>
+    <span>→ Factory Code</span>
+    <span class="ex">16BG</span>
+    <span>→ associado à linha com Factory=16BG</span>
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:8px">
+    Suporta códigos de 4-5 caracteres entre separadores (_-). Se não encontrar correspondência, pode associar manualmente.
+  </div>
+</div>
+
+<!-- Upload form -->
+<div class="card" style="padding:20px;margin-bottom:20px">
+  <div style="font-size:14px;font-weight:600;margin-bottom:14px">📁 Seleccionar PDFs</div>
+  <form method="post" enctype="multipart/form-data" id="uploadForm">
+    <div class="upload-zone" id="dropZone" onclick="document.getElementById('pdfInput').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="event.preventDefault();this.classList.remove('drag');handleDrop(event)">
+      <div style="font-size:40px;margin-bottom:12px">📂</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px">Clique ou arraste os ficheiros PDF</div>
+      <div style="font-size:12px;color:var(--text-muted)">Pode seleccionar múltiplos ficheiros de uma vez</div>
+      <input type="file" name="pdfs" id="pdfInput" multiple accept=".pdf,.PDF" onchange="mostrarFicheiros(this)">
+    </div>
+    <div id="fileList" style="margin-top:12px;display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Ficheiros seleccionados:</div>
+      <div id="fileItems"></div>
+    </div>
+    <div style="margin-top:14px;text-align:right">
+      <button type="submit" class="btn btn-primary" id="submitBtn" style="display:none">
+        🚀 Fazer Upload e Associar Automaticamente
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Unmatched files for manual assignment -->
+{% set unmatched = session.get('unmatched_' + equipamento.id|string, []) %}
+{% if unmatched %}
+<div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:10px">
+  ⚠️ {{ unmatched|length }} ficheiro(s) sem correspondência automática — associe manualmente:
+</div>
+{% for u in unmatched %}
+<div class="unmatched-card">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1">
+      <div style="font-weight:600;font-size:13px">📄 {{ u.filename }}</div>
+      <div style="font-size:11px;color:var(--text-muted)">Código detectado: <span style="font-family:monospace;color:var(--accent)">{{ u.code }}</span></div>
+    </div>
+    <form method="post" action="{{ url_for('tecnico_upload_bulk_assign', eid=equipamento.id) }}" style="display:flex;gap:8px;align-items:center">
+      <input type="hidden" name="safe" value="{{ u.safe }}">
+      <select name="opcao_id" class="input" style="min-width:220px;font-size:12px">
+        <option value="">— Seleccionar Option Code —</option>
+        {% for o in opcoes %}
+        {% if not o.pdf_path %}
+        <option value="{{ o.id }}">{{ o.option_name[:40] }} (Ord:{{ o.ordered }} Fac:{{ o.factory }})</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Associar</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Current option codes status -->
+<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;margin-top:20px">
+  Estado dos Option Codes
+</div>
+<div class="card" style="padding:0;overflow-x:auto">
+  <table class="table" style="font-size:12px">
+    <thead><tr>
+      <th>Option Name</th><th>Ordered</th><th>Factory</th><th>PDF</th>
+    </tr></thead>
+    <tbody>
+    {% for o in opcoes %}
+    <tr>
+      <td style="max-width:280px">{{ o.option_name }}</td>
+      <td class="mono">{{ o.ordered or '—' }}</td>
+      <td class="mono" style="font-weight:600;color:var(--accent)">{{ o.factory or '—' }}</td>
+      <td>
+        {% if o.pdf_path %}
+        <span style="color:#22c55e;font-size:11px">✅ {{ o.pdf_filename }}</span>
+        {% else %}
+        <span style="color:var(--text-muted);font-size:11px">Sem PDF</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function mostrarFicheiros(input) {
+  var files = Array.from(input.files);
+  var list = document.getElementById('fileItems');
+  var container = document.getElementById('fileList');
+  if (!files.length) { container.style.display='none'; return; }
+  container.style.display='block';
+  list.innerHTML = files.map(f => {
+    var code = extrairCodigo(f.name);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
+      '<span>📄</span>' +
+      '<span style="font-size:12px;flex:1">' + f.name + '</span>' +
+      '<span style="font-size:11px;font-family:monospace;background:var(--surface2);padding:2px 6px;border-radius:4px;color:' +
+        (code ? 'var(--accent)' : 'var(--danger)') + '">' +
+        (code ? '🔍 ' + code : '⚠️ sem código') + '</span>' +
+      '</div>';
+  }).join('');
+  document.getElementById('submitBtn').style.display = 'block';
+}
+
+function extrairCodigo(filename) {
+  var name = filename.replace(/\.pdf$/i, '');
+  var patterns = [/[_\-]([A-Z0-9]{4,5})[_\-]/i, /[_\-]([A-Z0-9]{4,5})$/i, /^([A-Z0-9]{4,5})[_\-]/i];
+  for (var i = 0; i < patterns.length; i++) {
+    var m = name.match(patterns[i]);
+    if (m) return m[1].toUpperCase();
+  }
+  return null;
+}
+
+function handleDrop(event) {
+  var dt = event.dataTransfer;
+  var input = document.getElementById('pdfInput');
+  input.files = dt.files;
+  mostrarFicheiros(input);
+}
+</script>
+{% endblock %}
