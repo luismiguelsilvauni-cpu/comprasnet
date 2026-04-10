@@ -3261,12 +3261,14 @@ def tecnico_editar(eid):
         e.serial_number     = request.form.get('serial_number','').strip()
         e.base_code         = request.form.get('base_code','').strip()
         e.manufactured_date = request.form.get('manufactured_date','').strip()
+        e.catalogo          = request.form.get('catalogo','').strip()
         e.material          = request.form.get('material','').strip()
         e.caixa_modelo      = request.form.get('caixa_modelo','').strip()
         e.caixa_ratio       = request.form.get('caixa_ratio','').strip()
         e.caixa_serial      = request.form.get('caixa_serial','').strip()
         e.tipo_motor        = request.form.get('tipo_motor','principal')
         e.ativo             = request.form.get('ativo') == '1'
+        e.catalogo          = request.form.get('catalogo','').strip()
         e.material          = request.form.get('material','').strip()
         e.manufacturing_date = request.form.get('manufacturing_date','').strip()
         e.base_engine_pt    = request.form.get('base_engine_pt','').strip()
@@ -3338,37 +3340,39 @@ def tecnico_opcao_upload(oid):
     o.pdf_path = safe
 
     # Determine reference code by priority: distributor > factory > ordered
-    ref_code = None
-    ref_type = None
     dist = (o.distributor or '').strip().replace('*','').strip()
     fac  = (o.factory    or '').strip().replace('*','').strip()
     ord_ = (o.ordered    or '').strip().replace('*','').strip()
+    ref_code = dist or fac or ord_
+    ref_type = 'distributor' if dist else ('factory' if fac else 'ordered' if ord_ else None)
 
-    if dist:
-        ref_code, ref_type = dist, 'distributor'
-    elif fac:
-        ref_code, ref_type = fac, 'factory'
-    elif ord_:
-        ref_code, ref_type = ord_, 'ordered'
+    # Get catalog of this equipment
+    eq = Equipamento.query.get(o.equipamento_id)
+    catalogo = (eq.catalogo or '').strip().upper() if eq else None
 
     propagated = 0
     if ref_code:
-        # Find all other option lines with same code in the relevant column
-        if ref_type == 'distributor':
-            others = EquipamentoOpcao.query.filter(
+        # Find all option lines with same code AND same catalog (if catalog set)
+        def match_others(col):
+            q = EquipamentoOpcao.query.filter(
                 EquipamentoOpcao.id != oid,
-                db.func.replace(db.func.replace(EquipamentoOpcao.distributor, '*', ''), ' ', '') == ref_code
-            ).all()
-        elif ref_type == 'factory':
-            others = EquipamentoOpcao.query.filter(
-                EquipamentoOpcao.id != oid,
-                db.func.replace(db.func.replace(EquipamentoOpcao.factory, '*', ''), ' ', '') == ref_code
-            ).all()
+                db.func.replace(db.func.replace(col,'*',''),' ','') == ref_code
+            )
+            if catalogo:
+                # Only match equipamentos with same catalog
+                eq_ids = [e.id for e in Equipamento.query.filter(
+                    db.func.upper(Equipamento.catalogo) == catalogo
+                ).all()]
+                if eq_ids:
+                    q = q.filter(EquipamentoOpcao.equipamento_id.in_(eq_ids))
+            return q.all()
+
+        if dist:
+            others = match_others(EquipamentoOpcao.distributor)
+        elif fac:
+            others = match_others(EquipamentoOpcao.factory)
         else:
-            others = EquipamentoOpcao.query.filter(
-                EquipamentoOpcao.id != oid,
-                db.func.replace(db.func.replace(EquipamentoOpcao.ordered, '*', ''), ' ', '') == ref_code
-            ).all()
+            others = match_others(EquipamentoOpcao.ordered)
 
         for other in others:
             other.pdf_filename = f.filename
@@ -3377,8 +3381,9 @@ def tecnico_opcao_upload(oid):
 
     db.session.commit()
 
+    cat_info = f' (catálogo {catalogo})' if catalogo else ''
     if propagated:
-        flash(f'✅ PDF associado e propagado para {propagated} outras linhas com {ref_type} = {ref_code}.', 'success')
+        flash(f'✅ PDF associado e propagado para {propagated} linhas com {ref_type}={ref_code}{cat_info}.', 'success')
     else:
         flash('PDF associado.', 'success')
 
@@ -4144,18 +4149,26 @@ def api_tecnico_ativo(eid):
 import re as _re
 
 def extrair_factory_code(filename):
-    """Extract 4-5 char factory/ordered code from filename."""
+    """Extract 4-5 char factory/ordered code from filename.
+    e.g. PC12295_1150_ST617227 → code='1150', catalog='PC12295'
+    """
     name = filename.replace('.pdf','').replace('.PDF','')
-    patterns = [
-        r'[_\-]([A-Z0-9]{4,5})[_\-]',
-        r'[_\-]([A-Z0-9]{4,5})$',
-        r'^([A-Z0-9]{4,5})[_\-]',
-    ]
-    for pat in patterns:
-        m = _re.search(pat, name, _re.IGNORECASE)
-        if m:
-            return m.group(1).upper()
-    return None
+    parts = _re.split(r'[_\-]', name)
+    # Catalog: first part that looks like PC##### (letters + digits)
+    catalog = None
+    for p in parts:
+        if _re.match(r'^[A-Z]{1,3}[0-9]{4,6}$', p, _re.IGNORECASE):
+            catalog = p.upper()
+            break
+    # Code: 4-5 char alphanumeric that is NOT the catalog and NOT a long serial
+    code = None
+    for p in parts:
+        if p.upper() == (catalog or ''):
+            continue
+        if _re.match(r'^[A-Z0-9]{4,5}$', p, _re.IGNORECASE) and not _re.match(r'^ST', p, _re.IGNORECASE):
+            code = p.upper()
+            break
+    return code, catalog
 
 @app.route('/tecnico/<int:eid>/upload-bulk', methods=['GET', 'POST'])
 @login_required
@@ -4185,15 +4198,16 @@ def tecnico_upload_bulk(eid):
     for f in files:
         if not f or not f.filename:
             continue
-        code = extrair_factory_code(f.filename)
+        code, catalog = extrair_factory_code(f.filename)
         opcao = None
         
         if code:
-            # Match against factory OR ordered columns
+            # Match against factory OR ordered columns for this equipment
             opcao = EquipamentoOpcao.query.filter_by(equipamento_id=eid).filter(
                 db.or_(
-                    EquipamentoOpcao.factory == code,
-                    EquipamentoOpcao.ordered == code,
+                    db.func.replace(db.func.replace(EquipamentoOpcao.factory,'*',''),' ','') == code,
+                    db.func.replace(db.func.replace(EquipamentoOpcao.ordered,'*',''),' ','') == code,
+                    db.func.replace(db.func.replace(EquipamentoOpcao.distributor,'*',''),' ','') == code,
                 )
             ).first()
         
@@ -4226,7 +4240,7 @@ def tecnico_upload_bulk(eid):
     if matched:
         flash(f'✅ {matched} PDFs associados automaticamente.', 'success')
     if unmatched:
-        flash(f'⚠️ {len(unmatched)} ficheiro(s) sem correspondência guardados em "Outros Ficheiros".', 'warning')
+        flash(f'⚠️ {len(unmatched)} ficheiro(s) guardados em "Outros Ficheiros".', 'warning')
     
     return redirect(url_for('tecnico_upload_bulk', eid=eid))
 
@@ -4387,73 +4401,67 @@ def api_campos_tecnicos_remover_ficheiro(cid):
 @app.route('/api/tecnico/<int:eid>/sync-pdfs', methods=['POST'])
 @login_required
 def api_tecnico_sync_pdfs(eid):
-    """Check all option codes without PDF and try to match from existing uploaded PDFs."""
-    opcoes_sem_pdf = EquipamentoOpcao.query.filter_by(
-        equipamento_id=eid, pdf_path=None).all()
+    """Check all option codes without PDF and match from existing PDFs using catalog+code."""
+    eq = Equipamento.query.get_or_404(eid)
+    catalogo = (eq.catalogo or '').strip().upper()
+    opcoes_sem_pdf = EquipamentoOpcao.query.filter_by(equipamento_id=eid, pdf_path=None).all()
+
+    # Get all equipamentos with same catalog for scoped search
+    if catalogo:
+        cat_eq_ids = [e.id for e in Equipamento.query.filter(
+            db.func.upper(Equipamento.catalogo) == catalogo).all()]
+    else:
+        cat_eq_ids = None  # search all
 
     matched = 0
     details = []
 
     for o in opcoes_sem_pdf:
-        # Determine reference by priority: distributor > factory > ordered
         dist = (o.distributor or '').strip().replace('*','').strip()
         fac  = (o.factory    or '').strip().replace('*','').strip()
         ord_ = (o.ordered    or '').strip().replace('*','').strip()
-
         ref_code = dist or fac or ord_
-        ref_type = 'distributor' if dist else ('factory' if fac else 'ordered')
-
+        ref_type = 'distributor' if dist else ('factory' if fac else ('ordered' if ord_ else None))
         if not ref_code:
             continue
 
-        # Look for any opcao (any equipment) with same code that HAS a PDF
-        donor = None
-        if dist:
-            donor = EquipamentoOpcao.query.filter(
+        def find_donor(col, code):
+            q = EquipamentoOpcao.query.filter(
                 EquipamentoOpcao.id != o.id,
                 EquipamentoOpcao.pdf_path.isnot(None),
-                db.func.replace(db.func.replace(EquipamentoOpcao.distributor,'*',''),' ','') == ref_code
-            ).first()
-        if not donor and fac:
-            donor = EquipamentoOpcao.query.filter(
-                EquipamentoOpcao.id != o.id,
-                EquipamentoOpcao.pdf_path.isnot(None),
-                db.func.replace(db.func.replace(EquipamentoOpcao.factory,'*',''),' ','') == ref_code
-            ).first()
-        if not donor and ord_:
-            donor = EquipamentoOpcao.query.filter(
-                EquipamentoOpcao.id != o.id,
-                EquipamentoOpcao.pdf_path.isnot(None),
-                db.func.replace(db.func.replace(EquipamentoOpcao.ordered,'*',''),' ','') == ref_code
-            ).first()
+                db.func.replace(db.func.replace(col,'*',''),' ','') == code
+            )
+            if cat_eq_ids:
+                q = q.filter(EquipamentoOpcao.equipamento_id.in_(cat_eq_ids))
+            return q.first()
 
-        # Also check FactoryCodePDF library
+        donor = None
+        if dist:   donor = find_donor(EquipamentoOpcao.distributor, dist)
+        if not donor and fac:  donor = find_donor(EquipamentoOpcao.factory, fac)
+        if not donor and ord_: donor = find_donor(EquipamentoOpcao.ordered, ord_)
+
+        # Fallback: search without catalog restriction
         if not donor:
-            lib = FactoryCodePDF.query.filter_by(factory_code=ref_code).first()
-            if lib:
-                o.pdf_filename = lib.pdf_filename
-                o.pdf_path = lib.pdf_path
-                matched += 1
-                details.append(f'{o.option_name[:30]} ({ref_type}={ref_code}) ← biblioteca')
-                continue
+            if dist:   donor = EquipamentoOpcao.query.filter(EquipamentoOpcao.id!=o.id, EquipamentoOpcao.pdf_path.isnot(None), db.func.replace(db.func.replace(EquipamentoOpcao.distributor,'*',''),' ','') == dist).first()
+            if not donor and fac: donor = EquipamentoOpcao.query.filter(EquipamentoOpcao.id!=o.id, EquipamentoOpcao.pdf_path.isnot(None), db.func.replace(db.func.replace(EquipamentoOpcao.factory,'*',''),' ','') == fac).first()
+            if not donor and ord_: donor = EquipamentoOpcao.query.filter(EquipamentoOpcao.id!=o.id, EquipamentoOpcao.pdf_path.isnot(None), db.func.replace(db.func.replace(EquipamentoOpcao.ordered,'*',''),' ','') == ord_).first()
 
         if donor:
             o.pdf_filename = donor.pdf_filename
             o.pdf_path = donor.pdf_path
             matched += 1
-            details.append(f'{o.option_name[:30]} ({ref_type}={ref_code}) ← {donor.pdf_filename}')
+            cat_tag = f' [{catalogo}]' if catalogo else ''
+            details.append(f'{o.option_name[:30]} ({ref_type}={ref_code}){cat_tag}')
 
     db.session.commit()
-
-    total_sem = len(opcoes_sem_pdf)
-    still_missing = total_sem - matched
 
     return jsonify({
         'ok': True,
         'matched': matched,
-        'still_missing': still_missing,
-        'total_checked': total_sem,
+        'still_missing': len(opcoes_sem_pdf) - matched,
+        'total_checked': len(opcoes_sem_pdf),
         'details': details,
+        'catalogo': catalogo or 'não definido',
     })
 
 

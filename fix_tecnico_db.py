@@ -145,3 +145,13 @@ with app.app_context():
                 with db.engine.begin() as conn:
                     conn.execute(text(f"ALTER TABLE campo_tecnico_modelo ADD COLUMN {col} TEXT"))
                 print(f"OK: campo_tecnico_modelo.{col} adicionado")
+
+    # Add catalogo to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        if 'catalogo' not in eq_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE equipamento ADD COLUMN catalogo TEXT"))
+            print("OK: equipamento.catalogo adicionado")
+        else:
+            print("OK: catalogo ja existe")
