@@ -57,6 +57,28 @@
   <div class="eq-f"><label>Caixa Red.</label><span>{{ equipamento.caixa_modelo or '—' }}</span></div>
   <div class="eq-f"><label>Ratio</label><span class="mono">{{ equipamento.caixa_ratio or '—' }}</span></div>
   <div class="eq-f"><label>Série Caixa</label><span class="mono">{{ equipamento.caixa_serial or '—' }}</span></div>
+  {% if equipamento.material or equipamento.manufacturing_date or equipamento.base_engine_pt or equipamento.base_engine_eng or equipamento.fuel_system_pt or equipamento.fuel_system_eng %}
+  <div style="flex-basis:100%;border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+    {% if equipamento.material %}
+    <div class="eq-f"><label>Base Code</label><span class="mono">{{ equipamento.material }}</span></div>
+    {% endif %}
+    {% if equipamento.manufacturing_date %}
+    <div class="eq-f"><label>Manufacturing Date</label><span>{{ equipamento.manufacturing_date }}</span></div>
+    {% endif %}
+    {% if equipamento.base_engine_pt %}
+    <div class="eq-f"><label>Base Engine PT</label><span style="font-size:12px">{{ equipamento.base_engine_pt }}</span></div>
+    {% endif %}
+    {% if equipamento.base_engine_eng %}
+    <div class="eq-f"><label>Base Engine ENG</label><span style="font-size:12px">{{ equipamento.base_engine_eng }}</span></div>
+    {% endif %}
+    {% if equipamento.fuel_system_pt %}
+    <div class="eq-f"><label>Fuel System PT</label><span style="font-size:12px">{{ equipamento.fuel_system_pt }}</span></div>
+    {% endif %}
+    {% if equipamento.fuel_system_eng %}
+    <div class="eq-f"><label>Fuel System ENG</label><span style="font-size:12px">{{ equipamento.fuel_system_eng }}</span></div>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 {% set motor_docs = documentos|selectattr('componente','equalto','motor')|list %}
