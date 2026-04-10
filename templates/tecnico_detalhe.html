@@ -663,8 +663,8 @@ function syncPDFs() {
         html += '<div style="font-weight:700;color:#f59e0b;margin:8px 0 4px">❌ ' + d.missing + ' linha(s) ainda sem PDF no catálogo</div>';
         html += d.details_missing.map(s=>'<div style="font-size:11px;padding:2px 4px;color:var(--text-muted)">'+s+'</div>').join('');
       }
-      if (d.corrected > 0 && d.details_fixed.some(s => s.includes('⚠️'))) {
-        html += '<div style="font-weight:700;color:#f59e0b;margin:8px 0 4px">⚠️ ' + d.corrected + ' PDF(s) com catálogo errado detectados</div>';
+      if (d.corrected > 0) {
+        html += '<div style="font-weight:700;color:#ef4444;margin:8px 0 4px">🗑 ' + d.corrected + ' PDF(s) removidos por não corresponderem ao catálogo</div>';
         html += d.details_fixed.map(s=>'<div style="font-size:11px;padding:2px 4px">'+s+'</div>').join('');
       }
       if (d.matched === 0 && d.corrected === 0 && d.missing === 0) {

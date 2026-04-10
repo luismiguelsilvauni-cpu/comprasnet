@@ -4464,23 +4464,22 @@ def api_tecnico_sync_pdfs(eid):
                 missing += 1
                 details_missing.append(f'❌ {o.option_name[:35]} ({typ}={code})')
         else:
-            # Has PDF — verify filename contains correct catalog and code
+            # Has PDF — verify filename contains correct catalog AND code
             if not filename_matches(o.pdf_filename, catalogo, code):
-                # Wrong catalog in this PDF
-                import re as _re2
-                detected = _re2.match(r'^([A-Z]{1,3}[0-9]{3,6})', (o.pdf_filename or '').upper())
-                detected_cat = detected.group(1) if detected else '?'
-                details_fixed.append(
-                    f'⚠️ {o.option_name[:30]} ({typ}={code}): '
-                    f'"{o.pdf_filename}" tem catálogo {detected_cat}, esperado {catalogo}'
-                )
+                # Wrong — remove the PDF association
+                old_name = o.pdf_filename
+                o.pdf_filename = None
+                o.pdf_path = None
                 corrected += 1
-                # Try to replace with correct donor
+                details_fixed.append(
+                    f'🗑 {o.option_name[:30]} ({typ}={code}): '
+                    f'"{old_name}" removido — não contém catálogo {catalogo} + código {code}'
+                )
+                # Immediately try to find a correct replacement
                 if donor and filename_matches(donor.pdf_filename, catalogo, code):
                     o.pdf_filename = donor.pdf_filename
                     o.pdf_path = donor.pdf_path
-                    details_fixed[-1] += f' → corrigido para {donor.pdf_filename}'
-            # else: PDF filename looks correct
+                    details_fixed[-1] += f' → substituído por {donor.pdf_filename}'
 
     db.session.commit()
 
