@@ -13,125 +13,117 @@
 {% endwith %}
 
 <style>
-.info-box { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px }
-.match-rule { display:flex;align-items:center;gap:10px;font-size:13px;margin-bottom:8px }
-.match-rule .ex { font-family:monospace;background:var(--surface2);padding:2px 8px;border-radius:4px;color:var(--accent) }
-.upload-zone { border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;transition:border-color .2s;cursor:pointer }
-.upload-zone:hover,.upload-zone.drag { border-color:var(--accent);background:rgba(59,110,240,.04) }
-.upload-zone input[type=file] { display:none }
-.unmatched-card { background:var(--surface);border:1px solid var(--warning, #f59e0b);border-radius:10px;padding:14px;margin-bottom:10px }
+.eq-info{display:flex;gap:20px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:18px}
+.eq-info div label{font-size:10px;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:2px}
+.eq-info div span{font-size:13px;font-weight:700}
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(59,110,240,.04)}
+.file-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.code-tag{font-family:monospace;padding:2px 7px;border-radius:4px;font-size:11px}
+.outros-card{background:var(--surface);border:1px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:8px}
+.status-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.status-tbl th{text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+.status-tbl td{padding:7px 10px;border-bottom:1px solid var(--border)}
 </style>
 
-<!-- Equipment info -->
-<div class="info-box" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
-  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Embarcação</div><div style="font-weight:700;color:var(--accent)">{{ equipamento.embarcacao or '—' }}</div></div>
-  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Motor</div><div style="font-weight:600">{{ equipamento.motor_modelo or '—' }}</div></div>
-  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Option Codes</div><div style="font-weight:600">{{ opcoes|length }}</div></div>
-  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Com PDF</div><div style="font-weight:600;color:#22c55e">{{ opcoes|selectattr('pdf_path')|list|length }}</div></div>
-  <div><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted)">Sem PDF</div><div style="font-weight:600;color:#f59e0b">{{ opcoes|rejectattr('pdf_path')|list|length }}</div></div>
+<!-- Equipment summary -->
+<div class="eq-info">
+  <div><label>Embarcação</label><span style="color:var(--accent)">{{ equipamento.embarcacao or '—' }}</span></div>
+  <div><label>Motor</label><span>{{ equipamento.motor_modelo or '—' }}</span></div>
+  <div><label>Option Codes</label><span>{{ opcoes|length }}</span></div>
+  <div><label>Com PDF</label><span style="color:#22c55e">{{ opcoes|selectattr('pdf_path')|list|length }}</span></div>
+  <div><label>Sem PDF</label><span style="color:#f59e0b">{{ opcoes|rejectattr('pdf_path')|list|length }}</span></div>
+  {% if outros_docs %}<div><label>Outros ficheiros</label><span style="color:#f59e0b">{{ outros_docs|length }}</span></div>{% endif %}
 </div>
 
 <!-- How it works -->
-<div class="info-box" style="margin-bottom:20px">
-  <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Como funciona</div>
-  <div class="match-rule">
-    <span>📄</span>
-    <span>O sistema extrai o Factory Code do nome do ficheiro e associa automaticamente</span>
-  </div>
-  <div class="match-rule">
-    <span>Exemplo:</span>
-    <span class="ex">PC12203_2123-ST618347.pdf</span>
-    <span>→ Factory Code</span>
-    <span class="ex">2123</span>
-    <span>→ associado à linha com Factory=2123</span>
-  </div>
-  <div class="match-rule">
-    <span>Exemplo:</span>
-    <span class="ex">16BG-specification.pdf</span>
-    <span>→ Factory Code</span>
-    <span class="ex">16BG</span>
-    <span>→ associado à linha com Factory=16BG</span>
-  </div>
-  <div style="font-size:11px;color:var(--text-muted);margin-top:8px">
-    Suporta códigos de 4-5 caracteres entre separadores (_-). Se não encontrar correspondência, pode associar manualmente.
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px">
+  <div style="font-weight:700;margin-bottom:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Como funciona</div>
+  <div style="display:flex;flex-direction:column;gap:5px">
+    <div>📄 <span style="font-family:monospace;background:var(--surface2);padding:1px 6px;border-radius:3px;color:var(--accent)">PC12203_2123-ST618347.pdf</span> → código <span style="font-family:monospace;background:var(--surface2);padding:1px 6px;border-radius:3px;color:var(--accent)">2123</span> → associado à linha Factory=2123</div>
+    <div>📄 Se não encontrar correspondência → guardado em <strong>Outros Ficheiros</strong> para associação manual</div>
   </div>
 </div>
 
 <!-- Upload form -->
-<div class="card" style="padding:20px;margin-bottom:20px">
-  <div style="font-size:14px;font-weight:600;margin-bottom:14px">📁 Seleccionar PDFs</div>
+<div class="card" style="padding:18px;margin-bottom:18px">
+  <div style="font-size:14px;font-weight:600;margin-bottom:12px">📁 Seleccionar PDFs</div>
   <form method="post" enctype="multipart/form-data" id="uploadForm">
-    <div class="upload-zone" id="dropZone" onclick="document.getElementById('pdfInput').click()"
+    <div class="upload-zone" id="dropZone"
+      onclick="document.getElementById('pdfInput').click()"
       ondragover="event.preventDefault();this.classList.add('drag')"
       ondragleave="this.classList.remove('drag')"
-      ondrop="event.preventDefault();this.classList.remove('drag');handleDrop(event)">
-      <div style="font-size:40px;margin-bottom:12px">📂</div>
-      <div style="font-size:15px;font-weight:600;margin-bottom:6px">Clique ou arraste os ficheiros PDF</div>
-      <div style="font-size:12px;color:var(--text-muted)">Pode seleccionar múltiplos ficheiros de uma vez</div>
+      ondrop="event.preventDefault();this.classList.remove('drag');document.getElementById('pdfInput').files=event.dataTransfer.files;mostrarFicheiros(document.getElementById('pdfInput'))">
+      <div style="font-size:36px;margin-bottom:10px">📂</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">Clique ou arraste os PDFs aqui</div>
+      <div style="font-size:12px;color:var(--text-muted)">Pode seleccionar múltiplos ficheiros</div>
       <input type="file" name="pdfs" id="pdfInput" multiple accept=".pdf,.PDF" onchange="mostrarFicheiros(this)">
     </div>
-    <div id="fileList" style="margin-top:12px;display:none">
-      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Ficheiros seleccionados:</div>
+    <div id="fileList" style="display:none;margin-top:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">Pré-visualização da associação:</div>
       <div id="fileItems"></div>
     </div>
-    <div style="margin-top:14px;text-align:right">
-      <button type="submit" class="btn btn-primary" id="submitBtn" style="display:none">
-        🚀 Fazer Upload e Associar Automaticamente
-      </button>
+    <div style="margin-top:12px;text-align:right">
+      <button type="submit" id="submitBtn" class="btn btn-primary" style="display:none">🚀 Upload e Associar</button>
     </div>
   </form>
 </div>
 
-<!-- Unmatched files for manual assignment -->
-{% set unmatched = session.get('unmatched_' + equipamento.id|string, []) %}
-{% if unmatched %}
-<div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:10px">
-  ⚠️ {{ unmatched|length }} ficheiro(s) sem correspondência automática — associe manualmente:
-</div>
-{% for u in unmatched %}
-<div class="unmatched-card">
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <div style="flex:1">
-      <div style="font-weight:600;font-size:13px">📄 {{ u.filename }}</div>
-      <div style="font-size:11px;color:var(--text-muted)">Código detectado: <span style="font-family:monospace;color:var(--accent)">{{ u.code }}</span></div>
-    </div>
-    <form method="post" action="{{ url_for('tecnico_upload_bulk_assign', eid=equipamento.id) }}" style="display:flex;gap:8px;align-items:center">
-      <input type="hidden" name="safe" value="{{ u.safe }}">
-      <select name="opcao_id" class="input" style="min-width:220px;font-size:12px">
-        <option value="">— Seleccionar Option Code —</option>
-        {% for o in opcoes %}
-        {% if not o.pdf_path %}
-        <option value="{{ o.id }}">{{ o.option_name[:40] }} (Ord:{{ o.ordered }} Fac:{{ o.factory }})</option>
-        {% endif %}
-        {% endfor %}
-      </select>
-      <button type="submit" class="btn btn-primary btn-sm">Associar</button>
-    </form>
+<!-- Outros Ficheiros (unmatched) -->
+{% if outros_docs %}
+<div style="margin-bottom:18px">
+  <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:10px">
+    📁 Outros Ficheiros ({{ outros_docs|length }}) — sem correspondência automática
   </div>
+  {% for d in outros_docs %}
+  <div class="outros-card">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:22px">📄</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">{{ d.pdf_filename }}</div>
+        <div style="font-size:11px;color:var(--text-muted)">{{ d.notas }}</div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <a href="{{ url_for('tecnico_doc_ver', did=d.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁 Ver</a>
+          <a href="{{ url_for('tecnico_doc_download', did=d.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇ Download</a>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('tecnico_upload_bulk_assign', eid=equipamento.id) }}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="hidden" name="doc_id" value="{{ d.id }}">
+        <select name="opcao_id" class="input" style="min-width:240px;font-size:12px">
+          <option value="">— Associar a Option Code —</option>
+          {% for o in opcoes %}
+          {% if not o.pdf_path %}
+          <option value="{{ o.id }}">{{ o.option_name[:35] }} | Ord:{{ o.ordered }} Fac:{{ o.factory }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Associar</button>
+        <form method="post" action="{{ url_for('tecnico_doc_apagar', did=d.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+        </form>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
 </div>
-{% endfor %}
 {% endif %}
 
-<!-- Current option codes status -->
-<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;margin-top:20px">
-  Estado dos Option Codes
-</div>
+<!-- Option codes status table -->
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px">Estado dos Option Codes</div>
 <div class="card" style="padding:0;overflow-x:auto">
-  <table class="table" style="font-size:12px">
-    <thead><tr>
-      <th>Option Name</th><th>Ordered</th><th>Factory</th><th>PDF</th>
-    </tr></thead>
+  <table class="status-tbl">
+    <thead><tr><th>Option Name</th><th>Ordered</th><th>Factory</th><th>PDF</th></tr></thead>
     <tbody>
     {% for o in opcoes %}
     <tr>
-      <td style="max-width:280px">{{ o.option_name }}</td>
+      <td>{{ o.option_name }}</td>
       <td class="mono">{{ o.ordered or '—' }}</td>
-      <td class="mono" style="font-weight:600;color:var(--accent)">{{ o.factory or '—' }}</td>
+      <td class="mono" style="color:var(--accent);font-weight:600">{{ o.factory or '—' }}</td>
       <td>
         {% if o.pdf_path %}
         <span style="color:#22c55e;font-size:11px">✅ {{ o.pdf_filename }}</span>
         {% else %}
-        <span style="color:var(--text-muted);font-size:11px">Sem PDF</span>
+        <span style="color:var(--text-muted);font-size:11px">—</span>
         {% endif %}
       </td>
     </tr>
@@ -141,24 +133,9 @@
 </div>
 
 <script>
-function mostrarFicheiros(input) {
-  var files = Array.from(input.files);
-  var list = document.getElementById('fileItems');
-  var container = document.getElementById('fileList');
-  if (!files.length) { container.style.display='none'; return; }
-  container.style.display='block';
-  list.innerHTML = files.map(f => {
-    var code = extrairCodigo(f.name);
-    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
-      '<span>📄</span>' +
-      '<span style="font-size:12px;flex:1">' + f.name + '</span>' +
-      '<span style="font-size:11px;font-family:monospace;background:var(--surface2);padding:2px 6px;border-radius:4px;color:' +
-        (code ? 'var(--accent)' : 'var(--danger)') + '">' +
-        (code ? '🔍 ' + code : '⚠️ sem código') + '</span>' +
-      '</div>';
-  }).join('');
-  document.getElementById('submitBtn').style.display = 'block';
-}
+var factoryCodes = {{ opcoes|map(attribute='factory')|select|list|tojson }};
+var orderedCodes = {{ opcoes|map(attribute='ordered')|select|list|tojson }};
+var allCodes = factoryCodes.concat(orderedCodes).map(c => c ? c.toUpperCase() : '');
 
 function extrairCodigo(filename) {
   var name = filename.replace(/\.pdf$/i, '');
@@ -170,11 +147,25 @@ function extrairCodigo(filename) {
   return null;
 }
 
-function handleDrop(event) {
-  var dt = event.dataTransfer;
-  var input = document.getElementById('pdfInput');
-  input.files = dt.files;
-  mostrarFicheiros(input);
+function mostrarFicheiros(input) {
+  var files = Array.from(input.files);
+  if (!files.length) return;
+  var items = document.getElementById('fileItems');
+  var list = document.getElementById('fileList');
+  list.style.display = 'block';
+  items.innerHTML = files.map(f => {
+    var code = extrairCodigo(f.name);
+    var found = code && allCodes.includes(code);
+    return '<div class="file-row">' +
+      '<span>📄</span>' +
+      '<span style="flex:1">' + f.name + '</span>' +
+      '<span class="code-tag" style="background:' + (code ? 'var(--surface2)' : 'rgba(239,68,68,.1)') + ';color:' + (code ? 'var(--accent)' : 'var(--danger)') + '">' +
+        (code || '⚠️ sem código') + '</span>' +
+      '<span style="font-size:11px;font-weight:700;color:' + (found ? '#22c55e' : '#f59e0b') + '">' +
+        (found ? '✅ match' : code ? '📁 outros' : '📁 outros') + '</span>' +
+      '</div>';
+  }).join('');
+  document.getElementById('submitBtn').style.display = 'block';
 }
 </script>
 {% endblock %}

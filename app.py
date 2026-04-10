@@ -4105,7 +4105,10 @@ def tecnico_upload_bulk(eid):
     opcoes = EquipamentoOpcao.query.filter_by(equipamento_id=eid).order_by(EquipamentoOpcao.ordem).all()
     
     if request.method == 'GET':
-        return render_template('tecnico_upload_bulk.html', equipamento=e, opcoes=opcoes)
+        outros_docs = EquipamentoDocumento.query.filter_by(
+            equipamento_id=eid, componente='outros_bulk').order_by(
+            EquipamentoDocumento.criado_em.desc()).all()
+        return render_template('tecnico_upload_bulk.html', equipamento=e, opcoes=opcoes, outros_docs=outros_docs)
     
     files = request.files.getlist('pdfs')
     if not files:
@@ -4139,50 +4142,48 @@ def tecnico_upload_bulk(eid):
             opcao.pdf_path = safe
             matched += 1
         else:
-            # Save file temporarily for manual assignment
-            safe = f"unmatched_{eid}_{f.filename.replace(' ','_')}"
+            # Save as "outros" document linked to equipment
+            safe = f"outros_{eid}_{f.filename.replace(' ','_')}"
             path = os.path.join(UPLOAD_TECNICO, safe)
             f.save(path)
-            unmatched.append({
-                'filename': f.filename,
-                'code': code or '?',
-                'safe': safe,
-            })
+            doc = EquipamentoDocumento(
+                equipamento_id=eid,
+                componente='outros_bulk',
+                titulo=f.filename,
+                pdf_filename=f.filename,
+                pdf_path=safe,
+                notas=f'Código detectado: {code or "nenhum"} — sem correspondência',
+            )
+            db.session.add(doc)
+            unmatched.append(f.filename)
     
     db.session.commit()
     
     if matched:
         flash(f'✅ {matched} PDFs associados automaticamente.', 'success')
     if unmatched:
-        # Store unmatched in session for manual assignment
-        import json
-        from flask import session
-        session[f'unmatched_{eid}'] = unmatched
-        flash(f'⚠️ {len(unmatched)} ficheiro(s) sem correspondência — associe manualmente abaixo.', 'warning')
+        flash(f'⚠️ {len(unmatched)} ficheiro(s) sem correspondência guardados em "Outros Ficheiros".', 'warning')
     
     return redirect(url_for('tecnico_upload_bulk', eid=eid))
 
 @app.route('/tecnico/<int:eid>/upload-bulk/assign', methods=['POST'])
 @login_required
 def tecnico_upload_bulk_assign(eid):
-    """Manually assign an unmatched file to an option code."""
-    safe = request.form.get('safe','')
+    """Manually assign an outros_bulk doc to an option code."""
+    did = request.form.get('doc_id','')
     oid = request.form.get('opcao_id','')
-    if not safe or not oid:
+    if not did or not oid:
         return redirect(url_for('tecnico_upload_bulk', eid=eid))
     
+    doc = EquipamentoDocumento.query.get(int(did))
     opcao = EquipamentoOpcao.query.get(int(oid))
-    if opcao and opcao.equipamento_id == eid:
-        opcao.pdf_filename = safe.split('unmatched_'+str(eid)+'_')[-1].replace('_',' ',1) if 'unmatched' in safe else safe
-        opcao.pdf_path = safe
+    
+    if doc and opcao and opcao.equipamento_id == eid:
+        opcao.pdf_filename = doc.pdf_filename
+        opcao.pdf_path = doc.pdf_path
+        db.session.delete(doc)
         db.session.commit()
-        
-        # Remove from session
-        from flask import session
-        import json
-        unmatched = session.get(f'unmatched_{eid}', [])
-        session[f'unmatched_{eid}'] = [u for u in unmatched if u['safe'] != safe]
-        flash('PDF associado com sucesso.', 'success')
+        flash(f'PDF "{opcao.pdf_filename}" associado a "{opcao.option_name}".', 'success')
     
     return redirect(url_for('tecnico_upload_bulk', eid=eid))
 
