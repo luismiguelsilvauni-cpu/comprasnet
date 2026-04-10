@@ -129,3 +129,10 @@ with app.app_context():
                 if col not in eq_cols:
                     conn.execute(text(f"ALTER TABLE equipamento ADD COLUMN {col} {typ}"))
                     print(f"OK: equipamento.{col} adicionado")
+
+    # Create campo_tecnico_modelo table
+    if 'campo_tecnico_modelo' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela campo_tecnico_modelo criada")
+    else:
+        print("OK: campo_tecnico_modelo ja existe")

@@ -2647,6 +2647,18 @@ class ModeloPDF(db.Model):
     criado_em       = db.Column(db.DateTime, default=datetime.now)
 
 
+class CampoTecnicoModelo(db.Model):
+    """Custom technical fields shared by component model (e.g. all MG5085 caixas)"""
+    __tablename__ = 'campo_tecnico_modelo'
+    id              = db.Column(db.Integer, primary_key=True)
+    tipo_componente = db.Column(db.String(50), nullable=False)  # 'caixa', 'motor', 'aux'
+    modelo_codigo   = db.Column(db.String(100), nullable=False, index=True)
+    titulo          = db.Column(db.String(200), nullable=False)
+    valor           = db.Column(db.Text, default='')
+    ordem           = db.Column(db.Integer, default=0)
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
+
+
 class FactoryCodePDF(db.Model):
     __tablename__ = 'factory_code_pdf'
     id           = db.Column(db.Integer, primary_key=True)
@@ -4221,6 +4233,54 @@ def api_tecnico_associar_outro(eid):
     opcao.pdf_filename = doc.pdf_filename
     opcao.pdf_path = doc.pdf_path
     db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+# ── CAMPOS TÉCNICOS POR MODELO ───────────────────────────────────────────────
+
+@app.route('/api/campos-tecnicos/<tipo>/<path:modelo>')
+@login_required
+def api_campos_tecnicos(tipo, modelo):
+    campos = CampoTecnicoModelo.query.filter_by(
+        tipo_componente=tipo, modelo_codigo=modelo
+    ).order_by(CampoTecnicoModelo.ordem, CampoTecnicoModelo.id).all()
+    return jsonify([{
+        'id': c.id, 'titulo': c.titulo, 'valor': c.valor, 'ordem': c.ordem
+    } for c in campos])
+
+@app.route('/api/campos-tecnicos/<tipo>/<path:modelo>', methods=['POST'])
+@login_required
+def api_campos_tecnicos_criar(tipo, modelo):
+    data = request.get_json()
+    titulo = (data.get('titulo') or '').strip()
+    valor  = (data.get('valor') or '').strip()
+    if not titulo:
+        return jsonify({'ok': False, 'error': 'Título obrigatório'})
+    count = CampoTecnicoModelo.query.filter_by(tipo_componente=tipo, modelo_codigo=modelo).count()
+    c = CampoTecnicoModelo(
+        tipo_componente=tipo, modelo_codigo=modelo,
+        titulo=titulo, valor=valor, ordem=count
+    )
+    db.session.add(c)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': c.id, 'titulo': c.titulo, 'valor': c.valor})
+
+@app.route('/api/campos-tecnicos/<int:cid>', methods=['PUT'])
+@login_required
+def api_campos_tecnicos_editar(cid):
+    c = CampoTecnicoModelo.query.get_or_404(cid)
+    data = request.get_json()
+    c.titulo = (data.get('titulo') or c.titulo).strip()
+    c.valor  = (data.get('valor')  or '').strip()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/campos-tecnicos/<int:cid>', methods=['DELETE'])
+@login_required
+def api_campos_tecnicos_apagar(cid):
+    c = CampoTecnicoModelo.query.get_or_404(cid)
+    db.session.delete(c)
     db.session.commit()
     return jsonify({'ok': True})
 

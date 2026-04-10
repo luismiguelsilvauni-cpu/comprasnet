@@ -298,14 +298,42 @@
 
 <!-- Caixa · Info -->
 <div class="cpanel" id="cp-caixa-info">
-  <div class="card" style="padding:16px">
+  <!-- Fixed fields -->
+  <div class="card" style="padding:16px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px">
       <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Modelo</label><div style="font-size:14px;font-weight:600;margin-top:3px">{{ equipamento.caixa_modelo or '—' }}</div></div>
       <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Ratio</label><div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--accent);margin-top:3px">{{ equipamento.caixa_ratio or '—' }}</div></div>
       <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Nº Série</label><div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--accent);margin-top:3px">{{ equipamento.caixa_serial or '—' }}</div></div>
     </div>
-    <div style="margin-top:12px;font-size:12px;color:var(--text-muted)">Para editar clique em <strong>Editar</strong> no topo.</div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">Para editar estes campos clique em <strong>Editar</strong> no topo.</div>
   </div>
+
+  {% if equipamento.caixa_modelo %}
+  <!-- Custom shared fields for this caixa model -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">
+      Dados Técnicos — {{ equipamento.caixa_modelo }}
+      <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:4px">(partilhado com todos os {{ equipamento.caixa_modelo }})</span>
+    </div>
+    <button onclick="addCampo('caixa','{{ equipamento.caixa_modelo }}')" class="btn btn-ghost btn-sm">+ Adicionar campo</button>
+  </div>
+
+  <!-- Add field form -->
+  <div id="addCampoForm-caixa" style="display:none;margin-bottom:10px">
+    <div class="card" style="padding:12px">
+      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;align-items:end">
+        <div class="form-group" style="margin:0"><label>Título</label><input type="text" id="newCampoTitulo-caixa" class="input" placeholder="Ex: Óleo, Peso, Potência Máx..."></div>
+        <div class="form-group" style="margin:0"><label>Valor</label><input type="text" id="newCampoValor-caixa" class="input" placeholder="Ex: SAE 30, 45 kg..."></div>
+        <button onclick="saveCampo('caixa','{{ equipamento.caixa_modelo }}')" class="btn btn-primary btn-sm">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic fields list -->
+  <div id="camposList-caixa" class="card" style="padding:12px;min-height:40px">
+    <div style="color:var(--text-muted);font-size:12px">A carregar...</div>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Caixa · Docs -->
@@ -412,6 +440,88 @@
 </div>
 
 <script>
+
+// ── Custom Technical Fields ──────────────────────────────────────────────
+function addCampo(tipo, modelo) {
+  var f = document.getElementById('addCampoForm-'+tipo);
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveCampo(tipo, modelo) {
+  var titulo = document.getElementById('newCampoTitulo-'+tipo).value.trim();
+  var valor  = document.getElementById('newCampoValor-'+tipo).value.trim();
+  if (!titulo) { alert('Preencha o título.'); return; }
+  fetch('/api/campos-tecnicos/'+tipo+'/'+encodeURIComponent(modelo), {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({titulo, valor})
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) {
+      document.getElementById('newCampoTitulo-'+tipo).value = '';
+      document.getElementById('newCampoValor-'+tipo).value = '';
+      document.getElementById('addCampoForm-'+tipo).style.display = 'none';
+      loadCampos(tipo, modelo);
+    }
+  });
+}
+
+function loadCampos(tipo, modelo) {
+  var list = document.getElementById('camposList-'+tipo);
+  if (!list) return;
+  fetch('/api/campos-tecnicos/'+tipo+'/'+encodeURIComponent(modelo))
+    .then(r=>r.json()).then(campos=>{
+      if (!campos.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);font-size:12px">Sem campos adicionais. Clique em + Adicionar campo.</div>';
+        return;
+      }
+      list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">' +
+        campos.map(c => `
+          <div id="campo-${c.id}" style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:3px">${c.titulo}</div>
+            <div id="campo-val-${c.id}" style="font-size:13px;font-weight:600">${c.valor || '—'}</div>
+            <div id="campo-edit-${c.id}" style="display:none;margin-top:6px">
+              <input type="text" id="campo-edit-titulo-${c.id}" value="${c.titulo}" class="input" style="font-size:11px;padding:3px 6px;margin-bottom:4px">
+              <input type="text" id="campo-edit-valor-${c.id}" value="${c.valor}" class="input" style="font-size:11px;padding:3px 6px;margin-bottom:4px">
+              <div style="display:flex;gap:4px">
+                <button onclick="updateCampo(${c.id},'${tipo}','${modelo}')" class="btn btn-primary btn-sm" style="font-size:10px;padding:2px 7px">OK</button>
+                <button onclick="document.getElementById('campo-edit-${c.id}').style.display='none'" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px">✕</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:3px;margin-top:6px">
+              <button onclick="document.getElementById('campo-edit-${c.id}').style.display='block'" class="btn btn-ghost btn-sm" style="font-size:10px">✏️</button>
+              <button onclick="deleteCampo(${c.id},'${tipo}','${modelo}')" class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--danger)">✕</button>
+            </div>
+          </div>
+        `).join('') + '</div>';
+    });
+}
+
+function updateCampo(cid, tipo, modelo) {
+  var titulo = document.getElementById('campo-edit-titulo-'+cid).value.trim();
+  var valor  = document.getElementById('campo-edit-valor-'+cid).value.trim();
+  fetch('/api/campos-tecnicos/'+cid, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({titulo, valor})
+  }).then(r=>r.json()).then(d=>{ if(d.ok) loadCampos(tipo, modelo); });
+}
+
+function deleteCampo(cid, tipo, modelo) {
+  if (!confirm('Apagar este campo? Remove de todos os ' + modelo + '.')) return;
+  fetch('/api/campos-tecnicos/'+cid, {method:'DELETE'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) loadCampos(tipo, modelo); });
+}
+
+// Auto-load campos when caixa info panel is opened
+var _origSelSub = selSub;
+selSub = function(comp, sub) {
+  _origSelSub(comp, sub);
+  if (comp === 'caixa' && sub === 'info') {
+    var modelo = '{{ equipamento.caixa_modelo }}';
+    if (modelo) loadCampos('caixa', modelo);
+  }
+};
+
 var _comp=null,_sub=null;
 
 // Load outros count on startup
