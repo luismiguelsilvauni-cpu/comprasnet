@@ -3248,6 +3248,12 @@ def tecnico_editar(eid):
         e.caixa_serial      = request.form.get('caixa_serial','').strip()
         e.tipo_motor        = request.form.get('tipo_motor','principal')
         e.ativo             = request.form.get('ativo') == '1'
+        e.material          = request.form.get('material','').strip()
+        e.manufacturing_date = request.form.get('manufacturing_date','').strip()
+        e.base_engine_pt    = request.form.get('base_engine_pt','').strip()
+        e.base_engine_eng   = request.form.get('base_engine_eng','').strip()
+        e.fuel_system_pt    = request.form.get('fuel_system_pt','').strip()
+        e.fuel_system_eng   = request.form.get('fuel_system_eng','').strip()
         e.notas             = request.form.get('notas','').strip()
         db.session.commit()
         return redirect(url_for('tecnico_detalhe', eid=eid))

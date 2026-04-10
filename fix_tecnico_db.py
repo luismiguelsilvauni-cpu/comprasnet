@@ -113,3 +113,19 @@ with app.app_context():
             print("OK: equipamento.ativo adicionado")
         else:
             print("OK: ativo ja existe")
+
+    # Add new motor fields to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        new_cols = [
+            ('manufacturing_date', 'TEXT'),
+            ('base_engine_pt', 'TEXT'),
+            ('base_engine_eng', 'TEXT'),
+            ('fuel_system_pt', 'TEXT'),
+            ('fuel_system_eng', 'TEXT'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in new_cols:
+                if col not in eq_cols:
+                    conn.execute(text(f"ALTER TABLE equipamento ADD COLUMN {col} {typ}"))
+                    print(f"OK: equipamento.{col} adicionado")

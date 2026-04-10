@@ -64,6 +64,31 @@
       </div>
     </div>
 
+    <!-- Motor - campos adicionais -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="form-group" style="margin:0">
+        <label>Manufacturing Date</label>
+        <input type="text" name="manufacturing_date" value="{{ equipamento.manufacturing_date if equipamento else '' }}" class="input" placeholder="Ex: 2017-04-04">
+      </div>
+      <div class="form-group" style="margin:0"></div>
+      <div class="form-group" style="margin:0">
+        <label>Base Engine PT</label>
+        <input type="text" name="base_engine_pt" value="{{ equipamento.base_engine_pt if equipamento else '' }}" class="input" placeholder="Descrição em Português">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Base Engine ENG</label>
+        <input type="text" name="base_engine_eng" value="{{ equipamento.base_engine_eng if equipamento else '' }}" class="input" placeholder="Description in English">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Fuel System PT</label>
+        <input type="text" name="fuel_system_pt" value="{{ equipamento.fuel_system_pt if equipamento else '' }}" class="input" placeholder="Sistema de combustível">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Fuel System ENG</label>
+        <input type="text" name="fuel_system_eng" value="{{ equipamento.fuel_system_eng if equipamento else '' }}" class="input" placeholder="Fuel system description">
+      </div>
+    </div>
+
     <!-- Caixa Redutora -->
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Caixa Inversora / Redutora / Alternador</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
