@@ -3404,33 +3404,28 @@ def tecnico_importar_html(eid):
 
             def _process_row(self):
                 option_name = ordered = factory = distributor = ''
-                plain_cells = []  # td cells without special attrs
+                plain_cells = []
                 for a, t in self.cells:
-                    clean = t.replace('*', '').strip()
+                    # Keep raw text - do NOT strip asterisks
+                    raw = t.strip()
                     if a.get('trans') == 'en_US':
-                        option_name = clean
+                        option_name = raw
                     elif a.get('trans') == 'other':
                         continue
                     elif a.get('name2') == 'viewDistribOption':
-                        distributor = clean
+                        distributor = raw
                     elif a.get('name2') == 'editDistribOption':
                         continue
                     elif a.get('width') == '100px' and a.get('align') == 'center':
                         continue
                     elif not a.get('trans') and not a.get('name2') and option_name:
-                        # Collect plain cells - ordered is raw text code, factory is link text
-                        plain_cells.append((a, clean))
+                        plain_cells.append(raw)
                 
-                # plain_cells[0] = Ordered (may be * = empty)
-                # plain_cells[1] = Factory (link, has the real code)
+                # plain_cells[0] = Ordered, plain_cells[1] = Factory
                 if len(plain_cells) >= 1:
-                    ordered = plain_cells[0][1]  # may be empty if was *
+                    ordered = plain_cells[0]
                 if len(plain_cells) >= 2:
-                    factory = plain_cells[1][1]  # link text = factory code
-                
-                # If ordered is empty but factory has value, factory IS the ordered code
-                if not ordered and factory:
-                    ordered = factory
+                    factory = plain_cells[1]
                 
                 if option_name:
                     self.rows.append({'option': option_name, 'ordered': ordered,
