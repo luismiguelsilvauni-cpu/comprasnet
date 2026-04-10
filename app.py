@@ -3336,7 +3336,52 @@ def tecnico_opcao_upload(oid):
     f.save(path)
     o.pdf_filename = f.filename
     o.pdf_path = safe
+
+    # Determine reference code by priority: distributor > factory > ordered
+    ref_code = None
+    ref_type = None
+    dist = (o.distributor or '').strip().replace('*','').strip()
+    fac  = (o.factory    or '').strip().replace('*','').strip()
+    ord_ = (o.ordered    or '').strip().replace('*','').strip()
+
+    if dist:
+        ref_code, ref_type = dist, 'distributor'
+    elif fac:
+        ref_code, ref_type = fac, 'factory'
+    elif ord_:
+        ref_code, ref_type = ord_, 'ordered'
+
+    propagated = 0
+    if ref_code:
+        # Find all other option lines with same code in the relevant column
+        if ref_type == 'distributor':
+            others = EquipamentoOpcao.query.filter(
+                EquipamentoOpcao.id != oid,
+                db.func.replace(db.func.replace(EquipamentoOpcao.distributor, '*', ''), ' ', '') == ref_code
+            ).all()
+        elif ref_type == 'factory':
+            others = EquipamentoOpcao.query.filter(
+                EquipamentoOpcao.id != oid,
+                db.func.replace(db.func.replace(EquipamentoOpcao.factory, '*', ''), ' ', '') == ref_code
+            ).all()
+        else:
+            others = EquipamentoOpcao.query.filter(
+                EquipamentoOpcao.id != oid,
+                db.func.replace(db.func.replace(EquipamentoOpcao.ordered, '*', ''), ' ', '') == ref_code
+            ).all()
+
+        for other in others:
+            other.pdf_filename = f.filename
+            other.pdf_path = safe
+            propagated += 1
+
     db.session.commit()
+
+    if propagated:
+        flash(f'✅ PDF associado e propagado para {propagated} outras linhas com {ref_type} = {ref_code}.', 'success')
+    else:
+        flash('PDF associado.', 'success')
+
     return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
 
 @app.route('/tecnico/opcao/<int:oid>/pdf')
