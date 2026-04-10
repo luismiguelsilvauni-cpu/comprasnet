@@ -4397,65 +4397,88 @@ def api_campos_tecnicos_remover_ficheiro(cid):
 @app.route('/api/tecnico/<int:eid>/sync-pdfs', methods=['POST'])
 @login_required
 def api_tecnico_sync_pdfs(eid):
-    """Check all option codes without PDF and match from existing PDFs using catalog+code."""
+    """Sync PDFs: fill missing + validate existing ones using catalog+code."""
     eq = Equipamento.query.get_or_404(eid)
     catalogo = (eq.catalogo or '').strip().upper()
-    opcoes_sem_pdf = EquipamentoOpcao.query.filter_by(equipamento_id=eid, pdf_path=None).all()
 
-    # Get all equipamentos with same catalog for scoped search
-    if catalogo:
-        cat_eq_ids = [e.id for e in Equipamento.query.filter(
-            db.func.upper(Equipamento.catalogo) == catalogo).all()]
-    else:
-        cat_eq_ids = None  # search all
+    if not catalogo:
+        return jsonify({
+            'ok': False,
+            'error': 'Este equipamento não tem Catálogo definido. Preencha o campo Catálogo no Editar Equipamento.'
+        })
 
+    # All equipamentos with same catalog
+    cat_eq_ids = [e.id for e in Equipamento.query.filter(
+        db.func.upper(Equipamento.catalogo) == catalogo).all()]
+
+    all_opcoes = EquipamentoOpcao.query.filter_by(equipamento_id=eid).all()
     matched = 0
-    details = []
+    corrected = 0
+    missing = 0
+    details_new = []
+    details_fixed = []
+    details_missing = []
 
-    for o in opcoes_sem_pdf:
+    def get_ref(o):
         dist = (o.distributor or '').strip().replace('*','').strip()
         fac  = (o.factory    or '').strip().replace('*','').strip()
         ord_ = (o.ordered    or '').strip().replace('*','').strip()
-        ref_code = dist or fac or ord_
-        ref_type = 'distributor' if dist else ('factory' if fac else ('ordered' if ord_ else None))
-        if not ref_code:
-            continue
+        code = dist or fac or ord_
+        typ  = 'distributor' if dist else ('factory' if fac else ('ordered' if ord_ else None))
+        return code, typ
 
-        def find_donor(col, code):
-            q = EquipamentoOpcao.query.filter(
+    def find_donor(o, code):
+        """Find best PDF donor within same catalog."""
+        for col in [EquipamentoOpcao.distributor, EquipamentoOpcao.factory, EquipamentoOpcao.ordered]:
+            donor = EquipamentoOpcao.query.filter(
                 EquipamentoOpcao.id != o.id,
                 EquipamentoOpcao.pdf_path.isnot(None),
+                EquipamentoOpcao.equipamento_id.in_(cat_eq_ids),
                 db.func.replace(db.func.replace(col,'*',''),' ','') == code
-            )
-            if cat_eq_ids:
-                q = q.filter(EquipamentoOpcao.equipamento_id.in_(cat_eq_ids))
-            return q.first()
+            ).first()
+            if donor:
+                return donor
+        return None
 
-        donor = None
-        if dist:   donor = find_donor(EquipamentoOpcao.distributor, dist)
-        if not donor and fac:  donor = find_donor(EquipamentoOpcao.factory, fac)
-        if not donor and ord_: donor = find_donor(EquipamentoOpcao.ordered, ord_)
+    for o in all_opcoes:
+        code, typ = get_ref(o)
+        if not code:
+            continue
 
-        # No fallback without catalog — skip if no match within same catalog
-        if not catalogo:
-            continue  # no catalog = no propagation
+        donor = find_donor(o, code)
 
-        if donor:
-            o.pdf_filename = donor.pdf_filename
-            o.pdf_path = donor.pdf_path
-            matched += 1
-            cat_tag = f' [{catalogo}]' if catalogo else ''
-            details.append(f'{o.option_name[:30]} ({ref_type}={ref_code}){cat_tag}')
+        if not o.pdf_path:
+            # Missing PDF — try to fill
+            if donor:
+                o.pdf_filename = donor.pdf_filename
+                o.pdf_path = donor.pdf_path
+                matched += 1
+                details_new.append(f'✅ {o.option_name[:35]} ({typ}={code})')
+            else:
+                missing += 1
+                details_missing.append(f'❌ {o.option_name[:35]} ({typ}={code})')
+        else:
+            # Has PDF — verify it matches what others have
+            if donor and donor.pdf_path != o.pdf_path:
+                # There's a newer/different PDF for this code — update
+                old_name = o.pdf_filename
+                o.pdf_filename = donor.pdf_filename
+                o.pdf_path = donor.pdf_path
+                corrected += 1
+                details_fixed.append(f'🔄 {o.option_name[:30]} ({typ}={code}): {old_name} → {donor.pdf_filename}')
 
     db.session.commit()
 
     return jsonify({
         'ok': True,
+        'catalogo': catalogo,
         'matched': matched,
-        'still_missing': len(opcoes_sem_pdf) - matched,
-        'total_checked': len(opcoes_sem_pdf),
-        'details': details,
-        'catalogo': catalogo or 'não definido',
+        'corrected': corrected,
+        'missing': missing,
+        'total': len(all_opcoes),
+        'details_new': details_new,
+        'details_fixed': details_fixed,
+        'details_missing': details_missing,
     })
 
 
