@@ -38,7 +38,7 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 26px; margin: 0 auto 14px;
         }
-        .login-logo h1 { font-size: 22px; font-weight: 700; }
+        .login-logo h1 { font-size: clamp(13px,4vw,20px); font-weight: 700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .login-logo p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
         
         .form-group { margin-bottom: 16px; }
@@ -76,7 +76,7 @@
         {% else %}
         <div class="icon">🔧</div>
         {% endif %}
-        <h1 style="white-space:nowrap;font-size:clamp(14px,3vw,20px)">{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }}</h1>
+        <h1>{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }}</h1>
         <p style="margin-top:4px">Gestão Integrada Técnica, Logística e Financeira</p>
         <p style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:right">by UCN</p>
     </div>
