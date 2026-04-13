@@ -76,7 +76,7 @@
         {% else %}
         <div class="icon">🔧</div>
         {% endif %}
-        <h1>{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }}</h1>
+        <h1 style="white-space:nowrap;font-size:clamp(14px,3vw,20px)">{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }}</h1>
         <p style="margin-top:4px">Gestão Integrada Técnica, Logística e Financeira</p>
         <p style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:right">by UCN</p>
     </div>
@@ -98,7 +98,11 @@
         </div>
         <button type="submit" class="btn-login">Entrar</button>
     </form>
-    
+
+    <div style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-muted)">
+      Não tem conta? <a href="{{ url_for('registo') }}" style="color:var(--accent);text-decoration:none;font-weight:600">Pedir registo</a>
+    </div>
+
     <div class="footer-note">
         Integrado com <span>PHC CS</span> · Rede Local
     </div>
