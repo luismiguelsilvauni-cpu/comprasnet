@@ -4862,12 +4862,25 @@ def api_testar_smtp():
         msg['Subject'] = '[NavTech] Teste de email'
         msg['From'] = cfg.smtp_from or cfg.smtp_user
         msg['To'] = cfg.smtp_user
-        with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port or 587, timeout=10) as s:
-            if cfg.smtp_tls:
-                s.starttls()
-            if cfg.smtp_user and cfg.smtp_pass:
-                s.login(cfg.smtp_user, cfg.smtp_pass)
-            s.send_message(msg)
+        port = cfg.smtp_port or 587
+        if port == 465:
+            # SSL directo
+            import ssl
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(cfg.smtp_host, port, timeout=15, context=ctx) as s:
+                if cfg.smtp_user and cfg.smtp_pass:
+                    s.login(cfg.smtp_user, cfg.smtp_pass)
+                s.send_message(msg)
+        else:
+            # STARTTLS (587 ou 25)
+            with smtplib.SMTP(cfg.smtp_host, port, timeout=15) as s:
+                s.ehlo()
+                if cfg.smtp_tls:
+                    s.starttls()
+                    s.ehlo()
+                if cfg.smtp_user and cfg.smtp_pass:
+                    s.login(cfg.smtp_user, cfg.smtp_pass)
+                s.send_message(msg)
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
