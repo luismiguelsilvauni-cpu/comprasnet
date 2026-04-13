@@ -257,30 +257,46 @@
     <div class="sidebar-nav">
         <div class="nav-section">
             <div class="nav-label">Principal</div>
+            {% if pode_aceder('dashboard') %}
             <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
                 <span class="icon">⊞</span><span>Dashboard</span>
             </a>
+            {% endif %}
+            {% if pode_aceder('clientes') %}
             <a href="{{ url_for('clientes') }}" class="nav-item {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
                 <span class="icon">👥</span><span>Clientes</span>
             </a>
+            {% endif %}
+            {% if pode_aceder('pedidos') %}
             <a href="{{ url_for('pedidos', estado='aberto') }}" class="nav-item {% if 'pedido' in request.endpoint and 'reposicao' not in request.endpoint %}active{% endif %}">
                 <span class="icon">📋</span><span>Pedidos de Compra</span>
             </a>
+            {% endif %}
+            {% if pode_aceder('inventario') %}
             <a href="{{ url_for('stock') }}" class="nav-item {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
                 <span class="icon">📊</span><span>Stock</span>
             </a>
+            {% endif %}
+            {% if pode_aceder('biblioteca_modelos') %}
             <a href="{{ url_for('biblioteca_modelos') }}" class="nav-item {% if 'biblioteca' in (request.endpoint or '') %}active{% endif %}">
                 <span class="icon">📚</span><span>Biblioteca PDF</span>
             </a>
+            {% endif %}
+            {% if pode_aceder('tecnico') %}
             <a href="{{ url_for('tecnico') }}" class="nav-item {% if 'tecnico' in request.endpoint %}active{% endif %}">
                 <span class="icon">🔧</span><span>Técnico</span>
             </a>
+            {% endif %}
+            {% if pode_aceder('inventario') %}
             <a href="{{ url_for('inventario') }}" class="nav-item {% if request.endpoint == 'inventario' %}active{% endif %}">
                 <span class="icon">📊</span><span>Análise de Inventário</span>
             </a>
+            {% endif %}
+            {% if pode_aceder('reposicao') %}
             <a href="{{ url_for('reposicao') }}" class="nav-item {% if request.endpoint == 'reposicao' or request.endpoint == 'analisar_artigo' %}active{% endif %}">
                 <span class="icon">📦</span><span>Reposição de Stock</span>
             </a>
+            {% endif %}
             <a href="{{ url_for('pendentes') }}" class="nav-item {% if request.endpoint == 'pendentes' %}active{% endif %}">
                 <span class="icon">🔗</span>
                 <span>Associações Pendentes</span>
@@ -290,7 +306,7 @@
         {% if current_user.is_admin %}
         <div class="nav-section" style="margin-top:12px">
             <div class="nav-label">Admin</div>
-            <a href="{{ url_for('admin_utilizadores') }}" class="nav-item {% if request.endpoint == 'admin_utilizadores' %}active{% endif %}">
+            <a href="{{ url_for('admin_utilizadores') }}" class="nav-item {% if request.endpoint in ['admin_utilizadores','admin_perfis'] %}active{% endif %}">
                 <span class="icon">👥</span><span>Utilizadores</span>
             </a>
             <a href="{{ url_for('admin_phc') }}" class="nav-item {% if request.endpoint == 'admin_phc' %}active{% endif %}">

@@ -25,6 +25,34 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Por favor faça login para aceder.'
 
+def user_pode_aceder(endpoint):
+    """Check if current user can access the given menu endpoint."""
+    if not current_user.is_authenticated:
+        return False
+    if current_user.is_admin:
+        return True
+    perfil_id = getattr(current_user, 'perfil_id', None)
+    if not perfil_id:
+        return True  # no perfil = full access (backwards compat)
+    perfil = Perfil.query.get(perfil_id)
+    if not perfil:
+        return True
+    return perfil.pode_aceder(endpoint)
+
+
+@app.context_processor
+def inject_perfil():
+    def pode_aceder(endpoint):
+        from flask_login import current_user
+        if not current_user.is_authenticated: return False
+        if current_user.is_admin: return True
+        pid = get_user_perfil_id(current_user)
+        if not pid: return True
+        p = Perfil.query.get(pid)
+        if not p: return True
+        return p.pode_aceder(endpoint)
+    return dict(pode_aceder=pode_aceder)
+
 @app.before_request
 def refresh_session():
     """Keep session alive on every request."""
@@ -85,7 +113,7 @@ def login():
             login_user(u, remember=True)
             return redirect(url_for('dashboard'))
         flash('Utilizador ou palavra-passe incorretos.', 'error')
-    return render_template('login.html')
+    return render_template('login.html', cfg=ConfigGeral.query.first())
 
 @app.route('/logout')
 @login_required
@@ -935,7 +963,8 @@ def admin_phc():
 def admin_utilizadores():
     if not current_user.is_admin:
         flash('Sem permissão.','error'); return redirect(url_for('dashboard'))
-    return render_template('admin_utilizadores.html', utilizadores=User.query.all())
+    perfis = Perfil.query.order_by(Perfil.nome).all()
+    return render_template('admin_utilizadores.html', utilizadores=User.query.all(), perfis=perfis, get_user_perfil_id=get_user_perfil_id)
 
 @app.route('/admin/utilizadores/novo', methods=['POST'])
 @login_required
@@ -2606,6 +2635,41 @@ class EquipamentoConsumivel(db.Model):
     quantidade      = db.Column(db.Float, default=1)
     notas           = db.Column(db.String(300))
     ordem           = db.Column(db.Integer, default=0)
+
+
+# ── PERFIS E PERMISSÕES ──────────────────────────────────────────────────────
+
+MENUS_DISPONIVEIS = [
+    ('dashboard',     '🏠 Dashboard'),
+    ('pedidos',       '📋 Pedidos de Compra'),
+    ('reposicao',     '📦 Reposição'),
+    ('inventario',    '📊 Inventário'),
+    ('clientes',      '👥 Clientes'),
+    ('tecnico',       '🔧 Técnico'),
+    ('biblioteca_modelos', '📚 Biblioteca PDF'),
+    ('roadmap',       '🗺️ Roadmap'),
+    ('changelog',     '📝 Changelog'),
+    ('admin_config',  '⚙️ Configurações'),
+    ('admin_utilizadores', '👤 Utilizadores'),
+]
+
+class Perfil(db.Model):
+    __tablename__ = 'perfil'
+    id        = db.Column(db.Integer, primary_key=True)
+    nome      = db.Column(db.String(100), unique=True, nullable=False)
+    descricao = db.Column(db.String(300), default='')
+    menus     = db.Column(db.Text, default='')  # JSON list of allowed endpoints
+    criado_em = db.Column(db.DateTime, default=datetime.now)
+
+    def get_menus(self):
+        try: return json.loads(self.menus) if self.menus else []
+        except: return []
+
+    def set_menus(self, lst):
+        self.menus = json.dumps(lst)
+
+    def pode_aceder(self, endpoint):
+        return endpoint in self.get_menus()
 
 
 class EquipamentoDocumento(db.Model):
@@ -4539,6 +4603,82 @@ def api_tecnico_sync_pdfs(eid):
         'details_fixed': details_fixed,
         'details_missing': details_missing,
     })
+
+
+# ── GESTÃO DE PERFIS ─────────────────────────────────────────────────────────
+
+@app.route('/admin/perfis')
+@login_required
+def admin_perfis():
+    if not current_user.is_admin:
+        flash('Sem permissão.','error'); return redirect(url_for('dashboard'))
+    perfis = Perfil.query.order_by(Perfil.nome).all()
+    return render_template('admin_perfis.html', perfis=perfis, menus=MENUS_DISPONIVEIS)
+
+@app.route('/admin/perfis/novo', methods=['POST'])
+@login_required
+def admin_perfis_novo():
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    nome = request.form.get('nome','').strip()
+    if not nome or Perfil.query.filter_by(nome=nome).first():
+        flash('Nome inválido ou já existe.','error')
+        return redirect(url_for('admin_perfis'))
+    menus = request.form.getlist('menus')
+    p = Perfil(nome=nome, descricao=request.form.get('descricao','').strip())
+    p.set_menus(menus)
+    db.session.add(p)
+    db.session.commit()
+    flash(f'Perfil "{nome}" criado.','success')
+    return redirect(url_for('admin_perfis'))
+
+@app.route('/admin/perfis/<int:pid>/editar', methods=['POST'])
+@login_required
+def admin_perfis_editar(pid):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    p = Perfil.query.get_or_404(pid)
+    p.nome = request.form.get('nome', p.nome).strip()
+    p.descricao = request.form.get('descricao','').strip()
+    p.set_menus(request.form.getlist('menus'))
+    db.session.commit()
+    flash(f'Perfil "{p.nome}" actualizado.','success')
+    return redirect(url_for('admin_perfis'))
+
+@app.route('/admin/perfis/<int:pid>/apagar', methods=['POST'])
+@login_required
+def admin_perfis_apagar(pid):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    p = Perfil.query.get_or_404(pid)
+    db.session.delete(p)
+    db.session.commit()
+    flash('Perfil removido.','info')
+    return redirect(url_for('admin_perfis'))
+
+@app.route('/admin/utilizadores/<int:uid>/perfil', methods=['POST'])
+@login_required
+def admin_utilizador_perfil(uid):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    u = User.query.get_or_404(uid)
+    perfil_id = request.form.get('perfil_id','')
+    # Store perfil_id in departamento field as JSON for now
+    import json as _json
+    try:
+        meta = _json.loads(u.departamento or '{}')
+    except:
+        meta = {'dept': u.departamento or ''}
+    meta['perfil_id'] = int(perfil_id) if perfil_id else None
+    u.departamento = _json.dumps(meta)
+    u.is_admin = request.form.get('is_admin') == 'on'
+    db.session.commit()
+    flash(f'Utilizador {u.nome} actualizado.','success')
+    return redirect(url_for('admin_utilizadores'))
+
+def get_user_perfil_id(user):
+    """Get perfil_id from user.departamento JSON."""
+    try:
+        meta = json.loads(user.departamento or '{}')
+        return meta.get('perfil_id')
+    except:
+        return None
 
 
 def init_db():

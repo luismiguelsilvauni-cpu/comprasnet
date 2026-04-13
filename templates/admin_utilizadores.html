@@ -1,84 +1,86 @@
 {% extends "base.html" %}
-{% block title %}Utilizadores · ComprasNet{% endblock %}
+{% block title %}Utilizadores · Admin{% endblock %}
 {% block page_title %}Gestão de Utilizadores{% endblock %}
 {% block topbar_actions %}
-    <button class="btn btn-primary" onclick="document.getElementById('modalNovoUser').style.display='flex'">+ Novo Utilizador</button>
+  <a href="{{ url_for('admin_perfis') }}" class="btn btn-ghost btn-sm">⚙️ Perfis</a>
+  <button onclick="tog('formNovo')" class="btn btn-primary btn-sm">+ Novo Utilizador</button>
 {% endblock %}
-
 {% block content %}
-<div class="card">
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr><th>Nome</th><th>Username</th><th>Departamento</th><th>Perfil</th><th>Criado em</th><th></th></tr>
-            </thead>
-            <tbody>
-            {% for u in utilizadores %}
-            <tr>
-                <td style="font-weight:500">
-                    <div class="flex items-center gap-8">
-                        <div class="avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">{{ u.nome[0].upper() }}</div>
-                        {{ u.nome }}
-                    </div>
-                </td>
-                <td class="mono text-muted">{{ u.username }}</td>
-                <td class="text-muted">{{ u.departamento or '—' }}</td>
-                <td>
-                    {% if u.is_admin %}<span class="badge badge-gold">🔑 Admin</span>
-                    {% else %}<span class="badge badge-gray">Utilizador</span>{% endif %}
-                </td>
-                <td class="text-muted" style="font-size:12px">{{ u.data_criacao.strftime('%d/%m/%Y') }}</td>
-                <td>
-                    {% if u.id != current_user.id %}
-                    <form method="POST" action="{{ url_for('apagar_utilizador', uid=u.id) }}" onsubmit="return confirm('Remover utilizador {{ u.nome }}?')">
-                        <button type="submit" class="btn btn-danger btn-sm">Remover</button>
-                    </form>
-                    {% else %}
-                    <span class="badge badge-blue">Você</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<!-- New user form -->
+<div id="formNovo" style="display:none;margin-bottom:20px">
+  <div class="card" style="padding:18px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px">Novo Utilizador</div>
+    <form method="post" action="{{ url_for('novo_utilizador') }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0"><label>Username *</label><input type="text" name="username" required class="input"></div>
+        <div class="form-group" style="margin:0"><label>Nome *</label><input type="text" name="nome" required class="input"></div>
+        <div class="form-group" style="margin:0"><label>Password *</label><input type="password" name="password" required class="input"></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="is_admin"> Administrador
+        </label>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="tog('formNovo')" class="btn btn-ghost btn-sm">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Criar</button>
+      </div>
+    </form>
+  </div>
 </div>
 
-<!-- Modal -->
-<div id="modalNovoUser" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">
-    <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:32px; width:440px; max-width:95vw;">
-        <div class="flex items-center justify-between mb-16">
-            <h2 style="font-size:16px; font-weight:600">Novo Utilizador</h2>
-            <button onclick="document.getElementById('modalNovoUser').style.display='none'" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
-        </div>
-        <form method="POST" action="{{ url_for('novo_utilizador') }}">
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Nome Completo *</label>
-                    <input type="text" name="nome" required placeholder="João Silva">
-                </div>
-                <div class="form-group">
-                    <label>Username *</label>
-                    <input type="text" name="username" required placeholder="joao.silva">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Departamento</label>
-                <input type="text" name="departamento" placeholder="Compras, Produção...">
-            </div>
-            <div class="form-group">
-                <label>Palavra-passe *</label>
-                <input type="password" name="password" required placeholder="Mínimo 6 caracteres">
-            </div>
-            <div class="form-group" style="display:flex; align-items:center; gap:10px">
-                <input type="checkbox" name="is_admin" id="isAdmin" style="width:auto">
-                <label for="isAdmin" style="margin:0; cursor:pointer">Administrador (acesso total)</label>
-            </div>
-            <div class="flex gap-8" style="justify-content:flex-end; margin-top:8px">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalNovoUser').style.display='none'">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Criar Utilizador</button>
-            </div>
+<!-- Users list -->
+<div class="card" style="padding:0">
+  <table class="table" style="font-size:13px">
+    <thead><tr>
+      <th>Utilizador</th><th>Nome</th><th>Perfil</th><th>Admin</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for u in utilizadores %}
+    <tr>
+      <td class="mono" style="font-weight:600">{{ u.username }}</td>
+      <td>{{ u.nome }}</td>
+      <td>
+        {% set pid = get_user_perfil_id(u) %}
+        {% set p = perfis|selectattr('id','equalto',pid)|first if pid else none %}
+        <form method="post" action="{{ url_for('admin_utilizador_perfil', uid=u.id) }}" style="display:flex;gap:6px;align-items:center">
+          <select name="perfil_id" class="input" style="font-size:12px;padding:3px 6px">
+            <option value="">— Sem perfil (acesso total) —</option>
+            {% for perf in perfis %}
+            <option value="{{ perf.id }}" {% if pid == perf.id %}selected{% endif %}>{{ perf.nome }}</option>
+            {% endfor %}
+          </select>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap">
+            <input type="checkbox" name="is_admin" {% if u.is_admin %}checked{% endif %}> Admin
+          </label>
+          <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px">Guardar</button>
         </form>
-    </div>
+      </td>
+      <td>
+        {% if u.is_admin %}
+        <span style="font-size:11px;background:rgba(59,110,240,.15);color:var(--accent);padding:2px 7px;border-radius:4px">Admin</span>
+        {% else %}—{% endif %}
+      </td>
+      <td style="text-align:right">
+        {% if u.id != current_user.id %}
+        <form method="post" action="{{ url_for('apagar_utilizador', uid=u.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </div>
+
+<script>
+function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
+</script>
 {% endblock %}

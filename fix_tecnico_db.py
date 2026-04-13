@@ -155,3 +155,10 @@ with app.app_context():
             print("OK: equipamento.catalogo adicionado")
         else:
             print("OK: catalogo ja existe")
+
+    # Create perfil table
+    if 'perfil' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela perfil criada")
+    else:
+        print("OK: perfil ja existe")

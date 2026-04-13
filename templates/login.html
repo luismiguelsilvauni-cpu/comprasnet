@@ -70,8 +70,13 @@
 
 <div class="login-card">
     <div class="login-logo">
+        {% if cfg and cfg.empresa_logo_path %}
+        <img src="/uploads/{{ cfg.empresa_logo_path }}" alt="Logo"
+             style="max-height:80px;max-width:220px;object-fit:contain;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto">
+        {% else %}
         <div class="icon">📦</div>
-        <h1>ComprasNet</h1>
+        {% endif %}
+        <h1>{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'ComprasNet' }}</h1>
         <p>Gestão de Orçamentos e Compras</p>
     </div>
     

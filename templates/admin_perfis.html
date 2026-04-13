@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Perfis · Admin{% endblock %}
+{% block page_title %}Gestão de Perfis{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('admin_utilizadores') }}" class="btn btn-ghost btn-sm">← Utilizadores</a>
+  <button onclick="tog('formNovo')" class="btn btn-primary btn-sm">+ Novo Perfil</button>
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<!-- New perfil form -->
+<div id="formNovo" style="display:none;margin-bottom:20px">
+  <div class="card" style="padding:18px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px">Novo Perfil</div>
+    <form method="post" action="{{ url_for('admin_perfis_novo') }}">
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px">
+        <div class="form-group" style="margin:0"><label>Nome *</label><input type="text" name="nome" required class="input" placeholder="Ex: Logística, Técnico..."></div>
+        <div class="form-group" style="margin:0"><label>Descrição</label><input type="text" name="descricao" class="input" placeholder="Descrição do perfil"></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Menus acessíveis</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-bottom:12px">
+        {% for endpoint, label in menus %}
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:6px 8px;background:var(--surface2);border-radius:6px">
+          <input type="checkbox" name="menus" value="{{ endpoint }}">
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="tog('formNovo')" class="btn btn-ghost btn-sm">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Criar Perfil</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Perfis list -->
+{% if perfis %}
+{% for p in perfis %}
+<div class="card" style="padding:16px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+    <div style="font-size:14px;font-weight:700;flex:1">{{ p.nome }}</div>
+    {% if p.descricao %}<div style="font-size:12px;color:var(--text-muted)">{{ p.descricao }}</div>{% endif %}
+    <button onclick="tog('edit-{{ p.id }}')" class="btn btn-ghost btn-sm">✏️ Editar</button>
+    <form method="post" action="{{ url_for('admin_perfis_apagar', pid=p.id) }}" onsubmit="return confirm('Apagar perfil?')" style="display:inline">
+      <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+    </form>
+  </div>
+  <!-- Menus badges -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    {% set p_menus = p.get_menus() %}
+    {% for endpoint, label in menus %}
+    <span style="font-size:11px;padding:2px 8px;border-radius:4px;
+      {% if endpoint in p_menus %}background:rgba(59,110,240,.15);color:var(--accent){% else %}background:var(--surface2);color:var(--text-muted){% endif %}">
+      {{ label }}
+    </span>
+    {% endfor %}
+  </div>
+  <!-- Edit form -->
+  <div id="edit-{{ p.id }}" style="display:none;border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+    <form method="post" action="{{ url_for('admin_perfis_editar', pid=p.id) }}">
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0"><label>Nome</label><input type="text" name="nome" value="{{ p.nome }}" required class="input"></div>
+        <div class="form-group" style="margin:0"><label>Descrição</label><input type="text" name="descricao" value="{{ p.descricao or '' }}" class="input"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-bottom:10px">
+        {% for endpoint, label in menus %}
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:6px 8px;background:var(--surface2);border-radius:6px">
+          <input type="checkbox" name="menus" value="{{ endpoint }}" {% if endpoint in p_menus %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="tog('edit-{{ p.id }}')" class="btn btn-ghost btn-sm">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">
+  <div style="font-size:32px;margin-bottom:12px">👤</div>
+  <div style="font-weight:600;margin-bottom:6px">Sem perfis criados</div>
+  <div style="font-size:13px;margin-bottom:16px">Crie perfis para controlar o acesso aos menus.</div>
+  <button onclick="tog('formNovo')" class="btn btn-primary btn-sm">+ Criar primeiro perfil</button>
+</div>
+{% endif %}
+
+<script>
+function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
+</script>
+{% endblock %}
