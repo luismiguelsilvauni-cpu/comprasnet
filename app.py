@@ -2651,17 +2651,18 @@ class EquipamentoConsumivel(db.Model):
 # ── PERFIS E PERMISSÕES ──────────────────────────────────────────────────────
 
 MENUS_DISPONIVEIS = [
-    ('dashboard',     '🏠 Dashboard'),
-    ('pedidos',       '📋 Pedidos de Compra'),
-    ('reposicao',     '📦 Reposição'),
-    ('inventario',    '📊 Inventário'),
-    ('clientes',      '👥 Clientes'),
-    ('tecnico',       '🔧 Técnico'),
+    ('dashboard',          '🏠 Dashboard'),
+    ('pedidos',            '📋 Pedidos de Compra'),
+    ('reposicao',          '📦 Reposição'),
+    ('inventario',         '📊 Inventário'),
+    ('clientes',           '👥 Clientes'),
+    ('tecnico',            '🔧 Técnico'),
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
-    ('roadmap',       '🗺️ Roadmap'),
-    ('changelog',     '📝 Changelog'),
-    ('admin_config',  '⚙️ Configurações'),
-    ('admin_utilizadores', '👤 Utilizadores'),
+    ('funcionarios',       '👤 Funcionários'),
+    ('roadmap',            '🗺️ Roadmap'),
+    ('changelog',          '📝 Changelog'),
+    ('admin_config',       '⚙️ Configurações'),
+    ('admin_utilizadores', '👥 Utilizadores'),
 ]
 
 # ── MÓDULO FUNCIONÁRIOS ───────────────────────────────────────────────────────
@@ -5325,6 +5326,16 @@ def _rh_upload_docs(fid, files):
                     funcionario_id=fid, tipo=tipo,
                     titulo={'cc':'Cartão de Cidadão','passaporte':'Passaporte','morada':'Comprovativo de Morada'}[tipo],
                     pdf_filename=f.filename, pdf_path=safe))
+
+
+@app.route('/admin/perfis/sync-menus', methods=['POST'])
+@login_required
+def admin_perfis_sync_menus():
+    """Show all available menus — doesn't change permissions, just refreshes the list."""
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    flash('Lista de menus actualizada. Edite cada perfil para atribuir os novos menus.', 'success')
+    return redirect(url_for('admin_perfis'))
 
 
 def init_db():

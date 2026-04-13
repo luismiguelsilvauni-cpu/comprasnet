@@ -3,9 +3,15 @@
 {% block page_title %}Gestão de Perfis{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('admin_utilizadores') }}" class="btn btn-ghost btn-sm">← Utilizadores</a>
+  <form method="post" action="{{ url_for('admin_perfis_sync_menus') }}" style="display:inline">
+    <button type="submit" class="btn btn-ghost btn-sm">🔄 Actualizar Lista de Menus</button>
+  </form>
   <button onclick="tog('formNovo')" class="btn btn-primary btn-sm">+ Novo Perfil</button>
 {% endblock %}
 {% block content %}
+<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+  {{ menus|length }} menus disponíveis para atribuição. Se adicionou novos menus ao sistema, clique em 🔄 Actualizar Lista de Menus e edite cada perfil.
+</div>
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}{% for cat,msg in messages %}
     <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
