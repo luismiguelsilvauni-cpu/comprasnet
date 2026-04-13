@@ -162,3 +162,10 @@ with app.app_context():
         print("OK: tabela perfil criada")
     else:
         print("OK: perfil ja existe")
+
+    # Create registo_pendente table
+    if 'registo_pendente' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela registo_pendente criada")
+    else:
+        print("OK: registo_pendente ja existe")

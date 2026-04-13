@@ -306,8 +306,13 @@
         {% if current_user.is_admin %}
         <div class="nav-section" style="margin-top:12px">
             <div class="nav-label">Admin</div>
-            <a href="{{ url_for('admin_utilizadores') }}" class="nav-item {% if request.endpoint in ['admin_utilizadores','admin_perfis'] %}active{% endif %}">
+            <a href="{{ url_for('admin_utilizadores') }}" class="nav-item {% if request.endpoint in ['admin_utilizadores','admin_perfis','admin_registos_pendentes'] %}active{% endif %}">
                 <span class="icon">👥</span><span>Utilizadores</span>
+            </a>
+            <a href="{{ url_for('admin_registos_pendentes') }}" class="nav-item {% if request.endpoint == 'admin_registos_pendentes' %}active{% endif %}">
+                <span class="icon">📝</span><span>Registos Pendentes
+                <span id="badgeRegistos" style="margin-left:6px;background:var(--danger);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;display:none"></span>
+                </span>
             </a>
             <a href="{{ url_for('admin_phc') }}" class="nav-item {% if request.endpoint == 'admin_phc' %}active{% endif %}">
                 <span class="icon">🔗</span><span>Integração PHC</span>
@@ -495,5 +500,15 @@ function showLoading(icon, title, steps) {
 })();
 </script>
 
+<script>
+{% if current_user.is_authenticated and current_user.is_admin %}
+fetch('/api/admin/registos-count').then(r=>r.json()).then(d=>{
+  if(d.count>0){
+    var b=document.getElementById('badgeRegistos');
+    if(b){b.textContent=d.count;b.style.display='inline';}
+  }
+}).catch(()=>{});
+{% endif %}
+</script>
 </body>
 </html>

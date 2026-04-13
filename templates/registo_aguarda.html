@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Aguarda Aprovação · NavTech</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0d14;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#111827;border:1px solid #1f2937;border-radius:16px;padding:40px;width:100%;max-width:420px;text-align:center}
+.icon{font-size:56px;margin-bottom:20px}
+h1{font-size:20px;font-weight:700;margin-bottom:10px}
+p{font-size:14px;color:#94a3b8;line-height:1.6;margin-bottom:8px}
+.link{margin-top:24px;font-size:13px}
+.link a{color:#3b6ef0;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">⏳</div>
+  <h1>Pedido Enviado!</h1>
+  <p>O seu pedido de registo foi submetido com sucesso.</p>
+  <p>Aguarde a aprovação do administrador.<br>Receberá um email quando o acesso for concedido.</p>
+  <div class="link"><a href="{{ url_for('login') }}">← Voltar ao Login</a></div>
+</div>
+</body>
+</html>

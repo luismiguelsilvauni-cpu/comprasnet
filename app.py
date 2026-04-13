@@ -2652,6 +2652,17 @@ MENUS_DISPONIVEIS = [
     ('admin_utilizadores', '👤 Utilizadores'),
 ]
 
+class RegistoPendente(db.Model):
+    __tablename__ = 'registo_pendente'
+    id            = db.Column(db.Integer, primary_key=True)
+    nome          = db.Column(db.String(120), nullable=False)
+    username      = db.Column(db.String(80), nullable=False)
+    email         = db.Column(db.String(200), nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    criado_em     = db.Column(db.DateTime, default=datetime.now)
+    estado        = db.Column(db.String(20), default='pendente')  # pendente/aceite/recusado
+
+
 class Perfil(db.Model):
     __tablename__ = 'perfil'
     id        = db.Column(db.Integer, primary_key=True)
@@ -4678,6 +4689,153 @@ def get_user_perfil_id(user):
         return meta.get('perfil_id')
     except:
         return None
+
+
+# ── REGISTO DE UTILIZADORES ───────────────────────────────────────────────────
+
+@app.route('/registo', methods=['GET', 'POST'])
+def registo():
+    if request.method == 'POST':
+        nome     = request.form.get('nome','').strip()
+        username = request.form.get('username','').strip()
+        email    = request.form.get('email','').strip()
+        password = request.form.get('password','')
+
+        if not all([nome, username, email, password]):
+            flash('Preencha todos os campos.', 'error')
+            return redirect(url_for('registo'))
+
+        if User.query.filter_by(username=username).first():
+            flash('Username já existe.', 'error')
+            return redirect(url_for('registo'))
+
+        if RegistoPendente.query.filter_by(username=username, estado='pendente').first():
+            flash('Já existe um pedido de registo pendente para este username.', 'error')
+            return redirect(url_for('registo'))
+
+        r = RegistoPendente(
+            nome=nome, username=username, email=email,
+            password_hash=generate_password_hash(password)
+        )
+        db.session.add(r)
+        db.session.commit()
+
+        # Notify admins by email if SMTP configured
+        try:
+            _notificar_admins_registo(nome, username, email)
+        except Exception as ex:
+            app.logger.warning(f"Email notify error: {ex}")
+
+        return redirect(url_for('registo_aguarda'))
+    return render_template('registo.html', cfg=ConfigGeral.query.first())
+
+@app.route('/registo/aguarda')
+def registo_aguarda():
+    return render_template('registo_aguarda.html', cfg=ConfigGeral.query.first())
+
+@app.route('/admin/registos-pendentes')
+@login_required
+def admin_registos_pendentes():
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    pendentes = RegistoPendente.query.filter_by(estado='pendente').order_by(RegistoPendente.criado_em).all()
+    return render_template('admin_registos.html', pendentes=pendentes)
+
+@app.route('/admin/registos/<int:rid>/aceitar', methods=['POST'])
+@login_required
+def admin_registo_aceitar(rid):
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    r = RegistoPendente.query.get_or_404(rid)
+    if User.query.filter_by(username=r.username).first():
+        flash('Username já existe.', 'error')
+        return redirect(url_for('admin_registos_pendentes'))
+    u = User(nome=r.nome, username=r.username,
+              password_hash=r.password_hash, is_admin=False)
+    db.session.add(u)
+    r.estado = 'aceite'
+    db.session.commit()
+    try:
+        _enviar_email_aprovacao(r.email, r.nome, r.username)
+    except Exception as ex:
+        app.logger.warning(f"Email aprovacao error: {ex}")
+    flash(f'Utilizador {r.nome} aprovado.', 'success')
+    return redirect(url_for('admin_registos_pendentes'))
+
+@app.route('/admin/registos/<int:rid>/recusar', methods=['POST'])
+@login_required
+def admin_registo_recusar(rid):
+    if not current_user.is_admin:
+        return redirect(url_for('dashboard'))
+    r = RegistoPendente.query.get_or_404(rid)
+    r.estado = 'recusado'
+    db.session.commit()
+    flash(f'Pedido de {r.nome} recusado.', 'info')
+    return redirect(url_for('admin_registos_pendentes'))
+
+def _notificar_admins_registo(nome, username, email):
+    """Send email to all admins about new registration request."""
+    admins = User.query.filter_by(is_admin=True).all()
+    cfg = ConfigGeral.query.first()
+    smtp_host = getattr(cfg, 'smtp_host', None) if cfg else None
+    if not smtp_host:
+        return
+    import smtplib
+    from email.mime.text import MIMEText
+    msg = MIMEText(f"""
+Novo pedido de registo na plataforma:
+
+Nome: {nome}
+Username: {username}
+Email: {email}
+
+Aceda ao menu Admin → Registos Pendentes para aprovar ou recusar.
+""")
+    msg['Subject'] = f'[NavTech] Novo pedido de registo: {nome}'
+    msg['From'] = getattr(cfg, 'smtp_from', 'noreply@navtech.pt')
+    msg['To'] = ', '.join([a.username for a in admins if '@' in (a.username or '')])
+    if not msg['To']:
+        return
+    with smtplib.SMTP(smtp_host, getattr(cfg, 'smtp_port', 587)) as s:
+        s.starttls()
+        if getattr(cfg, 'smtp_user', None):
+            s.login(cfg.smtp_user, cfg.smtp_pass or '')
+        s.send_message(msg)
+
+def _enviar_email_aprovacao(email, nome, username):
+    """Send approval email to new user."""
+    cfg = ConfigGeral.query.first()
+    smtp_host = getattr(cfg, 'smtp_host', None) if cfg else None
+    if not smtp_host or not email:
+        return
+    import smtplib
+    from email.mime.text import MIMEText
+    empresa = getattr(cfg, 'empresa_nome', 'NavTech') if cfg else 'NavTech'
+    msg = MIMEText(f"""
+Olá {nome},
+
+O seu registo na plataforma {empresa} foi aprovado.
+
+Pode agora aceder com o username: {username}
+
+Bem-vindo(a)!
+""")
+    msg['Subject'] = f'[{empresa}] Acesso aprovado'
+    msg['From'] = getattr(cfg, 'smtp_from', 'noreply@navtech.pt')
+    msg['To'] = email
+    with smtplib.SMTP(smtp_host, getattr(cfg, 'smtp_port', 587)) as s:
+        s.starttls()
+        if getattr(cfg, 'smtp_user', None):
+            s.login(cfg.smtp_user, cfg.smtp_pass or '')
+        s.send_message(msg)
+
+
+@app.route('/api/admin/registos-count')
+@login_required
+def api_admin_registos_count():
+    if not current_user.is_admin:
+        return jsonify({'count': 0})
+    return jsonify({'count': RegistoPendente.query.filter_by(estado='pendente').count()})
 
 
 def init_db():

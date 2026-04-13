@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Registos Pendentes · Admin{% endblock %}
+{% block page_title %}Pedidos de Registo Pendentes{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('admin_utilizadores') }}" class="btn btn-ghost btn-sm">← Utilizadores</a>
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+{% if pendentes %}
+<div class="card" style="padding:0">
+  <table class="table" style="font-size:13px">
+    <thead><tr>
+      <th>Nome</th><th>Username</th><th>Email</th><th>Data Pedido</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for r in pendentes %}
+    <tr>
+      <td style="font-weight:600">{{ r.nome }}</td>
+      <td class="mono">{{ r.username }}</td>
+      <td style="color:var(--text-muted)">{{ r.email }}</td>
+      <td style="font-size:11px;color:var(--text-muted)">{{ r.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td style="text-align:right">
+        <form method="post" action="{{ url_for('admin_registo_aceitar', rid=r.id) }}" style="display:inline">
+          <button type="submit" class="btn btn-primary btn-sm">✅ Aceitar</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_registo_recusar', rid=r.id) }}" onsubmit="return confirm('Recusar?')" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕ Recusar</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">
+  <div style="font-size:32px;margin-bottom:12px">✅</div>
+  <div style="font-weight:600">Sem pedidos pendentes</div>
+</div>
+{% endif %}
+{% endblock %}

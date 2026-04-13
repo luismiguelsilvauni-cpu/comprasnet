@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Registo · NavTech</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0d14;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#111827;border:1px solid #1f2937;border-radius:16px;padding:36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.logo-area{text-align:center;margin-bottom:28px}
+.logo-area img{max-height:70px;max-width:200px;object-fit:contain;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto}
+.logo-area h1{font-size:20px;font-weight:700;color:#f1f5f9}
+.logo-area .sub{font-size:12px;color:#64748b;margin-top:4px}
+.logo-area .by{font-size:11px;color:#475569;text-align:right;margin-top:4px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.form-group input{width:100%;padding:10px 14px;background:#1f2937;border:1px solid #374151;border-radius:8px;color:#f1f5f9;font-size:14px;outline:none;transition:border-color .2s}
+.form-group input:focus{border-color:#3b6ef0}
+.btn{width:100%;padding:12px;background:#3b6ef0;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px;transition:background .2s}
+.btn:hover{background:#2d5dd4}
+.link{text-align:center;margin-top:16px;font-size:13px;color:#64748b}
+.link a{color:#3b6ef0;text-decoration:none}
+.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-area">
+    {% if cfg and cfg.empresa_logo_path %}
+    <img src="/uploads/{{ cfg.empresa_logo_path }}" alt="Logo">
+    {% endif %}
+    <h1>{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }}</h1>
+    <div class="sub">Gestão Integrada Técnica, Logística e Financeira</div>
+    <div class="by">by UCN</div>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat,msg in messages %}<div class="error">{{ msg }}</div>{% endfor %}
+  {% endwith %}
+  <form method="post">
+    <div class="form-group"><label>Nome Completo</label><input type="text" name="nome" required autofocus placeholder="Ex: João Silva"></div>
+    <div class="form-group"><label>Username</label><input type="text" name="username" required placeholder="Ex: jsilva"></div>
+    <div class="form-group"><label>Email</label><input type="email" name="email" required placeholder="email@empresa.pt"></div>
+    <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="Mínimo 6 caracteres"></div>
+    <button type="submit" class="btn">Pedir Registo</button>
+  </form>
+  <div class="link"><a href="{{ url_for('login') }}">← Voltar ao Login</a></div>
+</div>
+</body>
+</html>
