@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Funcionários{% endblock %}
+{% block page_title %}Funcionários{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('funcionarios_exportar_excel') }}" class="btn btn-ghost btn-sm">⬇ Excel</a>
+  <a href="{{ url_for('funcionario_novo') }}" class="btn btn-primary btn-sm">+ Novo</a>
+{% endblock %}
+{% block content %}
+<style>
+.badge-ativo{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;cursor:pointer;border:none}
+.badge-sim{background:rgba(34,197,94,.15);color:#22c55e}
+.badge-nao{background:rgba(239,68,68,.15);color:#ef4444}
+</style>
+<!-- Filters -->
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;flex:1">
+    <input type="text" name="q" value="{{ q }}" placeholder="🔍 Nome ou Nº funcionário"
+      style="flex:1;min-width:180px;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
+    <select name="filtro" onchange="this.form.submit()"
+      style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
+      <option value="todos" {% if filtro=='todos' %}selected{% endif %}>Todos</option>
+      <option value="ativo" {% if filtro=='ativo' %}selected{% endif %}>✅ Activos</option>
+      <option value="inativo" {% if filtro=='inativo' %}selected{% endif %}>🔴 Inactivos</option>
+    </select>
+    <select name="categoria" onchange="this.form.submit()"
+      style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
+      <option value="">Todas as categorias</option>
+      {% for c in categorias %}
+      <option value="{{ c }}" {% if categoria==c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-ghost btn-sm">Pesquisar</button>
+    {% if q or filtro!='todos' or categoria %}
+    <a href="{{ url_for('funcionarios') }}" class="btn btn-ghost btn-sm">Limpar</a>
+    {% endif %}
+  </form>
+  <span style="font-size:12px;color:var(--text-muted)">{{ total }} funcionário(s)</span>
+</div>
+
+{% if funcionarios %}
+<div class="card" style="padding:0;overflow-x:auto">
+  <table class="table" style="font-size:13px">
+    <thead><tr>
+      <th>Estado</th><th>Nº</th><th>Nome</th><th>Categoria</th>
+      <th>Data Nasc.</th><th>Idade</th><th>NIF</th><th>Telemóvel</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for f in funcionarios %}
+    <tr>
+      <td>
+        <button onclick="toggleAtivo({{ f.id }},this)" class="badge-ativo {{ 'badge-sim' if f.ativo else 'badge-nao' }}"
+          data-ativo="{{ f.ativo|lower }}">
+          {{ '✅ Activo' if f.ativo else '🔴 Inactivo' }}
+        </button>
+      </td>
+      <td class="mono" style="font-weight:700;color:var(--accent)">{{ f.numero }}</td>
+      <td style="font-weight:600"><a href="{{ url_for('funcionario_detalhe', fid=f.id) }}" style="color:var(--text)">{{ f.nome }}</a></td>
+      <td style="color:var(--text-muted)">{{ f.categoria or '—' }}</td>
+      <td style="font-size:12px">{{ f.data_nascimento.strftime('%d/%m/%Y') if f.data_nascimento else '—' }}</td>
+      <td>{{ f.idade or '—' }}</td>
+      <td class="mono" style="font-size:12px">{{ f.nif or '—' }}</td>
+      <td style="font-size:12px">{{ f.telemovel or '—' }}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <a href="{{ url_for('funcionario_detalhe', fid=f.id) }}" class="btn btn-ghost btn-sm">Ver</a>
+        <a href="{{ url_for('funcionario_editar', fid=f.id) }}" class="btn btn-ghost btn-sm">✏️</a>
+        <form method="post" action="{{ url_for('funcionario_apagar', fid=f.id) }}" onsubmit="return confirm('Eliminar?')" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if pages > 1 %}
+<div style="display:flex;gap:6px;justify-content:center;margin-top:12px">
+  {% for p in range(1, pages+1) %}
+  <a href="{{ url_for('funcionarios', q=q, filtro=filtro, categoria=categoria, page=p) }}"
+    style="padding:4px 10px;border-radius:6px;font-size:13px;text-decoration:none;
+    {% if p==page %}background:var(--accent);color:#fff{% else %}background:var(--surface);color:var(--text);border:1px solid var(--border){% endif %}">{{ p }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:40px;margin-bottom:12px">👥</div>
+  <div style="font-weight:600;margin-bottom:8px">Sem funcionários</div>
+  <a href="{{ url_for('funcionario_novo') }}" class="btn btn-primary btn-sm">+ Adicionar primeiro funcionário</a>
+</div>
+{% endif %}
+
+<script>
+function toggleAtivo(fid, btn) {
+  fetch('/funcionarios/'+fid+'/toggle-ativo', {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      btn.dataset.ativo = d.ativo ? 'true' : 'false';
+      btn.className = 'badge-ativo ' + (d.ativo ? 'badge-sim' : 'badge-nao');
+      btn.textContent = d.ativo ? '✅ Activo' : '🔴 Inactivo';
+    });
+}
+</script>
+{% endblock %}

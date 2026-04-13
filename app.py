@@ -2664,6 +2664,69 @@ MENUS_DISPONIVEIS = [
     ('admin_utilizadores', '👤 Utilizadores'),
 ]
 
+# ── MÓDULO FUNCIONÁRIOS ───────────────────────────────────────────────────────
+
+UPLOAD_RH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'rh')
+os.makedirs(UPLOAD_RH, exist_ok=True)
+
+class Funcionario(db.Model):
+    __tablename__ = 'funcionario'
+    id                  = db.Column(db.Integer, primary_key=True)
+    numero              = db.Column(db.String(20), unique=True, nullable=False)
+    nome                = db.Column(db.String(200), nullable=False)
+    categoria           = db.Column(db.String(100))
+    ativo               = db.Column(db.Boolean, default=True)
+    data_nascimento     = db.Column(db.Date)
+    morada              = db.Column(db.Text)
+    nif                 = db.Column(db.String(20))
+    num_cc              = db.Column(db.String(50))
+    num_passaporte      = db.Column(db.String(50))
+    agregado_familiar   = db.Column(db.Integer, default=0)
+    telemovel           = db.Column(db.String(30))
+    email               = db.Column(db.String(200))
+    contacto_emergencia = db.Column(db.String(200))
+    nome_emergencia     = db.Column(db.String(200))
+    iban                = db.Column(db.String(50))
+    num_seg_social      = db.Column(db.String(30))
+    seguro_companhia    = db.Column(db.String(200))
+    seguro_apolice      = db.Column(db.String(100))
+    notas               = db.Column(db.Text)
+    criado_em           = db.Column(db.DateTime, default=datetime.now)
+    atualizado_em       = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    documentos          = db.relationship('FuncionarioDocumento', backref='funcionario', lazy=True, cascade='all, delete-orphan')
+    formacoes           = db.relationship('FuncionarioFormacao', backref='funcionario', lazy=True, cascade='all, delete-orphan')
+
+    @property
+    def idade(self):
+        if not self.data_nascimento: return None
+        today = datetime.now().date()
+        d = self.data_nascimento
+        return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+
+class FuncionarioDocumento(db.Model):
+    __tablename__ = 'funcionario_documento'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    tipo            = db.Column(db.String(100), nullable=False)  # cc, passaporte, morada, higiene, aptidao, outro
+    titulo          = db.Column(db.String(300), nullable=False)
+    pdf_filename    = db.Column(db.String(500))
+    pdf_path        = db.Column(db.String(1000))
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
+
+class FuncionarioFormacao(db.Model):
+    __tablename__ = 'funcionario_formacao'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    titulo          = db.Column(db.String(300), nullable=False)
+    entidade        = db.Column(db.String(200))
+    data_inicio     = db.Column(db.Date)
+    data_fim        = db.Column(db.Date)
+    horas           = db.Column(db.Integer)
+    pdf_filename    = db.Column(db.String(500))
+    pdf_path        = db.Column(db.String(1000))
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
+
+
 class RegistoPendente(db.Model):
     __tablename__ = 'registo_pendente'
     id            = db.Column(db.Integer, primary_key=True)
@@ -5005,6 +5068,263 @@ def admin_editar_email(uid):
     db.session.commit()
     flash(f'Email de {u.nome} actualizado.', 'success')
     return redirect(url_for('admin_utilizadores'))
+
+
+# ── FUNCIONÁRIOS ROUTES ───────────────────────────────────────────────────────
+
+@app.route('/funcionarios')
+@login_required
+def funcionarios():
+    q      = request.args.get('q','').strip()
+    filtro = request.args.get('filtro','todos')
+    cat    = request.args.get('categoria','')
+    page   = int(request.args.get('page', 1))
+    per    = 20
+
+    query = Funcionario.query
+    if q:
+        query = query.filter(db.or_(
+            Funcionario.nome.ilike(f'%{q}%'),
+            Funcionario.numero.ilike(f'%{q}%'),
+        ))
+    if filtro == 'ativo':   query = query.filter_by(ativo=True)
+    if filtro == 'inativo': query = query.filter_by(ativo=False)
+    if cat: query = query.filter_by(categoria=cat)
+
+    total = query.count()
+    items = query.order_by(Funcionario.numero).offset((page-1)*per).limit(per).all()
+    categorias = [r[0] for r in db.session.query(Funcionario.categoria).distinct() if r[0]]
+
+    return render_template('funcionarios.html',
+        funcionarios=items, total=total, page=page, per=per,
+        q=q, filtro=filtro, categoria=cat, categorias=categorias,
+        pages=((total-1)//per+1) if total else 1)
+
+@app.route('/funcionarios/novo', methods=['GET','POST'])
+@login_required
+def funcionario_novo():
+    if request.method == 'POST':
+        from datetime import date
+        def d(f): return request.form.get(f,'').strip() or None
+        def di(f):
+            v = d(f)
+            try: return date.fromisoformat(v) if v else None
+            except: return None
+
+        # Auto-generate numero if empty
+        num = d('numero')
+        if not num:
+            last = Funcionario.query.order_by(Funcionario.id.desc()).first()
+            num = str((int(last.numero) + 1) if last and last.numero.isdigit() else 1).zfill(4)
+
+        f = Funcionario(
+            numero=num, nome=d('nome'), categoria=d('categoria'),
+            ativo=request.form.get('ativo')=='1',
+            data_nascimento=di('data_nascimento'),
+            morada=d('morada'), nif=d('nif'),
+            num_cc=d('num_cc'), num_passaporte=d('num_passaporte'),
+            agregado_familiar=int(request.form.get('agregado_familiar',0) or 0),
+            telemovel=d('telemovel'), email=d('email'),
+            contacto_emergencia=d('contacto_emergencia'),
+            nome_emergencia=d('nome_emergencia'),
+            iban=d('iban'), num_seg_social=d('num_seg_social'),
+            seguro_companhia=d('seguro_companhia'),
+            seguro_apolice=d('seguro_apolice'), notas=d('notas'),
+        )
+        db.session.add(f)
+        db.session.flush()
+        _rh_upload_docs(f.id, request.files)
+        db.session.commit()
+        flash(f'Funcionário {f.nome} criado.', 'success')
+        return redirect(url_for('funcionario_detalhe', fid=f.id))
+    return render_template('funcionario_form.html', f=None)
+
+@app.route('/funcionarios/<int:fid>')
+@login_required
+def funcionario_detalhe(fid):
+    f = Funcionario.query.get_or_404(fid)
+    return render_template('funcionario_detalhe.html', f=f)
+
+@app.route('/funcionarios/<int:fid>/editar', methods=['GET','POST'])
+@login_required
+def funcionario_editar(fid):
+    func = Funcionario.query.get_or_404(fid)
+    if request.method == 'POST':
+        from datetime import date
+        def d(field): return request.form.get(field,'').strip() or None
+        def di(field):
+            v = d(field)
+            try: return date.fromisoformat(v) if v else None
+            except: return None
+        func.nome=d('nome'); func.categoria=d('categoria')
+        func.ativo=request.form.get('ativo')=='1'
+        func.data_nascimento=di('data_nascimento')
+        func.morada=d('morada'); func.nif=d('nif')
+        func.num_cc=d('num_cc'); func.num_passaporte=d('num_passaporte')
+        func.agregado_familiar=int(request.form.get('agregado_familiar',0) or 0)
+        func.telemovel=d('telemovel'); func.email=d('email')
+        func.contacto_emergencia=d('contacto_emergencia')
+        func.nome_emergencia=d('nome_emergencia')
+        func.iban=d('iban'); func.num_seg_social=d('num_seg_social')
+        func.seguro_companhia=d('seguro_companhia')
+        func.seguro_apolice=d('seguro_apolice'); func.notas=d('notas')
+        _rh_upload_docs(fid, request.files)
+        db.session.commit()
+        flash('Dados actualizados.', 'success')
+        return redirect(url_for('funcionario_detalhe', fid=fid))
+    return render_template('funcionario_form.html', f=func)
+
+@app.route('/funcionarios/<int:fid>/apagar', methods=['POST'])
+@login_required
+def funcionario_apagar(fid):
+    f = Funcionario.query.get_or_404(fid)
+    db.session.delete(f)
+    db.session.commit()
+    flash('Funcionário eliminado.', 'info')
+    return redirect(url_for('funcionarios'))
+
+@app.route('/funcionarios/<int:fid>/toggle-ativo', methods=['POST'])
+@login_required
+def funcionario_toggle_ativo(fid):
+    f = Funcionario.query.get_or_404(fid)
+    f.ativo = not f.ativo
+    db.session.commit()
+    return jsonify({'ok': True, 'ativo': f.ativo})
+
+@app.route('/funcionarios/<int:fid>/doc/upload', methods=['POST'])
+@login_required
+def funcionario_doc_upload(fid):
+    Funcionario.query.get_or_404(fid)
+    file = request.files.get('file')
+    tipo = request.form.get('tipo','outro')
+    titulo = request.form.get('titulo','').strip()
+    if not file or not titulo:
+        flash('Título e ficheiro obrigatórios.', 'error')
+        return redirect(url_for('funcionario_detalhe', fid=fid))
+    safe = f"rh_{fid}_{tipo}_{file.filename.replace(' ','_')}"
+    file.save(os.path.join(UPLOAD_RH, safe))
+    db.session.add(FuncionarioDocumento(
+        funcionario_id=fid, tipo=tipo, titulo=titulo,
+        pdf_filename=file.filename, pdf_path=safe))
+    db.session.commit()
+    flash('Documento adicionado.', 'success')
+    return redirect(url_for('funcionario_detalhe', fid=fid))
+
+@app.route('/funcionarios/doc/<int:did>/ver')
+@login_required
+def funcionario_doc_ver(did):
+    d = FuncionarioDocumento.query.get_or_404(did)
+    return send_from_directory(UPLOAD_RH, d.pdf_path, as_attachment=False, download_name=d.pdf_filename)
+
+@app.route('/funcionarios/doc/<int:did>/download')
+@login_required
+def funcionario_doc_download(did):
+    d = FuncionarioDocumento.query.get_or_404(did)
+    return send_from_directory(UPLOAD_RH, d.pdf_path, as_attachment=True, download_name=d.pdf_filename)
+
+@app.route('/funcionarios/doc/<int:did>/apagar', methods=['POST'])
+@login_required
+def funcionario_doc_apagar(did):
+    d = FuncionarioDocumento.query.get_or_404(did)
+    fid = d.funcionario_id
+    try:
+        p = os.path.join(UPLOAD_RH, d.pdf_path)
+        if os.path.exists(p): os.remove(p)
+    except: pass
+    db.session.delete(d)
+    db.session.commit()
+    return redirect(url_for('funcionario_detalhe', fid=fid))
+
+@app.route('/funcionarios/<int:fid>/formacao/adicionar', methods=['POST'])
+@login_required
+def funcionario_formacao_add(fid):
+    Funcionario.query.get_or_404(fid)
+    from datetime import date
+    def d(f): return request.form.get(f,'').strip() or None
+    def di(f):
+        v = d(f)
+        try: return date.fromisoformat(v) if v else None
+        except: return None
+    fm = FuncionarioFormacao(
+        funcionario_id=fid, titulo=d('titulo'), entidade=d('entidade'),
+        data_inicio=di('data_inicio'), data_fim=di('data_fim'),
+        horas=int(d('horas') or 0) if d('horas') else None)
+    db.session.add(fm)
+    db.session.flush()
+    cert = request.files.get('certificado')
+    if cert and cert.filename:
+        safe = f"rh_{fid}_form_{fm.id}_{cert.filename.replace(' ','_')}"
+        cert.save(os.path.join(UPLOAD_RH, safe))
+        fm.pdf_filename = cert.filename
+        fm.pdf_path = safe
+    db.session.commit()
+    flash('Formação adicionada.', 'success')
+    return redirect(url_for('funcionario_detalhe', fid=fid))
+
+@app.route('/funcionarios/formacao/<int:fmid>/apagar', methods=['POST'])
+@login_required
+def funcionario_formacao_apagar(fmid):
+    fm = FuncionarioFormacao.query.get_or_404(fmid)
+    fid = fm.funcionario_id
+    try:
+        if fm.pdf_path:
+            p = os.path.join(UPLOAD_RH, fm.pdf_path)
+            if os.path.exists(p): os.remove(p)
+    except: pass
+    db.session.delete(fm)
+    db.session.commit()
+    return redirect(url_for('funcionario_detalhe', fid=fid))
+
+@app.route('/funcionarios/formacao/<int:fmid>/certificado')
+@login_required
+def funcionario_formacao_cert(fmid):
+    fm = FuncionarioFormacao.query.get_or_404(fmid)
+    return send_from_directory(UPLOAD_RH, fm.pdf_path, as_attachment=False, download_name=fm.pdf_filename)
+
+@app.route('/funcionarios/exportar-excel')
+@login_required
+def funcionarios_exportar_excel():
+    import openpyxl
+    from io import BytesIO
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Funcionários'
+    headers = ['Nº','Nome','Categoria','Ativo','Data Nasc.','Idade','NIF','Nº CC','Nº Passaporte',
+               'Agregado Familiar','Telemóvel','Email','NIF','IBAN','Nº Seg. Social',
+               'Seguro Companhia','Seguro Apólice','Morada']
+    ws.append(headers)
+    for f in Funcionario.query.order_by(Funcionario.numero).all():
+        ws.append([f.numero, f.nome, f.categoria or '',
+                   'Sim' if f.ativo else 'Não',
+                   f.data_nascimento.strftime('%d/%m/%Y') if f.data_nascimento else '',
+                   f.idade or '', f.nif or '', f.num_cc or '',
+                   f.num_passaporte or '', f.agregado_familiar or 0,
+                   f.telemovel or '', f.email or '', f.nif or '',
+                   f.iban or '', f.num_seg_social or '',
+                   f.seguro_companhia or '', f.seguro_apolice or '',
+                   f.morada or ''])
+    buf = BytesIO()
+    wb.save(buf); buf.seek(0)
+    from flask import send_file
+    return send_file(buf, as_attachment=True, download_name='funcionarios.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+def _rh_upload_docs(fid, files):
+    """Upload inline document files (cc, passaporte, morada) from form."""
+    for tipo in ['cc','passaporte','morada']:
+        f = files.get(f'doc_{tipo}')
+        if f and f.filename:
+            safe = f"rh_{fid}_{tipo}_{f.filename.replace(' ','_')}"
+            f.save(os.path.join(UPLOAD_RH, safe))
+            # Replace existing doc of same type
+            existing = FuncionarioDocumento.query.filter_by(funcionario_id=fid, tipo=tipo).first()
+            if existing:
+                existing.pdf_filename = f.filename; existing.pdf_path = safe
+            else:
+                db.session.add(FuncionarioDocumento(
+                    funcionario_id=fid, tipo=tipo,
+                    titulo={'cc':'Cartão de Cidadão','passaporte':'Passaporte','morada':'Comprovativo de Morada'}[tipo],
+                    pdf_filename=f.filename, pdf_path=safe))
 
 
 def init_db():

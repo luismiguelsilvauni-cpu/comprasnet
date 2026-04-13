@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if f else 'Novo' }} Funcionário{% endblock %}
+{% block page_title %}{{ 'Editar' if f else 'Novo' }} Funcionário{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('funcionarios') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+{% endblock %}
+{% block content %}
+<form method="post" enctype="multipart/form-data">
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+<div>
+
+<!-- Identificação -->
+<div class="card" style="padding:16px;margin-bottom:14px">
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">👤 Identificação</div>
+  <div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:10px;margin-bottom:10px">
+    <div class="form-group" style="margin:0"><label>Nº Funcionário</label><input type="text" name="numero" value="{{ f.numero if f else '' }}" class="input" placeholder="Auto"></div>
+    <div class="form-group" style="margin:0"><label>Nome *</label><input type="text" name="nome" required value="{{ f.nome if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Categoria</label><input type="text" name="categoria" value="{{ f.categoria if f else '' }}" class="input" placeholder="Ex: Técnico, Operador..."></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 80px;gap:10px">
+    <div class="form-group" style="margin:0"><label>Data Nascimento</label><input type="date" name="data_nascimento" value="{{ f.data_nascimento.isoformat() if f and f.data_nascimento else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>NIF</label><input type="text" name="nif" value="{{ f.nif if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Nº CC / BI</label><input type="text" name="num_cc" value="{{ f.num_cc if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Agregado</label><input type="number" name="agregado_familiar" value="{{ f.agregado_familiar if f else 0 }}" min="0" class="input"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+    <div class="form-group" style="margin:0"><label>Nº Passaporte</label><input type="text" name="num_passaporte" value="{{ f.num_passaporte if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Estado</label>
+      <select name="ativo" class="input">
+        <option value="1" {% if not f or f.ativo %}selected{% endif %}>✅ Activo</option>
+        <option value="0" {% if f and not f.ativo %}selected{% endif %}>🔴 Inactivo</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Contacto -->
+<div class="card" style="padding:16px;margin-bottom:14px">
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">📞 Contacto</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="form-group" style="margin:0"><label>Telemóvel</label><input type="text" name="telemovel" value="{{ f.telemovel if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Email</label><input type="email" name="email" value="{{ f.email if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Contacto de Emergência</label><input type="text" name="contacto_emergencia" value="{{ f.contacto_emergencia if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Nome Contacto Emergência</label><input type="text" name="nome_emergencia" value="{{ f.nome_emergencia if f else '' }}" class="input"></div>
+  </div>
+  <div class="form-group" style="margin:10px 0 0"><label>Morada</label><textarea name="morada" class="input" rows="2">{{ f.morada if f else '' }}</textarea></div>
+</div>
+
+<!-- Documentos inline upload -->
+<div class="card" style="padding:16px;margin-bottom:14px">
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">📎 Documentos de Identificação</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+    <div class="form-group" style="margin:0"><label>CC / BI (PDF)</label><input type="file" name="doc_cc" accept=".pdf" class="input" style="font-size:11px">
+      {% if f %}{%set d=f.documentos|selectattr('tipo','equalto','cc')|first%}{% if d %}<div style="font-size:10px;color:var(--accent);margin-top:4px">✅ {{ d.pdf_filename }}</div>{% endif %}{% endif %}
+    </div>
+    <div class="form-group" style="margin:0"><label>Passaporte (PDF)</label><input type="file" name="doc_passaporte" accept=".pdf" class="input" style="font-size:11px">
+      {% if f %}{%set d=f.documentos|selectattr('tipo','equalto','passaporte')|first%}{% if d %}<div style="font-size:10px;color:var(--accent);margin-top:4px">✅ {{ d.pdf_filename }}</div>{% endif %}{% endif %}
+    </div>
+    <div class="form-group" style="margin:0"><label>Comprov. Morada (PDF)</label><input type="file" name="doc_morada" accept=".pdf" class="input" style="font-size:11px">
+      {% if f %}{%set d=f.documentos|selectattr('tipo','equalto','morada')|first%}{% if d %}<div style="font-size:10px;color:var(--accent);margin-top:4px">✅ {{ d.pdf_filename }}</div>{% endif %}{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="form-group"><label>Notas</label><textarea name="notas" class="input" rows="2">{{ f.notas if f else '' }}</textarea></div>
+<button type="submit" class="btn btn-primary" style="width:100%">{{ 'Guardar Alterações' if f else 'Criar Funcionário' }}</button>
+</div>
+
+<!-- Sidebar -->
+<div>
+<div class="card" style="padding:16px;margin-bottom:14px">
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">💶 Dados Financeiros</div>
+  <div class="form-group"><label>IBAN</label><input type="text" name="iban" value="{{ f.iban if f else '' }}" class="input" placeholder="PT50..."></div>
+  <div class="form-group"><label>Nº Segurança Social</label><input type="text" name="num_seg_social" value="{{ f.num_seg_social if f else '' }}" class="input"></div>
+</div>
+<div class="card" style="padding:16px">
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">🛡️ Seguro de Trabalho</div>
+  <div class="form-group"><label>Companhia</label><input type="text" name="seguro_companhia" value="{{ f.seguro_companhia if f else '' }}" class="input"></div>
+  <div class="form-group"><label>Nº Apólice</label><input type="text" name="seguro_apolice" value="{{ f.seguro_apolice if f else '' }}" class="input"></div>
+</div>
+</div>
+</div>
+</form>
+{% endblock %}

@@ -195,3 +195,11 @@ with app.app_context():
                 with db.engine.begin() as conn:
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {typ} DEFAULT 0"))
                 print(f"OK: users.{col} adicionado")
+
+    # Create funcionario tables
+    for tbl in ['funcionario','funcionario_documento','funcionario_formacao']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: tabela {tbl} criada")
+        else:
+            print(f"OK: {tbl} ja existe")

@@ -282,6 +282,11 @@
                 <span class="icon">📚</span><span>Biblioteca PDF</span>
             </a>
             {% endif %}
+            {% if pode_aceder('funcionarios') %}
+            <a href="{{ url_for('funcionarios') }}" class="nav-item {% if 'funcionario' in request.endpoint %}active{% endif %}">
+                <span class="icon">👥</span><span>Funcionários</span>
+            </a>
+            {% endif %}
             {% if pode_aceder('tecnico') %}
             <a href="{{ url_for('tecnico') }}" class="nav-item {% if 'tecnico' in request.endpoint %}active{% endif %}">
                 <span class="icon">🔧</span><span>Técnico</span>
