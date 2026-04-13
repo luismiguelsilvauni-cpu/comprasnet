@@ -1218,6 +1218,15 @@ def admin_config():
                 cfg.logo_altura    = int(request.form.get('logo_altura', 48) or 48)
                 cfg.logo_largura   = int(request.form.get('logo_largura', 180) or 180)
                 cfg.logo_filtro    = request.form.get('logo_filtro', '').strip()
+            # SMTP
+            cfg.smtp_host = request.form.get('smtp_host', '').strip()
+            cfg.smtp_port = int(request.form.get('smtp_port', 587) or 587)
+            cfg.smtp_user = request.form.get('smtp_user', '').strip()
+            smtp_pass_input = request.form.get('smtp_pass', '').strip()
+            if smtp_pass_input:  # only update if not empty
+                cfg.smtp_pass = smtp_pass_input
+            cfg.smtp_from = request.form.get('smtp_from', '').strip()
+            cfg.smtp_tls  = 1 if request.form.get('smtp_tls') else 0
             # Logo upload
             if 'logo' in request.files and request.files['logo'].filename:
                 logo = request.files['logo']
