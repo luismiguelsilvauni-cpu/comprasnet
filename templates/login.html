@@ -72,12 +72,13 @@
     <div class="login-logo">
         {% if cfg and cfg.empresa_logo_path %}
         <img src="/uploads/{{ cfg.empresa_logo_path }}" alt="Logo"
-             style="max-height:80px;max-width:220px;object-fit:contain;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto">
+             style="max-height:90px;max-width:240px;object-fit:contain;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto">
         {% else %}
-        <div class="icon">📦</div>
+        <div class="icon">🔧</div>
         {% endif %}
-        <h1>{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'ComprasNet' }}</h1>
-        <p>Gestão de Orçamentos e Compras</p>
+        <h1>{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }}</h1>
+        <p style="margin-top:4px">Gestão Integrada Técnica, Logística e Financeira</p>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:right">by UCN</p>
     </div>
     
     {% with messages = get_flashed_messages(with_categories=true) %}

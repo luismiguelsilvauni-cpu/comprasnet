@@ -509,7 +509,6 @@ def apagar_orcamento(oid):
     return redirect(url_for('pedido_detalhe', pid=pid))
 
 @app.route('/uploads/<filename>')
-@login_required
 def download_pdf(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
