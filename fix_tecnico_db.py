@@ -203,3 +203,26 @@ with app.app_context():
             print(f"OK: tabela {tbl} criada")
         else:
             print(f"OK: {tbl} ja existe")
+
+    # Add new funcionario fields
+    if 'funcionario' in insp.get_table_names():
+        fc = [c['name'] for c in insp.get_columns('funcionario')]
+        new_fc = [
+            ('data_admissao','DATE'),('filiacao_pai','TEXT'),('filiacao_mae','TEXT'),
+            ('situacao_militar','TEXT'),('estado_civil','TEXT'),('conjuge','TEXT'),
+            ('titulares_rendimento','INTEGER'),('num_dependentes','INTEGER'),
+            ('natural_freguesia','TEXT'),('natural_concelho','TEXT'),
+            ('socio_numero','TEXT'),('sindicato','TEXT'),('carta_conducao','INTEGER'),
+            ('obs','TEXT'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in new_fc:
+                if col not in fc:
+                    conn.execute(text(f"ALTER TABLE funcionario ADD COLUMN {col} {typ}"))
+                    print(f"OK: funcionario.{col}")
+
+    # Create new tables
+    for tbl in ['funcionario_situacao_prof','funcionario_falta']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: {tbl} criado")

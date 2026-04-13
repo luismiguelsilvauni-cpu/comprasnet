@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ f.nome }} · Funcionário{% endblock %}
-{% block page_title %}{{ f.nome }}{% endblock %}
+{% block page_title %}Ficha de Funcionário{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('funcionarios') }}" class="btn btn-ghost btn-sm">← Lista</a>
   <a href="{{ url_for('funcionario_editar', fid=f.id) }}" class="btn btn-ghost btn-sm">✏️ Editar</a>
-  <form method="post" action="{{ url_for('funcionario_apagar', fid=f.id) }}" onsubmit="return confirm('Eliminar?')" style="display:inline">
-    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕ Eliminar</button>
+  <form method="post" action="{{ url_for('funcionario_apagar', fid=f.id) }}" onsubmit="return confirm('Eliminar funcionário?')" style="display:inline">
+    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
   </form>
 {% endblock %}
 {% block content %}
@@ -15,25 +15,28 @@
   {% endfor %}{% endif %}
 {% endwith %}
 <style>
-.field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:14px}
-.field-item label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);display:block;margin-bottom:3px}
-.field-item span{font-size:13px;font-weight:600}
-.doc-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px}
+.fld label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);display:block;margin-bottom:2px}
+.fld span{font-size:13px;font-weight:600}
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:8px}
+.sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.doc-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:5px}
 .doc-row:hover{border-color:var(--accent)}
-.section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px}
 </style>
 
-<!-- Header card -->
-<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px">
-  <div style="width:56px;height:56px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0">{{ f.nome[0].upper() }}</div>
+<!-- Header -->
+<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:14px">
+  <div style="width:52px;height:52px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0">{{ f.nome[0].upper() }}</div>
   <div style="flex:1">
     <div style="font-size:18px;font-weight:700">{{ f.nome }}</div>
-    <div style="font-size:13px;color:var(--text-muted)">{{ f.categoria or 'Sem categoria' }} · Nº {{ f.numero }}</div>
+    <div style="font-size:12px;color:var(--text-muted)">
+      {{ f.categoria or 'Sem categoria' }} · Nº {{ f.numero }}
+      {% if f.data_admissao %} · Admissão: {{ f.data_admissao.strftime('%d/%m/%Y') }}{% endif %}
+    </div>
   </div>
+  {% if f.idade %}<div style="text-align:center;min-width:50px"><div style="font-size:22px;font-weight:700;color:var(--accent)">{{ f.idade }}</div><div style="font-size:10px;color:var(--text-muted)">anos</div></div>{% endif %}
   <span style="font-size:12px;font-weight:700;padding:4px 12px;border-radius:6px;{% if f.ativo %}background:rgba(34,197,94,.15);color:#22c55e{% else %}background:rgba(239,68,68,.15);color:#ef4444{% endif %}">
     {{ '✅ Activo' if f.ativo else '🔴 Inactivo' }}
   </span>
-  {% if f.idade %}<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--accent)">{{ f.idade }}</div><div style="font-size:11px;color:var(--text-muted)">anos</div></div>{% endif %}
 </div>
 
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
@@ -41,156 +44,271 @@
 
 <!-- Identificação -->
 <div class="card" style="padding:14px;margin-bottom:12px">
-  <div class="section-title">👤 Identificação</div>
-  <div class="field-grid">
-    <div class="field-item"><label>Data Nascimento</label><span>{{ f.data_nascimento.strftime('%d/%m/%Y') if f.data_nascimento else '—' }}</span></div>
-    <div class="field-item"><label>NIF</label><span class="mono">{{ f.nif or '—' }}</span></div>
-    <div class="field-item"><label>Nº CC / BI</label><span class="mono">{{ f.num_cc or '—' }}</span></div>
-    <div class="field-item"><label>Nº Passaporte</label><span class="mono">{{ f.num_passaporte or '—' }}</span></div>
-    <div class="field-item"><label>Agregado Familiar</label><span>{{ f.agregado_familiar or 0 }}</span></div>
-    <div class="field-item"><label>Nº Seg. Social</label><span class="mono">{{ f.num_seg_social or '—' }}</span></div>
+  <div class="sec">👤 Identificação</div>
+  <div class="fg">
+    <div class="fld"><label>Data Nascimento</label><span>{{ f.data_nascimento.strftime('%d/%m/%Y') if f.data_nascimento else '—' }}</span></div>
+    <div class="fld"><label>BI / CC Nº</label><span class="mono">{{ f.num_cc or '—' }}</span></div>
+    <div class="fld"><label>NIF</label><span class="mono">{{ f.nif or '—' }}</span></div>
+    <div class="fld"><label>Nº Passaporte</label><span class="mono">{{ f.num_passaporte or '—' }}</span></div>
+    <div class="fld"><label>Filiação (Pai)</label><span>{{ f.filiacao_pai or '—' }}</span></div>
+    <div class="fld"><label>Filiação (Mãe)</label><span>{{ f.filiacao_mae or '—' }}</span></div>
+    <div class="fld"><label>Situação Militar</label><span>{{ f.situacao_militar or '—' }}</span></div>
+    <div class="fld"><label>Estado Civil</label><span>{{ f.estado_civil or '—' }}</span></div>
+    <div class="fld"><label>Cônjuge</label><span>{{ f.conjuge or '—' }}</span></div>
+    <div class="fld"><label>Titulares Rendimento</label><span>{{ f.titulares_rendimento or 1 }}</span></div>
+    <div class="fld"><label>Nº Dependentes</label><span>{{ f.num_dependentes or 0 }}</span></div>
+    <div class="fld"><label>Agregado Familiar</label><span>{{ f.agregado_familiar or 0 }}</span></div>
+    <div class="fld"><label>Natural Freguesia</label><span>{{ f.natural_freguesia or '—' }}</span></div>
+    <div class="fld"><label>Concelho</label><span>{{ f.natural_concelho or '—' }}</span></div>
+    <div class="fld"><label>Sócio Nº</label><span>{{ f.socio_numero or '—' }}</span></div>
+    <div class="fld"><label>Sindicato</label><span>{{ f.sindicato or '—' }}</span></div>
+    <div class="fld"><label>Nº Seg. Social</label><span class="mono">{{ f.num_seg_social or '—' }}</span></div>
+    <div class="fld"><label>Carta Condução</label><span>{{ '✅ Sim' if f.carta_conducao else '❌ Não' }}</span></div>
   </div>
-  {% if f.morada %}<div><label style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Morada</label><div style="font-size:13px;margin-top:3px">{{ f.morada }}</div></div>{% endif %}
+  {% if f.morada %}<div class="fld"><label>Morada</label><span style="font-size:12px;font-weight:400">{{ f.morada }}</span></div>{% endif %}
 </div>
 
 <!-- Contacto -->
 <div class="card" style="padding:14px;margin-bottom:12px">
-  <div class="section-title">📞 Contacto</div>
-  <div class="field-grid">
-    <div class="field-item"><label>Telemóvel</label><span>{{ f.telemovel or '—' }}</span></div>
-    <div class="field-item"><label>Email</label><span>{{ f.email or '—' }}</span></div>
-    <div class="field-item"><label>Emergência</label><span>{{ f.contacto_emergencia or '—' }}</span></div>
-    <div class="field-item"><label>Nome Emergência</label><span>{{ f.nome_emergencia or '—' }}</span></div>
+  <div class="sec">📞 Contacto</div>
+  <div class="fg">
+    <div class="fld"><label>Telemóvel</label><span>{{ f.telemovel or '—' }}</span></div>
+    <div class="fld"><label>Email</label><span>{{ f.email or '—' }}</span></div>
+    <div class="fld"><label>Emergência</label><span>{{ f.contacto_emergencia or '—' }}</span></div>
+    <div class="fld"><label>Nome Emergência</label><span>{{ f.nome_emergencia or '—' }}</span></div>
   </div>
 </div>
 
 <!-- Documentos -->
 <div class="card" style="padding:14px;margin-bottom:12px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div class="section-title" style="margin:0">📄 Documentos</div>
+    <div class="sec" style="margin:0;border:none">📄 Documentos</div>
     <button onclick="tog('addDocForm')" class="btn btn-ghost btn-sm">+ Adicionar</button>
   </div>
-  <div id="addDocForm" style="display:none;margin-bottom:10px">
-    <div style="background:var(--surface2);border-radius:8px;padding:12px">
-      <form method="post" action="{{ url_for('funcionario_doc_upload', fid=f.id) }}" enctype="multipart/form-data">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input" placeholder="Ex: Ficha de Aptidão..."></div>
-          <div class="form-group" style="margin:0"><label>Tipo</label>
-            <select name="tipo" class="input">
-              <option value="higiene">Entrega Equipamento Higiene e Segurança</option>
-              <option value="aptidao">Ficha de Aptidão</option>
-              <option value="cc">CC / BI</option>
-              <option value="passaporte">Passaporte</option>
-              <option value="morada">Comprovativo de Morada</option>
-              <option value="outro">Outro Documento</option>
-            </select>
-          </div>
+  <div id="addDocForm" style="display:none;margin-bottom:10px;background:var(--surface2);border-radius:8px;padding:12px">
+    <form method="post" action="{{ url_for('funcionario_doc_upload', fid=f.id) }}" enctype="multipart/form-data">
+      <div style="display:grid;grid-template-columns:2fr 2fr;gap:8px;margin-bottom:8px">
+        <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input" placeholder="Ex: Ficha de Aptidão 2024"></div>
+        <div class="form-group" style="margin:0"><label>Tipo</label>
+          <select name="tipo" class="input">
+            <option value="higiene">🦺 Entrega Equipamento Higiene e Seg.</option>
+            <option value="aptidao">🩺 Ficha de Aptidão</option>
+            <option value="cc">🪪 CC / BI</option>
+            <option value="passaporte">📗 Passaporte</option>
+            <option value="morada">🏠 Comprov. Morada</option>
+            <option value="outro">📄 Outro Documento</option>
+          </select>
         </div>
-        <div class="form-group" style="margin:0 0 8px"><label>Ficheiro *</label><input type="file" name="file" required class="input"></div>
-        <button type="submit" class="btn btn-primary btn-sm">Upload</button>
-      </form>
-    </div>
+      </div>
+      <div class="form-group" style="margin:0 0 8px"><label>Ficheiro *</label><input type="file" name="file" required class="input"></div>
+      <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+    </form>
   </div>
   {% set tipo_icons = {'cc':'🪪','passaporte':'📗','morada':'🏠','higiene':'🦺','aptidao':'🩺','outro':'📄'} %}
   {% if f.documentos %}
     {% for d in f.documentos|sort(attribute='tipo') %}
     <div class="doc-row">
-      <span style="font-size:20px">{{ tipo_icons.get(d.tipo,'📄') }}</span>
+      <span style="font-size:18px">{{ tipo_icons.get(d.tipo,'📄') }}</span>
       <div style="flex:1"><div style="font-size:12px;font-weight:600">{{ d.titulo }}</div><div style="font-size:10px;color:var(--text-muted)">{{ d.pdf_filename }} · {{ d.criado_em.strftime('%d/%m/%Y') }}</div></div>
-      <div style="display:flex;gap:4px">
-        <a href="{{ url_for('funcionario_doc_ver', did=d.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
-        <a href="{{ url_for('funcionario_doc_download', did=d.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
-        <button onclick="window.open('{{ url_for('funcionario_doc_ver', did=d.id) }}').print()" class="btn btn-ghost btn-sm" style="font-size:11px">🖨</button>
-        <form method="post" action="{{ url_for('funcionario_doc_apagar', did=d.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
-          <button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
-        </form>
-      </div>
+      <a href="{{ url_for('funcionario_doc_ver', did=d.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
+      <a href="{{ url_for('funcionario_doc_download', did=d.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
+      <button onclick="window.open('{{ url_for('funcionario_doc_ver', did=d.id) }}').print()" class="btn btn-ghost btn-sm" style="font-size:11px">🖨</button>
+      <form method="post" action="{{ url_for('funcionario_doc_apagar', did=d.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
+        <button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+      </form>
     </div>
     {% endfor %}
   {% else %}
-  <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:8px">Sem documentos</div>
+  <div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:8px">Sem documentos</div>
   {% endif %}
 </div>
 
 <!-- Formações -->
-<div class="card" style="padding:14px">
+<div class="card" style="padding:14px;margin-bottom:12px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div class="section-title" style="margin:0">🎓 Formações</div>
+    <div class="sec" style="margin:0;border:none">🎓 Formações</div>
     <button onclick="tog('addFormForm')" class="btn btn-ghost btn-sm">+ Adicionar</button>
   </div>
-  <div id="addFormForm" style="display:none;margin-bottom:10px">
-    <div style="background:var(--surface2);border-radius:8px;padding:12px">
-      <form method="post" action="{{ url_for('funcionario_formacao_add', fid=f.id) }}" enctype="multipart/form-data">
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px">
-          <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input" placeholder="Ex: Segurança no Trabalho"></div>
-          <div class="form-group" style="margin:0"><label>Entidade</label><input type="text" name="entidade" class="input"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:8px;margin-bottom:8px">
-          <div class="form-group" style="margin:0"><label>Data Início</label><input type="date" name="data_inicio" class="input"></div>
-          <div class="form-group" style="margin:0"><label>Data Fim</label><input type="date" name="data_fim" class="input"></div>
-          <div class="form-group" style="margin:0"><label>Horas</label><input type="number" name="horas" min="1" class="input"></div>
-        </div>
-        <div class="form-group" style="margin:0 0 8px"><label>Certificado (PDF)</label><input type="file" name="certificado" accept=".pdf" class="input"></div>
-        <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
-      </form>
-    </div>
+  <div id="addFormForm" style="display:none;margin-bottom:10px;background:var(--surface2);border-radius:8px;padding:12px">
+    <form method="post" action="{{ url_for('funcionario_formacao_add', fid=f.id) }}" enctype="multipart/form-data">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input"></div>
+        <div class="form-group" style="margin:0"><label>Entidade</label><input type="text" name="entidade" class="input"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:8px;margin-bottom:8px">
+        <div class="form-group" style="margin:0"><label>Data Início</label><input type="date" name="data_inicio" class="input"></div>
+        <div class="form-group" style="margin:0"><label>Data Fim</label><input type="date" name="data_fim" class="input"></div>
+        <div class="form-group" style="margin:0"><label>Horas</label><input type="number" name="horas" min="1" class="input"></div>
+      </div>
+      <div class="form-group" style="margin:0 0 8px"><label>Certificado (PDF)</label><input type="file" name="certificado" accept=".pdf" class="input"></div>
+      <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+    </form>
   </div>
   {% if f.formacoes %}
-  <div class="card" style="padding:0;overflow-x:auto">
-    <table class="table" style="font-size:12px">
-      <thead><tr><th>Formação</th><th>Entidade</th><th>Período</th><th>Horas</th><th>Certificado</th><th></th></tr></thead>
-      <tbody>
-      {% for fm in f.formacoes|sort(attribute='data_inicio', reverse=True) %}
-      <tr>
-        <td style="font-weight:600">{{ fm.titulo }}</td>
-        <td style="color:var(--text-muted)">{{ fm.entidade or '—' }}</td>
-        <td style="font-size:11px">
-          {{ fm.data_inicio.strftime('%d/%m/%Y') if fm.data_inicio else '—' }}
-          {% if fm.data_fim %} → {{ fm.data_fim.strftime('%d/%m/%Y') }}{% endif %}
-        </td>
-        <td>{{ fm.horas or '—' }}h</td>
-        <td>
-          {% if fm.pdf_path %}
-          <a href="{{ url_for('funcionario_formacao_cert', fmid=fm.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
-          <a href="{{ url_for('funcionario_formacao_cert', fmid=fm.id) }}" download class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
-          {% else %}—{% endif %}
-        </td>
-        <td>
-          <form method="post" action="{{ url_for('funcionario_formacao_apagar', fmid=fm.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
-            <button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+  <div style="overflow-x:auto">
+  <table class="table" style="font-size:12px">
+    <thead><tr><th>Formação</th><th>Entidade</th><th>Período</th><th>h</th><th>Cert.</th><th></th></tr></thead>
+    <tbody>
+    {% for fm in f.formacoes|sort(attribute='data_inicio', reverse=True) %}
+    <tr>
+      <td style="font-weight:600">{{ fm.titulo }}</td>
+      <td style="color:var(--text-muted)">{{ fm.entidade or '—' }}</td>
+      <td style="font-size:11px">{{ fm.data_inicio.strftime('%d/%m/%Y') if fm.data_inicio else '—' }}{% if fm.data_fim %} → {{ fm.data_fim.strftime('%d/%m/%Y') }}{% endif %}</td>
+      <td>{{ fm.horas or '—' }}</td>
+      <td>{% if fm.pdf_path %}<a href="{{ url_for('funcionario_formacao_cert', fmid=fm.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>{% else %}—{% endif %}</td>
+      <td><form method="post" action="{{ url_for('funcionario_formacao_apagar', fmid=fm.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline"><button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
   </div>
   {% else %}
-  <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:8px">Sem formações registadas</div>
+  <div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:8px">Sem formações</div>
   {% endif %}
 </div>
 
-</div>
-<!-- Sidebar -->
-<div>
-<div class="card" style="padding:14px;margin-bottom:12px">
-  <div class="section-title">💶 Dados Financeiros</div>
-  <div class="field-item" style="margin-bottom:10px"><label>IBAN</label><span class="mono" style="font-size:12px">{{ f.iban or '—' }}</span></div>
-</div>
-<div class="card" style="padding:14px">
-  <div class="section-title">🛡️ Seguro de Trabalho</div>
-  <div class="field-item" style="margin-bottom:8px"><label>Companhia</label><span>{{ f.seguro_companhia or '—' }}</span></div>
-  <div class="field-item"><label>Nº Apólice</label><span class="mono">{{ f.seguro_apolice or '—' }}</span></div>
-</div>
-{% if f.notas %}
-<div class="card" style="padding:14px;margin-top:12px">
-  <div class="section-title">📝 Notas</div>
-  <div style="font-size:13px;color:var(--text-muted)">{{ f.notas }}</div>
+<!-- Situação Profissional (admin only) -->
+{% if current_user.is_admin %}
+<div class="card" style="padding:14px;margin-bottom:12px" id="situacao-prof">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div class="sec" style="margin:0;border:none">💼 Situação Profissional <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(apenas admins)</span></div>
+    <button onclick="tog('addSPForm')" class="btn btn-ghost btn-sm">+ Adicionar</button>
+  </div>
+  <div id="addSPForm" style="display:none;margin-bottom:10px;background:var(--surface2);border-radius:8px;padding:12px">
+    <form method="post" action="{{ url_for('funcionario_situacao_prof_add', fid=f.id) }}">
+      <div style="display:grid;grid-template-columns:120px 2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="form-group" style="margin:0"><label>Data *</label><input type="date" name="data" required class="input" value="{{ now.strftime('%Y-%m-%d') if now else '' }}"></div>
+        <div class="form-group" style="margin:0"><label>Categoria Profissional</label><input type="text" name="categoria_prof" class="input" value="{{ f.categoria or '' }}"></div>
+        <div class="form-group" style="margin:0"><label>Vencimento €</label><input type="number" name="vencimento" step="0.01" class="input" placeholder="0.00"></div>
+        <div class="form-group" style="margin:0"><label>Refeição €</label><input type="number" name="refeicao" step="0.01" class="input" placeholder="0.00"></div>
+        <div class="form-group" style="margin:0"><label>Prémios & Outros €</label><input type="number" name="premios_outros" step="0.01" class="input" placeholder="0.00"></div>
+      </div>
+      <div class="form-group" style="margin:0 0 8px"><label>Notas</label><input type="text" name="notas" class="input"></div>
+      <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+    </form>
+  </div>
+  {% if f.situacoes_prof %}
+  <div style="overflow-x:auto">
+  <table class="table" style="font-size:12px">
+    <thead><tr><th>Data</th><th>Categoria Profissional</th><th>Vencimento</th><th>Refeição</th><th>Prémios & Outros</th><th>Notas</th><th></th></tr></thead>
+    <tbody>
+    {% for sp in f.situacoes_prof %}
+    <tr>
+      <td style="font-weight:600;white-space:nowrap">{{ sp.data.strftime('%d/%m/%Y') }}</td>
+      <td>{{ sp.categoria_prof or '—' }}</td>
+      <td class="mono">{{ '%.2f €'|format(sp.vencimento|float) if sp.vencimento else '—' }}</td>
+      <td class="mono">{{ '%.2f €'|format(sp.refeicao|float) if sp.refeicao else '—' }}</td>
+      <td class="mono">{{ '%.2f €'|format(sp.premios_outros|float) if sp.premios_outros else '—' }}</td>
+      <td style="color:var(--text-muted);font-size:11px">{{ sp.notas or '' }}</td>
+      <td><form method="post" action="{{ url_for('funcionario_situacao_prof_apagar', sid=sp.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline"><button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:8px">Sem registos de situação profissional</div>
+  {% endif %}
 </div>
 {% endif %}
+
+<!-- Registo de Faltas -->
+<div class="card" style="padding:14px">
+  <div class="sec">📅 Registo de Faltas</div>
+  {% set ano_atual = now.year if now else 2026 %}
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+    <select id="anoFaltas" onchange="loadFaltas()" class="input" style="width:100px">
+      {% for a in range(ano_atual, ano_atual-6, -1) %}
+      <option value="{{ a }}">{{ a }}</option>
+      {% endfor %}
+    </select>
+    <select id="tipoFaltas" onchange="loadFaltas()" class="input" style="width:160px">
+      <option value="injustificada">Injustificada</option>
+      <option value="justificada">Justificada</option>
+      <option value="baixa">Baixa Médica</option>
+      <option value="ferias">Férias</option>
+    </select>
+    <span style="font-size:12px;color:var(--text-muted)">Clique numa célula para editar</span>
+  </div>
+  <div style="overflow-x:auto">
+  <table class="table" style="font-size:12px;min-width:600px" id="tblFaltas">
+    <thead>
+      <tr>
+        <th>Tipo</th>
+        {% for m in ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+        <th style="text-align:center;min-width:50px">{{ m }}</th>
+        {% endfor %}
+        <th style="text-align:center">Total</th>
+      </tr>
+    </thead>
+    <tbody id="bodyFaltas">
+      <tr><td colspan="14" style="text-align:center;color:var(--text-muted)">A carregar...</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+</div>
+
+<!-- Sidebar -->
+<div>
+  <div class="card" style="padding:14px;margin-bottom:12px">
+    <div class="sec">💶 Dados Financeiros</div>
+    <div class="fld" style="margin-bottom:8px"><label>IBAN</label><span class="mono" style="font-size:12px;word-break:break-all">{{ f.iban or '—' }}</span></div>
+  </div>
+  <div class="card" style="padding:14px;margin-bottom:12px">
+    <div class="sec">🛡️ Seguro Trabalho</div>
+    <div class="fld" style="margin-bottom:8px"><label>Companhia</label><span>{{ f.seguro_companhia or '—' }}</span></div>
+    <div class="fld"><label>Nº Apólice</label><span class="mono">{{ f.seguro_apolice or '—' }}</span></div>
+  </div>
+  {% if f.obs or f.notas %}
+  <div class="card" style="padding:14px">
+    <div class="sec">📝 Notas</div>
+    {% if f.obs %}<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">{{ f.obs }}</div>{% endif %}
+    {% if f.notas %}<div style="font-size:12px;color:var(--text-muted)">{{ f.notas }}</div>{% endif %}
+  </div>
+  {% endif %}
 </div>
 </div>
+
 <script>
+var FID = {{ f.id }};
+var MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
 function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
+
+function loadFaltas() {
+  var ano = document.getElementById('anoFaltas').value;
+  var tipo = document.getElementById('tipoFaltas').value;
+  fetch('/api/funcionarios/'+FID+'/faltas/'+ano)
+    .then(r=>r.json()).then(faltas=>{
+      var byMes = {};
+      faltas.filter(x=>x.tipo===tipo).forEach(x=>{ byMes[x.mes] = x; });
+      var total = 0;
+      var row = '<tr><td style="font-weight:600">Dias</td>';
+      for (var m=1;m<=12;m++) {
+        var v = byMes[m] ? parseFloat(byMes[m].dias_falta) : 0;
+        total += v;
+        row += '<td style="text-align:center;padding:0">' +
+          '<input type="number" min="0" max="31" step="0.5" value="'+(v||'')+'" ' +
+          'style="width:46px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);padding:4px;color:var(--text);font-size:12px" ' +
+          'onchange="gravarFalta('+ano+','+m+',this.value)" placeholder="0">' +
+          '</td>';
+      }
+      row += '<td style="text-align:center;font-weight:700;color:var(--accent)">'+(total||0)+'</td></tr>';
+      document.getElementById('bodyFaltas').innerHTML = row;
+    });
+}
+
+function gravarFalta(ano, mes, dias) {
+  var tipo = document.getElementById('tipoFaltas').value;
+  var fd = new FormData();
+  fd.append('ano', ano); fd.append('mes', mes);
+  fd.append('dias_falta', dias || 0); fd.append('tipo', tipo);
+  fetch('/funcionarios/'+FID+'/falta/gravar', {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{ if(d.ok) loadFaltas(); });
+}
+
+loadFaltas();
 </script>
 {% endblock %}

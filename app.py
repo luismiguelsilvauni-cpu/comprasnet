@@ -2677,25 +2677,45 @@ class Funcionario(db.Model):
     nome                = db.Column(db.String(200), nullable=False)
     categoria           = db.Column(db.String(100))
     ativo               = db.Column(db.Boolean, default=True)
+    # Identificação
+    data_admissao       = db.Column(db.Date)
     data_nascimento     = db.Column(db.Date)
-    morada              = db.Column(db.Text)
-    nif                 = db.Column(db.String(20))
     num_cc              = db.Column(db.String(50))
+    nif                 = db.Column(db.String(20))
     num_passaporte      = db.Column(db.String(50))
-    agregado_familiar   = db.Column(db.Integer, default=0)
+    filiacao_pai        = db.Column(db.String(200))
+    filiacao_mae        = db.Column(db.String(200))
+    situacao_militar    = db.Column(db.String(100))
+    estado_civil        = db.Column(db.String(50))
+    conjuge             = db.Column(db.String(200))
+    titulares_rendimento= db.Column(db.Integer, default=1)
+    num_dependentes     = db.Column(db.Integer, default=0)
+    natural_freguesia   = db.Column(db.String(100))
+    natural_concelho    = db.Column(db.String(100))
+    socio_numero        = db.Column(db.String(50))
+    sindicato           = db.Column(db.String(100))
+    num_seg_social      = db.Column(db.String(30))
+    carta_conducao      = db.Column(db.Boolean, default=False)
+    # Contacto
+    morada              = db.Column(db.Text)
     telemovel           = db.Column(db.String(30))
     email               = db.Column(db.String(200))
     contacto_emergencia = db.Column(db.String(200))
     nome_emergencia     = db.Column(db.String(200))
+    # Financeiro
     iban                = db.Column(db.String(50))
-    num_seg_social      = db.Column(db.String(30))
     seguro_companhia    = db.Column(db.String(200))
     seguro_apolice      = db.Column(db.String(100))
+    # Misc
+    agregado_familiar   = db.Column(db.Integer, default=0)
     notas               = db.Column(db.Text)
+    obs                 = db.Column(db.Text)
     criado_em           = db.Column(db.DateTime, default=datetime.now)
     atualizado_em       = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     documentos          = db.relationship('FuncionarioDocumento', backref='funcionario', lazy=True, cascade='all, delete-orphan')
     formacoes           = db.relationship('FuncionarioFormacao', backref='funcionario', lazy=True, cascade='all, delete-orphan')
+    situacoes_prof      = db.relationship('FuncionarioSituacaoProf', backref='funcionario', lazy=True, cascade='all, delete-orphan', order_by='FuncionarioSituacaoProf.data.desc()')
+    faltas              = db.relationship('FuncionarioFalta', backref='funcionario', lazy=True, cascade='all, delete-orphan')
 
     @property
     def idade(self):
@@ -2703,6 +2723,30 @@ class Funcionario(db.Model):
         today = datetime.now().date()
         d = self.data_nascimento
         return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+
+class FuncionarioSituacaoProf(db.Model):
+    __tablename__ = 'funcionario_situacao_prof'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    data            = db.Column(db.Date, nullable=False)
+    categoria_prof  = db.Column(db.String(200))
+    vencimento      = db.Column(db.Numeric(10,2))
+    refeicao        = db.Column(db.Numeric(10,2))
+    premios_outros  = db.Column(db.Numeric(10,2))
+    notas           = db.Column(db.Text)
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
+
+class FuncionarioFalta(db.Model):
+    __tablename__ = 'funcionario_falta'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    ano             = db.Column(db.Integer, nullable=False)
+    mes             = db.Column(db.Integer, nullable=False)  # 1-12
+    dias_falta      = db.Column(db.Numeric(5,1), default=0)
+    horas_falta     = db.Column(db.Numeric(5,1), default=0)
+    tipo            = db.Column(db.String(50), default='injustificada')  # justificada/injustificada/baixa/ferias
+    notas           = db.Column(db.Text)
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
 
 class FuncionarioDocumento(db.Model):
     __tablename__ = 'funcionario_documento'
@@ -5160,15 +5204,25 @@ def funcionario_editar(fid):
         func.nome=d('nome'); func.categoria=d('categoria')
         func.ativo=request.form.get('ativo')=='1'
         func.data_nascimento=di('data_nascimento')
+        func.data_admissao=di('data_admissao')
         func.morada=d('morada'); func.nif=d('nif')
         func.num_cc=d('num_cc'); func.num_passaporte=d('num_passaporte')
+        func.filiacao_pai=d('filiacao_pai'); func.filiacao_mae=d('filiacao_mae')
+        func.situacao_militar=d('situacao_militar'); func.estado_civil=d('estado_civil')
+        func.conjuge=d('conjuge')
+        func.titulares_rendimento=int(request.form.get('titulares_rendimento',1) or 1)
+        func.num_dependentes=int(request.form.get('num_dependentes',0) or 0)
+        func.natural_freguesia=d('natural_freguesia'); func.natural_concelho=d('natural_concelho')
+        func.socio_numero=d('socio_numero'); func.sindicato=d('sindicato')
+        func.carta_conducao=request.form.get('carta_conducao')=='1'
         func.agregado_familiar=int(request.form.get('agregado_familiar',0) or 0)
         func.telemovel=d('telemovel'); func.email=d('email')
         func.contacto_emergencia=d('contacto_emergencia')
         func.nome_emergencia=d('nome_emergencia')
         func.iban=d('iban'); func.num_seg_social=d('num_seg_social')
         func.seguro_companhia=d('seguro_companhia')
-        func.seguro_apolice=d('seguro_apolice'); func.notas=d('notas')
+        func.seguro_apolice=d('seguro_apolice')
+        func.notas=d('notas'); func.obs=d('obs')
         _rh_upload_docs(fid, request.files)
         db.session.commit()
         flash('Dados actualizados.', 'success')
@@ -5336,6 +5390,84 @@ def admin_perfis_sync_menus():
         return redirect(url_for('dashboard'))
     flash('Lista de menus actualizada. Edite cada perfil para atribuir os novos menus.', 'success')
     return redirect(url_for('admin_perfis'))
+
+
+@app.route('/funcionarios/<int:fid>/situacao-prof/adicionar', methods=['POST'])
+@login_required
+def funcionario_situacao_prof_add(fid):
+    if not current_user.is_admin:
+        flash('Sem permissão.', 'error')
+        return redirect(url_for('funcionario_detalhe', fid=fid))
+    Funcionario.query.get_or_404(fid)
+    from datetime import date
+    def d(f): return request.form.get(f,'').strip() or None
+    def di(f):
+        v = d(f)
+        try: return date.fromisoformat(v) if v else None
+        except: return None
+    def dn(f):
+        v = d(f)
+        if not v: return None
+        try: return float(v.replace(',','.'))
+        except: return None
+    sp = FuncionarioSituacaoProf(
+        funcionario_id=fid,
+        data=di('data') or date.today(),
+        categoria_prof=d('categoria_prof'),
+        vencimento=dn('vencimento'),
+        refeicao=dn('refeicao'),
+        premios_outros=dn('premios_outros'),
+        notas=d('notas'),
+    )
+    db.session.add(sp)
+    db.session.commit()
+    flash('Situação profissional adicionada.', 'success')
+    return redirect(url_for('funcionario_detalhe', fid=fid) + '#situacao-prof')
+
+@app.route('/funcionarios/situacao-prof/<int:sid>/apagar', methods=['POST'])
+@login_required
+def funcionario_situacao_prof_apagar(sid):
+    if not current_user.is_admin:
+        return redirect(url_for('funcionarios'))
+    sp = FuncionarioSituacaoProf.query.get_or_404(sid)
+    fid = sp.funcionario_id
+    db.session.delete(sp)
+    db.session.commit()
+    return redirect(url_for('funcionario_detalhe', fid=fid) + '#situacao-prof')
+
+@app.route('/funcionarios/<int:fid>/falta/gravar', methods=['POST'])
+@login_required
+def funcionario_falta_gravar(fid):
+    Funcionario.query.get_or_404(fid)
+    ano = int(request.form.get('ano', datetime.now().year))
+    mes = int(request.form.get('mes', 1))
+    dias = float(request.form.get('dias_falta', 0) or 0)
+    horas = float(request.form.get('horas_falta', 0) or 0)
+    tipo = request.form.get('tipo', 'injustificada')
+    notas = request.form.get('notas', '').strip()
+
+    existing = FuncionarioFalta.query.filter_by(
+        funcionario_id=fid, ano=ano, mes=mes, tipo=tipo).first()
+    if existing:
+        existing.dias_falta = dias
+        existing.horas_falta = horas
+        existing.notas = notas
+    else:
+        db.session.add(FuncionarioFalta(
+            funcionario_id=fid, ano=ano, mes=mes,
+            dias_falta=dias, horas_falta=horas,
+            tipo=tipo, notas=notas))
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/funcionarios/<int:fid>/faltas/<int:ano>')
+@login_required
+def api_funcionario_faltas(fid, ano):
+    faltas = FuncionarioFalta.query.filter_by(funcionario_id=fid, ano=ano).all()
+    return jsonify([{
+        'id': f.id, 'mes': f.mes, 'dias_falta': float(f.dias_falta or 0),
+        'horas_falta': float(f.horas_falta or 0), 'tipo': f.tipo, 'notas': f.notas or ''
+    } for f in faltas])
 
 
 def init_db():
