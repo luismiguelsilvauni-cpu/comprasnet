@@ -314,6 +314,13 @@ class ConfigGeral(db.Model):
     dashboard_layouts     = db.Column(db.Text, default='{}')
     logo_altura           = db.Column(db.Integer, default=48)
     logo_largura          = db.Column(db.Integer, default=180)
+    # SMTP
+    smtp_host             = db.Column(db.String(200))
+    smtp_port             = db.Column(db.Integer, default=587)
+    smtp_user             = db.Column(db.String(200))
+    smtp_pass             = db.Column(db.String(200))
+    smtp_from             = db.Column(db.String(200))
+    smtp_tls              = db.Column(db.Integer, default=1)
     logo_filtro           = db.Column(db.String(100), default='')
     ultimo_backup_ok      = db.Column(db.Boolean)
     # Claude chat
