@@ -3,6 +3,7 @@
 {% block page_title %}Gestão de Utilizadores{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('admin_perfis') }}" class="btn btn-ghost btn-sm">⚙️ Perfis</a>
+  <a href="{{ url_for('admin_registos_pendentes') }}" class="btn btn-ghost btn-sm">📝 Registos Pendentes</a>
   <button onclick="tog('formNovo')" class="btn btn-primary btn-sm">+ Novo Utilizador</button>
 {% endblock %}
 {% block content %}
@@ -17,9 +18,10 @@
   <div class="card" style="padding:18px">
     <div style="font-size:14px;font-weight:600;margin-bottom:14px">Novo Utilizador</div>
     <form method="post" action="{{ url_for('novo_utilizador') }}">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="form-group" style="margin:0"><label>Username *</label><input type="text" name="username" required class="input"></div>
         <div class="form-group" style="margin:0"><label>Nome *</label><input type="text" name="nome" required class="input"></div>
+        <div class="form-group" style="margin:0"><label>Email</label><input type="email" name="email" class="input"></div>
         <div class="form-group" style="margin:0"><label>Password *</label><input type="password" name="password" required class="input"></div>
       </div>
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
@@ -35,42 +37,61 @@
   </div>
 </div>
 
-<!-- Users list -->
-<div class="card" style="padding:0">
-  <table class="table" style="font-size:13px">
+<!-- Users table -->
+<div class="card" style="padding:0;overflow-x:auto">
+  <table class="table" style="font-size:12px">
     <thead><tr>
-      <th>Utilizador</th><th>Nome</th><th>Perfil</th><th>Admin</th><th></th>
+      <th>Username</th><th>Nome</th><th>Email</th><th>Perfil</th><th>Password</th><th></th>
     </tr></thead>
     <tbody>
     {% for u in utilizadores %}
+    {% set pid = get_user_perfil_id(u) %}
     <tr>
       <td class="mono" style="font-weight:600">{{ u.username }}</td>
-      <td>{{ u.nome }}</td>
+      <td>{{ u.nome }}{% if u.is_admin %} <span style="font-size:10px;background:rgba(59,110,240,.15);color:var(--accent);padding:1px 5px;border-radius:3px">Admin</span>{% endif %}</td>
       <td>
-        {% set pid = get_user_perfil_id(u) %}
-        {% set p = perfis|selectattr('id','equalto',pid)|first if pid else none %}
-        <form method="post" action="{{ url_for('admin_utilizador_perfil', uid=u.id) }}" style="display:flex;gap:6px;align-items:center">
-          <select name="perfil_id" class="input" style="font-size:12px;padding:3px 6px">
-            <option value="">— Sem perfil (acesso total) —</option>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="color:var(--text-muted);font-size:12px">{{ u.email or '—' }}</span>
+          <button onclick="tog('email-edit-{{ u.id }}')" class="btn btn-ghost btn-sm" style="font-size:10px;padding:1px 5px">✏️</button>
+        </div>
+        <div id="email-edit-{{ u.id }}" style="display:none;margin-top:4px">
+          <form method="post" action="{{ url_for('admin_editar_email', uid=u.id) }}" style="display:flex;gap:4px">
+            <input type="email" name="email" value="{{ u.email or '' }}" class="input" style="font-size:11px;padding:3px 6px" placeholder="email@empresa.pt">
+            <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 7px">OK</button>
+          </form>
+        </div>
+      </td>
+      <td>
+        <form method="post" action="{{ url_for('admin_utilizador_perfil', uid=u.id) }}" style="display:flex;gap:4px;align-items:center">
+          <select name="perfil_id" class="input" style="font-size:11px;padding:3px 6px">
+            <option value="">— Sem perfil —</option>
             {% for perf in perfis %}
             <option value="{{ perf.id }}" {% if pid == perf.id %}selected{% endif %}>{{ perf.nome }}</option>
             {% endfor %}
           </select>
-          <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap">
-            <input type="checkbox" name="is_admin" {% if u.is_admin %}checked{% endif %}> Admin
+          <label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap">
+            <input type="checkbox" name="is_admin" {% if u.is_admin %}checked{% endif %}> Adm
           </label>
-          <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px">Guardar</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="font-size:10px;padding:2px 6px">💾</button>
         </form>
       </td>
       <td>
-        {% if u.is_admin %}
-        <span style="font-size:11px;background:rgba(59,110,240,.15);color:var(--accent);padding:2px 7px;border-radius:4px">Admin</span>
-        {% else %}—{% endif %}
+        <div style="display:flex;align-items:center;gap:4px">
+          {% if u.must_change_password %}
+          <span style="font-size:10px;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:3px">Temporária</span>
+          {% else %}
+          <span style="font-size:10px;color:var(--text-muted)">••••••••</span>
+          {% endif %}
+          <form method="post" action="{{ url_for('admin_reset_password', uid=u.id) }}"
+            onsubmit="return confirm('Resetar password de {{ u.nome }}? Será enviado email com nova password temporária.')" style="display:inline">
+            <button type="submit" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px" title="Reset Password">🔑</button>
+          </form>
+        </div>
       </td>
       <td style="text-align:right">
         {% if u.id != current_user.id %}
         <form method="post" action="{{ url_for('apagar_utilizador', uid=u.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
-          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger);font-size:10px">✕</button>
         </form>
         {% endif %}
       </td>
@@ -78,6 +99,11 @@
     {% endfor %}
     </tbody>
   </table>
+</div>
+
+<!-- Change own password link -->
+<div style="margin-top:12px;font-size:12px;color:var(--text-muted)">
+  Para alterar a sua própria password: <a href="{{ url_for('alterar_password') }}" style="color:var(--accent)">Alterar password</a>
 </div>
 
 <script>

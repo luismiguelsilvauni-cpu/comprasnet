@@ -11,6 +11,8 @@ class User(UserMixin, db.Model):
     nome          = db.Column(db.String(120), nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin      = db.Column(db.Boolean, default=False)
+    email         = db.Column(db.String(200))
+    must_change_password = db.Column(db.Boolean, default=False)
     departamento  = db.Column(db.String(100))
     data_criacao  = db.Column(db.DateTime, default=datetime.utcnow)
     pedidos_criados       = db.relationship('PedidoCompra', foreign_keys='PedidoCompra.criado_por', backref='criador', lazy=True)

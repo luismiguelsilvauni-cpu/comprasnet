@@ -186,3 +186,12 @@ with app.app_context():
                 if col not in cg_cols:
                     conn.execute(text(f"ALTER TABLE config_geral ADD COLUMN {col} {typ}"))
                     print(f"OK: config_geral.{col} adicionado")
+
+    # Add email and must_change_password to users table
+    if 'users' in insp.get_table_names():
+        u_cols = [c['name'] for c in insp.get_columns('users')]
+        for col, typ in [('email','TEXT'), ('must_change_password','INTEGER')]:
+            if col not in u_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {typ} DEFAULT 0"))
+                print(f"OK: users.{col} adicionado")

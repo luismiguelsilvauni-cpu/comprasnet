@@ -111,6 +111,8 @@ def login():
         u = User.query.filter_by(username=request.form.get('username','')).first()
         if u and check_password_hash(u.password_hash, request.form.get('password','')):
             login_user(u, remember=True)
+            if getattr(u, 'must_change_password', False):
+                return redirect(url_for('alterar_password'))
             return redirect(url_for('dashboard'))
         flash('Utilizador ou palavra-passe incorretos.', 'error')
     return render_template('login.html', cfg=ConfigGeral.query.first())
@@ -977,6 +979,7 @@ def novo_utilizador():
         username=username, nome=request.form.get('nome','').strip(),
         password_hash=generate_password_hash(request.form.get('password','')),
         is_admin=request.form.get('is_admin')=='on',
+        email=request.form.get('email','').strip(),
         departamento=request.form.get('departamento','').strip()))
     db.session.commit(); flash('Utilizador criado.','success')
     return redirect(url_for('admin_utilizadores'))
@@ -4760,15 +4763,17 @@ def admin_registo_aceitar(rid):
         flash('Username já existe.', 'error')
         return redirect(url_for('admin_registos_pendentes'))
     u = User(nome=r.nome, username=r.username,
-              password_hash=r.password_hash, is_admin=False)
+              password_hash=r.password_hash, is_admin=False,
+              email=r.email, must_change_password=False)
     db.session.add(u)
     r.estado = 'aceite'
     db.session.commit()
     try:
         _enviar_email_aprovacao(r.email, r.nome, r.username)
+        flash(f'Utilizador {r.nome} aprovado. Email enviado para {r.email}.', 'success')
     except Exception as ex:
         app.logger.warning(f"Email aprovacao error: {ex}")
-    flash(f'Utilizador {r.nome} aprovado.', 'success')
+        flash(f'Utilizador {r.nome} aprovado. ⚠️ Email não enviado: {ex}', 'warning')
     return redirect(url_for('admin_registos_pendentes'))
 
 @app.route('/admin/registos/<int:rid>/recusar', methods=['POST'])
@@ -4884,6 +4889,122 @@ def api_testar_smtp():
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
+
+
+import secrets
+import string
+
+def gerar_password_aleatoria(length=10):
+    chars = string.ascii_letters + string.digits + '!@#$%'
+    return ''.join(secrets.choice(chars) for _ in range(length))
+
+def enviar_email(para, assunto, corpo):
+    """Generic email sender using SMTP config."""
+    cfg = ConfigGeral.query.first()
+    if not cfg or not getattr(cfg, 'smtp_host', None):
+        raise Exception('SMTP não configurado')
+    import smtplib
+    from email.mime.text import MIMEText
+    msg = MIMEText(corpo, 'plain', 'utf-8')
+    msg['Subject'] = assunto
+    msg['From'] = getattr(cfg, 'smtp_from', None) or getattr(cfg, 'smtp_user', '')
+    msg['To'] = para
+    port = getattr(cfg, 'smtp_port', 587) or 587
+    if port == 465:
+        import ssl
+        with smtplib.SMTP_SSL(cfg.smtp_host, port, timeout=15, context=ssl.create_default_context()) as s:
+            if cfg.smtp_user and cfg.smtp_pass:
+                s.login(cfg.smtp_user, cfg.smtp_pass)
+            s.send_message(msg)
+    else:
+        with smtplib.SMTP(cfg.smtp_host, port, timeout=15) as s:
+            s.ehlo()
+            if getattr(cfg, 'smtp_tls', 1): s.starttls(); s.ehlo()
+            if cfg.smtp_user and cfg.smtp_pass:
+                s.login(cfg.smtp_user, cfg.smtp_pass)
+            s.send_message(msg)
+
+@app.route('/recuperar-password', methods=['GET', 'POST'])
+def recuperar_password():
+    cfg = ConfigGeral.query.first()
+    if request.method == 'POST':
+        email_ou_user = request.form.get('email_ou_user','').strip()
+        u = User.query.filter(
+            (User.email == email_ou_user) | (User.username == email_ou_user)
+        ).first()
+        if u and u.email:
+            nova = gerar_password_aleatoria()
+            u.password_hash = generate_password_hash(nova)
+            u.must_change_password = True
+            db.session.commit()
+            try:
+                empresa = cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech'
+                enviar_email(u.email,
+                    f'[{empresa}] Reset de Password',
+                    f'Olá {u.nome},\n\nA sua password foi redefinida.\n\nPassword temporária: {nova}\n\nAo fazer login será pedido que defina uma nova password.\n\nSe não pediu este reset, contacte o administrador.')
+                flash('Email enviado com a nova password temporária.', 'success')
+            except Exception as ex:
+                flash(f'Password alterada mas email não enviado: {ex}', 'warning')
+        else:
+            flash('Email ou utilizador não encontrado.', 'error')
+        return redirect(url_for('login'))
+    return render_template('recuperar_password.html', cfg=cfg)
+
+@app.route('/alterar-password', methods=['GET', 'POST'])
+@login_required
+def alterar_password():
+    if request.method == 'POST':
+        atual = request.form.get('atual','')
+        nova  = request.form.get('nova','').strip()
+        conf  = request.form.get('confirmar','').strip()
+        if not check_password_hash(current_user.password_hash, atual):
+            flash('Password actual incorrecta.', 'error')
+            return redirect(url_for('alterar_password'))
+        if nova != conf:
+            flash('As passwords não coincidem.', 'error')
+            return redirect(url_for('alterar_password'))
+        if len(nova) < 6:
+            flash('A password deve ter pelo menos 6 caracteres.', 'error')
+            return redirect(url_for('alterar_password'))
+        current_user.password_hash = generate_password_hash(nova)
+        current_user.must_change_password = False
+        db.session.commit()
+        flash('Password alterada com sucesso.', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('alterar_password.html')
+
+@app.route('/admin/utilizadores/<int:uid>/reset-password', methods=['POST'])
+@login_required
+def admin_reset_password(uid):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    u = User.query.get_or_404(uid)
+    nova = gerar_password_aleatoria()
+    u.password_hash = generate_password_hash(nova)
+    u.must_change_password = True
+    db.session.commit()
+    if u.email:
+        try:
+            cfg = ConfigGeral.query.first()
+            empresa = cfg.empresa_nome if cfg else 'NavTech'
+            enviar_email(u.email,
+                f'[{empresa}] Reset de Password',
+                f'Olá {u.nome},\n\nA sua password foi redefinida pelo administrador.\n\nPassword temporária: {nova}\n\nAo fazer login será pedido que defina uma nova password.')
+            flash(f'Password de {u.nome} redefinida e email enviado para {u.email}.', 'success')
+        except Exception as ex:
+            flash(f'Password redefinida: {nova} (email não enviado: {ex})', 'warning')
+    else:
+        flash(f'Password de {u.nome} redefinida: {nova} (sem email registado)', 'warning')
+    return redirect(url_for('admin_utilizadores'))
+
+@app.route('/admin/utilizadores/<int:uid>/editar-email', methods=['POST'])
+@login_required
+def admin_editar_email(uid):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    u = User.query.get_or_404(uid)
+    u.email = request.form.get('email','').strip()
+    db.session.commit()
+    flash(f'Email de {u.nome} actualizado.', 'success')
+    return redirect(url_for('admin_utilizadores'))
 
 
 def init_db():
