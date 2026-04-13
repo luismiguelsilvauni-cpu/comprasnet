@@ -169,3 +169,20 @@ with app.app_context():
         print("OK: tabela registo_pendente criada")
     else:
         print("OK: registo_pendente ja existe")
+
+    # Add SMTP fields to config_geral
+    if 'config_geral' in insp.get_table_names():
+        cg_cols = [c['name'] for c in insp.get_columns('config_geral')]
+        smtp_cols = [
+            ('smtp_host', 'TEXT'),
+            ('smtp_port', 'INTEGER'),
+            ('smtp_user', 'TEXT'),
+            ('smtp_pass', 'TEXT'),
+            ('smtp_from', 'TEXT'),
+            ('smtp_tls',  'INTEGER'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in smtp_cols:
+                if col not in cg_cols:
+                    conn.execute(text(f"ALTER TABLE config_geral ADD COLUMN {col} {typ}"))
+                    print(f"OK: config_geral.{col} adicionado")

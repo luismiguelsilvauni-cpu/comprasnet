@@ -4838,6 +4838,32 @@ def api_admin_registos_count():
     return jsonify({'count': RegistoPendente.query.filter_by(estado='pendente').count()})
 
 
+@app.route('/api/admin/testar-smtp', methods=['POST'])
+@login_required
+def api_testar_smtp():
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    cfg = ConfigGeral.query.first()
+    if not cfg or not cfg.smtp_host:
+        return jsonify({'ok': False, 'error': 'SMTP não configurado. Guarde primeiro.'})
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        msg = MIMEText('Teste de email da plataforma NavTech.')
+        msg['Subject'] = '[NavTech] Teste de email'
+        msg['From'] = cfg.smtp_from or cfg.smtp_user
+        msg['To'] = cfg.smtp_user
+        with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port or 587, timeout=10) as s:
+            if cfg.smtp_tls:
+                s.starttls()
+            if cfg.smtp_user and cfg.smtp_pass:
+                s.login(cfg.smtp_user, cfg.smtp_pass)
+            s.send_message(msg)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():

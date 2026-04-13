@@ -193,7 +193,64 @@
 </div>
 
 </div><!-- grid -->
+
+<!-- SMTP -->
+<div style="margin-top:20px">
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+    📧 Configuração de Email (SMTP)
+    <span style="font-weight:400;font-size:11px">— necessário para envio de emails de registo e aprovação</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+    <div class="config-field">
+      <label>Servidor SMTP</label>
+      <input type="text" name="smtp_host" value="{{ cfg.smtp_host or '' }}" class="config-input" placeholder="Ex: smtp.gmail.com">
+    </div>
+    <div class="config-field">
+      <label>Porta</label>
+      <input type="number" name="smtp_port" value="{{ cfg.smtp_port or 587 }}" class="config-input" placeholder="587">
+    </div>
+    <div class="config-field">
+      <label>Utilizador SMTP</label>
+      <input type="text" name="smtp_user" value="{{ cfg.smtp_user or '' }}" class="config-input" placeholder="email@empresa.pt">
+    </div>
+    <div class="config-field">
+      <label>Password SMTP</label>
+      <input type="password" name="smtp_pass" value="{{ cfg.smtp_pass or '' }}" class="config-input" placeholder="••••••••">
+    </div>
+    <div class="config-field">
+      <label>Email Remetente (From)</label>
+      <input type="text" name="smtp_from" value="{{ cfg.smtp_from or '' }}" class="config-input" placeholder="noreply@empresa.pt">
+    </div>
+    <div class="config-field" style="display:flex;align-items:center;gap:8px;padding-top:20px">
+      <input type="checkbox" name="smtp_tls" value="1" {% if cfg.smtp_tls %}checked{% endif %} id="smtpTls">
+      <label for="smtpTls" style="font-size:13px;cursor:pointer">Usar TLS/STARTTLS</label>
+    </div>
+  </div>
+  <!-- Test button -->
+  <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+    <button type="button" onclick="testarSMTP()" class="btn btn-ghost btn-sm">📧 Testar envio de email</button>
+    <span id="smtpTestResult" style="font-size:12px"></span>
+  </div>
+</div>
+
 </form>
+
+<script>
+function testarSMTP() {
+  var btn = event.target;
+  btn.textContent = '⏳ A testar...';
+  btn.disabled = true;
+  fetch('/api/admin/testar-smtp', {method:'POST'})
+    .then(r=>r.json())
+    .then(d=>{
+      btn.textContent = '📧 Testar envio de email';
+      btn.disabled = false;
+      var res = document.getElementById('smtpTestResult');
+      res.textContent = d.ok ? '✅ Email enviado com sucesso!' : '❌ Erro: ' + d.error;
+      res.style.color = d.ok ? '#22c55e' : '#ef4444';
+    });
+}
+</script>
 
 <script>
 function aplicarTema(accent, bg, surface) {
