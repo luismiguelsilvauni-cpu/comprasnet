@@ -54,12 +54,12 @@
       <select name="func_{{ loop.index0 }}" class="input" style="width:220px;font-size:12px">
         <option value="">— Seleccionar —</option>
         {% for f in funcionarios %}
-        <option value="{{ f.id }}" {% if rec.func_match_id == f.id %}selected{% endif %}>
+        <option value="{{ f.id }}" {% if rec.get("func_match_id") == f.id %}selected{% endif %}>
           {{ f.numero }} · {{ f.nome }}
         </option>
         {% endfor %}
       </select>
-      {% if rec.func_match_id %}
+      {% if rec.get("func_match_id") %}
       <span style="font-size:11px;color:#22c55e">✅ auto</span>
       {% else %}
       <span style="font-size:11px;color:#f59e0b">⚠️ manual</span>

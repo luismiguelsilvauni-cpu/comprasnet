@@ -5812,10 +5812,14 @@ def salarios_importar():
         f.save(tmp.name); tmp.close()
         try:
             resultado = _parse_recibos_excel(tmp.name)
-            session['excel_import_tmp'] = tmp.name
-            session['excel_import_resultado'] = resultado
+            # Strip non-serializable objects before storing in session
+            resultado_safe = []
+            for rec in resultado:
+                r2 = {k: v for k, v in rec.items() if k != 'func_match'}
+                resultado_safe.append(r2)
+            session['excel_import_resultado'] = resultado_safe
             return render_template('salarios_importar_preview.html',
-                resultado=resultado,
+                resultado=resultado_safe,
                 funcionarios=Funcionario.query.order_by(Funcionario.nome).all(),
                 meses_labels=MESES_LABELS)
         except Exception as e:
@@ -5961,7 +5965,6 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
     return {
         'sheet': sname,
         'nome_raw': nome_raw,
-        'func_match': func_match,
         'func_match_id': func_match.id if func_match else None,
         'func_match_nome': func_match.nome if func_match else '—',
         'mes_global': mes_global,
