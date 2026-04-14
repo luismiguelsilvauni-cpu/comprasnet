@@ -5795,6 +5795,222 @@ def salario_recibo_apagar(rid):
     return redirect(url_for('salarios_calendario', fid=fid, ano=ano))
 
 
+# ── IMPORTAÇÃO RECIBOS EXCEL ─────────────────────────────────────────────────
+
+@app.route('/salarios/importar', methods=['GET', 'POST'])
+@login_required
+def salarios_importar():
+    if request.method == 'POST':
+        f = request.files.get('excel')
+        if not f or not f.filename:
+            flash('Seleccione um ficheiro Excel.', 'error')
+            return redirect(url_for('salarios_importar'))
+        # Save temp file
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(suffix='.xls', delete=False)
+        f.save(tmp.name); tmp.close()
+        try:
+            resultado = _parse_recibos_excel(tmp.name)
+            session['excel_import_tmp'] = tmp.name
+            session['excel_import_resultado'] = resultado
+            return render_template('salarios_importar_preview.html',
+                resultado=resultado,
+                funcionarios=Funcionario.query.order_by(Funcionario.nome).all(),
+                meses_labels=MESES_LABELS)
+        except Exception as e:
+            flash(f'Erro ao ler ficheiro: {e}', 'error')
+            return redirect(url_for('salarios_importar'))
+    return render_template('salarios_importar.html')
+
+@app.route('/salarios/importar/confirmar', methods=['POST'])
+@login_required
+def salarios_importar_confirmar():
+    """Confirm import — create ReciboSalario records from Excel data."""
+    from flask import session as sess
+    resultado = sess.get('excel_import_resultado', [])
+    mes_global = request.form.get('mes_global', '')
+    ano_global = request.form.get('ano_global', str(datetime.now().year))
+
+    criados = 0
+    erros = []
+    for i, rec in enumerate(resultado):
+        fid = request.form.get(f'func_{i}')
+        mes = request.form.get(f'mes_{i}') or mes_global
+        ano = request.form.get(f'ano_{i}') or ano_global
+
+        if not fid or not mes or not ano:
+            erros.append(f"Linha {i+1} ({rec.get('sheet','?')}): sem funcionário/mês/ano")
+            continue
+
+        fid = int(fid); mes = int(mes); ano = int(ano)
+        func = Funcionario.query.get(fid)
+        if not func:
+            erros.append(f"Linha {i+1}: funcionário não encontrado")
+            continue
+
+        # Check existing
+        existing = ReciboSalario.query.filter_by(
+            funcionario_id=fid, ano=ano, mes=mes).first()
+        if existing:
+            # Update
+            r = existing
+        else:
+            r = ReciboSalario(funcionario_id=fid, ano=ano, mes=mes,
+                mes_label=MESES_LABELS.get(mes, f'Mês {mes}'))
+            db.session.add(r)
+
+        r.vencimento_base    = rec.get('vencimento_base', 0)
+        r.premios            = rec.get('premios', 0)
+        r.horas_extra        = rec.get('horas_extra', 0)
+        r.subsidio_refeicao  = rec.get('subsidio_refeicao', 0)
+        r.outros_abonos      = rec.get('outros_abonos', 0)
+        r.total_abonos       = rec.get('total_iliquido', 0)
+        r.seg_social_func    = rec.get('seg_social', 0)
+        r.irs_retencao       = rec.get('irs', 0)
+        r.outros_descontos   = 0
+        r.total_descontos    = rec.get('total_descontos', 0)
+        r.liquido            = rec.get('liquido', 0)
+        r.estado             = 'processado'
+        r.notas              = f'Importado de Excel: {rec.get("sheet","")}'
+        r.atualizado_em      = datetime.now()
+        criados += 1
+
+    db.session.commit()
+    if erros:
+        for e in erros: flash(e, 'warning')
+    flash(f'{criados} recibo(s) importado(s) com sucesso.', 'success')
+    return redirect(url_for('salarios'))
+
+def _parse_recibos_excel(filepath):
+    """Parse UCN salary Excel format — one sheet per employee."""
+    try:
+        import xlrd
+        wb = xlrd.open_workbook(filepath)
+    except:
+        import openpyxl
+        return _parse_recibos_xlsx(filepath)
+
+    resultado = []
+
+    # Get global month from INICIO sheet if present
+    mes_global = ''
+    try:
+        ini = wb.sheet_by_name('INICIO')
+        mes_global = str(ini.cell_value(4, 2)).strip()  # C5
+    except: pass
+
+    for sname in wb.sheet_names():
+        if sname in ('INICIO', 'Transf BCP', 'inicio', 'transf'):
+            continue
+        ws = wb.sheet_by_name(sname)
+        try:
+            rec = _parse_sheet_xls(ws, sname, mes_global)
+            resultado.append(rec)
+        except Exception as e:
+            resultado.append({'sheet': sname, 'erro': str(e), 'nome_raw': sname})
+
+    return resultado
+
+def _parse_sheet_xls(ws, sname, mes_global=''):
+    """Extract salary data from one employee sheet."""
+    def val(r, c):
+        try: return ws.cell_value(r-1, c-1)
+        except: return 0
+    def fval(r, c):
+        try: return float(ws.cell_value(r-1, c-1) or 0)
+        except: return 0.0
+    def sval(r, c):
+        try: return str(ws.cell_value(r-1, c-1)).strip()
+        except: return ''
+
+    # Nome do funcionário (A4, after "NOME DO FUNCIONÁRIO ")
+    nome_raw = sval(4, 1).replace('NOME DO FUNCIONÁRIO', '').replace('NOME DO FUNCIONÁRIO XPTO','').strip()
+    if not nome_raw or nome_raw == 'XPTO':
+        nome_raw = sname  # fallback to sheet name
+
+    # Try to match funcionario
+    func_match = None
+    funcs = Funcionario.query.all()
+    nome_parts = nome_raw.upper().split()
+    best_score = 0
+    for f in funcs:
+        f_parts = f.nome.upper().split()
+        score = sum(1 for p in nome_parts if any(p in fp for fp in f_parts))
+        if score > best_score:
+            best_score = score
+            func_match = f
+
+    # Also try sheet name (format "11-Luis Silva")
+    if '-' in sname:
+        parts = sname.split('-', 1)
+        if len(parts) == 2:
+            num = parts[0].strip()
+            nome_sheet = parts[1].strip()
+            # Try by number first
+            f_by_num = Funcionario.query.filter_by(numero=num).first()
+            if f_by_num:
+                func_match = f_by_num
+            else:
+                # Try by name from sheet
+                for f in funcs:
+                    if nome_sheet.upper() in f.nome.upper() or f.nome.upper() in nome_sheet.upper():
+                        func_match = f
+                        break
+
+    return {
+        'sheet': sname,
+        'nome_raw': nome_raw,
+        'func_match': func_match,
+        'func_match_id': func_match.id if func_match else None,
+        'func_match_nome': func_match.nome if func_match else '—',
+        'mes_global': mes_global,
+        # Abonos
+        'vencimento_base':   fval(9, 8),   # H9
+        'premios':           fval(10, 8),  # H10
+        'horas_extra':       fval(13, 8),  # H13
+        'subsidio_refeicao': fval(14, 8),  # H14
+        'outros_abonos':     fval(15, 8),  # H15
+        'total_iliquido':    fval(16, 8),  # H16
+        # Descontos
+        'seg_social':        fval(18, 6),  # F18
+        'irs':               fval(19, 8),  # H19
+        'total_descontos':   fval(23, 8),  # H23
+        # Líquido
+        'liquido':           fval(25, 8),  # H25
+        'transf_conta':      fval(27, 8),  # H27
+        'transf_refeicao':   fval(28, 8),  # H28
+    }
+
+def _parse_recibos_xlsx(filepath):
+    """Parse .xlsx format."""
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+    resultado = []
+    for sname in wb.sheetnames:
+        if sname.upper() in ('INICIO', 'TRANSF BCP'):
+            continue
+        ws = wb[sname]
+        def fv(r, c):
+            try: return float(ws.cell(row=r, column=c).value or 0)
+            except: return 0.0
+        def sv(r, c):
+            try: return str(ws.cell(row=r, column=c).value or '').strip()
+            except: return ''
+        nome_raw = sv(4, 1).replace('NOME DO FUNCIONÁRIO','').replace('XPTO','').strip()
+        resultado.append({
+            'sheet': sname, 'nome_raw': nome_raw or sname,
+            'func_match': None, 'func_match_id': None, 'func_match_nome': '—',
+            'mes_global': '',
+            'vencimento_base': fv(9,8), 'premios': fv(10,8),
+            'horas_extra': fv(13,8), 'subsidio_refeicao': fv(14,8),
+            'outros_abonos': fv(15,8), 'total_iliquido': fv(16,8),
+            'seg_social': fv(18,6), 'irs': fv(19,8),
+            'total_descontos': fv(23,8), 'liquido': fv(25,8),
+            'transf_conta': fv(27,8), 'transf_refeicao': fv(28,8),
+        })
+    return resultado
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():

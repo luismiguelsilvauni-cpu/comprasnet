@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Importar Recibos Excel{% endblock %}
+{% block page_title %}Importação de Recibos Excel{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('salarios') }}" class="btn btn-ghost btn-sm">← Salários</a>
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div>
+<div class="card" style="padding:20px">
+  <div style="font-size:14px;font-weight:700;margin-bottom:6px">📊 Importar ficheiro Excel</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+    O sistema lê o ficheiro Excel com o formato UCN.<br>
+    Cada folha (sheet) corresponde a um funcionário.<br>
+    Suporta <strong>.xls</strong> e <strong>.xlsx</strong>.
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    <div class="form-group">
+      <label>Ficheiro Excel *</label>
+      <input type="file" name="excel" required accept=".xls,.xlsx" class="input">
+    </div>
+    <button type="submit" class="btn btn-primary" style="width:100%">
+      📥 Ler Ficheiro e Pré-visualizar
+    </button>
+  </form>
+</div>
+</div>
+
+<div class="card" style="padding:20px">
+  <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--accent)">ℹ️ Formato esperado</div>
+  <div style="font-size:12px;color:var(--text-muted);line-height:1.8">
+    <div>📋 Sheet <strong>INICIO</strong> — mês global e dias úteis</div>
+    <div>👤 Uma sheet por funcionário (ex: <em>11-Luis Silva</em>)</div>
+    <div>Linha 4 — Nome do funcionário</div>
+    <div>Linha 9 — Remuneração Base (coluna H)</div>
+    <div>Linha 10 — Gratificação / Prémios (coluna H)</div>
+    <div>Linha 13 — Horas Extraordinárias (coluna H)</div>
+    <div>Linha 14 — Subsídio Alimentação (coluna H)</div>
+    <div>Linha 16 — Total Ilíquido (coluna H)</div>
+    <div>Linha 18 — CRSS / Seg. Social (coluna F)</div>
+    <div>Linha 19 — IRS (coluna H)</div>
+    <div>Linha 23 — Total Descontos (coluna H)</div>
+    <div>Linha 25 — Líquido a Receber (coluna H)</div>
+    <div style="margin-top:8px">📋 Sheet <strong>Transf BCP</strong> — ignorada automaticamente</div>
+  </div>
+</div>
+</div>
+{% endblock %}

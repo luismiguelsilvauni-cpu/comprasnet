@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Pré-visualização Importação{% endblock %}
+{% block page_title %}Pré-visualização — Recibos Excel{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('salarios_importar') }}" class="btn btn-ghost btn-sm">← Novo upload</a>
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<div class="alert alert-info" style="margin-bottom:16px;background:rgba(59,110,240,.1);border:1px solid rgba(59,110,240,.3);border-radius:8px;padding:10px 14px;font-size:13px">
+  ℹ️ Verifique a associação de cada recibo ao funcionário e ao mês. Corrija manualmente se necessário.
+</div>
+
+<form method="post" action="{{ url_for('salarios_importar_confirmar') }}">
+
+<!-- Global settings -->
+<div class="card" style="padding:14px;margin-bottom:14px">
+  <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px">⚙️ Configurações Globais (aplicadas onde não estiver definido por linha)</div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <div class="form-group" style="margin:0">
+      <label>Mês (global)</label>
+      <select name="mes_global" class="input" style="width:180px">
+        {% for num, label in meses_labels.items() %}
+        <option value="{{ num }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>Ano</label>
+      <input type="number" name="ano_global" value="{{ now().year }}" class="input" style="width:90px">
+    </div>
+  </div>
+</div>
+
+<!-- Preview table -->
+{% for rec in resultado %}
+<div class="card" style="padding:0;margin-bottom:12px;{% if rec.get('erro') %}border-color:var(--danger){% elif rec.func_match_id %}border-color:rgba(34,197,94,.4){% else %}border-color:var(--warning){% endif %}">
+  <!-- Sheet header -->
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2)">
+    <div style="font-size:13px;font-weight:700;flex:1">
+      📋 {{ rec.sheet }}
+      {% if rec.get('erro') %}
+      <span style="font-size:11px;color:var(--danger);margin-left:8px">⚠️ Erro: {{ rec.erro }}</span>
+      {% endif %}
+    </div>
+    {% if not rec.get('erro') %}
+    <!-- Funcionario selector -->
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;color:var(--text-muted)">Funcionário:</label>
+      <select name="func_{{ loop.index0 }}" class="input" style="width:220px;font-size:12px">
+        <option value="">— Seleccionar —</option>
+        {% for f in funcionarios %}
+        <option value="{{ f.id }}" {% if rec.func_match_id == f.id %}selected{% endif %}>
+          {{ f.numero }} · {{ f.nome }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if rec.func_match_id %}
+      <span style="font-size:11px;color:#22c55e">✅ auto</span>
+      {% else %}
+      <span style="font-size:11px;color:#f59e0b">⚠️ manual</span>
+      {% endif %}
+    </div>
+    <!-- Mês selector -->
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;color:var(--text-muted)">Mês:</label>
+      <select name="mes_{{ loop.index0 }}" class="input" style="width:160px;font-size:12px">
+        <option value="">— Global —</option>
+        {% for num, label in meses_labels.items() %}
+        <option value="{{ num }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;color:var(--text-muted)">Ano:</label>
+      <input type="number" name="ano_{{ loop.index0 }}" placeholder="Global" class="input" style="width:80px;font-size:12px">
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not rec.get('erro') %}
+  <!-- Values preview -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+    <!-- Abonos -->
+    <div style="padding:12px 14px;border-right:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase">Abonos</div>
+      {% set abonos = [
+        ('Remuneração Base', rec.vencimento_base),
+        ('Gratificação/Prémios', rec.premios),
+        ('Horas Extraordinárias', rec.horas_extra),
+        ('Subsídio de Alimentação', rec.subsidio_refeicao),
+        ('Outros Abonos', rec.outros_abonos),
+      ] %}
+      {% for label, val in abonos %}
+      {% if val %}
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text-muted)">{{ label }}</span>
+        <span style="font-family:monospace;font-weight:600">{{ '%.2f'|format(val) }} €</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;font-weight:700;color:#22c55e">
+        <span>Total Ilíquido</span>
+        <span style="font-family:monospace">{{ '%.2f'|format(rec.total_iliquido) }} €</span>
+      </div>
+    </div>
+    <!-- Descontos + Líquido -->
+    <div style="padding:12px 14px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase">Descontos</div>
+      {% set descontos = [
+        ('Seg. Social (11%)', rec.seg_social),
+        ('IRS', rec.irs),
+      ] %}
+      {% for label, val in descontos %}
+      {% if val %}
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text-muted)">{{ label }}</span>
+        <span style="font-family:monospace;font-weight:600;color:#ef4444">{{ '%.2f'|format(val) }} €</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;font-weight:700;color:#ef4444">
+        <span>Total Descontos</span>
+        <span style="font-family:monospace">{{ '%.2f'|format(rec.total_descontos) }} €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;font-weight:700;color:#22c55e;border-top:2px solid var(--border);margin-top:4px">
+        <span>💶 LÍQUIDO</span>
+        <span style="font-family:monospace">{{ '%.2f'|format(rec.liquido) }} €</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<div style="display:flex;gap:10px;margin-top:16px">
+  <button type="submit" class="btn btn-primary">
+    ✅ Confirmar e Importar {{ resultado|length }} recibo(s)
+  </button>
+  <a href="{{ url_for('salarios_importar') }}" class="btn btn-ghost">Cancelar</a>
+</div>
+</form>
+{% endblock %}
