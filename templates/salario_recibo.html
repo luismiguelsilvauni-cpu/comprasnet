@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Recibo {{ mes_label }} {{ ano }} · {{ func.nome }}{% endblock %}
+{% block page_title %}Recibo de Salário{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('salarios_calendario', fid=func.id, ano=ano) }}" class="btn btn-ghost btn-sm">← Calendário</a>
+  {% if recibo %}
+  <button onclick="gerarPDF()" class="btn btn-ghost btn-sm">📄 PDF</button>
+  <button onclick="window.print()" class="btn btn-ghost btn-sm">🖨 Imprimir</button>
+  <button onclick="enviarEmail({{ recibo.id }})" class="btn btn-ghost btn-sm">📧 Email</button>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<style>
+.recibo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.val-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
+.val-row:last-child{border-bottom:none}
+.val-label{font-size:13px;color:var(--text)}
+.val-input{width:110px;text-align:right;padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);font-family:monospace}
+.total-row{display:flex;justify-content:space-between;padding:10px 0;font-weight:700;font-size:14px}
+.liquido-box{background:rgba(34,197,94,.1);border:2px solid #22c55e;border-radius:10px;padding:14px 18px;text-align:center;margin-top:14px}
+.sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+</style>
+
+<!-- Header -->
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:16px">
+  <div style="flex:1">
+    <div style="font-size:17px;font-weight:700">{{ func.nome }}</div>
+    <div style="font-size:12px;color:var(--text-muted)">{{ func.categoria or '' }} · Nº {{ func.numero }} · NIF: {{ func.nif or '—' }}</div>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:18px;font-weight:700;color:var(--accent)">{{ mes_label }}</div>
+    <div style="font-size:13px;color:var(--text-muted)">{{ ano }}</div>
+  </div>
+</div>
+
+{% if dias_falta > 0 %}
+<div class="alert alert-warning" style="margin-bottom:12px">
+  ⚠️ Este funcionário tem {{ dias_falta }} dias de falta registados em {{ mes_label }}.
+</div>
+{% endif %}
+
+<form method="post" id="reciboForm">
+<input type="hidden" name="action" id="formAction" value="save">
+
+<div class="recibo-grid">
+<!-- ABONOS -->
+<div class="card" style="padding:14px">
+  <div class="sec-title">📈 Abonos</div>
+  {% set abonos = [
+    ('vencimento_base','Vencimento Base','base'),
+    ('subsidio_refeicao','Subsídio de Refeição','ref'),
+    ('horas_extra','Horas Extra','hex'),
+    ('premios','Prémios','prem'),
+    ('outros_abonos','Outros Abonos','outr'),
+  ] %}
+  {% for fname, flabel, fkey in abonos %}
+  <div class="val-row">
+    <span class="val-label">{{ flabel }}</span>
+    <input type="number" name="{{ fname }}" step="0.01" min="0"
+      value="{{ '%.2f'|format((recibo[fname]|float) if recibo and recibo[fname] else (ultima_sp.vencimento|float if fkey=='base' and ultima_sp and ultima_sp.vencimento else (ultima_sp.refeicao|float if fkey=='ref' and ultima_sp and ultima_sp.refeicao else 0))) }}"
+      class="val-input" oninput="calcular()">
+  </div>
+  {% endfor %}
+  <div class="total-row" style="color:#22c55e">
+    <span>Total Abonos</span><span id="totalAbonos">0.00 €</span>
+  </div>
+</div>
+
+<!-- DESCONTOS -->
+<div class="card" style="padding:14px">
+  <div class="sec-title">📉 Descontos</div>
+  {% set descontos = [
+    ('irs_retencao','Retenção IRS',''),
+    ('seg_social_func','Seg. Social (11%)','ss'),
+    ('faltas_valor','Faltas','falt'),
+    ('outros_descontos','Outros Descontos',''),
+  ] %}
+  {% for fname, flabel, fkey in descontos %}
+  <div class="val-row">
+    <span class="val-label">{{ flabel }}</span>
+    <input type="number" name="{{ fname }}" step="0.01" min="0"
+      value="{{ '%.2f'|format(recibo[fname]|float if recibo and recibo[fname] else 0) }}"
+      class="val-input" id="inp-{{ fname }}" oninput="calcular()">
+  </div>
+  {% endfor %}
+  <div class="val-row" style="background:rgba(59,110,240,.05);border-radius:6px;padding:6px 8px">
+    <span style="font-size:12px;color:var(--text-muted)">Seg. Social Entidade (23.75%)</span>
+    <span id="ssEmp" style="font-family:monospace;font-size:12px;color:var(--text-muted)">0.00 €</span>
+    <input type="hidden" name="seg_social_emp" id="ssEmpVal" value="0">
+  </div>
+  <div class="total-row" style="color:#ef4444">
+    <span>Total Descontos</span><span id="totalDescontos">0.00 €</span>
+  </div>
+</div>
+</div>
+
+<!-- Tabelas IRS helper -->
+{% if tabelas_irs %}
+<div class="card" style="padding:12px;margin-top:12px">
+  <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">📊 Tabelas IRS disponíveis ({{ ano }})</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+  {% for t in tabelas_irs %}
+  <a href="{{ url_for('salario_doc_ver', did=t.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">📄 {{ t.descricao }}</a>
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Totals -->
+<div class="liquido-box">
+  <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">Valor Líquido a Receber</div>
+  <div style="font-size:32px;font-weight:700;color:#22c55e" id="liquido">0.00 €</div>
+</div>
+
+<!-- Estado e notas -->
+<div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-top:14px">
+  <div class="form-group"><label>Estado</label>
+    <select name="estado" class="input">
+      <option value="rascunho" {% if not recibo or recibo.estado=='rascunho' %}selected{% endif %}>📝 Rascunho</option>
+      <option value="processado" {% if recibo and recibo.estado=='processado' %}selected{% endif %}>✅ Processado</option>
+      <option value="pago" {% if recibo and recibo.estado=='pago' %}selected{% endif %}>💶 Pago</option>
+    </select>
+  </div>
+  <div class="form-group"><label>Notas</label>
+    <input type="text" name="notas" value="{{ recibo.notas if recibo else '' }}" class="input">
+  </div>
+</div>
+
+<div style="display:flex;gap:8px;margin-top:12px">
+  <button type="submit" class="btn btn-primary">💾 Guardar Recibo</button>
+  <button type="button" onclick="document.getElementById('formAction').value='pdf';document.getElementById('reciboForm').submit()" class="btn btn-ghost">📄 Guardar e Gerar PDF</button>
+</div>
+</form>
+
+<script>
+function fmt(v){return parseFloat(v||0).toFixed(2)+' €';}
+function calcular(){
+  var base   = +getVal('vencimento_base');
+  var ref    = +getVal('subsidio_refeicao');
+  var hex    = +getVal('horas_extra');
+  var prem   = +getVal('premios');
+  var outr   = +getVal('outros_abonos');
+  var irs    = +getVal('irs_retencao');
+  var ss     = base * 0.11;
+  var ssEmp  = base * 0.2375;
+  var falt   = +getVal('faltas_valor');
+  var outd   = +getVal('outros_descontos');
+
+  // Auto-fill SS if 0
+  var ssInput = document.querySelector('[name=seg_social_func]');
+  if (ssInput && parseFloat(ssInput.value)==0) ssInput.value = ss.toFixed(2);
+
+  var totalA = base + ref + hex + prem + outr;
+  var totalD = irs + +getVal('seg_social_func') + falt + outd;
+  var liq    = totalA - totalD;
+
+  document.getElementById('totalAbonos').textContent   = fmt(totalA);
+  document.getElementById('totalDescontos').textContent = fmt(totalD);
+  document.getElementById('liquido').textContent        = fmt(liq);
+  document.getElementById('ssEmp').textContent          = fmt(ssEmp);
+  document.getElementById('ssEmpVal').value             = ssEmp.toFixed(2);
+}
+
+function getVal(name){
+  var el = document.querySelector('[name='+name+']');
+  return el ? parseFloat(el.value||0) : 0;
+}
+
+function gerarPDF(){
+  document.getElementById('formAction').value='pdf';
+  document.getElementById('reciboForm').submit();
+}
+
+function enviarEmail(rid){
+  if(!confirm('Enviar recibo para o email do funcionário?')) return;
+  fetch('/salarios/recibo/'+rid+'/email',{method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      alert(d.ok?'✅ Email enviado!':'❌ '+d.error);
+    });
+}
+
+calcular();
+</script>
+{% endblock %}

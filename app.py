@@ -2659,6 +2659,7 @@ MENUS_DISPONIVEIS = [
     ('tecnico',            '🔧 Técnico'),
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
+    ('salarios',           '💶 Salários'),
     ('roadmap',            '🗺️ Roadmap'),
     ('changelog',          '📝 Changelog'),
     ('admin_config',       '⚙️ Configurações'),
@@ -2770,6 +2771,73 @@ class FuncionarioFormacao(db.Model):
     pdf_filename    = db.Column(db.String(500))
     pdf_path        = db.Column(db.String(1000))
     criado_em       = db.Column(db.DateTime, default=datetime.now)
+
+
+# ── MÓDULO SALÁRIOS ───────────────────────────────────────────────────────────
+
+UPLOAD_SALARIOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'salarios')
+os.makedirs(UPLOAD_SALARIOS, exist_ok=True)
+
+class TabelaIRS(db.Model):
+    __tablename__ = 'tabela_irs'
+    id          = db.Column(db.Integer, primary_key=True)
+    ano         = db.Column(db.Integer, nullable=False)
+    descricao   = db.Column(db.String(200))
+    pdf_filename= db.Column(db.String(500))
+    pdf_path    = db.Column(db.String(1000))
+    dados_json  = db.Column(db.Text, default='{}')  # parsed IRS brackets
+    criado_em   = db.Column(db.DateTime, default=datetime.now)
+
+class DocContabilistico(db.Model):
+    __tablename__ = 'doc_contabilistico'
+    id          = db.Column(db.Integer, primary_key=True)
+    titulo      = db.Column(db.String(300), nullable=False)
+    tipo        = db.Column(db.String(100))  # tabela_irs, outro
+    ano         = db.Column(db.Integer)
+    pdf_filename= db.Column(db.String(500))
+    pdf_path    = db.Column(db.String(1000))
+    criado_em   = db.Column(db.DateTime, default=datetime.now)
+
+class ReciboSalario(db.Model):
+    __tablename__ = 'recibo_salario'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    ano             = db.Column(db.Integer, nullable=False)
+    mes             = db.Column(db.Integer, nullable=False)   # 1-12, 13=ferias, 14=natal, 15+=extra
+    mes_label       = db.Column(db.String(50))                # "Janeiro", "Subsídio Férias", etc.
+    estado          = db.Column(db.String(20), default='rascunho')  # rascunho/processado/pago
+    # Valores base
+    vencimento_base = db.Column(db.Numeric(10,2), default=0)
+    subsidio_refeicao = db.Column(db.Numeric(10,2), default=0)
+    horas_extra     = db.Column(db.Numeric(10,2), default=0)
+    premios         = db.Column(db.Numeric(10,2), default=0)
+    outros_abonos   = db.Column(db.Numeric(10,2), default=0)
+    # Deduções
+    irs_retencao    = db.Column(db.Numeric(10,2), default=0)
+    seg_social_func = db.Column(db.Numeric(10,2), default=0)  # 11%
+    seg_social_emp  = db.Column(db.Numeric(10,2), default=0)  # 23.75%
+    outros_descontos= db.Column(db.Numeric(10,2), default=0)
+    faltas_valor    = db.Column(db.Numeric(10,2), default=0)
+    # Totais calculados
+    total_abonos    = db.Column(db.Numeric(10,2), default=0)
+    total_descontos = db.Column(db.Numeric(10,2), default=0)
+    liquido         = db.Column(db.Numeric(10,2), default=0)
+    # Extra info
+    notas           = db.Column(db.Text)
+    dados_json      = db.Column(db.Text, default='{}')  # extra fields
+    pdf_filename    = db.Column(db.String(500))
+    pdf_path        = db.Column(db.String(1000))
+    criado_em       = db.Column(db.DateTime, default=datetime.now)
+    atualizado_em   = db.Column(db.DateTime, default=datetime.now)
+
+    funcionario     = db.relationship('Funcionario', backref='recibos')
+
+MESES_LABELS = {
+    1:'Janeiro', 2:'Fevereiro', 3:'Março', 4:'Abril',
+    5:'Maio', 6:'Junho', 7:'Julho', 8:'Agosto',
+    9:'Setembro', 10:'Outubro', 11:'Novembro', 12:'Dezembro',
+    13:'Subsídio de Férias', 14:'Subsídio de Natal'
+}
 
 
 class RegistoPendente(db.Model):
@@ -5468,6 +5536,230 @@ def api_funcionario_faltas(fid, ano):
         'id': f.id, 'mes': f.mes, 'dias_falta': float(f.dias_falta or 0),
         'horas_falta': float(f.horas_falta or 0), 'tipo': f.tipo, 'notas': f.notas or ''
     } for f in faltas])
+
+
+# ── SALÁRIOS ROUTES ───────────────────────────────────────────────────────────
+
+@app.route('/salarios')
+@login_required
+def salarios():
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    return render_template('salarios.html', funcionarios=funcionarios)
+
+@app.route('/salarios/processar/<int:fid>')
+@login_required
+def salarios_calendario(fid):
+    func = Funcionario.query.get_or_404(fid)
+    ano = int(request.args.get('ano', datetime.now().year))
+    # Get existing recibos for this employee/year
+    recibos = {r.mes: r for r in ReciboSalario.query.filter_by(
+        funcionario_id=fid, ano=ano).all()}
+    # Extra months defined by user
+    extra_meses = []
+    for m_num, m_label in MESES_LABELS.items():
+        pass
+    return render_template('salarios_calendario.html',
+        func=func, ano=ano, recibos=recibos,
+        meses_labels=MESES_LABELS)
+
+@app.route('/salarios/recibo/<int:fid>/<int:ano>/<int:mes>', methods=['GET','POST'])
+@login_required
+def salario_recibo(fid, ano, mes):
+    func = Funcionario.query.get_or_404(fid)
+    recibo = ReciboSalario.query.filter_by(
+        funcionario_id=fid, ano=ano, mes=mes).first()
+
+    # Get last situacao profissional for defaults
+    ultima_sp = None
+    if func.situacoes_prof:
+        ultima_sp = func.situacoes_prof[0]
+
+    if request.method == 'POST':
+        def n(f): 
+            v = request.form.get(f,'0').strip().replace(',','.')
+            try: return float(v)
+            except: return 0.0
+
+        if not recibo:
+            recibo = ReciboSalario(
+                funcionario_id=fid, ano=ano, mes=mes,
+                mes_label=MESES_LABELS.get(mes, f'Mês {mes}'))
+            db.session.add(recibo)
+
+        recibo.vencimento_base    = n('vencimento_base')
+        recibo.subsidio_refeicao  = n('subsidio_refeicao')
+        recibo.horas_extra        = n('horas_extra')
+        recibo.premios            = n('premios')
+        recibo.outros_abonos      = n('outros_abonos')
+        recibo.irs_retencao       = n('irs_retencao')
+        recibo.seg_social_func    = n('seg_social_func')
+        recibo.seg_social_emp     = n('seg_social_emp')
+        recibo.outros_descontos   = n('outros_descontos')
+        recibo.faltas_valor       = n('faltas_valor')
+        recibo.notas              = request.form.get('notas','').strip()
+        recibo.estado             = request.form.get('estado', 'rascunho')
+
+        # Calculate totals
+        recibo.total_abonos    = (recibo.vencimento_base + recibo.subsidio_refeicao +
+                                   recibo.horas_extra + recibo.premios + recibo.outros_abonos)
+        recibo.total_descontos = (recibo.irs_retencao + recibo.seg_social_func +
+                                   recibo.outros_descontos + recibo.faltas_valor)
+        recibo.liquido         = recibo.total_abonos - recibo.total_descontos
+        recibo.atualizado_em   = datetime.now()
+        db.session.commit()
+
+        if request.form.get('action') == 'pdf':
+            return redirect(url_for('salario_recibo_pdf', rid=recibo.id))
+        flash('Recibo guardado.', 'success')
+        return redirect(url_for('salario_recibo', fid=fid, ano=ano, mes=mes))
+
+    # Get faltas for this month
+    faltas_mes = FuncionarioFalta.query.filter_by(
+        funcionario_id=fid, ano=ano, mes=mes).all()
+    dias_falta = sum(float(f.dias_falta or 0) for f in faltas_mes)
+
+    # Get tabelas IRS
+    tabelas_irs = TabelaIRS.query.filter_by(ano=ano).order_by(TabelaIRS.id.desc()).all()
+
+    return render_template('salario_recibo.html',
+        func=func, ano=ano, mes=mes,
+        mes_label=MESES_LABELS.get(mes, f'Mês {mes}'),
+        recibo=recibo, ultima_sp=ultima_sp,
+        dias_falta=dias_falta, tabelas_irs=tabelas_irs)
+
+@app.route('/salarios/recibo/<int:rid>/pdf')
+@login_required
+def salario_recibo_pdf(rid):
+    """Generate PDF for salary slip."""
+    r = ReciboSalario.query.get_or_404(rid)
+    func = Funcionario.query.get(r.funcionario_id)
+    # Render HTML and convert to PDF using weasyprint or return HTML for print
+    html = render_template('salario_recibo_print.html', recibo=r, func=func,
+                           mes_label=MESES_LABELS.get(r.mes, f'Mês {r.mes}'))
+    try:
+        from weasyprint import HTML as WP
+        pdf = WP(string=html).write_pdf()
+        fname = f"recibo_{func.numero}_{r.ano}_{r.mes:02d}.pdf"
+        r.pdf_filename = fname
+        safe = os.path.join(UPLOAD_SALARIOS, fname)
+        with open(safe, 'wb') as pf: pf.write(pdf)
+        r.pdf_path = fname
+        db.session.commit()
+        return send_from_directory(UPLOAD_SALARIOS, fname, as_attachment=True, download_name=fname)
+    except ImportError:
+        # Fallback: return printable HTML
+        from flask import make_response
+        resp = make_response(html)
+        resp.headers['Content-Type'] = 'text/html'
+        return resp
+
+@app.route('/salarios/recibo/<int:rid>/email', methods=['POST'])
+@login_required
+def salario_recibo_email(rid):
+    r = ReciboSalario.query.get_or_404(rid)
+    func = Funcionario.query.get(r.funcionario_id)
+    if not func.email:
+        return jsonify({'ok': False, 'error': 'Funcionário sem email'})
+    try:
+        cfg = ConfigGeral.query.first()
+        empresa = cfg.empresa_nome if cfg else 'Empresa'
+        mes_label = MESES_LABELS.get(r.mes, f'Mês {r.mes}')
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.base import MIMEBase
+        from email import encoders
+
+        msg = MIMEMultipart()
+        msg['Subject'] = f'[{empresa}] Recibo de Salário — {mes_label} {r.ano}'
+        msg['From'] = getattr(cfg,'smtp_from','') or getattr(cfg,'smtp_user','')
+        msg['To'] = func.email
+        msg.attach(MIMEText(f'Olá {func.nome},
+
+Segue em anexo o recibo de salário referente a {mes_label} de {r.ano}.
+
+Com os melhores cumprimentos,
+{empresa}'))
+
+        if r.pdf_path:
+            ppath = os.path.join(UPLOAD_SALARIOS, r.pdf_path)
+            if os.path.exists(ppath):
+                with open(ppath,'rb') as pf:
+                    part = MIMEBase('application','octet-stream')
+                    part.set_payload(pf.read())
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f'attachment; filename="{r.pdf_filename}"')
+                    msg.attach(part)
+
+        port = getattr(cfg,'smtp_port',587) or 587
+        if port == 465:
+            import ssl; ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(cfg.smtp_host, port, timeout=15, context=ctx) as s:
+                if cfg.smtp_user: s.login(cfg.smtp_user, cfg.smtp_pass or '')
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(cfg.smtp_host, port, timeout=15) as s:
+                s.ehlo()
+                if getattr(cfg,'smtp_tls',1): s.starttls(); s.ehlo()
+                if cfg.smtp_user: s.login(cfg.smtp_user, cfg.smtp_pass or '')
+                s.send_message(msg)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+# Documentos Contabilísticos
+@app.route('/salarios/documentos', methods=['GET','POST'])
+@login_required
+def salarios_documentos():
+    if request.method == 'POST':
+        f = request.files.get('file')
+        titulo = request.form.get('titulo','').strip()
+        tipo = request.form.get('tipo','outro')
+        ano = request.form.get('ano','')
+        if f and titulo:
+            safe = f"contab_{tipo}_{ano}_{f.filename.replace(' ','_')}"
+            f.save(os.path.join(UPLOAD_SALARIOS, safe))
+            doc = DocContabilistico(titulo=titulo, tipo=tipo,
+                ano=int(ano) if ano.isdigit() else None,
+                pdf_filename=f.filename, pdf_path=safe)
+            db.session.add(doc)
+            if tipo == 'tabela_irs' and ano.isdigit():
+                db.session.add(TabelaIRS(ano=int(ano), descricao=titulo,
+                    pdf_filename=f.filename, pdf_path=safe))
+            db.session.commit()
+            flash('Documento guardado.', 'success')
+        return redirect(url_for('salarios_documentos'))
+    docs = DocContabilistico.query.order_by(DocContabilistico.criado_em.desc()).all()
+    return render_template('salarios_documentos.html', docs=docs)
+
+@app.route('/salarios/documentos/<int:did>/ver')
+@login_required
+def salario_doc_ver(did):
+    d = DocContabilistico.query.get_or_404(did)
+    return send_from_directory(UPLOAD_SALARIOS, d.pdf_path, as_attachment=False, download_name=d.pdf_filename)
+
+@app.route('/salarios/documentos/<int:did>/apagar', methods=['POST'])
+@login_required
+def salario_doc_apagar(did):
+    d = DocContabilistico.query.get_or_404(did)
+    try:
+        p = os.path.join(UPLOAD_SALARIOS, d.pdf_path)
+        if os.path.exists(p): os.remove(p)
+    except: pass
+    db.session.delete(d)
+    db.session.commit()
+    return redirect(url_for('salarios_documentos'))
+
+@app.route('/salarios/historico')
+@login_required
+def salarios_historico():
+    ano = int(request.args.get('ano', datetime.now().year))
+    fid = request.args.get('fid','')
+    q = ReciboSalario.query.filter_by(ano=ano)
+    if fid: q = q.filter_by(funcionario_id=int(fid))
+    recibos = q.order_by(ReciboSalario.funcionario_id, ReciboSalario.mes).all()
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    return render_template('salarios_historico.html', recibos=recibos, ano=ano, funcs=funcs, fid=fid)
 
 
 def init_db():

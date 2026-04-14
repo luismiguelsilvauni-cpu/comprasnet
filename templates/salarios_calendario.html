@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Calendário Salarial · {{ func.nome }}{% endblock %}
+{% block page_title %}Calendário Salarial{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('salarios') }}" class="btn btn-ghost btn-sm">← Salários</a>
+{% endblock %}
+{% block content %}
+<style>
+.cal-header{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px}
+.mes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.mes-badge{background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;display:block;position:relative}
+.mes-badge:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.mes-badge.processado{border-color:#22c55e;background:rgba(34,197,94,.06)}
+.mes-badge.pago{border-color:#3b6ef0;background:rgba(59,110,240,.06)}
+.mes-badge.extra{border-color:#f59e0b}
+.mes-icon{font-size:32px;display:block;margin-bottom:8px}
+.mes-nome{font-size:14px;font-weight:700;color:var(--text)}
+.mes-valor{font-size:12px;color:var(--text-muted);margin-top:4px}
+.mes-estado{position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px}
+.est-processado{background:rgba(34,197,94,.2);color:#22c55e}
+.est-pago{background:rgba(59,110,240,.2);color:#3b6ef0}
+.est-rascunho{background:rgba(245,158,11,.2);color:#f59e0b}
+</style>
+
+<!-- Employee header -->
+<div class="cal-header">
+  <div style="width:44px;height:44px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff">{{ func.nome[0].upper() }}</div>
+  <div style="flex:1">
+    <div style="font-size:16px;font-weight:700">{{ func.nome }}</div>
+    <div style="font-size:12px;color:var(--text-muted)">{{ func.categoria or '' }} · Nº {{ func.numero }}</div>
+  </div>
+  <select onchange="location.href='/salarios/processar/{{ func.id }}?ano='+this.value"
+    style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
+    {% for a in range(now.year+1, now.year-4, -1) %}
+    <option value="{{ a }}" {% if a==ano %}selected{% endif %}>{{ a }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<!-- Month badges -->
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Meses Regulares</div>
+<div class="mes-grid">
+{% set mes_icons = {1:'❄️',2:'🌧️',3:'🌱',4:'🌸',5:'☀️',6:'🌊',7:'🏖️',8:'🌅',9:'🍂',10:'🎃',11:'🍁',12:'🎄'} %}
+{% for mes_num, mes_nome in meses_labels.items() if mes_num <= 12 %}
+{% set r = recibos.get(mes_num) %}
+<a href="{{ url_for('salario_recibo', fid=func.id, ano=ano, mes=mes_num) }}"
+   class="mes-badge {{ r.estado if r else '' }}">
+  {% if r %}<span class="mes-estado est-{{ r.estado }}">{{ r.estado|upper }}</span>{% endif %}
+  <span class="mes-icon">{{ mes_icons.get(mes_num,'📅') }}</span>
+  <div class="mes-nome">{{ mes_nome }}</div>
+  {% if r and r.liquido %}<div class="mes-valor">{{ '%.2f €'|format(r.liquido|float) }}</div>{% else %}<div class="mes-valor">Não processado</div>{% endif %}
+</a>
+{% endfor %}
+</div>
+
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Subsídios e Extras</div>
+<div class="mes-grid">
+{% for mes_num, mes_nome in meses_labels.items() if mes_num > 12 %}
+{% set r = recibos.get(mes_num) %}
+<a href="{{ url_for('salario_recibo', fid=func.id, ano=ano, mes=mes_num) }}"
+   class="mes-badge extra {{ r.estado if r else '' }}">
+  {% if r %}<span class="mes-estado est-{{ r.estado }}">{{ r.estado|upper }}</span>{% endif %}
+  <span class="mes-icon">{{ '🏖️' if mes_num==13 else '🎁' if mes_num==14 else '➕' }}</span>
+  <div class="mes-nome">{{ mes_nome }}</div>
+  {% if r and r.liquido %}<div class="mes-valor">{{ '%.2f €'|format(r.liquido|float) }}</div>{% else %}<div class="mes-valor">Não processado</div>{% endif %}
+</a>
+{% endfor %}
+
+<!-- Add extra month -->
+<div class="mes-badge" onclick="adicionarMesExtra()" style="border-style:dashed">
+  <span class="mes-icon">➕</span>
+  <div class="mes-nome" style="color:var(--text-muted)">Adicionar Extra</div>
+</div>
+</div>
+<script>
+function adicionarMesExtra() {
+  var nome = prompt('Nome do mês extra (ex: Subsídio de Turno):');
+  if (!nome) return;
+  // Find next available mes number
+  var next = {{ (recibos.keys()|list|max if recibos else 14) + 1 }};
+  if (next < 15) next = 15;
+  window.location.href = '/salarios/recibo/{{ func.id }}/{{ ano }}/' + next + '?label=' + encodeURIComponent(nome);
+}
+</script>
+{% endblock %}

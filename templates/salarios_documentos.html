@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Documentos Contabilísticos{% endblock %}
+{% block page_title %}Upload Documentos Contabilísticos{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('salarios') }}" class="btn btn-ghost btn-sm">← Salários</a>
+  <button onclick="tog('uploadForm')" class="btn btn-primary btn-sm">+ Upload</button>
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<div id="uploadForm" style="display:none;margin-bottom:18px">
+  <div class="card" style="padding:16px">
+    <form method="post" enctype="multipart/form-data">
+      <div style="display:grid;grid-template-columns:2fr 1fr 80px;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input" placeholder="Ex: Tabela IRS 2025 Casado 2 dependentes"></div>
+        <div class="form-group" style="margin:0"><label>Tipo</label>
+          <select name="tipo" class="input">
+            <option value="tabela_irs">📊 Tabela IRS</option>
+            <option value="tabela_ss">🛡️ Tabela Seg. Social</option>
+            <option value="legislacao">📋 Legislação</option>
+            <option value="outro">📄 Outro</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0"><label>Ano</label><input type="number" name="ano" value="{{ now.year }}" class="input"></div>
+      </div>
+      <div class="form-group"><label>Ficheiro (PDF) *</label><input type="file" name="file" required accept=".pdf,.xlsx,.xls" class="input"></div>
+      <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+    </form>
+  </div>
+</div>
+
+{% set tipo_icons = {'tabela_irs':'📊','tabela_ss':'🛡️','legislacao':'📋','outro':'📄'} %}
+{% if docs %}
+<div class="card" style="padding:0">
+  <table class="table" style="font-size:13px">
+    <thead><tr><th>Tipo</th><th>Título</th><th>Ano</th><th>Ficheiro</th><th>Data</th><th></th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+    <tr>
+      <td>{{ tipo_icons.get(d.tipo,'📄') }} {{ d.tipo|replace('_',' ')|title }}</td>
+      <td style="font-weight:600">{{ d.titulo }}</td>
+      <td>{{ d.ano or '—' }}</td>
+      <td style="font-size:11px;color:var(--text-muted)">{{ d.pdf_filename }}</td>
+      <td style="font-size:11px;color:var(--text-muted)">{{ d.criado_em.strftime('%d/%m/%Y') }}</td>
+      <td style="text-align:right">
+        <a href="{{ url_for('salario_doc_ver', did=d.id) }}" target="_blank" class="btn btn-ghost btn-sm">👁</a>
+        <form method="post" action="{{ url_for('salario_doc_apagar', did=d.id) }}" onsubmit="return confirm('Apagar?')" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">
+  <div style="font-size:40px;margin-bottom:12px">📂</div>
+  <div style="font-weight:600;margin-bottom:6px">Sem documentos</div>
+  <div style="font-size:13px">Faça upload das tabelas de IRS e outros documentos contabilísticos.</div>
+</div>
+{% endif %}
+<script>function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}</script>
+{% endblock %}

@@ -226,3 +226,11 @@ with app.app_context():
         if tbl not in insp.get_table_names():
             db.create_all()
             print(f"OK: {tbl} criado")
+
+    # Create salary tables
+    for tbl in ['tabela_irs','doc_contabilistico','recibo_salario']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: {tbl} criado")
+        else:
+            print(f"OK: {tbl} existe")

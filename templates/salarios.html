@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Salários{% endblock %}
+{% block page_title %}Módulo de Salários{% endblock %}
+{% block content %}
+<style>
+.main-badges{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:28px}
+.main-badge{background:var(--surface);border:2px solid var(--border);border-radius:16px;padding:32px 20px;cursor:pointer;text-align:center;transition:all .2s;position:relative;text-decoration:none;display:block}
+.main-badge:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.main-badge .mbi{font-size:48px;display:block;margin-bottom:14px}
+.main-badge .mbt{font-size:16px;font-weight:700;color:var(--text)}
+.main-badge .mbs{font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5}
+.funcs-table{font-size:13px}
+.funcs-table th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:8px 10px;border-bottom:2px solid var(--border)}
+.funcs-table td{padding:8px 10px;border-bottom:1px solid var(--border)}
+</style>
+
+<div class="main-badges">
+  <a href="#salarios-lista" onclick="showSection('salarios-lista')" class="main-badge" id="badge-salarios">
+    <span class="mbi">💶</span>
+    <div class="mbt">Pagamento de Salários</div>
+    <div class="mbs">Lista de funcionários · Processar recibo · Enviar por email</div>
+  </a>
+  <a href="{{ url_for('salarios_documentos') }}" class="main-badge">
+    <span class="mbi">📂</span>
+    <div class="mbt">Upload Documentos Contabilísticos</div>
+    <div class="mbs">Tabelas IRS · Documentos fiscais · Arquivos</div>
+  </a>
+  <a href="{{ url_for('salarios_historico') }}" class="main-badge">
+    <span class="mbi">📋</span>
+    <div class="mbt">Histórico</div>
+    <div class="mbs">Recibos processados · Consulta por funcionário e ano</div>
+  </a>
+</div>
+
+<!-- Salary list section -->
+<div id="salarios-lista">
+  {% set ano_atual = now.year %}
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div style="font-size:14px;font-weight:700">💶 Funcionários — Processamento de Salários</div>
+    <div style="flex:1"></div>
+    <select id="anoSel" onchange="location.href='/salarios?ano='+this.value"
+      style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
+      {% for a in range(ano_atual+1, ano_atual-4, -1) %}
+      <option value="{{ a }}" {% if request.args.get('ano',ano_atual|string)==a|string %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% set funcs = funcionarios %}
+  {% if funcs %}
+  <div class="card" style="padding:0;overflow-x:auto">
+    <table class="table funcs-table">
+      <thead><tr>
+        <th>Nº</th><th>Nome</th><th>NIF</th><th>CC / BI</th><th>Passaporte</th>
+        <th>Dependentes</th><th>IBAN</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for f in funcs %}
+      <tr>
+        <td class="mono" style="font-weight:700;color:var(--accent)">{{ f.numero }}</td>
+        <td style="font-weight:600">{{ f.nome }}</td>
+        <td class="mono">{{ f.nif or '—' }}</td>
+        <td class="mono">{{ f.num_cc or '—' }}</td>
+        <td class="mono">{{ f.num_passaporte or '—' }}</td>
+        <td style="text-align:center">{{ f.num_dependentes or 0 }}</td>
+        <td class="mono" style="font-size:11px">{{ f.iban or '—' }}</td>
+        <td>
+          <a href="{{ url_for('salarios_calendario', fid=f.id) }}" class="btn btn-primary btn-sm">
+            💶 Processar Salário
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">
+    <div style="font-size:32px;margin-bottom:12px">👥</div>
+    <div>Sem funcionários activos. <a href="{{ url_for('funcionarios') }}" style="color:var(--accent)">Adicionar funcionários</a></div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

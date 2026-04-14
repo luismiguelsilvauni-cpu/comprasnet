@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Histórico Salarial{% endblock %}
+{% block page_title %}Histórico de Salários{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('salarios') }}" class="btn btn-ghost btn-sm">← Salários</a>
+{% endblock %}
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+  <select onchange="location.href='/salarios/historico?ano='+this.value+'&fid={{ fid }}'"
+    style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
+    {% for a in range(now.year+1, now.year-5, -1) %}
+    <option value="{{ a }}" {% if a==ano %}selected{% endif %}>{{ a }}</option>
+    {% endfor %}
+  </select>
+  <select onchange="location.href='/salarios/historico?ano={{ ano }}&fid='+this.value"
+    style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
+    <option value="">Todos os funcionários</option>
+    {% for f in funcs %}
+    <option value="{{ f.id }}" {% if fid|string==f.id|string %}selected{% endif %}>{{ f.nome }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% set meses_labels = {1:'Jan',2:'Fev',3:'Mar',4:'Abr',5:'Mai',6:'Jun',7:'Jul',8:'Ago',9:'Set',10:'Out',11:'Nov',12:'Dez',13:'Férias',14:'Natal'} %}
+{% if recibos %}
+<div class="card" style="padding:0;overflow-x:auto">
+  <table class="table" style="font-size:12px">
+    <thead><tr><th>Funcionário</th><th>Mês</th><th>Abonos</th><th>Descontos</th><th>Líquido</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    {% for r in recibos %}
+    <tr>
+      <td style="font-weight:600">{{ r.funcionario.nome }}</td>
+      <td>{{ r.mes_label or meses_labels.get(r.mes,'Mês '+r.mes|string) }}</td>
+      <td class="mono">{{ '%.2f €'|format(r.total_abonos|float) }}</td>
+      <td class="mono" style="color:#ef4444">{{ '%.2f €'|format(r.total_descontos|float) }}</td>
+      <td class="mono" style="font-weight:700;color:#22c55e">{{ '%.2f €'|format(r.liquido|float) }}</td>
+      <td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;{% if r.estado=='pago' %}background:rgba(59,110,240,.15);color:#3b6ef0{% elif r.estado=='processado' %}background:rgba(34,197,94,.15);color:#22c55e{% else %}background:rgba(245,158,11,.15);color:#f59e0b{% endif %}">{{ r.estado|upper }}</span></td>
+      <td><a href="{{ url_for('salario_recibo', fid=r.funcionario_id, ano=r.ano, mes=r.mes) }}" class="btn btn-ghost btn-sm" style="font-size:11px">Ver</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">
+  <div style="font-size:40px;margin-bottom:12px">📋</div>
+  <div>Sem recibos processados para {{ ano }}.</div>
+</div>
+{% endif %}
+{% endblock %}
