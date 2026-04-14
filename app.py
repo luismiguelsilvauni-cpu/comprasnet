@@ -5674,12 +5674,8 @@ def salario_recibo_email(rid):
         msg['Subject'] = f'[{empresa}] Recibo de Salário — {mes_label} {r.ano}'
         msg['From'] = getattr(cfg,'smtp_from','') or getattr(cfg,'smtp_user','')
         msg['To'] = func.email
-        msg.attach(MIMEText(f'Olá {func.nome},
-
-Segue em anexo o recibo de salário referente a {mes_label} de {r.ano}.
-
-Com os melhores cumprimentos,
-{empresa}'))
+        corpo = 'Olá ' + func.nome + ',\n\nSegue em anexo o recibo de salário referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
+        msg.attach(MIMEText(corpo))
 
         if r.pdf_path:
             ppath = os.path.join(UPLOAD_SALARIOS, r.pdf_path)
