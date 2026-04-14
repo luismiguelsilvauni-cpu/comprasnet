@@ -4,8 +4,7 @@
 {% block topbar_actions %}
   <a href="{{ url_for('salarios_calendario', fid=func.id, ano=ano) }}" class="btn btn-ghost btn-sm">← Calendário</a>
   {% if recibo %}
-  <button onclick="gerarPDF()" class="btn btn-ghost btn-sm">📄 PDF</button>
-  <button onclick="window.print()" class="btn btn-ghost btn-sm">🖨 Imprimir</button>
+  <button onclick="gerarPDF()" class="btn btn-ghost btn-sm">📄 PDF / Imprimir</button>
   <button onclick="enviarEmail({{ recibo.id }})" class="btn btn-ghost btn-sm">📧 Email</button>
   <a href="{{ url_for('salario_recibo_excel', rid=recibo.id) }}" class="btn btn-ghost btn-sm">📊 Excel</a>
   <form method="post" action="{{ url_for('salario_recibo_apagar', rid=recibo.id) }}" onsubmit="return confirm('Eliminar este recibo?')" style="display:inline">
@@ -171,8 +170,11 @@ function getVal(name){
 }
 
 function gerarPDF(){
-  document.getElementById('formAction').value='pdf';
-  document.getElementById('reciboForm').submit();
+  {% if recibo %}
+  window.open('/salarios/recibo/{{ recibo.id }}/pdf', '_blank');
+  {% else %}
+  alert('Guarde o recibo primeiro antes de gerar o PDF.');
+  {% endif %}
 }
 
 function enviarEmail(rid){

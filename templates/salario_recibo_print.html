@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <style>
 @page { size: A4; margin: 15mm 15mm 15mm 15mm; }
+@media print { .no-print { display: none !important; } }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; font-size: 10pt; color: #1a1a1a; background: white; }
 
@@ -244,5 +245,12 @@ tr:nth-child(even) { background: #f9f9f9; }
   </div>
 
 </div>
+<script>
+// Auto-print when opened
+window.onload = function() {
+  // Small delay to ensure logo loads
+  setTimeout(function() { window.print(); }, 500);
+};
+</script>
 </body>
 </html>
