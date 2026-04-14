@@ -5762,6 +5762,32 @@ def salarios_historico():
     return render_template('salarios_historico.html', recibos=recibos, ano=ano, funcs=funcs, fid=fid)
 
 
+@app.route('/salarios/recibo/<int:rid>/excel')
+@login_required
+def salario_recibo_excel(rid):
+    """Download salary slip as Excel."""
+    from io import BytesIO
+    from flask import send_file
+    r = ReciboSalario.query.get_or_404(rid)
+    func = Funcionario.query.get(r.funcionario_id)
+    cfg = ConfigGeral.query.first()
+    empresa = cfg.empresa_nome if cfg else 'União Construtora Naval Limitada'
+    mes_label = MESES_LABELS.get(r.mes, r.mes_label or f'Mês {r.mes}')
+
+    import importlib.util, sys
+    spec = importlib.util.spec_from_file_location("gerar_recibo",
+        os.path.join(os.path.dirname(__file__), 'gerar_recibo.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    wb = mod.gerar_recibo_excel(func, r, mes_label, r.ano, empresa)
+    buf = BytesIO()
+    wb.save(buf); buf.seek(0)
+    fname = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}.xlsx"
+    return send_file(buf, as_attachment=True, download_name=fname,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():
