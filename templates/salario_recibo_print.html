@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<style>
+@page { size: A4; margin: 15mm 15mm 15mm 15mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; font-size: 10pt; color: #1a1a1a; background: white; }
+
+.recibo-wrapper { border: 2px solid #1a1a1a; padding: 0; }
+
+/* Header */
+.header { display: flex; align-items: center; padding: 10px 14px; border-bottom: 2px solid #1a1a1a; background: #f8f8f8; }
+.header-logo { width: 80px; margin-right: 14px; }
+.header-logo img { max-width: 80px; max-height: 50px; object-fit: contain; }
+.header-empresa { flex: 1; }
+.header-empresa h1 { font-size: 13pt; font-weight: bold; color: #003366; }
+.header-empresa p { font-size: 8pt; color: #555; margin-top: 2px; }
+.header-recibo { text-align: right; }
+.header-recibo .recibo-label { font-size: 12pt; font-weight: bold; color: #003366; }
+.header-recibo .recibo-num { font-size: 9pt; color: #555; }
+
+/* Employee info */
+.emp-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #ccc; }
+.emp-col { padding: 8px 14px; }
+.emp-col:first-child { border-right: 1px solid #ccc; }
+.info-row { display: flex; margin-bottom: 3px; font-size: 9pt; }
+.info-label { font-weight: bold; min-width: 110px; color: #003366; }
+.info-val { color: #1a1a1a; }
+.month-badge { background: #003366; color: white; text-align: center; padding: 6px 14px; font-weight: bold; font-size: 11pt; border-bottom: 2px solid #1a1a1a; }
+
+/* Tables */
+.section-title { background: #003366; color: white; font-weight: bold; font-size: 9pt; padding: 4px 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+th { background: #e8edf5; font-weight: bold; color: #003366; padding: 4px 8px; border: 1px solid #ccc; text-align: center; font-size: 8pt; }
+td { padding: 3px 8px; border: 1px solid #ddd; }
+td:last-child { text-align: right; }
+.td-center { text-align: center; }
+tr:nth-child(even) { background: #f9f9f9; }
+.subtotal-row td { background: #e8edf5; font-weight: bold; border-top: 2px solid #003366; }
+.total-row td { background: #003366; color: white; font-weight: bold; font-size: 10pt; border: none; }
+.zero { color: #999; }
+
+/* Totals box */
+.totals-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: 2px solid #1a1a1a; }
+.total-box { padding: 8px 12px; text-align: center; border-right: 1px solid #ccc; }
+.total-box:last-child { border-right: none; }
+.total-box .t-label { font-size: 8pt; color: #555; font-weight: bold; text-transform: uppercase; }
+.total-box .t-value { font-size: 14pt; font-weight: bold; margin-top: 2px; }
+.total-box.liquido { background: #003366; color: white; }
+.total-box.abonos .t-value { color: #006600; }
+.total-box.descontos .t-value { color: #cc0000; }
+
+/* Transferencias */
+.transf { padding: 6px 14px; border-top: 1px solid #ccc; font-size: 8.5pt; }
+.transf-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.transf-label { color: #555; }
+.transf-val { font-weight: bold; }
+
+/* Assinatura */
+.sign-area { display: grid; grid-template-columns: 2fr 1fr; padding: 10px 14px; border-top: 2px solid #1a1a1a; gap: 20px; }
+.sign-text { font-size: 8pt; color: #444; line-height: 1.5; }
+.sign-line { border-top: 1px solid #333; margin-top: 20px; text-align: center; font-size: 8pt; color: #555; padding-top: 2px; }
+
+/* Footer */
+.footer { background: #f0f4f8; border-top: 1px solid #ccc; padding: 4px 14px; font-size: 7.5pt; color: #777; text-align: center; }
+.original-tag { position: absolute; top: 12px; right: 14px; background: #cc0000; color: white; font-size: 7pt; font-weight: bold; padding: 2px 6px; border-radius: 3px; transform: rotate(15deg); }
+</style>
+</head>
+<body>
+
+<div class="recibo-wrapper" style="position:relative">
+
+  <!-- ORIGINAL tag -->
+  <div class="original-tag">ORIGINAL</div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-logo">
+      {% if cfg and cfg.empresa_logo_path %}
+      <img src="{{ upload_url }}/{{ cfg.empresa_logo_path }}" alt="Logo">
+      {% else %}
+      <div style="width:80px;height:50px;background:#003366;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:8pt">UCN</div>
+      {% endif %}
+    </div>
+    <div class="header-empresa">
+      <h1>{{ empresa_nome }}</h1>
+      {% if cfg and cfg.empresa_morada %}<p>{{ cfg.empresa_morada }}</p>{% endif %}
+      {% if cfg and cfg.empresa_nif %}<p>NIF: {{ cfg.empresa_nif }}</p>{% endif %}
+    </div>
+    <div class="header-recibo">
+      <div class="recibo-label">RECIBO DE REMUNERAÇÃO</div>
+      <div class="recibo-num">Nº {{ func.numero }} · {{ ano }}</div>
+    </div>
+  </div>
+
+  <!-- Month badge -->
+  <div class="month-badge">{{ mes_label }} {{ ano }}</div>
+
+  <!-- Employee info -->
+  <div class="emp-info">
+    <div class="emp-col">
+      <div class="info-row"><span class="info-label">Funcionário:</span><span class="info-val"><strong>{{ func.nome }}</strong></span></div>
+      <div class="info-row"><span class="info-label">Categoria:</span><span class="info-val">{{ func.categoria or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Morada:</span><span class="info-val">{{ func.morada or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">NIF:</span><span class="info-val">{{ func.nif or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Nº Seg. Social:</span><span class="info-val">{{ func.num_seg_social or '—' }}</span></div>
+    </div>
+    <div class="emp-col">
+      <div class="info-row"><span class="info-label">Estado Civil:</span><span class="info-val">{{ func.estado_civil or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Titulares IRS:</span><span class="info-val">{{ func.titulares_rendimento or 1 }}</span></div>
+      <div class="info-row"><span class="info-label">Dependentes:</span><span class="info-val">{{ func.num_dependentes or 0 }}</span></div>
+      <div class="info-row"><span class="info-label">Seguro:</span><span class="info-val">{{ func.seguro_companhia or '—' }} · Apólice {{ func.seguro_apolice or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">IBAN:</span><span class="info-val">{{ func.iban or '—' }}</span></div>
+    </div>
+  </div>
+
+  <!-- Abonos -->
+  <div class="section-title">ABONOS</div>
+  <table>
+    <thead>
+      <tr><th style="text-align:left;width:40%">Descrição</th><th>Dias</th><th>Horas</th><th>RHT (€)</th><th>Base (€)</th><th>Valor (€)</th></tr>
+    </thead>
+    <tbody>
+      {% set venc = recibo.vencimento_base|float %}
+      {% set dias = 30 %}
+      <tr>
+        <td>Remuneração Base</td>
+        <td class="td-center">{{ dias }}</td>
+        <td class="td-center">{{ '%.2f'|format(venc/dias*8 if venc and dias else 0) }}</td>
+        <td class="td-center">{{ '%.3f'|format(venc/dias if venc and dias else 0) }}</td>
+        <td class="td-center">{{ '%.2f'|format(venc) }}</td>
+        <td>{{ '%.2f'|format(venc) }}</td>
+      </tr>
+      {% if recibo.premios|float > 0 %}
+      <tr><td>Gratificação / Prémios</td><td></td><td></td><td></td><td></td><td>{{ '%.2f'|format(recibo.premios|float) }}</td></tr>
+      {% endif %}
+      {% if recibo.horas_extra|float > 0 %}
+      <tr><td>Horas Extraordinárias</td><td></td><td class="td-center">{{ '%.2f'|format(recibo.horas_extra|float) }}</td><td></td><td></td><td>{{ '%.2f'|format(recibo.horas_extra|float * venc/dias/8*1.5 if venc and dias else 0) }}</td></tr>
+      {% endif %}
+      {% if recibo.subsidio_refeicao|float > 0 %}
+      {% set ref_dias = 22 %}
+      {% set ref_dia_val = recibo.subsidio_refeicao|float / ref_dias %}
+      <tr><td>Subsídio de Alimentação</td><td class="td-center">{{ ref_dias }}</td><td></td><td class="td-center">{{ '%.2f'|format(ref_dia_val) }}</td><td></td><td>{{ '%.2f'|format(recibo.subsidio_refeicao|float) }}</td></tr>
+      {% endif %}
+      {% if recibo.outros_abonos|float > 0 %}
+      <tr><td>Outros Abonos</td><td></td><td></td><td></td><td></td><td>{{ '%.2f'|format(recibo.outros_abonos|float) }}</td></tr>
+      {% endif %}
+      <tr class="subtotal-row"><td colspan="5" style="text-align:right">TOTAL ILÍQUIDO</td><td>{{ '%.2f'|format(recibo.total_abonos|float) }}</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Descontos -->
+  <div class="section-title" style="margin-top:8px">DESCONTOS</div>
+  <table>
+    <thead>
+      <tr><th style="text-align:left;width:40%">Descrição</th><th>%</th><th>Base (€)</th><th colspan="2"></th><th>Valor (€)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>C.R.S.S. (Seg. Social Trabalhador)</td>
+        <td class="td-center">11,00%</td>
+        <td class="td-center">{{ '%.2f'|format(venc) }}</td>
+        <td colspan="2"></td>
+        <td>{{ '%.2f'|format(recibo.seg_social_func|float) }}</td>
+      </tr>
+      {% set irs = recibo.irs_retencao|float %}
+      {% set irs_base = recibo.total_abonos|float - recibo.subsidio_refeicao|float %}
+      {% set irs_rate = irs/irs_base if irs_base > 0 and irs > 0 else 0 %}
+      <tr>
+        <td>I.R.S. (Retenção na Fonte)</td>
+        <td class="td-center">{{ '%.2f'|format(irs_rate*100) }}%</td>
+        <td class="td-center">{{ '%.2f'|format(irs_base) }}</td>
+        <td colspan="2"></td>
+        <td>{{ '%.2f'|format(irs) }}</td>
+      </tr>
+      {% if recibo.faltas_valor|float > 0 %}
+      <tr><td>Desconto por Faltas</td><td></td><td></td><td colspan="2"></td><td>{{ '%.2f'|format(recibo.faltas_valor|float) }}</td></tr>
+      {% endif %}
+      {% if recibo.outros_descontos|float > 0 %}
+      <tr><td>Outros Descontos</td><td></td><td></td><td colspan="2"></td><td>{{ '%.2f'|format(recibo.outros_descontos|float) }}</td></tr>
+      {% endif %}
+      <tr class="subtotal-row"><td colspan="5" style="text-align:right">TOTAL DE DESCONTOS</td><td>{{ '%.2f'|format(recibo.total_descontos|float) }}</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="totals-grid">
+    <div class="total-box abonos">
+      <div class="t-label">Total Ilíquido</div>
+      <div class="t-value">{{ '%.2f'|format(recibo.total_abonos|float) }} €</div>
+    </div>
+    <div class="total-box descontos">
+      <div class="t-label">Total Descontos</div>
+      <div class="t-value">{{ '%.2f'|format(recibo.total_descontos|float) }} €</div>
+    </div>
+    <div class="total-box liquido">
+      <div class="t-label">Líquido a Receber</div>
+      <div class="t-value">{{ '%.2f'|format(recibo.liquido|float) }} €</div>
+    </div>
+  </div>
+
+  <!-- Transferências -->
+  <div class="transf">
+    <strong>Discriminativo de Pagamento:</strong>
+    <div class="transf-row">
+      <span class="transf-label">Transferência para conta {{ func.iban or '—' }}</span>
+      <span class="transf-val">{{ '%.2f'|format(recibo.liquido|float - recibo.subsidio_refeicao|float) }} €</span>
+    </div>
+    {% if recibo.subsidio_refeicao|float > 0 %}
+    <div class="transf-row">
+      <span class="transf-label">Transferência Subsídio de Refeição</span>
+      <span class="transf-val">{{ '%.2f'|format(recibo.subsidio_refeicao|float) }} €</span>
+    </div>
+    {% endif %}
+    <div class="transf-row" style="border-top:1px solid #ccc;margin-top:4px;padding-top:4px;font-weight:bold">
+      <span>TOTAL TRANSFERIDO</span>
+      <span>{{ '%.2f'|format(recibo.liquido|float) }} €</span>
+    </div>
+    <!-- Seg Social Entidade (informativo) -->
+    <div class="transf-row" style="margin-top:6px;color:#777;font-size:8pt">
+      <span>Encargo Seg. Social Entidade (23,75%) — informativo</span>
+      <span>{{ '%.2f'|format(venc * 0.2375) }} €</span>
+    </div>
+  </div>
+
+  <!-- Assinatura -->
+  <div class="sign-area">
+    <div class="sign-text">
+      Recebi o valor deste recibo, pago pela <strong>{{ empresa_nome }}</strong>, referente a <strong>{{ mes_label }} de {{ ano }}</strong>.<br>
+      Vila do Conde, em _____ / _____ / _________
+      {% if recibo.notas %}<br><em>Obs: {{ recibo.notas }}</em>{% endif %}
+    </div>
+    <div>
+      <div class="sign-line">(assinatura do trabalhador)</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Documento processado electronicamente · {{ empresa_nome }} · {{ ano }}
+    &nbsp;|&nbsp; NIF: {{ cfg.empresa_nif if cfg else '—' }}
+    &nbsp;|&nbsp; Estado: <strong>{{ recibo.estado|upper }}</strong>
+  </div>
+
+</div>
+</body>
+</html>

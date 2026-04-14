@@ -5784,6 +5784,23 @@ def salario_recibo_excel(rid):
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@app.route('/salarios/recibo/<int:rid>/apagar', methods=['POST'])
+@login_required
+def salario_recibo_apagar(rid):
+    r = ReciboSalario.query.get_or_404(rid)
+    fid = r.funcionario_id
+    ano = r.ano
+    try:
+        if r.pdf_path:
+            p = os.path.join(UPLOAD_SALARIOS, r.pdf_path)
+            if os.path.exists(p): os.remove(p)
+    except: pass
+    db.session.delete(r)
+    db.session.commit()
+    flash('Recibo eliminado.', 'info')
+    return redirect(url_for('salarios_calendario', fid=fid, ano=ano))
+
+
 def init_db():
     """Create all database tables."""
     with app.app_context():

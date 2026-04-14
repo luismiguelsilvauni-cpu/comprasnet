@@ -7,6 +7,10 @@
   <button onclick="gerarPDF()" class="btn btn-ghost btn-sm">📄 PDF</button>
   <button onclick="window.print()" class="btn btn-ghost btn-sm">🖨 Imprimir</button>
   <button onclick="enviarEmail({{ recibo.id }})" class="btn btn-ghost btn-sm">📧 Email</button>
+  <a href="{{ url_for('salario_recibo_excel', rid=recibo.id) }}" class="btn btn-ghost btn-sm">📊 Excel</a>
+  <form method="post" action="{{ url_for('salario_recibo_apagar', rid=recibo.id) }}" onsubmit="return confirm('Eliminar este recibo?')" style="display:inline">
+    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕ Eliminar</button>
+  </form>
   {% endif %}
 {% endblock %}
 {% block content %}
