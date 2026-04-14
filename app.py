@@ -5806,8 +5806,9 @@ def salarios_importar():
             flash('Seleccione um ficheiro Excel.', 'error')
             return redirect(url_for('salarios_importar'))
         # Save temp file
-        import tempfile
-        tmp = tempfile.NamedTemporaryFile(suffix='.xls', delete=False)
+        import tempfile, os as _os
+        ext = _os.path.splitext(f.filename)[1].lower() or '.xls'
+        tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
         f.save(tmp.name); tmp.close()
         try:
             resultado = _parse_recibos_excel(tmp.name)
@@ -5883,12 +5884,12 @@ def salarios_importar_confirmar():
 
 def _parse_recibos_excel(filepath):
     """Parse UCN salary Excel format — one sheet per employee."""
-    try:
-        import xlrd
-        wb = xlrd.open_workbook(filepath)
-    except:
-        import openpyxl
+    if filepath.lower().endswith('.xlsx'):
         return _parse_recibos_xlsx(filepath)
+
+    # .xls — use xlrd
+    import xlrd
+    wb = xlrd.open_workbook(filepath)
 
     resultado = []
 
