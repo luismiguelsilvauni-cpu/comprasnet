@@ -8,7 +8,7 @@
 <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
   <select onchange="location.href='/salarios/historico?ano='+this.value+'&fid={{ fid }}'"
     style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
-    {% for a in range(now.year+1, now.year-5, -1) %}
+    {% for a in range(now().year+1, now().year-5, -1) %}
     <option value="{{ a }}" {% if a==ano %}selected{% endif %}>{{ a }}</option>
     {% endfor %}
   </select>

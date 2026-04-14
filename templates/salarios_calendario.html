@@ -31,7 +31,7 @@
   </div>
   <select onchange="location.href='/salarios/processar/{{ func.id }}?ano='+this.value"
     style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)">
-    {% for a in range(now.year+1, now.year-4, -1) %}
+    {% for a in range(now().year+1, now().year-4, -1) %}
     <option value="{{ a }}" {% if a==ano %}selected{% endif %}>{{ a }}</option>
     {% endfor %}
   </select>

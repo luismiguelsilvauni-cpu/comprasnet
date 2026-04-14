@@ -177,7 +177,7 @@
   <div id="addSPForm" style="display:none;margin-bottom:10px;background:var(--surface2);border-radius:8px;padding:12px">
     <form method="post" action="{{ url_for('funcionario_situacao_prof_add', fid=f.id) }}">
       <div style="display:grid;grid-template-columns:120px 2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">
-        <div class="form-group" style="margin:0"><label>Data *</label><input type="date" name="data" required class="input" value="{{ now.strftime('%Y-%m-%d') if now else '' }}"></div>
+        <div class="form-group" style="margin:0"><label>Data *</label><input type="date" name="data" required class="input" value="{{ now().strftime('%Y-%m-%d') if now else '' }}"></div>
         <div class="form-group" style="margin:0"><label>Categoria Profissional</label><input type="text" name="categoria_prof" class="input" value="{{ f.categoria or '' }}"></div>
         <div class="form-group" style="margin:0"><label>Vencimento €</label><input type="number" name="vencimento" step="0.01" class="input" placeholder="0.00"></div>
         <div class="form-group" style="margin:0"><label>Refeição €</label><input type="number" name="refeicao" step="0.01" class="input" placeholder="0.00"></div>
@@ -215,7 +215,7 @@
 <!-- Registo de Faltas -->
 <div class="card" style="padding:14px">
   <div class="sec">📅 Registo de Faltas</div>
-  {% set ano_atual = now.year if now else 2026 %}
+  {% set ano_atual = now().year if now else 2026 %}
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
     <select id="anoFaltas" onchange="loadFaltas()" class="input" style="width:100px">
       {% for a in range(ano_atual, ano_atual-6, -1) %}
