@@ -5630,28 +5630,22 @@ def salario_recibo(fid, ano, mes):
 @app.route('/salarios/recibo/<int:rid>/pdf')
 @login_required
 def salario_recibo_pdf(rid):
-    """Generate PDF for salary slip."""
+    """Return printable HTML — user saves as PDF via browser print dialog."""
     r = ReciboSalario.query.get_or_404(rid)
     func = Funcionario.query.get(r.funcionario_id)
-    # Render HTML and convert to PDF using weasyprint or return HTML for print
-    html = render_template('salario_recibo_print.html', recibo=r, func=func,
-                           mes_label=MESES_LABELS.get(r.mes, f'Mês {r.mes}'))
-    try:
-        from weasyprint import HTML as WP
-        pdf = WP(string=html).write_pdf()
-        fname = f"recibo_{func.numero}_{r.ano}_{r.mes:02d}.pdf"
-        r.pdf_filename = fname
-        safe = os.path.join(UPLOAD_SALARIOS, fname)
-        with open(safe, 'wb') as pf: pf.write(pdf)
-        r.pdf_path = fname
-        db.session.commit()
-        return send_from_directory(UPLOAD_SALARIOS, fname, as_attachment=True, download_name=fname)
-    except ImportError:
-        # Fallback: return printable HTML
-        from flask import make_response
-        resp = make_response(html)
-        resp.headers['Content-Type'] = 'text/html'
-        return resp
+    cfg = ConfigGeral.query.first()
+    empresa_nome = cfg.empresa_nome if cfg else 'União Construtora Naval Limitada'
+    upload_url = request.host_url.rstrip('/') + '/uploads'
+    mes_label = MESES_LABELS.get(r.mes, r.mes_label or f'Mês {r.mes}')
+    html = render_template('salario_recibo_print.html',
+        recibo=r, func=func, ano=r.ano,
+        mes_label=mes_label,
+        cfg=cfg, empresa_nome=empresa_nome,
+        upload_url=upload_url)
+    from flask import make_response
+    resp = make_response(html)
+    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return resp
 
 @app.route('/salarios/recibo/<int:rid>/email', methods=['POST'])
 @login_required
