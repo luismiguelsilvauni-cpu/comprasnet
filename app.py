@@ -5966,78 +5966,51 @@ def _parse_recibos_excel(filepath):
     return resultado
 
 def _parse_sheet_xls(ws, sname, mes_global=''):
-    """Extract salary data from one employee sheet.
-    Finds the 'original' block (H2='original') and reads by label text.
+    """Parse one sheet. All sheets follow the same layout as 11-Luis Silva.
+    Each sheet may have 'original' + 'duplicado' block — we use only 'original'.
+    Offsets are relative to the row where H='original'.
     """
-    def fval(r, c):
+    def fv(r, c):
         try: return float(ws.cell_value(r, c) or 0)
         except: return 0.0
-    def sval(r, c):
+    def sv(r, c):
         try: return str(ws.cell_value(r, c)).strip()
         except: return ''
 
-    # Find start row of the 'original' block
-    # Look for cell containing 'original' in row 2 area
-    start_row = 0
-    for r in range(ws.nrows):
+    # Find the 'original' row (H2 normally, but scan to be safe)
+    orig_row = 1  # default row index (0-based) for H2
+    for r in range(min(5, ws.nrows)):
         for c in range(ws.ncols):
-            v = sval(r, c).lower()
-            if v == 'original':
-                start_row = r - 1  # block starts 1 row before
+            if sv(r, c).lower() == 'original':
+                orig_row = r
                 break
-        if start_row > 0:
-            break
 
-    # Build label->row map within this block (search up to 40 rows from start)
-    row_map = {}
-    end_search = min(start_row + 40, ws.nrows)
-    for r in range(start_row, end_search):
-        txt = sval(r, 0).upper()  # column A
-        if not txt: continue
-        if 'REMUNERAÇÃO BASE' in txt or 'REMUNERACAO BASE' in txt:
-            if 'rem_base' not in row_map: row_map['rem_base'] = r
-        if ('GRATIFICAÇÃO' in txt or 'GRATIFICACAO' in txt or 'PRÉMIO' in txt or 'PREMIO' in txt) and 'premios' not in row_map:
-            row_map['premios'] = r
-        if 'FALTAS' in txt and 'MÊS' not in txt and 'MES' not in txt and 'CORRENTE' not in txt and 'HORAS' not in txt and 'faltas_dias' not in row_map:
-            row_map['faltas_dias'] = r
-        if 'FALTAS' in txt and ('MÊS' in txt or 'MES' in txt or 'CORRENTE' in txt) and 'faltas_horas' not in row_map:
-            row_map['faltas_horas'] = r
-        if ('EXTRAORDINÁR' in txt or 'EXTRAORDINAR' in txt) and 'horas_extra' not in row_map:
-            row_map['horas_extra'] = r
-        if ('ALIMENTAÇÃO' in txt or 'ALIMENTACAO' in txt or 'REFEIÇÃO' in txt) and 'sub_ref' not in row_map:
-            row_map['sub_ref'] = r
-        if 'TOTAL ILÍQUIDO' in txt or 'TOTAL ILIQUIDO' in txt or ('TOTAL' in txt and 'ILÍQ' in txt):
-            row_map['total_iliq'] = r
-        if 'C.R.S.S' in txt and 'crss' not in row_map:
-            row_map['crss'] = r
-        if 'I.R.S' in txt and 'HORAS' not in txt and 'EXTRAS' not in txt and 'irs' not in row_map:
-            row_map['irs'] = r
-        if 'TOTAL DE DESCONTOS' in txt or 'TOTAL DESCONTOS' in txt:
-            row_map['total_desc'] = r
-        if 'LÍQUIDO A RECEBER' in txt or 'LIQUIDO A RECEBER' in txt:
-            row_map['liquido'] = r
-        if ('DISCRIMINATIVO' in txt or 'TRANSFERENCIA' in txt or 'TRANSFERÊNCIA' in txt) and 'transf' not in row_map:
-            row_map['transf'] = r
+    # All offsets from orig_row (0-based rows, 0-based cols)
+    # orig_row = row of "original" marker (row 2 in Excel = index 1)
+    # Row layout (Excel row → offset from orig_row):
+    # Row 1 (B1): company name         → orig_row - 1
+    # Row 4 (A4): employee name        → orig_row + 2
+    # Row 9 (A9): Remuneração Base     → orig_row + 7
+    # Row 10 (A10): Gratificação       → orig_row + 8
+    # Row 11 (A11): Faltas dias        → orig_row + 9
+    # Row 12 (A12): Faltas horas       → orig_row + 10
+    # Row 13 (A13): Horas Extra        → orig_row + 11
+    # Row 14 (A14): Sub Alimentação    → orig_row + 12
+    # Row 16: Total Ilíquido           → orig_row + 14
+    # Row 18 (A18): CRSS               → orig_row + 16
+    # Row 19 (A19): IRS                → orig_row + 17
+    # Row 23: Total Descontos          → orig_row + 21
+    # Row 25: Líquido                  → orig_row + 23
+    # Row 27: Transferência            → orig_row + 25
 
-    RB  = row_map.get('rem_base',  start_row + 8)
-    RPR = row_map.get('premios',   start_row + 9)
-    RFD = row_map.get('faltas_dias', start_row + 10)
-    RFH = row_map.get('faltas_horas', start_row + 11)
-    RHE = row_map.get('horas_extra', start_row + 12)
-    RSR = row_map.get('sub_ref',   start_row + 13)
-    RTI = row_map.get('total_iliq', start_row + 15)
-    RCS = row_map.get('crss',      start_row + 17)
-    RIR = row_map.get('irs',       start_row + 18)
-    RTD = row_map.get('total_desc', start_row + 22)
-    RLQ = row_map.get('liquido',   start_row + 24)
-    RTR = row_map.get('transf',    start_row + 26)
+    O  = orig_row  # shorthand
 
-    # Nome from A4 of block
-    nome_raw = sval(start_row + 3, 0).strip()
+    # Get employee name
+    nome_raw = sv(O + 2, 0).strip()  # A4
     if not nome_raw or 'NOME' in nome_raw.upper():
         nome_raw = sname
 
-    # Match funcionario by sheet name prefix or by name
+    # Match funcionario
     func_match = None
     funcs = Funcionario.query.all()
     if '-' in sname:
@@ -6046,12 +6019,12 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         f_by_num = Funcionario.query.filter_by(numero=num).first()
         if f_by_num:
             func_match = f_by_num
-        else:
-            nome_sheet = parts[1].strip() if len(parts) > 1 else ''
+        elif len(parts) > 1:
+            nome_sheet = parts[1].strip()
             for f in funcs:
                 if nome_sheet.upper() in f.nome.upper() or f.nome.upper() in nome_sheet.upper():
                     func_match = f; break
-    if not func_match and nome_raw and nome_raw != sname:
+    if not func_match:
         nome_parts = [p for p in nome_raw.upper().split() if len(p) > 2]
         best = 0
         for f in funcs:
@@ -6063,37 +6036,37 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
     return {
         'sheet': sname,
         'nome_raw': nome_raw,
-        'func_match_id': func_match.id if func_match else None,
+        'func_match_id':   func_match.id   if func_match else None,
         'func_match_nome': func_match.nome if func_match else '—',
         'mes_global': mes_global,
-        # Abonos
-        'vencimento_base':     fval(RB,  7),  # H col=7
-        'vencimento_base_rht': fval(RB,  5),  # F col=5
-        'vencimento_base_g':   fval(RB,  6),  # G col=6
-        'premios':             fval(RPR, 7),  # H
-        'faltas_dias':         fval(RFD, 3),  # D col=3
-        'faltas_horas':        fval(RFH, 4),  # E col=4
-        'horas_extra_horas':   fval(RHE, 4),  # E col=4
-        'horas_extra_rht':     fval(RHE, 5),  # F col=5
-        'horas_extra':         fval(RHE, 7),  # H col=7
-        'sub_refeicao_dias':   fval(RSR, 3),  # D
-        'sub_refeicao_vdia':   fval(RSR, 5),  # F
-        'subsidio_refeicao':   fval(RSR, 7),  # H
+        # ── ABONOS ──────────────────────────────────────────
+        'vencimento_base':     fv(O+7,  7),  # H9
+        'vencimento_base_rht': fv(O+7,  5),  # F9
+        'vencimento_base_g':   fv(O+7,  6),  # G9
+        'premios':             fv(O+8,  7),  # H10
+        'faltas_dias':         fv(O+9,  3),  # D11
+        'faltas_horas':        fv(O+10, 4),  # E12
+        'horas_extra_horas':   fv(O+11, 4),  # E13
+        'horas_extra_rht':     fv(O+11, 5),  # F13
+        'horas_extra':         fv(O+11, 7),  # H13
+        'sub_refeicao_dias':   fv(O+12, 3),  # D14
+        'sub_refeicao_vdia':   fv(O+12, 5),  # F14
+        'subsidio_refeicao':   fv(O+12, 7),  # H14
         'outros_abonos':       0,
-        'total_iliquido':      fval(RTI, 7),  # H
-        # Descontos
-        'seg_social_taxa':     fval(RCS, 3),  # D
-        'seg_social_base':     fval(RCS, 4),  # E
-        'seg_social':          fval(RCS, 5),  # F
-        'irs_taxa':            fval(RIR, 1),  # B col=1
-        'irs_parcela_abater':  fval(RIR, 2),  # C col=2
-        'irs_taxa_efetiva':    fval(RIR, 3),  # D col=3
-        'irs_base':            fval(RIR, 4),  # E col=4
-        'irs':                 fval(RIR, 7),  # H col=7
-        'total_descontos':     fval(RTD, 7),  # H
-        'liquido':             fval(RLQ, 7),  # H
-        'transf_conta':        fval(RTR, 7),  # H
-        'transf_refeicao':     fval(RTR+1, 7),  # H next row
+        'total_iliquido':      fv(O+14, 7),  # H16
+        # ── DESCONTOS ───────────────────────────────────────
+        'seg_social_taxa':     fv(O+16, 3),  # D18
+        'seg_social_base':     fv(O+16, 4),  # E18
+        'seg_social':          fv(O+16, 5),  # F18
+        'irs_taxa':            fv(O+17, 1),  # B19
+        'irs_parcela_abater':  fv(O+17, 2),  # C19
+        'irs_taxa_efetiva':    fv(O+17, 3),  # D19
+        'irs_base':            fv(O+17, 4),  # E19
+        'irs':                 fv(O+17, 7),  # H19
+        'total_descontos':     fv(O+21, 7),  # H23
+        'liquido':             fv(O+23, 7),  # H25
+        'transf_conta':        fv(O+25, 7),  # H27
+        'transf_refeicao':     fv(O+26, 7),  # H28
     }
 
 
