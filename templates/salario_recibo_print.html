@@ -140,9 +140,11 @@ tr:nth-child(even) { background: #f9f9f9; }
       {% if recibo.faltas_horas|float > 0 %}
       <tr><td>Faltas mês corrente (horas)</td><td></td><td class="td-center">{{ '%.1f'|format(recibo.faltas_horas|float) }}</td><td></td><td></td><td>—</td></tr>
       {% endif %}
-      {% if recibo.horas_extra|float > 0 or recibo.horas_extra_rht|float > 0 %}
-      {% set hex_val = recibo.horas_extra|float * recibo.horas_extra_rht|float %}
-      <tr><td>Horas Extraordinárias</td><td></td><td class="td-center">{{ '%.2f'|format(recibo.horas_extra|float) }}</td><td class="td-center">{{ '%.3f'|format(recibo.horas_extra_rht|float) }}</td><td></td><td>{{ '%.2f'|format(hex_val) }}</td></tr>
+      {% set hex_horas = recibo.horas_extra|float %}
+      {% set hex_rht2 = recibo.horas_extra_rht|float %}
+      {% if hex_horas > 0 or hex_rht2 > 0 %}
+      {% set hex_val = hex_horas * hex_rht2 %}
+      <tr><td>Horas Extraordinárias</td><td></td><td class="td-center">{{ '%.2f'|format(hex_horas) if hex_horas else '—' }}</td><td class="td-center">{{ '%.3f'|format(hex_rht2) if hex_rht2 else '—' }}</td><td></td><td>{{ '%.2f'|format(hex_val) if hex_val else '—' }}</td></tr>
       {% endif %}
       {% if recibo.premios|float > 0 %}
       <tr><td>Gratificação / Prémios</td><td></td><td></td><td></td><td></td><td>{{ '%.2f'|format(recibo.premios|float) }}</td></tr>
@@ -168,7 +170,7 @@ tr:nth-child(even) { background: #f9f9f9; }
     </thead>
     <tbody>
       {% set ss_taxa = recibo.seg_social_taxa|float or 0.11 %}
-      {% set ss_base = recibo.seg_social_base|float or venc %}
+      {% set ss_base = recibo.seg_social_base|float if recibo.seg_social_base else venc %}
       <tr>
         <td>C.R.S.S. (Seg. Social Trabalhador)</td>
         <td class="td-center">{{ '%.2f'|format(ss_taxa*100) }}%</td>
@@ -178,12 +180,12 @@ tr:nth-child(even) { background: #f9f9f9; }
         <td>{{ '%.2f'|format(recibo.seg_social_func|float) }}</td>
       </tr>
       {% set irs_taxa = recibo.irs_taxa|float %}
-      {% set irs_base_v = recibo.irs_base|float %}
+      {% set irs_base_v = recibo.irs_base|float or (recibo.total_abonos|float - recibo.subsidio_refeicao|float) %}
       {% set irs_val = recibo.irs_retencao|float %}
       <tr>
         <td>I.R.S. (Retenção na Fonte)</td>
         <td class="td-center">{{ '%.4f'|format(irs_taxa) }}</td>
-        <td class="td-center">{{ '%.4f'|format(irs_taxa) }}</td>
+        <td class="td-center">{{ '%.2f'|format(irs_taxa*100) }}%</td>
         <td class="td-center">{{ '%.2f'|format(irs_base_v) }}</td>
         <td></td>
         <td>{{ '%.2f'|format(irs_val) }}</td>

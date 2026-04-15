@@ -60,7 +60,7 @@
       <input type="number" name="rem_dias" id="rem_dias" value="{{ recibo.vencimento_base_g and 30 or 30 }}" class="val-input" step="1" min="0" oninput="calcular()">
       <input type="number" name="vencimento_base_rht" id="rem_horas" value="{{ '%.3f'|format(recibo.vencimento_base_rht|float if recibo and recibo.vencimento_base_rht else (ultima_sp.vencimento|float/30/8 if ultima_sp and ultima_sp.vencimento else 0)) }}" class="val-input" step="0.001" oninput="calcular()">
       <span class="val-static" id="rem_rht_show"></span>
-      <input type="hidden" name="vencimento_base_g" id="rem_base_g" value="{{ '%.2f'|format(recibo.vencimento_base_g|float if recibo and recibo.vencimento_base_g else (ultima_sp.vencimento|float if ultima_sp and ultima_sp.vencimento else 0)) }}">
+      <input type="hidden" name="vencimento_base_g" id="rem_base_g" value="{{ '%.2f'|format(recibo.vencimento_base_g|float if recibo and recibo.vencimento_base_g else recibo.vencimento_base|float if recibo and recibo.vencimento_base else 0) }}">
       <input type="number" name="vencimento_base" id="rem_valor" value="{{ '%.2f'|format(recibo.vencimento_base|float if recibo and recibo.vencimento_base else (ultima_sp.vencimento|float if ultima_sp and ultima_sp.vencimento else 0)) }}" class="val-input" step="0.01" oninput="calcular()">
     </div>
   </div>
@@ -133,7 +133,7 @@
     <div class="val-row" style="grid-template-columns:2fr 70px 90px 90px">
       <span class="val-label">C.R.S.S. (Seg. Social)</span>
       <input type="number" name="seg_social_taxa" id="ss_taxa" value="{{ '%.4f'|format(recibo.seg_social_taxa|float if recibo and recibo.seg_social_taxa else 0.11) }}" class="val-input" step="0.0001" oninput="calcular()">
-      <input type="number" name="seg_social_base" id="ss_base" value="{{ '%.2f'|format(recibo.seg_social_base|float if recibo and recibo.seg_social_base else 0) }}" class="val-input" step="0.01" oninput="calcular()">
+      <input type="number" name="seg_social_base" id="ss_base" value="{{ '%.2f'|format(recibo.seg_social_base|float if recibo and recibo.seg_social_base else recibo.vencimento_base|float if recibo and recibo.vencimento_base else 0) }}" class="val-input" step="0.01" oninput="calcular()">
       <span class="val-static" id="ss_valor_show">—</span>
       <input type="hidden" name="seg_social_func" id="seg_social_func" value="0">
     </div>
@@ -141,7 +141,7 @@
 
   <!-- IRS -->
   <div class="val-row" style="grid-template-columns:2fr 70px 90px 90px">
-    <span class="val-label">I.R.S.</span>
+    <span class="val-label">I.R.S. <span id="irs_pct_show" style="font-size:10px;color:var(--accent)"></span></span>
     <input type="number" name="irs_taxa" id="irs_taxa" value="{{ '%.6f'|format(recibo.irs_taxa|float if recibo and recibo.irs_taxa else 0) }}" class="val-input" step="0.0001" oninput="calcular()">
     <input type="number" name="irs_base" id="irs_base" value="{{ '%.2f'|format(recibo.irs_base|float if recibo and recibo.irs_base else 0) }}" class="val-input" step="0.01" oninput="calcular()">
     <span class="val-static" id="irs_valor_show">—</span>
@@ -254,11 +254,18 @@ function calcular(){
   sid('subsidio_refeicao').value = refTot.toFixed(2);
   sid('ss_valor_show').textContent = fmt(ss_val);
   sid('seg_social_func').value = ss_val.toFixed(2);
-  // Auto-fill ss_base if empty
-  if (!document.getElementById('ss_base').value || parseFloat(document.getElementById('ss_base').value)==0)
-    document.getElementById('ss_base').value = venc.toFixed(2);
+  // Auto-fill ss_base with venc if not set
+  var ssBaseEl = document.getElementById('ss_base');
+  if (ssBaseEl && (parseFloat(ssBaseEl.value)||0) === 0 && venc > 0)
+    ssBaseEl.value = venc.toFixed(2);
+  ss_base = parseFloat(ssBaseEl ? ssBaseEl.value : 0) || venc;
+  ss_val = ss_base * ss_taxa;
+  sid('ss_valor_show').textContent = fmt(ss_val);
+  sid('seg_social_func').value = ss_val.toFixed(2);
   sid('irs_valor_show').textContent = fmt(irs_val);
   sid('irs_retencao').value = irs_val.toFixed(2);
+  var irs_pct = document.getElementById('irs_pct_show');
+  if(irs_pct) irs_pct.textContent = irs_taxa>0 ? '(' + (irs_taxa*100).toFixed(2) + '%)' : '';
   sid('ss_emp_show').textContent = fmt(ssEmp);
   sid('seg_social_emp').value = ssEmp.toFixed(2);
   sid('totalAbonos').textContent = fmt(totalA);

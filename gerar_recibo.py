@@ -161,18 +161,25 @@ def gerar_recibo_excel(func, recibo, mes_label, ano, empresa_nome='União Constr
     # ── ROW 18: CRSS ──
     ss_rate = 0.11
     c('A18', 'C.R.S.S. Remuneração base', normal, left_al)
-    c('D18', ss_rate, normal, center, '0.00%')
-    c('E18', venc, normal, right, '#,##0.00')
+    stored_ss_taxa = float(getattr(recibo, 'seg_social_taxa', 0) or ss_rate)
+    stored_ss_base = float(getattr(recibo, 'seg_social_base', 0) or venc)
+    c('D18', stored_ss_taxa, normal, center, '0.00%')
+    c('E18', stored_ss_base, normal, right, '#,##0.00')
     c('F18', f'=D18*E18', normal, right, '#,##0.00')
 
     # ── ROW 19: IRS ──
     irs_val = float(recibo.irs_retencao or 0)
     # Calculate effective IRS rate
     total_irs_base = venc + grat
-    irs_rate = irs_val / total_irs_base if total_irs_base > 0 and irs_val > 0 else 0
+    # Use stored IRS taxa if available, else calculate
+    stored_irs_taxa = float(getattr(recibo, 'irs_taxa', 0) or 0)
+    stored_irs_base = float(getattr(recibo, 'irs_base', 0) or 0)
+    irs_rate = stored_irs_taxa if stored_irs_taxa else (irs_val / total_irs_base if total_irs_base > 0 and irs_val > 0 else 0)
+    irs_base_show = stored_irs_base if stored_irs_base else total_irs_base
     c('A19', 'I.R.S.', normal, left_al)
+    c('B19', irs_rate, normal, center, '0.0000')
     c('D19', irs_rate, normal, center, '0.0000')
-    c('E19', total_irs_base, normal, right, '#,##0.00')
+    c('E19', irs_base_show, normal, right, '#,##0.00')
     c('H19', irs_val if irs_val else f'=D19*E19', normal, right, '#,##0.00')
 
     # ── ROW 20: IRS info ──
