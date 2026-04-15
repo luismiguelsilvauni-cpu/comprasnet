@@ -88,49 +88,46 @@
     <!-- Abonos -->
     <div style="padding:12px 14px;border-right:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase">Abonos</div>
-      {% set abonos = [
-        ('Remuneração Base', rec.vencimento_base),
-        ('Gratificação/Prémios', rec.premios),
-        ('Horas Extraordinárias', rec.horas_extra),
-        ('Subsídio de Alimentação', rec.subsidio_refeicao),
-        ('Outros Abonos', rec.outros_abonos),
-      ] %}
-      {% for label, val in abonos %}
-      {% if val %}
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--text-muted)">{{ label }}</span>
-        <span style="font-family:monospace;font-weight:600">{{ '%.2f'|format(val) }} €</span>
-      </div>
-      {% endif %}
-      {% endfor %}
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;font-weight:700;color:#22c55e">
-        <span>Total Ilíquido</span>
-        <span style="font-family:monospace">{{ '%.2f'|format(rec.total_iliquido) }} €</span>
+      {% macro row(label, val, extra='') %}{% if val %}<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-muted)">{{ label }}{% if extra %} <span style="font-size:10px;color:var(--accent)">({{ extra }})</span>{% endif %}</span><span style="font-family:monospace;font-weight:600">{{ '%.4f'|format(val|float) if '.' in '%.4f'|format(val|float) and val|float < 100 else '%.2f'|format(val|float) }}</span></div>{% endif %}{% endmacro %}
+      {{ row('Remuneração Base (H9)', rec.get('vencimento_base',0), 'BASE G9: ' ~ '%.2f'|format(rec.get('vencimento_base_g',0))) }}
+      {{ row('RHT Base (F9)', rec.get('vencimento_base_rht',0)) }}
+      {{ row('Gratificação / Prémios (H10)', rec.get('premios',0)) }}
+      {{ row('Faltas/Desc/Férias/Feriados dias (D11)', rec.get('faltas_dias',0)) }}
+      {{ row('Faltas mês corrente horas (E12)', rec.get('faltas_horas',0)) }}
+      {{ row('Horas Extraordinárias horas (E13)', rec.get('horas_extra_horas',0)) }}
+      {{ row('Horas Extraordinárias RHT (F13)', rec.get('horas_extra_rht',0)) }}
+      {{ row('Subsídio Alimentação dias (D14)', rec.get('sub_refeicao_dias',0), 'val/dia F14: ' ~ '%.2f'|format(rec.get('sub_refeicao_vdia',0))) }}
+      {{ row('Subsídio Alimentação total (H14)', rec.get('subsidio_refeicao',0)) }}
+      {% if rec.get('outros_abonos',0) %}{{ row('Outros Abonos', rec.get('outros_abonos',0)) }}{% endif %}
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;font-weight:700;color:#22c55e;border-top:1px solid var(--border)">
+        <span>Total Ilíquido (H16)</span>
+        <span style="font-family:monospace">{{ '%.2f'|format(rec.get('total_iliquido',0)) }} €</span>
       </div>
     </div>
     <!-- Descontos + Líquido -->
     <div style="padding:12px 14px">
       <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase">Descontos</div>
-      {% set descontos = [
-        ('Seg. Social (11%)', rec.seg_social),
-        ('IRS', rec.irs),
-      ] %}
-      {% for label, val in descontos %}
-      {% if val %}
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--text-muted)">{{ label }}</span>
-        <span style="font-family:monospace;font-weight:600;color:#ef4444">{{ '%.2f'|format(val) }} €</span>
+      {% macro drow(label, val) %}{% if val %}<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-muted)">{{ label }}</span><span style="font-family:monospace;font-weight:600;color:#ef4444">{{ '%.4f'|format(val|float) if val|float < 10 else '%.2f'|format(val|float) }}</span></div>{% endif %}{% endmacro %}
+      {{ drow('C.R.S.S. % (D18)', rec.get('seg_social_taxa',0)) }}
+      {{ drow('C.R.S.S. Base (E18)', rec.get('seg_social_base',0)) }}
+      {{ drow('C.R.S.S. Valor (F18)', rec.get('seg_social',0)) }}
+      {{ drow('I.R.S. % (B19)', rec.get('irs_taxa',0)) }}
+      {{ drow('I.R.S. Base (E19)', rec.get('irs_base',0)) }}
+      {{ drow('I.R.S. Valor (H19)', rec.get('irs',0)) }}
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;font-weight:700;color:#ef4444;border-top:1px solid var(--border)">
+        <span>Total Descontos (H23)</span>
+        <span style="font-family:monospace">{{ '%.2f'|format(rec.get('total_descontos',0)) }} €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;font-weight:700;color:#22c55e;border-top:2px solid var(--border);margin-top:4px">
+        <span>💶 Líquido (H25)</span>
+        <span style="font-family:monospace">{{ '%.2f'|format(rec.get('liquido',0)) }} €</span>
+      </div>
+      {% if rec.get('transf_conta',0) %}
+      <div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--text-muted)">
+        <span>Transferência conta (H27)</span>
+        <span style="font-family:monospace">{{ '%.2f'|format(rec.get('transf_conta',0)) }} €</span>
       </div>
       {% endif %}
-      {% endfor %}
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;font-weight:700;color:#ef4444">
-        <span>Total Descontos</span>
-        <span style="font-family:monospace">{{ '%.2f'|format(rec.total_descontos) }} €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;font-weight:700;color:#22c55e;border-top:2px solid var(--border);margin-top:4px">
-        <span>💶 LÍQUIDO</span>
-        <span style="font-family:monospace">{{ '%.2f'|format(rec.liquido) }} €</span>
-      </div>
     </div>
   </div>
   {% endif %}

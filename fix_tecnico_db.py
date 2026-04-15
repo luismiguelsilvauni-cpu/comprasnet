@@ -234,3 +234,20 @@ with app.app_context():
             print(f"OK: {tbl} criado")
         else:
             print(f"OK: {tbl} existe")
+
+    # Add new fields to recibo_salario
+    if 'recibo_salario' in insp.get_table_names():
+        rs_cols = [c['name'] for c in insp.get_columns('recibo_salario')]
+        new_rs = [
+            ('vencimento_base_rht','NUMERIC'),('vencimento_base_g','NUMERIC'),
+            ('sub_refeicao_dias','NUMERIC'),('sub_refeicao_vdia','NUMERIC'),
+            ('horas_extra_rht','NUMERIC'),('faltas_dias','NUMERIC'),
+            ('faltas_horas','NUMERIC'),('irs_taxa','NUMERIC'),
+            ('irs_base','NUMERIC'),('seg_social_taxa','NUMERIC'),
+            ('seg_social_base','NUMERIC'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in new_rs:
+                if col not in rs_cols:
+                    conn.execute(text(f"ALTER TABLE recibo_salario ADD COLUMN {col} {typ} DEFAULT 0"))
+                    print(f"OK: recibo_salario.{col}")

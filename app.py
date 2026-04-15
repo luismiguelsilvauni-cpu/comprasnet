@@ -2807,17 +2807,28 @@ class ReciboSalario(db.Model):
     mes_label       = db.Column(db.String(50))                # "Janeiro", "Subsídio Férias", etc.
     estado          = db.Column(db.String(20), default='rascunho')  # rascunho/processado/pago
     # Valores base
-    vencimento_base = db.Column(db.Numeric(10,2), default=0)
-    subsidio_refeicao = db.Column(db.Numeric(10,2), default=0)
-    horas_extra     = db.Column(db.Numeric(10,2), default=0)
-    premios         = db.Column(db.Numeric(10,2), default=0)
-    outros_abonos   = db.Column(db.Numeric(10,2), default=0)
+    vencimento_base     = db.Column(db.Numeric(10,2), default=0)
+    vencimento_base_rht = db.Column(db.Numeric(10,4), default=0)   # F9
+    vencimento_base_g   = db.Column(db.Numeric(10,2), default=0)   # G9 BASE
+    subsidio_refeicao   = db.Column(db.Numeric(10,2), default=0)
+    sub_refeicao_dias   = db.Column(db.Numeric(5,1), default=0)    # D14
+    sub_refeicao_vdia   = db.Column(db.Numeric(8,4), default=0)    # F14
+    horas_extra         = db.Column(db.Numeric(10,2), default=0)   # E13 horas
+    horas_extra_rht     = db.Column(db.Numeric(10,4), default=0)   # F13 RHT
+    premios             = db.Column(db.Numeric(10,2), default=0)   # H10
+    outros_abonos       = db.Column(db.Numeric(10,2), default=0)
+    faltas_dias         = db.Column(db.Numeric(5,1), default=0)    # D11
+    faltas_horas        = db.Column(db.Numeric(5,1), default=0)    # E12
     # Deduções
-    irs_retencao    = db.Column(db.Numeric(10,2), default=0)
-    seg_social_func = db.Column(db.Numeric(10,2), default=0)  # 11%
-    seg_social_emp  = db.Column(db.Numeric(10,2), default=0)  # 23.75%
-    outros_descontos= db.Column(db.Numeric(10,2), default=0)
-    faltas_valor    = db.Column(db.Numeric(10,2), default=0)
+    irs_retencao        = db.Column(db.Numeric(10,2), default=0)   # H19
+    irs_taxa            = db.Column(db.Numeric(8,6), default=0)    # B19
+    irs_base            = db.Column(db.Numeric(10,2), default=0)   # E19
+    seg_social_func     = db.Column(db.Numeric(10,2), default=0)   # H18 11%
+    seg_social_taxa     = db.Column(db.Numeric(8,4), default=0)    # D18
+    seg_social_base     = db.Column(db.Numeric(10,2), default=0)   # E18
+    seg_social_emp      = db.Column(db.Numeric(10,2), default=0)   # 23.75%
+    outros_descontos    = db.Column(db.Numeric(10,2), default=0)
+    faltas_valor        = db.Column(db.Numeric(10,2), default=0)
     # Totais calculados
     total_abonos    = db.Column(db.Numeric(10,2), default=0)
     total_descontos = db.Column(db.Numeric(10,2), default=0)
@@ -5872,20 +5883,31 @@ def salarios_importar_confirmar():
                 mes_label=MESES_LABELS.get(mes, f'Mês {mes}'))
             db.session.add(r)
 
-        r.vencimento_base    = rec.get('vencimento_base', 0)
-        r.premios            = rec.get('premios', 0)
-        r.horas_extra        = rec.get('horas_extra', 0)
-        r.subsidio_refeicao  = rec.get('subsidio_refeicao', 0)
-        r.outros_abonos      = rec.get('outros_abonos', 0)
-        r.total_abonos       = rec.get('total_iliquido', 0)
-        r.seg_social_func    = rec.get('seg_social', 0)
-        r.irs_retencao       = rec.get('irs', 0)
-        r.outros_descontos   = 0
-        r.total_descontos    = rec.get('total_descontos', 0)
-        r.liquido            = rec.get('liquido', 0)
-        r.estado             = 'processado'
-        r.notas              = f'Importado de Excel: {rec.get("sheet","")}'
-        r.atualizado_em      = datetime.now()
+        r.vencimento_base     = rec.get('vencimento_base', 0)
+        r.vencimento_base_rht = rec.get('vencimento_base_rht', 0)
+        r.vencimento_base_g   = rec.get('vencimento_base_g', 0)
+        r.premios             = rec.get('premios', 0)
+        r.faltas_dias         = rec.get('faltas_dias', 0)
+        r.faltas_horas        = rec.get('faltas_horas', 0)
+        r.horas_extra         = rec.get('horas_extra_horas', 0)
+        r.horas_extra_rht     = rec.get('horas_extra_rht', 0)
+        r.sub_refeicao_dias   = rec.get('sub_refeicao_dias', 0)
+        r.sub_refeicao_vdia   = rec.get('sub_refeicao_vdia', 0)
+        r.subsidio_refeicao   = rec.get('subsidio_refeicao', 0)
+        r.outros_abonos       = rec.get('outros_abonos', 0)
+        r.total_abonos        = rec.get('total_iliquido', 0)
+        r.seg_social_taxa     = rec.get('seg_social_taxa', 0)
+        r.seg_social_base     = rec.get('seg_social_base', 0)
+        r.seg_social_func     = rec.get('seg_social', 0)
+        r.irs_taxa            = rec.get('irs_taxa', 0)
+        r.irs_base            = rec.get('irs_base', 0)
+        r.irs_retencao        = rec.get('irs', 0)
+        r.outros_descontos    = 0
+        r.total_descontos     = rec.get('total_descontos', 0)
+        r.liquido             = rec.get('liquido', 0)
+        r.estado              = 'processado'
+        r.notas               = 'Importado de Excel: ' + rec.get('sheet','')
+        r.atualizado_em       = datetime.now()
         criados += 1
 
     db.session.commit()
@@ -5977,20 +5999,32 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         'func_match_nome': func_match.nome if func_match else '—',
         'mes_global': mes_global,
         # Abonos
-        'vencimento_base':   fval(9, 8),   # H9
-        'premios':           fval(10, 8),  # H10
-        'horas_extra':       fval(13, 8),  # H13
-        'subsidio_refeicao': fval(14, 8),  # H14
-        'outros_abonos':     fval(15, 8),  # H15
-        'total_iliquido':    fval(16, 8),  # H16
+        'vencimento_base':     fval(9, 8),   # H9
+        'vencimento_base_rht': fval(9, 6),   # F9 RHT
+        'vencimento_base_g':   fval(9, 7),   # G9 BASE
+        'premios':             fval(10, 8),  # H10
+        'faltas_dias':         fval(11, 4),  # D11
+        'faltas_horas':        fval(12, 5),  # E12
+        'horas_extra_horas':   fval(13, 5),  # E13
+        'horas_extra_rht':     fval(13, 6),  # F13
+        'horas_extra':         fval(13, 8),  # H13 (calculado E13*F13)
+        'sub_refeicao_dias':   fval(14, 4),  # D14
+        'sub_refeicao_vdia':   fval(14, 6),  # F14
+        'subsidio_refeicao':   fval(14, 8),  # H14
+        'outros_abonos':       fval(15, 8),  # H15
+        'total_iliquido':      fval(16, 8),  # H16
         # Descontos
-        'seg_social':        fval(18, 6),  # F18
-        'irs':               fval(19, 8),  # H19
-        'total_descontos':   fval(23, 8),  # H23
+        'seg_social_taxa':     fval(18, 4),  # D18 %
+        'seg_social_base':     fval(18, 5),  # E18 base
+        'seg_social':          fval(18, 6),  # F18 valor (ou H18)
+        'irs_taxa':            fval(19, 2),  # B19 %
+        'irs_base':            fval(19, 5),  # E19 base
+        'irs':                 fval(19, 8),  # H19 valor
+        'total_descontos':     fval(23, 8),  # H23
         # Líquido
-        'liquido':           fval(25, 8),  # H25
-        'transf_conta':      fval(27, 8),  # H27
-        'transf_refeicao':   fval(28, 8),  # H28
+        'liquido':             fval(25, 8),  # H25
+        'transf_conta':        fval(27, 8),  # H27
+        'transf_refeicao':     fval(28, 8),  # H28
     }
 
 def _parse_recibos_xlsx(filepath):
