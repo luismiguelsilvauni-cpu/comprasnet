@@ -5619,6 +5619,8 @@ def salario_recibo(fid, ano, mes):
         recibo.outros_abonos       = n('outros_abonos')
         recibo.irs_retencao        = n('irs_retencao')
         recibo.irs_taxa            = n('irs_taxa')
+        recibo.irs_parcela_abater  = n('irs_parcela_abater')
+        recibo.irs_taxa_efetiva    = n('irs_taxa_efetiva')
         recibo.irs_base            = n('irs_base')
         recibo.seg_social_func     = n('seg_social_func')
         recibo.seg_social_taxa     = n('seg_social_taxa')
@@ -5915,6 +5917,8 @@ def salarios_importar_confirmar():
         r.seg_social_base     = rec.get('seg_social_base', 0)
         r.seg_social_func     = rec.get('seg_social', 0)
         r.irs_taxa            = rec.get('irs_taxa', 0)
+        r.irs_parcela_abater  = rec.get('irs_parcela_abater', 0)
+        r.irs_taxa_efetiva    = rec.get('irs_taxa_efetiva', 0)
         r.irs_base            = rec.get('irs_base', 0)
         r.irs_retencao        = rec.get('irs', 0)
         r.outros_descontos    = 0

@@ -240,8 +240,8 @@ tr:nth-child(even) { background: #f7f9fc; }
       </tr>
 
       {% set irs_tx_m  = recibo.irs_taxa|float %}
-      {% set irs_parc  = 0 %}
-      {% set irs_tx_ef = recibo.irs_taxa|float %}
+      {% set irs_parc  = recibo.irs_parcela_abater|float if recibo.irs_parcela_abater else 0 %}
+      {% set irs_tx_ef = recibo.irs_taxa_efetiva|float if recibo.irs_taxa_efetiva else recibo.irs_taxa|float %}
       {% set irs_base_v= recibo.irs_base|float if recibo.irs_base|float > 0 else (recibo.total_abonos|float - ref_tot) %}
       {% set irs_val   = recibo.irs_retencao|float %}
       <tr>

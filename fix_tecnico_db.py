@@ -251,3 +251,12 @@ with app.app_context():
                 if col not in rs_cols:
                     conn.execute(text(f"ALTER TABLE recibo_salario ADD COLUMN {col} {typ} DEFAULT 0"))
                     print(f"OK: recibo_salario.{col}")
+
+    # Add irs_parcela_abater and irs_taxa_efetiva to recibo_salario
+    if 'recibo_salario' in insp.get_table_names():
+        rs_cols = [c['name'] for c in insp.get_columns('recibo_salario')]
+        for col, typ in [('irs_parcela_abater','NUMERIC'),('irs_taxa_efetiva','NUMERIC')]:
+            if col not in rs_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE recibo_salario ADD COLUMN {col} {typ} DEFAULT 0"))
+                print(f"OK: recibo_salario.{col}")
