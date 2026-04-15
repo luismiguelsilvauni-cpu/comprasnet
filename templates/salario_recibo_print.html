@@ -3,76 +3,78 @@
 <head>
 <meta charset="UTF-8">
 <style>
-@page { size: A4; margin: 15mm 15mm 15mm 15mm; }
+@page { size: A4; margin: 12mm 12mm 12mm 12mm; }
 @media print { .no-print { display: none !important; } }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, sans-serif; font-size: 10pt; color: #1a1a1a; background: white; }
+body { font-family: Arial, sans-serif; font-size: 9.5pt; color: #1a1a1a; background: white; }
 
-.recibo-wrapper { border: 2px solid #1a1a1a; padding: 0; }
+.recibo-wrapper { border: 2px solid #1a1a1a; }
 
 /* Header */
-.header { display: flex; align-items: center; padding: 10px 14px; border-bottom: 2px solid #1a1a1a; background: #f8f8f8; }
-.header-logo { width: 80px; margin-right: 14px; }
-.header-logo img { max-width: 80px; max-height: 50px; object-fit: contain; }
+.header { display: flex; align-items: center; padding: 8px 12px; border-bottom: 2px solid #1a1a1a; background: #f8f8f8; }
+.header-logo { width: 75px; margin-right: 12px; flex-shrink: 0; }
+.header-logo img { max-width: 75px; max-height: 48px; object-fit: contain; }
+.header-empresa h1 { font-size: 12pt; font-weight: bold; color: #003366; }
+.header-empresa p { font-size: 7.5pt; color: #555; margin-top: 1px; }
+.header-recibo { text-align: right; flex-shrink: 0; }
+.header-recibo .recibo-label { font-size: 11pt; font-weight: bold; color: #003366; }
+.header-recibo .recibo-num { font-size: 8.5pt; color: #555; }
 .header-empresa { flex: 1; }
-.header-empresa h1 { font-size: 13pt; font-weight: bold; color: #003366; }
-.header-empresa p { font-size: 8pt; color: #555; margin-top: 2px; }
-.header-recibo { text-align: right; }
-.header-recibo .recibo-label { font-size: 12pt; font-weight: bold; color: #003366; }
-.header-recibo .recibo-num { font-size: 9pt; color: #555; }
+
+/* Month */
+.month-badge { background: #003366; color: white; text-align: center; padding: 5px 12px; font-weight: bold; font-size: 10.5pt; border-bottom: 2px solid #1a1a1a; }
 
 /* Employee info */
-.emp-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #ccc; }
-.emp-col { padding: 8px 14px; }
+.emp-info { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #ccc; }
+.emp-col { padding: 6px 12px; }
 .emp-col:first-child { border-right: 1px solid #ccc; }
-.info-row { display: flex; margin-bottom: 3px; font-size: 9pt; }
-.info-label { font-weight: bold; min-width: 110px; color: #003366; }
-.info-val { color: #1a1a1a; }
-.month-badge { background: #003366; color: white; text-align: center; padding: 6px 14px; font-weight: bold; font-size: 11pt; border-bottom: 2px solid #1a1a1a; }
+.info-row { display: flex; margin-bottom: 2px; font-size: 8.5pt; }
+.info-label { font-weight: bold; min-width: 105px; color: #003366; }
+
+/* Section title */
+.section-title { background: #003366; color: white; font-weight: bold; font-size: 8.5pt; padding: 3px 10px; letter-spacing: .04em; }
 
 /* Tables */
-.section-title { background: #003366; color: white; font-weight: bold; font-size: 9pt; padding: 4px 10px; }
-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-th { background: #e8edf5; font-weight: bold; color: #003366; padding: 4px 8px; border: 1px solid #ccc; text-align: center; font-size: 8pt; }
-td { padding: 3px 8px; border: 1px solid #ddd; }
-td:last-child { text-align: right; }
+table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+th { background: #dce4f0; font-weight: bold; color: #003366; padding: 3px 6px; border: 1px solid #bbb; text-align: center; font-size: 7.5pt; }
+th:first-child { text-align: left; }
+td { padding: 2px 6px; border: 1px solid #ddd; vertical-align: middle; }
+td:last-child { text-align: right; font-weight: 600; }
 .td-center { text-align: center; }
-tr:nth-child(even) { background: #f9f9f9; }
-.subtotal-row td { background: #e8edf5; font-weight: bold; border-top: 2px solid #003366; }
-.total-row td { background: #003366; color: white; font-weight: bold; font-size: 10pt; border: none; }
-.zero { color: #999; }
+tr:nth-child(even) { background: #f7f9fc; }
+.subtotal-row td { background: #dce4f0; font-weight: bold; border-top: 2px solid #003366; font-size: 9pt; }
 
-/* Totals box */
+/* Totals */
 .totals-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: 2px solid #1a1a1a; }
-.total-box { padding: 8px 12px; text-align: center; border-right: 1px solid #ccc; }
+.total-box { padding: 6px 10px; text-align: center; border-right: 1px solid #ccc; }
 .total-box:last-child { border-right: none; }
-.total-box .t-label { font-size: 8pt; color: #555; font-weight: bold; text-transform: uppercase; }
-.total-box .t-value { font-size: 14pt; font-weight: bold; margin-top: 2px; }
+.total-box .t-label { font-size: 7.5pt; color: #555; font-weight: bold; text-transform: uppercase; }
+.total-box .t-value { font-size: 13pt; font-weight: bold; margin-top: 2px; }
 .total-box.liquido { background: #003366; color: white; }
 .total-box.abonos .t-value { color: #006600; }
 .total-box.descontos .t-value { color: #cc0000; }
 
 /* Transferencias */
-.transf { padding: 6px 14px; border-top: 1px solid #ccc; font-size: 8.5pt; }
-.transf-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.transf { padding: 4px 12px; border-top: 1px solid #ccc; font-size: 8pt; }
+.transf-row { display: flex; justify-content: space-between; padding: 1px 0; }
 .transf-label { color: #555; }
 .transf-val { font-weight: bold; }
 
-/* Assinatura */
-.sign-area { display: grid; grid-template-columns: 2fr 1fr; padding: 10px 14px; border-top: 2px solid #1a1a1a; gap: 20px; }
-.sign-text { font-size: 8pt; color: #444; line-height: 1.5; }
-.sign-line { border-top: 1px solid #333; margin-top: 20px; text-align: center; font-size: 8pt; color: #555; padding-top: 2px; }
+/* Sign area */
+.sign-area { padding: 10px 12px 6px; border-top: 2px solid #1a1a1a; }
+.sign-text { font-size: 8pt; color: #333; line-height: 1.6; margin-bottom: 18px; }
+.sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.sign-line { border-top: 1px solid #333; text-align: center; font-size: 7.5pt; color: #555; padding-top: 2px; }
 
 /* Footer */
-.footer { background: #f0f4f8; border-top: 1px solid #ccc; padding: 4px 14px; font-size: 7.5pt; color: #777; text-align: center; }
-.original-tag { position: absolute; top: 12px; right: 14px; background: #cc0000; color: white; font-size: 7pt; font-weight: bold; padding: 2px 6px; border-radius: 3px; transform: rotate(15deg); }
+.footer { background: #f0f4f8; border-top: 1px solid #ccc; padding: 3px 12px; font-size: 7pt; color: #777; text-align: center; }
+
+.original-tag { position: absolute; top: 10px; right: 12px; background: #cc0000; color: white; font-size: 6.5pt; font-weight: bold; padding: 2px 5px; border-radius: 3px; transform: rotate(15deg); }
 </style>
 </head>
 <body>
-
 <div class="recibo-wrapper" style="position:relative">
 
-  <!-- ORIGINAL tag -->
   <div class="original-tag">ORIGINAL</div>
 
   <!-- Header -->
@@ -81,7 +83,7 @@ tr:nth-child(even) { background: #f9f9f9; }
       {% if cfg and cfg.empresa_logo_path %}
       <img src="{{ upload_url }}/{{ cfg.empresa_logo_path }}" alt="Logo">
       {% else %}
-      <div style="width:80px;height:50px;background:#003366;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:8pt">UCN</div>
+      <div style="width:75px;height:48px;background:#003366;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:8pt">UCN</div>
       {% endif %}
     </div>
     <div class="header-empresa">
@@ -95,108 +97,174 @@ tr:nth-child(even) { background: #f9f9f9; }
     </div>
   </div>
 
-  <!-- Month badge -->
+  <!-- Month -->
   <div class="month-badge">{{ mes_label }} {{ ano }}</div>
 
   <!-- Employee info -->
   <div class="emp-info">
     <div class="emp-col">
-      <div class="info-row"><span class="info-label">Funcionário:</span><span class="info-val"><strong>{{ func.nome }}</strong></span></div>
-      <div class="info-row"><span class="info-label">Categoria:</span><span class="info-val">{{ func.categoria or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">Morada:</span><span class="info-val">{{ func.morada or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">NIF:</span><span class="info-val">{{ func.nif or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">Nº Seg. Social:</span><span class="info-val">{{ func.num_seg_social or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Funcionário:</span><span><strong>{{ func.nome }}</strong></span></div>
+      <div class="info-row"><span class="info-label">Categoria:</span><span>{{ func.categoria or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Morada:</span><span>{{ func.morada or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">NIF:</span><span>{{ func.nif or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Nº Seg. Social:</span><span>{{ func.num_seg_social or '—' }}</span></div>
     </div>
     <div class="emp-col">
-      <div class="info-row"><span class="info-label">Estado Civil:</span><span class="info-val">{{ func.estado_civil or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">Titulares IRS:</span><span class="info-val">{{ func.titulares_rendimento or 1 }}</span></div>
-      <div class="info-row"><span class="info-label">Dependentes:</span><span class="info-val">{{ func.num_dependentes or 0 }}</span></div>
-      <div class="info-row"><span class="info-label">Seguro:</span><span class="info-val">{{ func.seguro_companhia or '—' }} · Apólice {{ func.seguro_apolice or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">IBAN:</span><span class="info-val">{{ func.iban or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Estado Civil:</span><span>{{ func.estado_civil or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Titulares IRS:</span><span>{{ func.titulares_rendimento or 1 }}</span></div>
+      <div class="info-row"><span class="info-label">Dependentes:</span><span>{{ func.num_dependentes or 0 }}</span></div>
+      <div class="info-row"><span class="info-label">Seguro:</span><span>{{ func.seguro_companhia or '—' }} · Apólice {{ func.seguro_apolice or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">IBAN:</span><span>{{ func.iban or '—' }}</span></div>
     </div>
   </div>
 
-  <!-- Abonos -->
-  <div class="section-title">ABONOS</div>
+  <!-- PROCESSAMENTO (abonos) -->
+  <div class="section-title">PROCESSAMENTO</div>
   <table>
     <thead>
-      <tr><th style="text-align:left;width:38%">Descrição</th><th>Dias</th><th>Horas</th><th>RHT</th><th>BASE (€)</th><th>Valor (€)</th></tr>
+      <tr>
+        <th style="width:38%">Descrição</th>
+        <th>Dias</th>
+        <th>Horas</th>
+        <th>RHT</th>
+        <th>BASE (€)</th>
+        <th>Valor (€)</th>
+      </tr>
     </thead>
     <tbody>
-      {% set venc = recibo.vencimento_base|float %}
-      {% set rht  = recibo.vencimento_base_rht|float %}
-      {% set base_g = recibo.vencimento_base_g|float %}
+      {% set venc    = recibo.vencimento_base|float %}
+      {% set rht     = recibo.vencimento_base_rht|float %}
+      {% set base_g  = recibo.vencimento_base_g|float or venc %}
+      {% set dias_rb = 30 %}
+      {# Horas = RHT × Dias (F9 × 30) #}
+      {% set horas_rb = rht * dias_rb %}
+
       <tr>
         <td>Remuneração Base</td>
-        <td class="td-center">30</td>
-        <td class="td-center">{{ '%.3f'|format(rht*30) if rht else '—' }}</td>
-        <td class="td-center">{{ '%.3f'|format(rht) if rht else '%.3f'|format(venc/30) }}</td>
-        <td class="td-center">{{ '%.2f'|format(base_g or venc) }}</td>
+        <td class="td-center">{{ dias_rb }}</td>
+        <td class="td-center">{{ '%.3f'|format(horas_rb) if horas_rb else '—' }}</td>
+        <td class="td-center">{{ '%.3f'|format(rht) if rht else '—' }}</td>
+        <td class="td-center">{{ '%.2f'|format(base_g) }}</td>
         <td>{{ '%.2f'|format(venc) }}</td>
       </tr>
-      {% if recibo.faltas_dias|float > 0 %}
-      <tr><td>Faltas/Desc./Férias/Feriados (dias)</td><td class="td-center">{{ '%.1f'|format(recibo.faltas_dias|float) }}</td><td></td><td></td><td></td><td>—</td></tr>
-      {% endif %}
-      {% if recibo.faltas_horas|float > 0 %}
-      <tr><td>Faltas mês corrente (horas)</td><td></td><td class="td-center">{{ '%.1f'|format(recibo.faltas_horas|float) }}</td><td></td><td></td><td>—</td></tr>
-      {% endif %}
-      {% set hex_horas = recibo.horas_extra|float %}
-      {% set hex_rht2 = recibo.horas_extra_rht|float %}
-      {% if hex_horas > 0 or hex_rht2 > 0 %}
-      {% set hex_val = hex_horas * hex_rht2 %}
-      <tr><td>Horas Extraordinárias</td><td></td><td class="td-center">{{ '%.2f'|format(hex_horas) if hex_horas else '—' }}</td><td class="td-center">{{ '%.3f'|format(hex_rht2) if hex_rht2 else '—' }}</td><td></td><td>{{ '%.2f'|format(hex_val) if hex_val else '—' }}</td></tr>
-      {% endif %}
+
+      {# Always show faltas lines (even if 0, matches Excel layout) #}
+      <tr>
+        <td>Faltas / Descontos / Férias / Feriados (dias)</td>
+        <td class="td-center">{{ '%.1f'|format(recibo.faltas_dias|float) if recibo.faltas_dias|float else '' }}</td>
+        <td></td><td></td><td></td>
+        <td style="color:#999">{{ '%.2f'|format(recibo.faltas_valor|float) if recibo.faltas_valor|float else '' }}</td>
+      </tr>
+      <tr>
+        <td>Faltas Mês Corrente (horas)</td>
+        <td></td>
+        <td class="td-center">{{ '%.1f'|format(recibo.faltas_horas|float) if recibo.faltas_horas|float else '' }}</td>
+        <td></td><td></td><td></td>
+      </tr>
+
+      {# Horas extraordinárias #}
+      {% set hex_h = recibo.horas_extra|float %}
+      {% set hex_r = recibo.horas_extra_rht|float %}
+      {% set hex_v = hex_h * hex_r %}
+      <tr>
+        <td>Horas Extraordinárias</td>
+        <td></td>
+        <td class="td-center">{{ '%.2f'|format(hex_h) if hex_h else '' }}</td>
+        <td class="td-center">{{ '%.3f'|format(hex_r) if hex_r else '' }}</td>
+        <td></td>
+        <td>{{ '%.2f'|format(hex_v) if hex_v else '' }}</td>
+      </tr>
+
       {% if recibo.premios|float > 0 %}
-      <tr><td>Gratificação / Prémios</td><td></td><td></td><td></td><td></td><td>{{ '%.2f'|format(recibo.premios|float) }}</td></tr>
+      <tr>
+        <td>Gratificação / Prémios</td>
+        <td></td><td></td><td></td><td></td>
+        <td>{{ '%.2f'|format(recibo.premios|float) }}</td>
+      </tr>
       {% endif %}
+
+      {# Subsídio alimentação #}
       {% set ref_dias = recibo.sub_refeicao_dias|float or 22 %}
       {% set ref_vdia = recibo.sub_refeicao_vdia|float %}
       {% set ref_tot  = recibo.subsidio_refeicao|float %}
       {% if ref_tot > 0 %}
-      <tr><td>Subsídio de Alimentação</td><td class="td-center">{{ '%.0f'|format(ref_dias) }}</td><td></td><td class="td-center">{{ '%.2f'|format(ref_vdia) if ref_vdia else '%.2f'|format(ref_tot/ref_dias) }}</td><td></td><td>{{ '%.2f'|format(ref_tot) }}</td></tr>
+      <tr>
+        <td>Subsídio de Alimentação</td>
+        <td class="td-center">{{ '%.0f'|format(ref_dias) }}</td>
+        <td></td>
+        <td class="td-center">{{ '%.2f'|format(ref_vdia if ref_vdia else ref_tot/ref_dias) }}</td>
+        <td></td>
+        <td>{{ '%.2f'|format(ref_tot) }}</td>
+      </tr>
       {% endif %}
+
       {% if recibo.outros_abonos|float > 0 %}
-      <tr><td>Outros Abonos</td><td></td><td></td><td></td><td></td><td>{{ '%.2f'|format(recibo.outros_abonos|float) }}</td></tr>
+      <tr>
+        <td>Outros Abonos</td>
+        <td></td><td></td><td></td><td></td>
+        <td>{{ '%.2f'|format(recibo.outros_abonos|float) }}</td>
+      </tr>
       {% endif %}
-      <tr class="subtotal-row"><td colspan="5" style="text-align:right">TOTAL ILÍQUIDO</td><td>{{ '%.2f'|format(recibo.total_abonos|float) }}</td></tr>
+
+      <tr class="subtotal-row">
+        <td colspan="5" style="text-align:right">TOTAL ILÍQUIDO &nbsp;›››</td>
+        <td>{{ '%.2f'|format(recibo.total_abonos|float) }}</td>
+      </tr>
     </tbody>
   </table>
 
-  <!-- Descontos -->
-  <div class="section-title" style="margin-top:8px">DESCONTOS</div>
+  <!-- DESCONTOS -->
+  <div class="section-title" style="margin-top:6px">DESCONTOS</div>
   <table>
     <thead>
-      <tr><th style="text-align:left;width:38%">Descrição</th><th>%</th><th>Tx Efect.</th><th>Base (€)</th><th colspan="1"></th><th>Valor (€)</th></tr>
+      <tr>
+        <th style="width:38%">Descrição</th>
+        <th>Taxa Marginal</th>
+        <th>Parcela a Abater</th>
+        <th>Taxa Efetiva</th>
+        <th>Base (€)</th>
+        <th>Valor (€)</th>
+      </tr>
     </thead>
     <tbody>
       {% set ss_taxa = recibo.seg_social_taxa|float or 0.11 %}
-      {% set ss_base = recibo.seg_social_base|float if recibo.seg_social_base else venc %}
+      {% set ss_base = recibo.seg_social_base|float if recibo.seg_social_base|float > 0 else venc %}
+      {% set ss_val  = recibo.seg_social_func|float %}
       <tr>
-        <td>C.R.S.S. (Seg. Social Trabalhador)</td>
+        <td>C.R.S.S. Remuneração Base</td>
         <td class="td-center">{{ '%.2f'|format(ss_taxa*100) }}%</td>
         <td></td>
+        <td></td>
         <td class="td-center">{{ '%.2f'|format(ss_base) }}</td>
-        <td></td>
-        <td>{{ '%.2f'|format(recibo.seg_social_func|float) }}</td>
+        <td>{{ '%.2f'|format(ss_val) }}</td>
       </tr>
-      {% set irs_taxa = recibo.irs_taxa|float %}
-      {% set irs_base_v = recibo.irs_base|float or (recibo.total_abonos|float - recibo.subsidio_refeicao|float) %}
-      {% set irs_val = recibo.irs_retencao|float %}
+
+      {% set irs_tx_m  = recibo.irs_taxa|float %}
+      {% set irs_parc  = 0 %}
+      {% set irs_tx_ef = recibo.irs_taxa|float %}
+      {% set irs_base_v= recibo.irs_base|float if recibo.irs_base|float > 0 else (recibo.total_abonos|float - ref_tot) %}
+      {% set irs_val   = recibo.irs_retencao|float %}
       <tr>
-        <td>I.R.S. (Retenção na Fonte)</td>
-        <td class="td-center">{{ '%.4f'|format(irs_taxa) }}</td>
-        <td class="td-center">{{ '%.2f'|format(irs_taxa*100) }}%</td>
+        <td>I.R.S.</td>
+        <td class="td-center">{{ '%.4f'|format(irs_tx_m) }}</td>
+        <td class="td-center">{{ '%.2f'|format(irs_parc) if irs_parc else '—' }}</td>
+        <td class="td-center">{{ '%.4f'|format(irs_tx_ef) }}</td>
         <td class="td-center">{{ '%.2f'|format(irs_base_v) }}</td>
-        <td></td>
         <td>{{ '%.2f'|format(irs_val) }}</td>
       </tr>
-      {% if recibo.faltas_valor|float > 0 %}
-      <tr><td>Desconto por Faltas</td><td></td><td></td><td></td><td></td><td>{{ '%.2f'|format(recibo.faltas_valor|float) }}</td></tr>
-      {% endif %}
+
       {% if recibo.outros_descontos|float > 0 %}
-      <tr><td>Outros Descontos</td><td></td><td></td><td></td><td></td><td>{{ '%.2f'|format(recibo.outros_descontos|float) }}</td></tr>
+      <tr>
+        <td>Outros Descontos</td>
+        <td></td><td></td><td></td><td></td>
+        <td>{{ '%.2f'|format(recibo.outros_descontos|float) }}</td>
+      </tr>
       {% endif %}
-      <tr class="subtotal-row"><td colspan="5" style="text-align:right">TOTAL DE DESCONTOS</td><td>{{ '%.2f'|format(recibo.total_descontos|float) }}</td></tr>
+
+      <tr class="subtotal-row">
+        <td colspan="5" style="text-align:right">TOTAL DE DESCONTOS &nbsp;›››</td>
+        <td>{{ '%.2f'|format(recibo.total_descontos|float) }}</td>
+      </tr>
     </tbody>
   </table>
 
@@ -216,56 +284,52 @@ tr:nth-child(even) { background: #f9f9f9; }
     </div>
   </div>
 
-  <!-- Transferências -->
+  <!-- Discriminativo -->
   <div class="transf">
-    <strong>Discriminativo de Pagamento:</strong>
+    <strong>Discriminativo:</strong>
     <div class="transf-row">
-      <span class="transf-label">Transferência para conta {{ func.iban or '—' }}</span>
-      <span class="transf-val">{{ '%.2f'|format(recibo.liquido|float - recibo.subsidio_refeicao|float) }} €</span>
+      <span class="transf-label">›&nbsp; Transferência v/ conta &nbsp;<strong>{{ func.iban or '—' }}</strong></span>
+      <span class="transf-val">{{ '%.2f'|format(recibo.liquido|float - ref_tot) }} €</span>
     </div>
-    {% if recibo.subsidio_refeicao|float > 0 %}
+    {% if ref_tot > 0 %}
     <div class="transf-row">
-      <span class="transf-label">Transferência Subsídio de Refeição</span>
-      <span class="transf-val">{{ '%.2f'|format(recibo.subsidio_refeicao|float) }} €</span>
+      <span class="transf-label">›&nbsp; Transferência Subsídio de Refeição (cartão)</span>
+      <span class="transf-val">{{ '%.2f'|format(ref_tot) }} €</span>
     </div>
     {% endif %}
-    <div class="transf-row" style="border-top:1px solid #ccc;margin-top:4px;padding-top:4px;font-weight:bold">
+    <div class="transf-row" style="border-top:1px solid #ccc;margin-top:3px;padding-top:3px;font-weight:bold">
       <span>TOTAL TRANSFERIDO</span>
       <span>{{ '%.2f'|format(recibo.liquido|float) }} €</span>
-    </div>
-    <!-- Seg Social Entidade (informativo) -->
-    <div class="transf-row" style="margin-top:6px;color:#777;font-size:8pt">
-      <span>Encargo Seg. Social Entidade (23,75%) — informativo</span>
-      <span>{{ '%.2f'|format(venc * 0.2375) }} €</span>
     </div>
   </div>
 
   <!-- Assinatura -->
   <div class="sign-area">
     <div class="sign-text">
-      Recebi o valor deste recibo, pago pela <strong>{{ empresa_nome }}</strong>, referente a <strong>{{ mes_label }} de {{ ano }}</strong>.<br>
-      Vila do Conde, em _____ / _____ / _________
+      Recebi o valor deste recibo, pago pela <strong>{{ empresa_nome }}</strong>,
+      referente a <strong>{{ mes_label }} de {{ ano }}</strong>.
       {% if recibo.notas %}<br><em>Obs: {{ recibo.notas }}</em>{% endif %}
     </div>
-    <div>
+    <div style="display:flex;gap:12px;font-size:7.5pt;color:#555">
+      <div>Vila do Conde, em _____ /_____ /_________</div>
+    </div>
+    <div class="sign-grid" style="margin-top:16px">
       <div class="sign-line">(assinatura do trabalhador)</div>
+      <div class="sign-line">(carimbo e assinatura da entidade)</div>
     </div>
   </div>
 
   <!-- Footer -->
   <div class="footer">
-    Documento processado electronicamente · {{ empresa_nome }} · {{ ano }}
+    Documento processado electronicamente · {{ empresa_nome }}
     &nbsp;|&nbsp; NIF: {{ cfg.empresa_nif if cfg else '—' }}
+    &nbsp;|&nbsp; {{ ano }}
     &nbsp;|&nbsp; Estado: <strong>{{ recibo.estado|upper }}</strong>
   </div>
 
 </div>
 <script>
-// Auto-print when opened
-window.onload = function() {
-  // Small delay to ensure logo loads
-  setTimeout(function() { window.print(); }, 500);
-};
+window.onload = function() { setTimeout(function() { window.print(); }, 500); };
 </script>
 </body>
 </html>
