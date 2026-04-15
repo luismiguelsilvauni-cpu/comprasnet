@@ -5975,31 +5975,32 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
     for r in range(1, ws.nrows+1):
         for c in range(1, min(ws.ncols+1, 5)):
             txt = sval(r, c).upper()
-            if 'REMUNERAÇÃO BASE' in txt or 'REMUNERACAO BASE' in txt:
-                row_map['rem_base'] = r
-            elif 'GRATIFICAÇÃO' in txt or 'GRATIFICACAO' in txt or 'PRÉMIO' in txt:
+            # Only match rem_base in first 15 rows to avoid CRSS line ("C.R.S.S. Remuneração base")
+            if r <= 15 and 'rem_base' not in row_map:
+                if 'REMUNERAÇÃO BASE' in txt or 'REMUNERACAO BASE' in txt:
+                    row_map['rem_base'] = r
+            if ('GRATIFICAÇÃO' in txt or 'GRATIFICACAO' in txt or 'PRÉMIO' in txt or 'PREMIO' in txt) and 'premios' not in row_map:
                 row_map['premios'] = r
-            elif 'FALTAS' in txt and 'MÊS' not in txt and 'MES' not in txt and 'HORAS' not in txt:
+            if 'FALTAS' in txt and ('MÊS' not in txt and 'MES' not in txt and 'HORAS' not in txt) and 'CORRENTE' not in txt and 'faltas_dias' not in row_map:
                 row_map['faltas_dias'] = r
-            elif 'FALTAS' in txt and ('MÊS' in txt or 'MES' in txt or 'HORAS' in txt):
+            if 'FALTAS' in txt and ('MÊS' in txt or 'MES' in txt or 'CORRENTE' in txt) and 'faltas_horas' not in row_map:
                 row_map['faltas_horas'] = r
-            elif 'EXTRAORDINÁR' in txt or 'EXTRAORDINAR' in txt:
+            if ('EXTRAORDINÁR' in txt or 'EXTRAORDINAR' in txt) and 'horas_extra' not in row_map:
                 row_map['horas_extra'] = r
-            elif 'ALIMENTAÇÃO' in txt or 'ALIMENTACAO' in txt or 'REFEIÇÃO' in txt or 'REFEICAO' in txt:
+            if ('ALIMENTAÇÃO' in txt or 'ALIMENTACAO' in txt or ('REFEIÇÃO' in txt and 'TOTAL' not in txt) or ('REFEICAO' in txt and 'TOTAL' not in txt)) and 'sub_ref' not in row_map:
                 row_map['sub_ref'] = r
-            elif 'TOTAL ILÍQUIDO' in txt or 'TOTAL ILIQUIDO' in txt or 'ILÍQUIDO' in txt:
+            if ('TOTAL ILÍQUIDO' in txt or 'TOTAL ILIQUIDO' in txt) and 'total_iliq' not in row_map:
                 row_map['total_iliq'] = r
-            elif 'C.R.S.S' in txt or 'CRSS' in txt or 'SEG' in txt and 'SOCIAL' in txt:
+            if ('C.R.S.S' in txt or ('SEG' in txt and 'SOCIAL' in txt and 'REMUNERAÇÃO' not in txt and 'REMUNERACAO' not in txt)) and 'crss' not in row_map:
                 row_map['crss'] = r
-            elif 'I.R.S' in txt or 'IRS' in txt:
+            if ('I.R.S' in txt and 'HORAS' not in txt) and 'irs' not in row_map:
                 row_map['irs'] = r
-            elif 'TOTAL DE DESCONTOS' in txt or 'TOTAL DESCONTOS' in txt:
+            if ('TOTAL DE DESCONTOS' in txt or 'TOTAL DESCONTOS' in txt) and 'total_desc' not in row_map:
                 row_map['total_desc'] = r
-            elif 'LÍQUIDO A RECEBER' in txt or 'LIQUIDO A RECEBER' in txt or 'LÍQUIDO' in txt:
+            if ('LÍQUIDO A RECEBER' in txt or 'LIQUIDO A RECEBER' in txt) and 'liquido' not in row_map:
                 row_map['liquido'] = r
-            elif 'DISCRIMINATIVO' in txt or 'TRANSFERÊNCIA' in txt or 'TRANSFERENCIA' in txt:
-                if 'CONTA' in txt or 'BCP' in txt or 'NIB' in txt or 'IBAN' in txt:
-                    row_map['transf'] = r
+            if ('DISCRIMINATIVO' in txt or ('TRANSFERÊNCIA' in txt and ('CONTA' in txt or 'BCP' in txt or 'NIB' in txt or 'IBAN' in txt))) and 'transf' not in row_map:
+                row_map['transf'] = r
 
     # Use detected rows or fallback to fixed positions
     RB  = row_map.get('rem_base', 9)
