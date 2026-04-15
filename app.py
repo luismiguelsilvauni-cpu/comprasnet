@@ -5269,6 +5269,14 @@ def funcionario_editar(fid):
             v = d(field)
             try: return date.fromisoformat(v) if v else None
             except: return None
+        # Update numero if changed and not duplicate
+        novo_numero = d('numero')
+        if novo_numero and novo_numero != func.numero:
+            existente = Funcionario.query.filter_by(numero=novo_numero).first()
+            if existente and existente.id != fid:
+                flash(f'Nº {novo_numero} já está atribuído a {existente.nome}.', 'error')
+                return redirect(url_for('funcionario_editar', fid=fid))
+            func.numero = novo_numero
         func.nome=d('nome'); func.categoria=d('categoria')
         func.ativo=request.form.get('ativo')=='1'
         func.data_nascimento=di('data_nascimento')
