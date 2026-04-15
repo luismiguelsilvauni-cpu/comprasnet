@@ -2822,6 +2822,8 @@ class ReciboSalario(db.Model):
     # Deduções
     irs_retencao        = db.Column(db.Numeric(10,2), default=0)   # H19
     irs_taxa            = db.Column(db.Numeric(8,6), default=0)    # B19
+    irs_parcela_abater  = db.Column(db.Numeric(10,2), default=0)  # C19
+    irs_taxa_efetiva    = db.Column(db.Numeric(8,6), default=0)   # D19
     irs_base            = db.Column(db.Numeric(10,2), default=0)   # E19
     seg_social_func     = db.Column(db.Numeric(10,2), default=0)   # H18 11%
     seg_social_taxa     = db.Column(db.Numeric(8,4), default=0)    # D18
