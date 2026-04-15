@@ -4,9 +4,9 @@
 {% block topbar_actions %}
   <a href="{{ url_for('salarios_calendario', fid=func.id, ano=ano) }}" class="btn btn-ghost btn-sm">← Calendário</a>
   {% if recibo %}
-  <button onclick="gerarPDF()" class="btn btn-ghost btn-sm">📄 PDF / Imprimir</button>
-  <button onclick="enviarEmail({{ recibo.id }})" class="btn btn-ghost btn-sm">📧 Email</button>
+  <button onclick="window.open('/salarios/recibo/{{ recibo.id }}/pdf','_blank')" class="btn btn-ghost btn-sm">📄 PDF / Imprimir</button>
   <a href="{{ url_for('salario_recibo_excel', rid=recibo.id) }}" class="btn btn-ghost btn-sm">📊 Excel</a>
+  <button onclick="enviarEmail({{ recibo.id }})" class="btn btn-ghost btn-sm">📧 Email</button>
   <form method="post" action="{{ url_for('salario_recibo_apagar', rid=recibo.id) }}" onsubmit="return confirm('Eliminar este recibo?')" style="display:inline">
     <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)">✕ Eliminar</button>
   </form>
@@ -14,109 +14,192 @@
 {% endblock %}
 {% block content %}
 <style>
-.recibo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.val-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
-.val-row:last-child{border-bottom:none}
-.val-label{font-size:13px;color:var(--text)}
-.val-input{width:110px;text-align:right;padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);font-family:monospace}
-.total-row{display:flex;justify-content:space-between;padding:10px 0;font-weight:700;font-size:14px}
-.liquido-box{background:rgba(34,197,94,.1);border:2px solid #22c55e;border-radius:10px;padding:14px 18px;text-align:center;margin-top:14px}
-.sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);padding:6px 12px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.val-row{display:grid;align-items:center;padding:5px 12px;border-bottom:1px solid var(--border);gap:8px}
+.val-row:hover{background:rgba(255,255,255,.02)}
+.val-label{font-size:12px;color:var(--text)}
+.val-input{text-align:right;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;font-size:12px;color:var(--text);font-family:monospace;width:100%}
+.val-input:focus{border-color:var(--accent);outline:none}
+.val-static{text-align:right;font-family:monospace;font-size:12px;color:var(--text-muted)}
+.total-row{display:flex;justify-content:space-between;padding:8px 12px;font-weight:700;font-size:13px;background:var(--surface2);border-top:2px solid var(--border)}
+.liquido-box{background:rgba(34,197,94,.1);border:2px solid #22c55e;border-radius:10px;padding:14px;text-align:center;margin-top:14px}
 </style>
 
 <!-- Header -->
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:16px">
+<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:14px">
   <div style="flex:1">
-    <div style="font-size:17px;font-weight:700">{{ func.nome }}</div>
+    <div style="font-size:16px;font-weight:700">{{ func.nome }}</div>
     <div style="font-size:12px;color:var(--text-muted)">{{ func.categoria or '' }} · Nº {{ func.numero }} · NIF: {{ func.nif or '—' }}</div>
   </div>
   <div style="text-align:right">
-    <div style="font-size:18px;font-weight:700;color:var(--accent)">{{ mes_label }}</div>
-    <div style="font-size:13px;color:var(--text-muted)">{{ ano }}</div>
+    <div style="font-size:17px;font-weight:700;color:var(--accent)">{{ mes_label }}</div>
+    <div style="font-size:12px;color:var(--text-muted)">{{ ano }}</div>
   </div>
 </div>
 
 {% if dias_falta > 0 %}
-<div class="alert alert-warning" style="margin-bottom:12px">
-  ⚠️ Este funcionário tem {{ dias_falta }} dias de falta registados em {{ mes_label }}.
-</div>
+<div class="alert alert-warning" style="margin-bottom:12px">⚠️ {{ func.nome }} tem {{ dias_falta }} dia(s) de falta registados em {{ mes_label }}.</div>
 {% endif %}
 
 <form method="post" id="reciboForm">
 <input type="hidden" name="action" id="formAction" value="save">
 
-<div class="recibo-grid">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
 <!-- ABONOS -->
-<div class="card" style="padding:14px">
-  <div class="sec-title">📈 Abonos</div>
-  {% set abonos = [
-    ('vencimento_base','Vencimento Base','base'),
-    ('subsidio_refeicao','Subsídio de Refeição','ref'),
-    ('horas_extra','Horas Extra','hex'),
-    ('premios','Prémios','prem'),
-    ('outros_abonos','Outros Abonos','outr'),
-  ] %}
-  {% for fname, flabel, fkey in abonos %}
-  <div class="val-row">
-    <span class="val-label">{{ flabel }}</span>
-    <input type="number" name="{{ fname }}" step="0.01" min="0"
-      value="{{ '%.2f'|format((recibo[fname]|float) if recibo and recibo[fname] else (ultima_sp.vencimento|float if fkey=='base' and ultima_sp and ultima_sp.vencimento else (ultima_sp.refeicao|float if fkey=='ref' and ultima_sp and ultima_sp.refeicao else 0))) }}"
-      class="val-input" oninput="calcular()">
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="sec">📈 Abonos</div>
+
+  <!-- Remuneração Base -->
+  <div style="background:rgba(59,110,240,.04)">
+    <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px;font-size:10px;font-weight:700;color:var(--text-muted);padding:3px 12px">
+      <span>Descrição</span><span style="text-align:right">Dias</span><span style="text-align:right">Horas</span><span style="text-align:right">RHT</span><span style="text-align:right">Valor</span>
+    </div>
+    <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
+      <span class="val-label">Remuneração Base</span>
+      <input type="number" name="rem_dias" id="rem_dias" value="{{ recibo.vencimento_base_g and 30 or 30 }}" class="val-input" step="1" min="0" oninput="calcular()">
+      <input type="number" name="vencimento_base_rht" id="rem_horas" value="{{ '%.3f'|format(recibo.vencimento_base_rht|float if recibo and recibo.vencimento_base_rht else (ultima_sp.vencimento|float/30/8 if ultima_sp and ultima_sp.vencimento else 0)) }}" class="val-input" step="0.001" oninput="calcular()">
+      <span class="val-static" id="rem_rht_show"></span>
+      <input type="hidden" name="vencimento_base_g" id="rem_base_g" value="{{ '%.2f'|format(recibo.vencimento_base_g|float if recibo and recibo.vencimento_base_g else (ultima_sp.vencimento|float if ultima_sp and ultima_sp.vencimento else 0)) }}">
+      <input type="number" name="vencimento_base" id="rem_valor" value="{{ '%.2f'|format(recibo.vencimento_base|float if recibo and recibo.vencimento_base else (ultima_sp.vencimento|float if ultima_sp and ultima_sp.vencimento else 0)) }}" class="val-input" step="0.01" oninput="calcular()">
+    </div>
   </div>
-  {% endfor %}
+
+  <!-- Faltas/Descontos/Ferias/Feriados (dias) -->
+  <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
+    <span class="val-label">Faltas/Desc./Férias/Feriados</span>
+    <input type="number" name="faltas_dias" id="faltas_dias" value="{{ '%.1f'|format(recibo.faltas_dias|float if recibo and recibo.faltas_dias else dias_falta) }}" class="val-input" step="0.5" min="0" oninput="calcular()">
+    <span></span><span></span><span></span>
+  </div>
+
+  <!-- Faltas mês corrente (horas) -->
+  <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
+    <span class="val-label">Faltas mês corrente (horas)</span>
+    <span></span>
+    <input type="number" name="faltas_horas" id="faltas_horas" value="{{ '%.1f'|format(recibo.faltas_horas|float if recibo and recibo.faltas_horas else 0) }}" class="val-input" step="0.5" min="0" oninput="calcular()">
+    <span></span><span></span>
+  </div>
+
+  <!-- Horas Extraordinárias -->
+  <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
+    <span class="val-label">Horas Extraordinárias</span>
+    <span></span>
+    <input type="number" name="horas_extra" id="hex_horas" value="{{ '%.2f'|format(recibo.horas_extra|float if recibo and recibo.horas_extra else 0) }}" class="val-input" step="0.5" min="0" oninput="calcular()">
+    <input type="number" name="horas_extra_rht" id="hex_rht" value="{{ '%.3f'|format(recibo.horas_extra_rht|float if recibo and recibo.horas_extra_rht else 0) }}" class="val-input" step="0.001" oninput="calcular()">
+    <span class="val-static" id="hex_valor_show">—</span>
+    <input type="hidden" name="horas_extra_valor" id="hex_valor" value="0">
+  </div>
+
+  <!-- Gratificação -->
+  <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
+    <span class="val-label">Gratificação / Prémios</span>
+    <span></span><span></span><span></span>
+    <input type="number" name="premios" id="premios" value="{{ '%.2f'|format(recibo.premios|float if recibo and recibo.premios else (ultima_sp.premios_outros|float if ultima_sp and ultima_sp.premios_outros else 0)) }}" class="val-input" step="0.01" min="0" oninput="calcular()">
+  </div>
+
+  <!-- Subsídio Alimentação -->
+  <div style="background:rgba(59,110,240,.04)">
+    <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
+      <span class="val-label">Subsídio de Alimentação</span>
+      <input type="number" name="sub_refeicao_dias" id="ref_dias" value="{{ '%.0f'|format(recibo.sub_refeicao_dias|float if recibo and recibo.sub_refeicao_dias else 22) }}" class="val-input" step="1" min="0" oninput="calcular()">
+      <span></span>
+      <input type="number" name="sub_refeicao_vdia" id="ref_vdia" value="{{ '%.2f'|format(recibo.sub_refeicao_vdia|float if recibo and recibo.sub_refeicao_vdia else (ultima_sp.refeicao|float/22 if ultima_sp and ultima_sp.refeicao else 10)) }}" class="val-input" step="0.01" oninput="calcular()">
+      <span class="val-static" id="ref_total_show">—</span>
+      <input type="hidden" name="subsidio_refeicao" id="subsidio_refeicao" value="0">
+    </div>
+  </div>
+
+  <!-- Outros -->
+  <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
+    <span class="val-label">Outros Abonos</span>
+    <span></span><span></span><span></span>
+    <input type="number" name="outros_abonos" id="outros_abonos" value="{{ '%.2f'|format(recibo.outros_abonos|float if recibo and recibo.outros_abonos else 0) }}" class="val-input" step="0.01" min="0" oninput="calcular()">
+  </div>
+
   <div class="total-row" style="color:#22c55e">
-    <span>Total Abonos</span><span id="totalAbonos">0.00 €</span>
+    <span>TOTAL ILÍQUIDO</span><span id="totalAbonos">0,00 €</span>
   </div>
 </div>
 
 <!-- DESCONTOS -->
-<div class="card" style="padding:14px">
-  <div class="sec-title">📉 Descontos</div>
-  {% set descontos = [
-    ('irs_retencao','Retenção IRS',''),
-    ('seg_social_func','Seg. Social (11%)','ss'),
-    ('faltas_valor','Faltas','falt'),
-    ('outros_descontos','Outros Descontos',''),
-  ] %}
-  {% for fname, flabel, fkey in descontos %}
-  <div class="val-row">
-    <span class="val-label">{{ flabel }}</span>
-    <input type="number" name="{{ fname }}" step="0.01" min="0"
-      value="{{ '%.2f'|format(recibo[fname]|float if recibo and recibo[fname] else 0) }}"
-      class="val-input" id="inp-{{ fname }}" oninput="calcular()">
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="sec">📉 Descontos</div>
+
+  <!-- CRSS -->
+  <div style="background:rgba(239,68,68,.03)">
+    <div class="val-row" style="grid-template-columns:2fr 70px 90px 90px;font-size:10px;font-weight:700;color:var(--text-muted);padding:3px 12px">
+      <span>Descrição</span><span style="text-align:right">%</span><span style="text-align:right">Base</span><span style="text-align:right">Valor</span>
+    </div>
+    <div class="val-row" style="grid-template-columns:2fr 70px 90px 90px">
+      <span class="val-label">C.R.S.S. (Seg. Social)</span>
+      <input type="number" name="seg_social_taxa" id="ss_taxa" value="{{ '%.4f'|format(recibo.seg_social_taxa|float if recibo and recibo.seg_social_taxa else 0.11) }}" class="val-input" step="0.0001" oninput="calcular()">
+      <input type="number" name="seg_social_base" id="ss_base" value="{{ '%.2f'|format(recibo.seg_social_base|float if recibo and recibo.seg_social_base else 0) }}" class="val-input" step="0.01" oninput="calcular()">
+      <span class="val-static" id="ss_valor_show">—</span>
+      <input type="hidden" name="seg_social_func" id="seg_social_func" value="0">
+    </div>
   </div>
-  {% endfor %}
-  <div class="val-row" style="background:rgba(59,110,240,.05);border-radius:6px;padding:6px 8px">
-    <span style="font-size:12px;color:var(--text-muted)">Seg. Social Entidade (23.75%)</span>
-    <span id="ssEmp" style="font-family:monospace;font-size:12px;color:var(--text-muted)">0.00 €</span>
-    <input type="hidden" name="seg_social_emp" id="ssEmpVal" value="0">
+
+  <!-- IRS -->
+  <div class="val-row" style="grid-template-columns:2fr 70px 90px 90px">
+    <span class="val-label">I.R.S.</span>
+    <input type="number" name="irs_taxa" id="irs_taxa" value="{{ '%.6f'|format(recibo.irs_taxa|float if recibo and recibo.irs_taxa else 0) }}" class="val-input" step="0.0001" oninput="calcular()">
+    <input type="number" name="irs_base" id="irs_base" value="{{ '%.2f'|format(recibo.irs_base|float if recibo and recibo.irs_base else 0) }}" class="val-input" step="0.01" oninput="calcular()">
+    <span class="val-static" id="irs_valor_show">—</span>
+    <input type="hidden" name="irs_retencao" id="irs_retencao" value="0">
   </div>
+  <div style="padding:2px 12px 4px;font-size:10px;color:var(--text-muted)">
+    Taxa marginal: <input type="number" name="irs_tx_marginal" value="{{ '%.4f'|format(recibo.irs_taxa|float if recibo and recibo.irs_taxa else 0) }}" style="width:70px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text-muted);font-size:10px">
+    &nbsp; Parcela a abater: <input type="number" name="irs_parcela" value="0" style="width:80px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text-muted);font-size:10px">
+  </div>
+
+  <!-- Faltas valor -->
+  <div class="val-row" style="grid-template-columns:2fr 70px 90px 90px">
+    <span class="val-label">Desconto Faltas</span>
+    <span></span><span></span>
+    <input type="number" name="faltas_valor" id="faltas_valor" value="{{ '%.2f'|format(recibo.faltas_valor|float if recibo and recibo.faltas_valor else 0) }}" class="val-input" step="0.01" min="0" oninput="calcular()">
+  </div>
+
+  <!-- Outros descontos -->
+  <div class="val-row" style="grid-template-columns:2fr 70px 90px 90px">
+    <span class="val-label">Outros Descontos</span>
+    <span></span><span></span>
+    <input type="number" name="outros_descontos" id="outros_descontos" value="{{ '%.2f'|format(recibo.outros_descontos|float if recibo and recibo.outros_descontos else 0) }}" class="val-input" step="0.01" min="0" oninput="calcular()">
+  </div>
+
+  <!-- Seg Social Entidade (informativo) -->
+  <div style="padding:6px 12px;background:rgba(59,110,240,.04);border-top:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+      <span>Encargo Entidade (23,75%) — informativo</span>
+      <span id="ss_emp_show" style="font-family:monospace">0,00 €</span>
+      <input type="hidden" name="seg_social_emp" id="seg_social_emp" value="0">
+    </div>
+  </div>
+
   <div class="total-row" style="color:#ef4444">
-    <span>Total Descontos</span><span id="totalDescontos">0.00 €</span>
+    <span>TOTAL DESCONTOS</span><span id="totalDescontos">0,00 €</span>
   </div>
+
+  <!-- Tabelas IRS helper -->
+  {% if tabelas_irs %}
+  <div style="padding:8px 12px;border-top:1px solid var(--border)">
+    <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">📊 Tabelas IRS {{ ano }}:</div>
+    {% for t in tabelas_irs %}
+    <a href="{{ url_for('salario_doc_ver', did=t.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;margin-right:4px">{{ t.descricao }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 </div>
 
-<!-- Tabelas IRS helper -->
-{% if tabelas_irs %}
-<div class="card" style="padding:12px;margin-top:12px">
-  <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">📊 Tabelas IRS disponíveis ({{ ano }})</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-  {% for t in tabelas_irs %}
-  <a href="{{ url_for('salario_doc_ver', did=t.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">📄 {{ t.descricao }}</a>
-  {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-<!-- Totals -->
+<!-- Líquido -->
 <div class="liquido-box">
-  <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">Valor Líquido a Receber</div>
-  <div style="font-size:32px;font-weight:700;color:#22c55e" id="liquido">0.00 €</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">💶 Líquido a Receber</div>
+  <div style="font-size:30px;font-weight:700;color:#22c55e" id="liquido">0,00 €</div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:4px" id="transf_info"></div>
 </div>
 
 <!-- Estado e notas -->
-<div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-top:14px">
+<div style="display:grid;grid-template-columns:160px 1fr;gap:12px;margin-top:12px">
   <div class="form-group"><label>Estado</label>
     <select name="estado" class="input">
       <option value="rascunho" {% if not recibo or recibo.estado=='rascunho' %}selected{% endif %}>📝 Rascunho</option>
@@ -129,62 +212,68 @@
   </div>
 </div>
 
-<div style="display:flex;gap:8px;margin-top:12px">
-  <button type="submit" class="btn btn-primary">💾 Guardar Recibo</button>
-  <button type="button" onclick="document.getElementById('formAction').value='pdf';document.getElementById('reciboForm').submit()" class="btn btn-ghost">📄 Guardar e Gerar PDF</button>
-</div>
+<button type="submit" class="btn btn-primary">💾 Guardar Recibo</button>
 </form>
 
 <script>
-function fmt(v){return parseFloat(v||0).toFixed(2)+' €';}
+function fmt(v){ return parseFloat(v||0).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function fmtN(v,d){ return parseFloat(v||0).toLocaleString('pt-PT',{minimumFractionDigits:d||3,maximumFractionDigits:d||3}); }
+
 function calcular(){
-  var base   = +getVal('vencimento_base');
-  var ref    = +getVal('subsidio_refeicao');
-  var hex    = +getVal('horas_extra');
-  var prem   = +getVal('premios');
-  var outr   = +getVal('outros_abonos');
-  var irs    = +getVal('irs_retencao');
-  var ss     = base * 0.11;
-  var ssEmp  = base * 0.2375;
-  var falt   = +getVal('faltas_valor');
-  var outd   = +getVal('outros_descontos');
+  var venc    = +gv('rem_valor');
+  var rem_rht = +gv('rem_horas');  // F9
+  var falDias = +gv('faltas_dias');
+  var falHoras= +gv('faltas_horas');
+  var hexHoras= +gv('hex_horas');
+  var hexRHT  = +gv('hex_rht');
+  var hexVal  = hexHoras * hexRHT;
+  var refDias = +gv('ref_dias');
+  var refVDia = +gv('ref_vdia');
+  var refTot  = refDias * refVDia;
+  var premios = +gv('premios');
+  var outros  = +gv('outros_abonos');
 
-  // Auto-fill SS if 0
-  var ssInput = document.querySelector('[name=seg_social_func]');
-  if (ssInput && parseFloat(ssInput.value)==0) ssInput.value = ss.toFixed(2);
+  var ss_taxa = +gv('ss_taxa');
+  var ss_base = +gv('ss_base') || venc;
+  var ss_val  = ss_base * ss_taxa;
+  var irs_taxa= +gv('irs_taxa');
+  var irs_base= +gv('irs_base') || (venc + premios);
+  var irs_val = irs_base * irs_taxa;
+  var faltVal = +gv('faltas_valor');
+  var outDesc = +gv('outros_descontos');
+  var ssEmp   = venc * 0.2375;
 
-  var totalA = base + ref + hex + prem + outr;
-  var totalD = irs + +getVal('seg_social_func') + falt + outd;
-  var liq    = totalA - totalD;
+  var totalA  = venc + hexVal + refTot + premios + outros;
+  var totalD  = ss_val + irs_val + faltVal + outDesc;
+  var liq     = totalA - totalD;
 
-  document.getElementById('totalAbonos').textContent   = fmt(totalA);
-  document.getElementById('totalDescontos').textContent = fmt(totalD);
-  document.getElementById('liquido').textContent        = fmt(liq);
-  document.getElementById('ssEmp').textContent          = fmt(ssEmp);
-  document.getElementById('ssEmpVal').value             = ssEmp.toFixed(2);
+  // Update displays
+  sid('hex_valor_show').textContent = hexVal ? fmt(hexVal) : '—';
+  sid('hex_valor').value = hexVal.toFixed(2);
+  sid('ref_total_show').textContent = refTot ? fmt(refTot) : '—';
+  sid('subsidio_refeicao').value = refTot.toFixed(2);
+  sid('ss_valor_show').textContent = fmt(ss_val);
+  sid('seg_social_func').value = ss_val.toFixed(2);
+  // Auto-fill ss_base if empty
+  if (!document.getElementById('ss_base').value || parseFloat(document.getElementById('ss_base').value)==0)
+    document.getElementById('ss_base').value = venc.toFixed(2);
+  sid('irs_valor_show').textContent = fmt(irs_val);
+  sid('irs_retencao').value = irs_val.toFixed(2);
+  sid('ss_emp_show').textContent = fmt(ssEmp);
+  sid('seg_social_emp').value = ssEmp.toFixed(2);
+  sid('totalAbonos').textContent = fmt(totalA);
+  sid('totalDescontos').textContent = fmt(totalD);
+  sid('liquido').textContent = fmt(liq);
+  sid('transf_info').textContent = 'Transferência conta: ' + fmt(liq - refTot) + ' + Refeição: ' + fmt(refTot);
 }
 
-function getVal(name){
-  var el = document.querySelector('[name='+name+']');
-  return el ? parseFloat(el.value||0) : 0;
-}
-
-function gerarPDF(){
-  {% if recibo %}
-  window.open('/salarios/recibo/{{ recibo.id }}/pdf', '_blank');
-  {% else %}
-  alert('Guarde o recibo primeiro antes de gerar o PDF.');
-  {% endif %}
-}
-
+function gv(id){ var e=document.getElementById(id); return e ? parseFloat(e.value||0)||0 : 0; }
+function sid(id){ return document.getElementById(id); }
 function enviarEmail(rid){
   if(!confirm('Enviar recibo para o email do funcionário?')) return;
   fetch('/salarios/recibo/'+rid+'/email',{method:'POST'})
-    .then(r=>r.json()).then(d=>{
-      alert(d.ok?'✅ Email enviado!':'❌ '+d.error);
-    });
+    .then(r=>r.json()).then(d=>{ alert(d.ok?'✅ Email enviado!':'❌ '+d.error); });
 }
-
 calcular();
 </script>
 {% endblock %}

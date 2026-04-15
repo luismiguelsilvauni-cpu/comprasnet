@@ -5605,24 +5605,36 @@ def salario_recibo(fid, ano, mes):
                 mes_label=MESES_LABELS.get(mes, f'Mês {mes}'))
             db.session.add(recibo)
 
-        recibo.vencimento_base    = n('vencimento_base')
-        recibo.subsidio_refeicao  = n('subsidio_refeicao')
-        recibo.horas_extra        = n('horas_extra')
-        recibo.premios            = n('premios')
-        recibo.outros_abonos      = n('outros_abonos')
-        recibo.irs_retencao       = n('irs_retencao')
-        recibo.seg_social_func    = n('seg_social_func')
-        recibo.seg_social_emp     = n('seg_social_emp')
-        recibo.outros_descontos   = n('outros_descontos')
-        recibo.faltas_valor       = n('faltas_valor')
-        recibo.notas              = request.form.get('notas','').strip()
-        recibo.estado             = request.form.get('estado', 'rascunho')
+        recibo.vencimento_base     = n('vencimento_base')
+        recibo.vencimento_base_rht = n('vencimento_base_rht')
+        recibo.vencimento_base_g   = n('vencimento_base_g')
+        recibo.faltas_dias         = n('faltas_dias')
+        recibo.faltas_horas        = n('faltas_horas')
+        recibo.horas_extra         = n('horas_extra')        # horas
+        recibo.horas_extra_rht     = n('horas_extra_rht')
+        recibo.sub_refeicao_dias   = n('sub_refeicao_dias')
+        recibo.sub_refeicao_vdia   = n('sub_refeicao_vdia')
+        recibo.subsidio_refeicao   = n('subsidio_refeicao')
+        recibo.premios             = n('premios')
+        recibo.outros_abonos       = n('outros_abonos')
+        recibo.irs_retencao        = n('irs_retencao')
+        recibo.irs_taxa            = n('irs_taxa')
+        recibo.irs_base            = n('irs_base')
+        recibo.seg_social_func     = n('seg_social_func')
+        recibo.seg_social_taxa     = n('seg_social_taxa')
+        recibo.seg_social_base     = n('seg_social_base')
+        recibo.seg_social_emp      = n('seg_social_emp')
+        recibo.outros_descontos    = n('outros_descontos')
+        recibo.faltas_valor        = n('faltas_valor')
+        recibo.notas               = request.form.get('notas','').strip()
+        recibo.estado              = request.form.get('estado', 'rascunho')
+
+        # Horas extra valor = horas * RHT
+        hex_valor = recibo.horas_extra * recibo.horas_extra_rht if recibo.horas_extra and recibo.horas_extra_rht else n('horas_extra_valor')
 
         # Calculate totals
-        recibo.total_abonos    = (recibo.vencimento_base + recibo.subsidio_refeicao +
-                                   recibo.horas_extra + recibo.premios + recibo.outros_abonos)
-        recibo.total_descontos = (recibo.irs_retencao + recibo.seg_social_func +
-                                   recibo.outros_descontos + recibo.faltas_valor)
+        recibo.total_abonos    = float(recibo.vencimento_base or 0) + float(recibo.subsidio_refeicao or 0) + hex_valor + float(recibo.premios or 0) + float(recibo.outros_abonos or 0)
+        recibo.total_descontos = float(recibo.irs_retencao or 0) + float(recibo.seg_social_func or 0) + float(recibo.outros_descontos or 0) + float(recibo.faltas_valor or 0)
         recibo.liquido         = recibo.total_abonos - recibo.total_descontos
         recibo.atualizado_em   = datetime.now()
         db.session.commit()
