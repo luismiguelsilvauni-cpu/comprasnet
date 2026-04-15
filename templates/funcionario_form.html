@@ -72,13 +72,13 @@
 <div class="card" style="padding:14px;margin-bottom:12px">
   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">📞 Contacto</div>
   <div class="form-group"><label>Morada Residência</label><textarea name="morada" class="input" rows="2">{{ f.morada if f else '' }}</textarea></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label>Telemóvel</label><input type="text" name="telemovel" value="{{ f.telemovel if f else '' }}" class="input"></div>
     <div class="form-group" style="margin:0"><label>Email</label><input type="email" name="email" value="{{ f.email if f else '' }}" class="input"></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    <div class="form-group" style="margin:0"><label>Contacto Emergência</label><input type="text" name="contacto_emergencia" value="{{ f.contacto_emergencia if f else '' }}" class="input"></div>
-    <div class="form-group" style="margin:0"><label>Nome Emergência</label><input type="text" name="nome_emergencia" value="{{ f.nome_emergencia if f else '' }}" class="input"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
+    <div class="form-group" style="margin:0"><label>Contacto Emergência (Telef.)</label><input type="text" name="contacto_emergencia" value="{{ f.contacto_emergencia if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Nome Contacto Emergência</label><input type="text" name="nome_emergencia" value="{{ f.nome_emergencia if f else '' }}" class="input"></div>
   </div>
 </div>
 
