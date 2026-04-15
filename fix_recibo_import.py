@@ -103,6 +103,30 @@ with app.app_context():
         r.atualizado_em        = datetime.now()
 
         db.session.commit()
-        print(f"    ✅ Gravado: venc={r.vencimento_base} | rht={r.vencimento_base_rht} | irs_taxa={r.irs_taxa} | parcela={r.irs_parcela_abater} | tx_ef={r.irs_taxa_efetiva} | líquido={r.liquido}\n")
+        # Force new columns via direct SQLite (SQLAlchemy cache issue)
+        import sqlite3 as _sq
+        _db = os.path.join(os.path.dirname(__file__), 'instance', 'compras.db')
+        _c = _sq.connect(_db)
+        _c.execute("""UPDATE recibo_salario SET
+            irs_parcela_abater=?, irs_taxa_efetiva=?,
+            vencimento_base=?, vencimento_base_rht=?, vencimento_base_g=?,
+            seg_social_taxa=?, seg_social_base=?, seg_social_func=?,
+            irs_taxa=?, irs_base=?, irs_retencao=?,
+            sub_refeicao_dias=?, sub_refeicao_vdia=?, subsidio_refeicao=?,
+            horas_extra=?, horas_extra_rht=?,
+            faltas_dias=?, faltas_horas=?,
+            premios=?, total_abonos=?, total_descontos=?, liquido=?
+            WHERE id=?""", (
+            rec.get('irs_parcela_abater',0), rec.get('irs_taxa_efetiva',0),
+            rec.get('vencimento_base',0), rec.get('vencimento_base_rht',0), rec.get('vencimento_base_g',0),
+            rec.get('seg_social_taxa',0), rec.get('seg_social_base',0), rec.get('seg_social',0),
+            rec.get('irs_taxa',0), rec.get('irs_base',0), rec.get('irs',0),
+            rec.get('sub_refeicao_dias',0), rec.get('sub_refeicao_vdia',0), rec.get('subsidio_refeicao',0),
+            rec.get('horas_extra_horas',0), rec.get('horas_extra_rht',0),
+            rec.get('faltas_dias',0), rec.get('faltas_horas',0),
+            rec.get('premios',0), rec.get('total_iliquido',0), rec.get('total_descontos',0), rec.get('liquido',0),
+            r.id))
+        _c.commit(); _c.close()
+        print(f"    ✅ Gravado: venc={rec.get('vencimento_base')} | parcela={rec.get('irs_parcela_abater')} | tx_ef={rec.get('irs_taxa_efetiva')} | líquido={rec.get('liquido')}\n")
 
 print("Concluído.")
