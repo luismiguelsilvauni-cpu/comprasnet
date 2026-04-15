@@ -71,10 +71,12 @@
 <!-- Contacto -->
 <div class="card" style="padding:14px;margin-bottom:12px">
   <div class="sec">📞 Contacto</div>
-  <div class="fg">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
     <div class="fld"><label>Telemóvel</label><span>{{ f.telemovel or '—' }}</span></div>
-    <div class="fld"><label>Email</label><span>{{ f.email or '—' }}</span></div>
-    <div class="fld"><label>Emergência</label><span>{{ f.contacto_emergencia or '—' }}</span></div>
+    <div class="fld"><label>Email</label><span style="word-break:break-all">{{ f.email or '—' }}</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="fld"><label>Contacto Emergência</label><span>{{ f.contacto_emergencia or '—' }}</span></div>
     <div class="fld"><label>Nome Emergência</label><span>{{ f.nome_emergencia or '—' }}</span></div>
   </div>
 </div>
