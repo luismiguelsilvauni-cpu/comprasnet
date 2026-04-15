@@ -5584,6 +5584,7 @@ def salarios_calendario(fid):
 @app.route('/salarios/recibo/<int:fid>/<int:ano>/<int:mes>', methods=['GET','POST'])
 @login_required
 def salario_recibo(fid, ano, mes):
+    db.session.expire_all()  # force fresh read
     func = Funcionario.query.get_or_404(fid)
     recibo = ReciboSalario.query.filter_by(
         funcionario_id=fid, ano=ano, mes=mes).first()
@@ -5664,6 +5665,7 @@ def salario_recibo(fid, ano, mes):
 @login_required
 def salario_recibo_pdf(rid):
     """Return printable HTML — user saves as PDF via browser print dialog."""
+    db.session.expire_all()  # force fresh read from DB
     r = ReciboSalario.query.get_or_404(rid)
     func = Funcionario.query.get(r.funcionario_id)
     cfg = ConfigGeral.query.first()
