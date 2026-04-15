@@ -76,10 +76,8 @@
     <div class="form-group" style="margin:0"><label>Telemóvel</label><input type="text" name="telemovel" value="{{ f.telemovel if f else '' }}" class="input"></div>
     <div class="form-group" style="margin:0"><label>Email</label><input type="email" name="email" value="{{ f.email if f else '' }}" class="input"></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
-    <div class="form-group" style="margin:0"><label>Contacto Emergência (Telef.)</label><input type="text" name="contacto_emergencia" value="{{ f.contacto_emergencia if f else '' }}" class="input"></div>
-    <div class="form-group" style="margin:0"><label>Nome Contacto Emergência</label><input type="text" name="nome_emergencia" value="{{ f.nome_emergencia if f else '' }}" class="input"></div>
-  </div>
+  <div class="form-group"><label>Contacto Emergência (Telef.)</label><input type="text" name="contacto_emergencia" value="{{ f.contacto_emergencia if f else '' }}" class="input"></div>
+  <div class="form-group"><label>Nome Contacto Emergência</label><input type="text" name="nome_emergencia" value="{{ f.nome_emergencia if f else '' }}" class="input"></div>
 </div>
 
 <!-- Documentos ID -->
