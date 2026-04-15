@@ -41,6 +41,8 @@
 <div class="card" style="padding:0;margin-bottom:12px;{% if rec.get('erro') %}border-color:var(--danger){% elif rec.func_match_id %}border-color:rgba(34,197,94,.4){% else %}border-color:var(--warning){% endif %}">
   <!-- Sheet header -->
   <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2)">
+    <input type="checkbox" name="incluir_{{ loop.index0 }}" value="1" checked class="sheet-check"
+      onchange="this.closest('.card').style.opacity=this.checked?'1':'0.4'">
     <div style="font-size:13px;font-weight:700;flex:1">
       📋 {{ rec.sheet }}
       {% if rec.get('erro') %}
@@ -134,11 +136,23 @@
 </div>
 {% endfor %}
 
-<div style="display:flex;gap:10px;margin-top:16px">
+<div style="display:flex;gap:10px;margin-top:16px;align-items:center">
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+    <input type="checkbox" id="selectAll" onchange="toggleAll(this)" checked> Seleccionar todos
+  </label>
+  <div style="flex:1"></div>
   <button type="submit" class="btn btn-primary">
     ✅ Confirmar e Importar {{ resultado|length }} recibo(s)
   </button>
   <a href="{{ url_for('salarios_importar') }}" class="btn btn-ghost">Cancelar</a>
 </div>
 </form>
+<script>
+function toggleAll(cb) {
+  document.querySelectorAll('.sheet-check').forEach(function(c){
+    c.checked = cb.checked;
+    c.closest('.card').style.opacity = cb.checked ? '1' : '0.4';
+  });
+}
+</script>
 {% endblock %}
