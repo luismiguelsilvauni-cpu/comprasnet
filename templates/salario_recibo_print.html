@@ -246,9 +246,9 @@ tr:nth-child(even) { background: #f7f9fc; }
       {% set irs_val   = recibo.irs_retencao|float %}
       <tr>
         <td>I.R.S.</td>
-        <td class="td-center">{{ '%.4f'|format(irs_tx_m) }}</td>
-        <td class="td-center">{{ '%.2f'|format(irs_parc) if irs_parc else '—' }}</td>
-        <td class="td-center">{{ '%.4f'|format(irs_tx_ef) }}</td>
+        <td class="td-center">{{ '%.2f'|format(irs_tx_m*100) }}%</td>
+        <td class="td-center">{{ '%.2f'|format(irs_parc) if irs_parc else '—' }} €</td>
+        <td class="td-center">{{ '%.2f'|format(irs_tx_ef*100) }}%</td>
         <td class="td-center">{{ '%.2f'|format(irs_base_v) }}</td>
         <td>{{ '%.2f'|format(irs_val) }}</td>
       </tr>
