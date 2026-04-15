@@ -308,7 +308,10 @@ tr:nth-child(even) { background: #f7f9fc; }
     <div class="sign-text">
       Recebi o valor deste recibo, pago pela <strong>{{ empresa_nome }}</strong>,
       referente a <strong>{{ mes_label }} de {{ ano }}</strong>.
-      {% if recibo.notas %}<br><em>Obs: {{ recibo.notas }}</em>{% endif %}
+    </div>
+    <div style="font-size:8pt;color:#555;margin-top:4px">
+      <span style="font-weight:bold">obs:</span>
+      {% if recibo.notas and 'Importado' not in recibo.notas %}{{ recibo.notas }}{% endif %}
     </div>
     <div style="display:flex;gap:12px;font-size:7.5pt;color:#555">
       <div>Vila do Conde, em _____ /_____ /_________</div>

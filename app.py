@@ -5930,6 +5930,7 @@ def salarios_importar_confirmar():
         r.liquido             = rec.get('liquido', 0)
         r.estado              = 'processado'
         r.notas               = 'Importado de Excel: ' + rec.get('sheet','')
+        if rec.get('obs'): r.notas = rec.get('obs') + ' | ' + r.notas
         r.atualizado_em       = datetime.now()
         criados += 1
 
@@ -6102,6 +6103,7 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         'liquido':             fv(RLQ, 7),  # H
         'transf_conta':        fv(RTR, 7),  # H
         'transf_refeicao':     fv(RTR+1, 7),# H next row
+        'obs':                 sv(O+30, 5),  # F32
     }
 
 

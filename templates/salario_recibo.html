@@ -243,8 +243,9 @@ function calcular(){
   var ss_base = +gv('ss_base') || venc;
   var ss_val  = ss_base * ss_taxa;
   var irs_taxa= +gv('irs_taxa');
+  var irs_tx_ef = +gv('irs_taxa_efetiva') || irs_taxa;
   var irs_base= +gv('irs_base') || (venc + premios);
-  var irs_val = irs_base * irs_taxa;
+  var irs_val = irs_base * irs_tx_ef;  // taxa efetiva aplica-se à base
   var faltVal = +gv('faltas_valor');
   var outDesc = +gv('outros_descontos');
   var ssEmp   = venc * 0.2375;
