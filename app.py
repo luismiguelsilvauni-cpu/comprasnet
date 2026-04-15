@@ -5966,9 +5966,8 @@ def _parse_recibos_excel(filepath):
     return resultado
 
 def _parse_sheet_xls(ws, sname, mes_global=''):
-    """Parse one sheet. All sheets follow the same layout as 11-Luis Silva.
-    Each sheet may have 'original' + 'duplicado' block — we use only 'original'.
-    Offsets are relative to the row where H='original'.
+    """Parse one salary sheet. Skips non-salary sheets (dist lucros, etc).
+    Finds key rows by text search within the 'original' block.
     """
     def fv(r, c):
         try: return float(ws.cell_value(r, c) or 0)
@@ -5977,36 +5976,71 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         try: return str(ws.cell_value(r, c)).strip()
         except: return ''
 
-    # Find the 'original' row (H2 normally, but scan to be safe)
-    orig_row = 1  # default row index (0-based) for H2
-    for r in range(min(5, ws.nrows)):
+    # Find 'original' row
+    orig_row = 1
+    for r in range(min(10, ws.nrows)):
         for c in range(ws.ncols):
             if sv(r, c).lower() == 'original':
                 orig_row = r
                 break
 
-    # All offsets from orig_row (0-based rows, 0-based cols)
-    # orig_row = row of "original" marker (row 2 in Excel = index 1)
-    # Row layout (Excel row → offset from orig_row):
-    # Row 1 (B1): company name         → orig_row - 1
-    # Row 4 (A4): employee name        → orig_row + 2
-    # Row 9 (A9): Remuneração Base     → orig_row + 7
-    # Row 10 (A10): Gratificação       → orig_row + 8
-    # Row 11 (A11): Faltas dias        → orig_row + 9
-    # Row 12 (A12): Faltas horas       → orig_row + 10
-    # Row 13 (A13): Horas Extra        → orig_row + 11
-    # Row 14 (A14): Sub Alimentação    → orig_row + 12
-    # Row 16: Total Ilíquido           → orig_row + 14
-    # Row 18 (A18): CRSS               → orig_row + 16
-    # Row 19 (A19): IRS                → orig_row + 17
-    # Row 23: Total Descontos          → orig_row + 21
-    # Row 25: Líquido                  → orig_row + 23
-    # Row 27: Transferência            → orig_row + 25
+    O = orig_row
 
-    O  = orig_row  # shorthand
+    # Verify this is a salary sheet (has 'Remuneração Base')
+    has_rem = False
+    for r in range(O, min(O+15, ws.nrows)):
+        txt = sv(r, 0).upper()
+        if 'REMUNERAÇÃO BASE' in txt or 'REMUNERACAO BASE' in txt:
+            has_rem = True
+            break
+    if not has_rem:
+        raise ValueError(f"Sheet '{sname}' não é um recibo de salário normal")
 
-    # Get employee name
-    nome_raw = sv(O + 2, 0).strip()  # A4
+    # Find key rows by text in col A within the block
+    rm = {}  # row_map
+    for r in range(O, min(O+30, ws.nrows)):
+        txt = sv(r, 0).upper()
+        if not txt: continue
+        if ('REMUNERAÇÃO BASE' in txt or 'REMUNERACAO BASE' in txt) and 'rem_base' not in rm:
+            rm['rem_base'] = r
+        elif ('GRATIFICAÇÃO' in txt or 'GRATIFICACAO' in txt or 'PRÉMIO' in txt or 'PREMIO' in txt) and 'premios' not in rm:
+            rm['premios'] = r
+        elif 'FALTAS' in txt and ('MÊS' in txt or 'MES' in txt or 'CORRENTE' in txt) and 'faltas_horas' not in rm:
+            rm['faltas_horas'] = r
+        elif 'FALTAS' in txt and 'faltas_dias' not in rm:
+            rm['faltas_dias'] = r
+        elif ('EXTRAORDINÁR' in txt or 'EXTRAORDINAR' in txt) and 'horas_extra' not in rm:
+            rm['horas_extra'] = r
+        elif ('ALIMENTAÇÃO' in txt or 'ALIMENTACAO' in txt or 'REFEIÇÃO' in txt) and 'sub_ref' not in rm:
+            rm['sub_ref'] = r
+        elif ('TOTAL ILÍQUIDO' in txt or 'TOTAL ILIQUIDO' in txt) and 'total_iliq' not in rm:
+            rm['total_iliq'] = r
+        elif 'C.R.S.S' in txt and 'crss' not in rm:
+            rm['crss'] = r
+        elif 'I.R.S' in txt and 'HORAS' not in txt and 'EXTRAS' not in txt and 'irs' not in rm:
+            rm['irs'] = r
+        elif ('TOTAL DE DESCONTOS' in txt or 'TOTAL DESCONTOS' in txt) and 'total_desc' not in rm:
+            rm['total_desc'] = r
+        elif ('LÍQUIDO A RECEBER' in txt or 'LIQUIDO A RECEBER' in txt) and 'liquido' not in rm:
+            rm['liquido'] = r
+        elif 'DISCRIMINATIVO' in txt and 'transf' not in rm:
+            rm['transf'] = r
+
+    RB  = rm.get('rem_base',  O+7)
+    RPR = rm.get('premios',   O+8)
+    RFD = rm.get('faltas_dias', O+9)
+    RFH = rm.get('faltas_horas', O+10)
+    RHE = rm.get('horas_extra', O+11)
+    RSR = rm.get('sub_ref',   O+12)
+    RTI = rm.get('total_iliq', O+14)
+    RCS = rm.get('crss',      O+16)
+    RIR = rm.get('irs',       O+17)
+    RTD = rm.get('total_desc', O+21)
+    RLQ = rm.get('liquido',   O+23)
+    RTR = rm.get('transf',    O+25)
+
+    # Employee name from A4 of block
+    nome_raw = sv(O+2, 0).strip()
     if not nome_raw or 'NOME' in nome_raw.upper():
         nome_raw = sname
 
@@ -6028,8 +6062,7 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         nome_parts = [p for p in nome_raw.upper().split() if len(p) > 2]
         best = 0
         for f in funcs:
-            f_parts = f.nome.upper().split()
-            score = sum(1 for p in nome_parts if any(p in fp for fp in f_parts))
+            score = sum(1 for p in nome_parts if any(p in fp for fp in f.nome.upper().split()))
             if score > best:
                 best = score; func_match = f
 
@@ -6039,34 +6072,32 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         'func_match_id':   func_match.id   if func_match else None,
         'func_match_nome': func_match.nome if func_match else '—',
         'mes_global': mes_global,
-        # ── ABONOS ──────────────────────────────────────────
-        'vencimento_base':     fv(O+7,  7),  # H9
-        'vencimento_base_rht': fv(O+7,  5),  # F9
-        'vencimento_base_g':   fv(O+7,  6),  # G9
-        'premios':             fv(O+8,  7),  # H10
-        'faltas_dias':         fv(O+9,  3),  # D11
-        'faltas_horas':        fv(O+10, 4),  # E12
-        'horas_extra_horas':   fv(O+11, 4),  # E13
-        'horas_extra_rht':     fv(O+11, 5),  # F13
-        'horas_extra':         fv(O+11, 7),  # H13
-        'sub_refeicao_dias':   fv(O+12, 3),  # D14
-        'sub_refeicao_vdia':   fv(O+12, 5),  # F14
-        'subsidio_refeicao':   fv(O+12, 7),  # H14
+        'vencimento_base':     fv(RB,  7),  # H
+        'vencimento_base_rht': fv(RB,  5),  # F
+        'vencimento_base_g':   fv(RB,  6),  # G
+        'premios':             fv(RPR, 7),  # H
+        'faltas_dias':         fv(RFD, 3),  # D
+        'faltas_horas':        fv(RFH, 4),  # E
+        'horas_extra_horas':   fv(RHE, 4),  # E
+        'horas_extra_rht':     fv(RHE, 5),  # F
+        'horas_extra':         fv(RHE, 7),  # H
+        'sub_refeicao_dias':   fv(RSR, 3),  # D
+        'sub_refeicao_vdia':   fv(RSR, 5),  # F
+        'subsidio_refeicao':   fv(RSR, 7),  # H
         'outros_abonos':       0,
-        'total_iliquido':      fv(O+14, 7),  # H16
-        # ── DESCONTOS ───────────────────────────────────────
-        'seg_social_taxa':     fv(O+16, 3),  # D18
-        'seg_social_base':     fv(O+16, 4),  # E18
-        'seg_social':          fv(O+16, 5),  # F18
-        'irs_taxa':            fv(O+17, 1),  # B19
-        'irs_parcela_abater':  fv(O+17, 2),  # C19
-        'irs_taxa_efetiva':    fv(O+17, 3),  # D19
-        'irs_base':            fv(O+17, 4),  # E19
-        'irs':                 fv(O+17, 7),  # H19
-        'total_descontos':     fv(O+21, 7),  # H23
-        'liquido':             fv(O+23, 7),  # H25
-        'transf_conta':        fv(O+25, 7),  # H27
-        'transf_refeicao':     fv(O+26, 7),  # H28
+        'total_iliquido':      fv(RTI, 7),  # H
+        'seg_social_taxa':     fv(RCS, 3),  # D
+        'seg_social_base':     fv(RCS, 4),  # E
+        'seg_social':          fv(RCS, 5),  # F
+        'irs_taxa':            fv(RIR, 1),  # B
+        'irs_parcela_abater':  fv(RIR, 2),  # C
+        'irs_taxa_efetiva':    fv(RIR, 3),  # D
+        'irs_base':            fv(RIR, 4),  # E
+        'irs':                 fv(RIR, 7),  # H
+        'total_descontos':     fv(RTD, 7),  # H
+        'liquido':             fv(RLQ, 7),  # H
+        'transf_conta':        fv(RTR, 7),  # H
+        'transf_refeicao':     fv(RTR+1, 7),# H next row
     }
 
 
