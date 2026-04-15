@@ -6078,9 +6078,11 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         'seg_social_taxa':     fval(RCS, 4),
         'seg_social_base':     fval(RCS, 5),
         'seg_social':          fval(RCS, 6) or fval(RCS, 8),
-        'irs_taxa':            fval(RIR, 2),
-        'irs_base':            fval(RIR, 5),
-        'irs':                 fval(RIR, 8),
+        'irs_taxa':            fval(RIR, 2),  # B19
+        'irs_parcela_abater':  fval(RIR, 3),  # C19
+        'irs_taxa_efetiva':    fval(RIR, 4),  # D19
+        'irs_base':            fval(RIR, 5),  # E19
+        'irs':                 fval(RIR, 8),  # H19
         'total_descontos':     fval(RTD, 8),
         'liquido':             fval(RLQ, 8),
         'transf_conta':        fval(RTR, 8),
