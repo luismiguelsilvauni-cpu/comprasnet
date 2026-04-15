@@ -5966,92 +5966,99 @@ def _parse_recibos_excel(filepath):
     return resultado
 
 def _parse_sheet_xls(ws, sname, mes_global=''):
-    """Extract salary data from one employee sheet."""
+    """Extract salary data from one employee sheet.
+    Finds the 'original' block (H2='original') and reads by label text.
+    """
     def fval(r, c):
-        try: return float(ws.cell_value(r-1, c-1) or 0)
+        try: return float(ws.cell_value(r, c) or 0)
         except: return 0.0
     def sval(r, c):
-        try: return str(ws.cell_value(r-1, c-1)).strip()
+        try: return str(ws.cell_value(r, c)).strip()
         except: return ''
 
-    # Build text index to find rows by label (handles shifted layouts)
-    row_map = {}  # label_key -> row number (1-based)
-    for r in range(1, ws.nrows+1):
-        for c in range(1, min(ws.ncols+1, 5)):
-            txt = sval(r, c).upper()
-            # Only match rem_base in first 15 rows to avoid CRSS line ("C.R.S.S. Remuneração base")
-            if r <= 15 and 'rem_base' not in row_map:
-                if 'REMUNERAÇÃO BASE' in txt or 'REMUNERACAO BASE' in txt:
-                    row_map['rem_base'] = r
-            if ('GRATIFICAÇÃO' in txt or 'GRATIFICACAO' in txt or 'PRÉMIO' in txt or 'PREMIO' in txt) and 'premios' not in row_map:
-                row_map['premios'] = r
-            if 'FALTAS' in txt and ('MÊS' not in txt and 'MES' not in txt and 'HORAS' not in txt) and 'CORRENTE' not in txt and 'faltas_dias' not in row_map:
-                row_map['faltas_dias'] = r
-            if 'FALTAS' in txt and ('MÊS' in txt or 'MES' in txt or 'CORRENTE' in txt) and 'faltas_horas' not in row_map:
-                row_map['faltas_horas'] = r
-            if ('EXTRAORDINÁR' in txt or 'EXTRAORDINAR' in txt) and 'horas_extra' not in row_map:
-                row_map['horas_extra'] = r
-            if ('ALIMENTAÇÃO' in txt or 'ALIMENTACAO' in txt or ('REFEIÇÃO' in txt and 'TOTAL' not in txt) or ('REFEICAO' in txt and 'TOTAL' not in txt)) and 'sub_ref' not in row_map:
-                row_map['sub_ref'] = r
-            if ('TOTAL ILÍQUIDO' in txt or 'TOTAL ILIQUIDO' in txt) and 'total_iliq' not in row_map:
-                row_map['total_iliq'] = r
-            if ('C.R.S.S' in txt or ('SEG' in txt and 'SOCIAL' in txt and 'REMUNERAÇÃO' not in txt and 'REMUNERACAO' not in txt)) and 'crss' not in row_map:
-                row_map['crss'] = r
-            if ('I.R.S' in txt and 'HORAS' not in txt) and 'irs' not in row_map:
-                row_map['irs'] = r
-            if ('TOTAL DE DESCONTOS' in txt or 'TOTAL DESCONTOS' in txt) and 'total_desc' not in row_map:
-                row_map['total_desc'] = r
-            if ('LÍQUIDO A RECEBER' in txt or 'LIQUIDO A RECEBER' in txt) and 'liquido' not in row_map:
-                row_map['liquido'] = r
-            if ('DISCRIMINATIVO' in txt or ('TRANSFERÊNCIA' in txt and ('CONTA' in txt or 'BCP' in txt or 'NIB' in txt or 'IBAN' in txt))) and 'transf' not in row_map:
-                row_map['transf'] = r
+    # Find start row of the 'original' block
+    # Look for cell containing 'original' in row 2 area
+    start_row = 0
+    for r in range(ws.nrows):
+        for c in range(ws.ncols):
+            v = sval(r, c).lower()
+            if v == 'original':
+                start_row = r - 1  # block starts 1 row before
+                break
+        if start_row > 0:
+            break
 
-    # Use detected rows or fallback to fixed positions
-    RB  = row_map.get('rem_base', 9)
-    RPR = row_map.get('premios', 10)
-    RFD = row_map.get('faltas_dias', 11)
-    RFH = row_map.get('faltas_horas', 12)
-    RHE = row_map.get('horas_extra', 13)
-    RSR = row_map.get('sub_ref', 14)
-    RTI = row_map.get('total_iliq', 16)
-    RCS = row_map.get('crss', 18)
-    RIR = row_map.get('irs', 19)
-    RTD = row_map.get('total_desc', 23)
-    RLQ = row_map.get('liquido', 25)
-    RTR = row_map.get('transf', 27)
+    # Build label->row map within this block (search up to 40 rows from start)
+    row_map = {}
+    end_search = min(start_row + 40, ws.nrows)
+    for r in range(start_row, end_search):
+        txt = sval(r, 0).upper()  # column A
+        if not txt: continue
+        if 'REMUNERAÇÃO BASE' in txt or 'REMUNERACAO BASE' in txt:
+            if 'rem_base' not in row_map: row_map['rem_base'] = r
+        if ('GRATIFICAÇÃO' in txt or 'GRATIFICACAO' in txt or 'PRÉMIO' in txt or 'PREMIO' in txt) and 'premios' not in row_map:
+            row_map['premios'] = r
+        if 'FALTAS' in txt and 'MÊS' not in txt and 'MES' not in txt and 'CORRENTE' not in txt and 'HORAS' not in txt and 'faltas_dias' not in row_map:
+            row_map['faltas_dias'] = r
+        if 'FALTAS' in txt and ('MÊS' in txt or 'MES' in txt or 'CORRENTE' in txt) and 'faltas_horas' not in row_map:
+            row_map['faltas_horas'] = r
+        if ('EXTRAORDINÁR' in txt or 'EXTRAORDINAR' in txt) and 'horas_extra' not in row_map:
+            row_map['horas_extra'] = r
+        if ('ALIMENTAÇÃO' in txt or 'ALIMENTACAO' in txt or 'REFEIÇÃO' in txt) and 'sub_ref' not in row_map:
+            row_map['sub_ref'] = r
+        if 'TOTAL ILÍQUIDO' in txt or 'TOTAL ILIQUIDO' in txt or ('TOTAL' in txt and 'ILÍQ' in txt):
+            row_map['total_iliq'] = r
+        if 'C.R.S.S' in txt and 'crss' not in row_map:
+            row_map['crss'] = r
+        if 'I.R.S' in txt and 'HORAS' not in txt and 'EXTRAS' not in txt and 'irs' not in row_map:
+            row_map['irs'] = r
+        if 'TOTAL DE DESCONTOS' in txt or 'TOTAL DESCONTOS' in txt:
+            row_map['total_desc'] = r
+        if 'LÍQUIDO A RECEBER' in txt or 'LIQUIDO A RECEBER' in txt:
+            row_map['liquido'] = r
+        if ('DISCRIMINATIVO' in txt or 'TRANSFERENCIA' in txt or 'TRANSFERÊNCIA' in txt) and 'transf' not in row_map:
+            row_map['transf'] = r
 
-    # Nome
-    nome_raw = sval(4, 1).replace('NOME DO FUNCIONÁRIO','').replace('NOME DO FUNCIONARIO','').strip()
-    nome_raw = nome_raw.replace('XPTO','').strip()
-    if not nome_raw:
+    RB  = row_map.get('rem_base',  start_row + 8)
+    RPR = row_map.get('premios',   start_row + 9)
+    RFD = row_map.get('faltas_dias', start_row + 10)
+    RFH = row_map.get('faltas_horas', start_row + 11)
+    RHE = row_map.get('horas_extra', start_row + 12)
+    RSR = row_map.get('sub_ref',   start_row + 13)
+    RTI = row_map.get('total_iliq', start_row + 15)
+    RCS = row_map.get('crss',      start_row + 17)
+    RIR = row_map.get('irs',       start_row + 18)
+    RTD = row_map.get('total_desc', start_row + 22)
+    RLQ = row_map.get('liquido',   start_row + 24)
+    RTR = row_map.get('transf',    start_row + 26)
+
+    # Nome from A4 of block
+    nome_raw = sval(start_row + 3, 0).strip()
+    if not nome_raw or 'NOME' in nome_raw.upper():
         nome_raw = sname
 
-    # Match funcionario
+    # Match funcionario by sheet name prefix or by name
     func_match = None
     funcs = Funcionario.query.all()
-
-    # Try by sheet name number prefix "11-Luis Silva"
     if '-' in sname:
         parts = sname.split('-', 1)
         num = parts[0].strip()
-        nome_sheet = parts[1].strip() if len(parts) > 1 else ''
         f_by_num = Funcionario.query.filter_by(numero=num).first()
         if f_by_num:
             func_match = f_by_num
-        elif nome_sheet:
+        else:
+            nome_sheet = parts[1].strip() if len(parts) > 1 else ''
             for f in funcs:
                 if nome_sheet.upper() in f.nome.upper() or f.nome.upper() in nome_sheet.upper():
                     func_match = f; break
-
-    # Try by name in cell A4
     if not func_match and nome_raw and nome_raw != sname:
-        nome_parts = nome_raw.upper().split()
-        best_score = 0
+        nome_parts = [p for p in nome_raw.upper().split() if len(p) > 2]
+        best = 0
         for f in funcs:
             f_parts = f.nome.upper().split()
             score = sum(1 for p in nome_parts if any(p in fp for fp in f_parts))
-            if score > best_score:
-                best_score = score; func_match = f
+            if score > best:
+                best = score; func_match = f
 
     return {
         'sheet': sname,
@@ -6060,34 +6067,35 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         'func_match_nome': func_match.nome if func_match else '—',
         'mes_global': mes_global,
         # Abonos
-        'vencimento_base':     fval(RB, 8),
-        'vencimento_base_rht': fval(RB, 6),
-        'vencimento_base_g':   fval(RB, 7),
-        'premios':             fval(RPR, 8),
-        'faltas_dias':         fval(RFD, 4),
-        'faltas_horas':        fval(RFH, 5),
-        'horas_extra_horas':   fval(RHE, 5),
-        'horas_extra_rht':     fval(RHE, 6),
-        'horas_extra':         fval(RHE, 8),
-        'sub_refeicao_dias':   fval(RSR, 4),
-        'sub_refeicao_vdia':   fval(RSR, 6),
-        'subsidio_refeicao':   fval(RSR, 8),
-        'outros_abonos':       fval(RTI-1, 8),
-        'total_iliquido':      fval(RTI, 8),
+        'vencimento_base':     fval(RB,  7),  # H col=7
+        'vencimento_base_rht': fval(RB,  5),  # F col=5
+        'vencimento_base_g':   fval(RB,  6),  # G col=6
+        'premios':             fval(RPR, 7),  # H
+        'faltas_dias':         fval(RFD, 3),  # D col=3
+        'faltas_horas':        fval(RFH, 4),  # E col=4
+        'horas_extra_horas':   fval(RHE, 4),  # E col=4
+        'horas_extra_rht':     fval(RHE, 5),  # F col=5
+        'horas_extra':         fval(RHE, 7),  # H col=7
+        'sub_refeicao_dias':   fval(RSR, 3),  # D
+        'sub_refeicao_vdia':   fval(RSR, 5),  # F
+        'subsidio_refeicao':   fval(RSR, 7),  # H
+        'outros_abonos':       0,
+        'total_iliquido':      fval(RTI, 7),  # H
         # Descontos
-        'seg_social_taxa':     fval(RCS, 4),
-        'seg_social_base':     fval(RCS, 5),
-        'seg_social':          fval(RCS, 6) or fval(RCS, 8),
-        'irs_taxa':            fval(RIR, 2),  # B19
-        'irs_parcela_abater':  fval(RIR, 3),  # C19
-        'irs_taxa_efetiva':    fval(RIR, 4),  # D19
-        'irs_base':            fval(RIR, 5),  # E19
-        'irs':                 fval(RIR, 8),  # H19
-        'total_descontos':     fval(RTD, 8),
-        'liquido':             fval(RLQ, 8),
-        'transf_conta':        fval(RTR, 8),
-        'transf_refeicao':     fval(RTR+1, 8),
+        'seg_social_taxa':     fval(RCS, 3),  # D
+        'seg_social_base':     fval(RCS, 4),  # E
+        'seg_social':          fval(RCS, 5),  # F
+        'irs_taxa':            fval(RIR, 1),  # B col=1
+        'irs_parcela_abater':  fval(RIR, 2),  # C col=2
+        'irs_taxa_efetiva':    fval(RIR, 3),  # D col=3
+        'irs_base':            fval(RIR, 4),  # E col=4
+        'irs':                 fval(RIR, 7),  # H col=7
+        'total_descontos':     fval(RTD, 7),  # H
+        'liquido':             fval(RLQ, 7),  # H
+        'transf_conta':        fval(RTR, 7),  # H
+        'transf_refeicao':     fval(RTR+1, 7),  # H next row
     }
+
 
 def _parse_recibos_xlsx(filepath):
     """Parse .xlsx format."""
