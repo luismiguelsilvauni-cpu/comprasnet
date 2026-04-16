@@ -5706,7 +5706,7 @@ def salario_recibo_email(rid):
         msg['From'] = getattr(cfg,'smtp_from','') or getattr(cfg,'smtp_user','')
         msg['To'] = func.email
         corpo = 'Olá ' + func.nome + ',\n\nSegue em anexo o recibo de salário referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
-        msg.attach(MIMEText(corpo))
+        msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
 
         # Generate HTML recibo and attach as .html (recipient can print to PDF)
         # When wkhtmltopdf is available on the server, this will be converted to PDF
@@ -5744,9 +5744,7 @@ def salario_recibo_email(rid):
 
             if not pdf_generated:
                 # Fallback: attach HTML file (recipient prints to PDF)
-                part = MIMEBase('text', 'html', charset='utf-8')
-                part.set_payload(html_body.encode('utf-8'))
-                encoders.encode_base64(part)
+                part = MIMEText(html_body, 'html', 'utf-8')
                 part.add_header('Content-Disposition', f'attachment; filename="{fname_pdf}.html"')
                 msg.attach(part)
                 # Add note to email body
