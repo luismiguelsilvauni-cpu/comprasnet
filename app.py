@@ -5701,11 +5701,12 @@ def salario_recibo_email(rid):
         from email.mime.base import MIMEBase
         from email import encoders
 
+        from email.header import Header
         msg = MIMEMultipart()
-        msg['Subject'] = f'[{empresa}] Recibo de Salário — {mes_label} {r.ano}'
+        msg['Subject'] = Header(f'[{empresa}] Recibo de Salario - {mes_label} {r.ano}', 'utf-8')
         msg['From'] = getattr(cfg,'smtp_from','') or getattr(cfg,'smtp_user','')
         msg['To'] = func.email
-        corpo = 'Olá ' + func.nome + ',\n\nSegue em anexo o recibo de salário referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
+        corpo = 'Ola ' + func.nome + ',\n\nSegue em anexo o recibo de salario referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
         msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
 
         # Generate HTML recibo and attach as .html (recipient can print to PDF)
