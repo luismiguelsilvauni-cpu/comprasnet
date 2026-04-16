@@ -12,8 +12,8 @@ body { font-family: Arial, sans-serif; font-size: 9.5pt; color: #1a1a1a; backgro
 
 /* Header */
 .header { display: flex; align-items: center; padding: 8px 12px; border-bottom: 2px solid #1a1a1a; background: #f8f8f8; }
-.header-logo { width: 75px; margin-right: 12px; flex-shrink: 0; }
-.header-logo img { max-width: 75px; max-height: 48px; object-fit: contain; }
+.header-logo { width: 120px; margin-right: 14px; flex-shrink: 0; }
+.header-logo img { max-width: 120px; max-height: 70px; object-fit: contain; }
 .header-empresa h1 { font-size: 12pt; font-weight: bold; color: #003366; }
 .header-empresa p { font-size: 7.5pt; color: #555; margin-top: 1px; }
 .header-recibo { text-align: right; flex-shrink: 0; }
@@ -83,7 +83,7 @@ tr:nth-child(even) { background: #f7f9fc; }
       {% if cfg and cfg.empresa_logo_path %}
       <img src="{{ upload_url }}/{{ cfg.empresa_logo_path }}" alt="Logo">
       {% else %}
-      <div style="width:75px;height:48px;background:#003366;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:8pt">UCN</div>
+      <div style="width:120px;height:70px;background:#003366;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:10pt">UCN</div>
       {% endif %}
     </div>
     <div class="header-empresa">
