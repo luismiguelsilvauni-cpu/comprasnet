@@ -5,6 +5,77 @@
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
   <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
+<!-- Status modal dashboard -->
+<div id="dashStatusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:440px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700" id="dsmDesig">—</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="dsmAtual"></div>
+      </div>
+      <button onclick="document.getElementById('dashStatusModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1">✕</button>
+    </div>
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Alterar estado para:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <button onclick="dashSetStatus('nao_encomendado')" style="padding:10px;border-radius:8px;border:2px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;font-weight:700;font-size:12px">🔴 Não Encomendado</button>
+        <button onclick="dashSetStatus('pendente')"        style="padding:10px;border-radius:8px;border:2px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:#f59e0b;cursor:pointer;font-weight:700;font-size:12px">⏳ Pendente Chegada</button>
+        <button onclick="dashSetStatus('recebido')"        style="padding:10px;border-radius:8px;border:2px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:#22c55e;cursor:pointer;font-weight:700;font-size:12px">✅ Recebido</button>
+        <button onclick="dashSetStatus('cancelado')"       style="padding:10px;border-radius:8px;border:2px solid rgba(168,85,247,.4);background:rgba(168,85,247,.1);color:#a855f7;cursor:pointer;font-weight:700;font-size:12px">❌ Cancelado</button>
+      </div>
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">Nota (opcional)</label>
+      <input type="text" id="dsmNotas" placeholder="Ex: Encomendado ao fornecedor X..." style="width:100%;margin-top:4px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+    </div>
+    <div style="padding:10px 16px;max-height:160px;overflow-y:auto" id="dsmHistorico">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div>
+    </div>
+  </div>
+</div>
+<script>
+var _dsmLinhaId = null, _dsmPedidoId = null;
+function dashAbrirStatus(linhaId, pedidoId, designacao, statusAtual) {
+  _dsmLinhaId = linhaId;
+  _dsmPedidoId = pedidoId;
+  var LABELS = {nao_encomendado:'🔴 Não Encomendado', pendente:'⏳ Pendente Chegada', recebido:'✅ Recebido', cancelado:'❌ Cancelado'};
+  document.getElementById('dsmDesig').textContent = designacao;
+  document.getElementById('dsmAtual').textContent = 'Estado actual: ' + (LABELS[statusAtual] || statusAtual);
+  document.getElementById('dsmNotas').value = '';
+  document.getElementById('dashStatusModal').style.display = 'flex';
+  // Load history
+  var hEl = document.getElementById('dsmHistorico');
+  hEl.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div><div style="font-size:12px;color:var(--text-muted)">A carregar...</div>';
+  fetch('/pedidos/' + pedidoId + '/linha/' + linhaId + '/historico')
+    .then(function(r){ return r.json(); })
+    .then(function(hist) {
+      var COLORS = {nao_encomendado:'#ef4444', pendente:'#f59e0b', recebido:'#22c55e', cancelado:'#a855f7'};
+      hEl.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div>' +
+        (hist.length ? hist.map(function(h){
+          return '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">' +
+            '<span style="color:' + (COLORS[h.status_novo]||'#999') + ';font-weight:600">' + (LABELS[h.status_novo]||h.status_novo) + '</span>' +
+            ' · <span style="color:var(--text-muted)">' + h.data + ' · ' + h.user_nome + (h.notas ? ' · ' + h.notas : '') + '</span>' +
+            '</div>';
+        }).join('') : '<div style="color:var(--text-muted);font-size:12px">Sem histórico</div>');
+    });
+}
+function dashSetStatus(novoStatus) {
+  if (!_dsmLinhaId) return;
+  var notas = document.getElementById('dsmNotas').value.trim();
+  fetch('/pedidos/' + _dsmPedidoId + '/linha/' + _dsmLinhaId + '/status', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: novoStatus, notas: notas})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) {
+      document.getElementById('dashStatusModal').style.display = 'none';
+      carregarArtigosPedidos();
+    }
+  });
+}
+document.getElementById('dashStatusModal').addEventListener('click', function(e){
+  if (e.target === this) this.style.display = 'none';
+});
+</script>
+
 {% endblock %}
 
 {% block content %}
@@ -592,6 +663,77 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved=>{
   if(saved&&saved.length>0) currentLayout=saved;
   renderGrid();
 }).catch(()=>renderGrid());
+</script>
+
+<!-- Status modal dashboard -->
+<div id="dashStatusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:440px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700" id="dsmDesig">—</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="dsmAtual"></div>
+      </div>
+      <button onclick="document.getElementById('dashStatusModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1">✕</button>
+    </div>
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Alterar estado para:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <button onclick="dashSetStatus('nao_encomendado')" style="padding:10px;border-radius:8px;border:2px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;font-weight:700;font-size:12px">🔴 Não Encomendado</button>
+        <button onclick="dashSetStatus('pendente')"        style="padding:10px;border-radius:8px;border:2px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:#f59e0b;cursor:pointer;font-weight:700;font-size:12px">⏳ Pendente Chegada</button>
+        <button onclick="dashSetStatus('recebido')"        style="padding:10px;border-radius:8px;border:2px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:#22c55e;cursor:pointer;font-weight:700;font-size:12px">✅ Recebido</button>
+        <button onclick="dashSetStatus('cancelado')"       style="padding:10px;border-radius:8px;border:2px solid rgba(168,85,247,.4);background:rgba(168,85,247,.1);color:#a855f7;cursor:pointer;font-weight:700;font-size:12px">❌ Cancelado</button>
+      </div>
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">Nota (opcional)</label>
+      <input type="text" id="dsmNotas" placeholder="Ex: Encomendado ao fornecedor X..." style="width:100%;margin-top:4px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+    </div>
+    <div style="padding:10px 16px;max-height:160px;overflow-y:auto" id="dsmHistorico">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div>
+    </div>
+  </div>
+</div>
+<script>
+var _dsmLinhaId = null, _dsmPedidoId = null;
+function dashAbrirStatus(linhaId, pedidoId, designacao, statusAtual) {
+  _dsmLinhaId = linhaId;
+  _dsmPedidoId = pedidoId;
+  var LABELS = {nao_encomendado:'🔴 Não Encomendado', pendente:'⏳ Pendente Chegada', recebido:'✅ Recebido', cancelado:'❌ Cancelado'};
+  document.getElementById('dsmDesig').textContent = designacao;
+  document.getElementById('dsmAtual').textContent = 'Estado actual: ' + (LABELS[statusAtual] || statusAtual);
+  document.getElementById('dsmNotas').value = '';
+  document.getElementById('dashStatusModal').style.display = 'flex';
+  // Load history
+  var hEl = document.getElementById('dsmHistorico');
+  hEl.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div><div style="font-size:12px;color:var(--text-muted)">A carregar...</div>';
+  fetch('/pedidos/' + pedidoId + '/linha/' + linhaId + '/historico')
+    .then(function(r){ return r.json(); })
+    .then(function(hist) {
+      var COLORS = {nao_encomendado:'#ef4444', pendente:'#f59e0b', recebido:'#22c55e', cancelado:'#a855f7'};
+      hEl.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div>' +
+        (hist.length ? hist.map(function(h){
+          return '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">' +
+            '<span style="color:' + (COLORS[h.status_novo]||'#999') + ';font-weight:600">' + (LABELS[h.status_novo]||h.status_novo) + '</span>' +
+            ' · <span style="color:var(--text-muted)">' + h.data + ' · ' + h.user_nome + (h.notas ? ' · ' + h.notas : '') + '</span>' +
+            '</div>';
+        }).join('') : '<div style="color:var(--text-muted);font-size:12px">Sem histórico</div>');
+    });
+}
+function dashSetStatus(novoStatus) {
+  if (!_dsmLinhaId) return;
+  var notas = document.getElementById('dsmNotas').value.trim();
+  fetch('/pedidos/' + _dsmPedidoId + '/linha/' + _dsmLinhaId + '/status', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: novoStatus, notas: notas})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) {
+      document.getElementById('dashStatusModal').style.display = 'none';
+      carregarArtigosPedidos();
+    }
+  });
+}
+document.getElementById('dashStatusModal').addEventListener('click', function(e){
+  if (e.target === this) this.style.display = 'none';
+});
 </script>
 
 {% endblock %}

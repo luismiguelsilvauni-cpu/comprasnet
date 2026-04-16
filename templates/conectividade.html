@@ -3,6 +3,27 @@
 {% block page_title %}Conectividade{% endblock %}
 
 {% block content %}
+<div class="card" style="padding:16px;margin-bottom:16px">
+  <div style="font-size:13px;font-weight:700;margin-bottom:12px">📱 Acesso Mobile</div>
+  <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <div id="qrMobile" style="background:white;padding:8px;border-radius:8px;display:inline-block;min-width:80px;min-height:80px"></div>
+    <div>
+      <div style="font-size:13px;margin-bottom:8px;color:var(--text-muted)">Aponte a câmara para o QR code ou clique no botão:</div>
+      <a href="/mobile" class="btn btn-primary">📱 Abrir App Mobile</a>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var url = window.location.origin + '/mobile';
+  document.getElementById('qrMobile').innerHTML = '';
+  // Use QR API
+  var img = document.createElement('img');
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=' + encodeURIComponent(url);
+  img.style.borderRadius = '4px';
+  document.getElementById('qrMobile').appendChild(img);
+})();
+</script>
 
 <div class="card" style="padding:16px;margin-bottom:16px">
   <div style="font-size:13px;font-weight:700;margin-bottom:12px">📱 Acesso Mobile</div>
