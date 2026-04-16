@@ -347,8 +347,8 @@
         <a href="/mobile" class="nav-item">
             <span class="icon">📱</span><span>App Mobile</span>
         </a>
-        <a href="{{ url_for('acesso_externo') }}" class="nav-item {% if request.endpoint == 'acesso_externo' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">🌐</span><span>Acesso Externo</span>
+        <a href="{{ url_for('conectividade') }}" class="nav-item {% if request.endpoint in ['conectividade','acesso_externo'] %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">🌐</span><span>Conectividade</span>
         </a>
         <a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">💬</span><span>Chat {% if cfg_ia and cfg_ia.provider == 'gemini' %}Gemini{% elif cfg_ia and cfg_ia.provider == 'lmstudio' %}LM Studio{% elif cfg_ia and cfg_ia.provider == 'ollama' %}Ollama{% elif cfg_ia and cfg_ia.provider == 'claude' %}Claude{% else %}IA{% endif %}</span>
