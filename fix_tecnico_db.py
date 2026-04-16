@@ -293,3 +293,11 @@ with app.app_context():
             with db.engine.begin() as conn:
                 conn.execute(text("ALTER TABLE pedidos_compra ADD COLUMN cliente_id INTEGER"))
             print("OK: pedidos_compra.cliente_id adicionado")
+
+    # Add cliente_id to linhas_pedido
+    if 'linhas_pedido' in insp.get_table_names():
+        lp_cols = [c['name'] for c in insp.get_columns('linhas_pedido')]
+        if 'cliente_id' not in lp_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE linhas_pedido ADD COLUMN cliente_id INTEGER"))
+            print("OK: linhas_pedido.cliente_id adicionado")

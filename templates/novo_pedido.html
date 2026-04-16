@@ -87,9 +87,15 @@
 var linhas = [];
 var linhaAtual = -1;
 var artigosMap = [];
+var clienteOpts = [
+  {id:'', nome:'Stock Interno (default)'}
+  {% for c in clientes %}
+  ,{id:'{{ c.id }}', nome:'{{ c.nome|replace("'", "\'") }}'}
+  {% endfor %}
+];
 
 function adicionarLinha() {
-  linhas.push({referencia:'', designacao:'', unidade:'un', quantidade:1, observacoes:''});
+  linhas.push({referencia:'', designacao:'', unidade:'un', quantidade:1, observacoes:'', cliente_id:''});
   renderLinhas();
   abrirPesquisa(linhas.length - 1);
 }
@@ -108,7 +114,7 @@ function renderLinhas() {
   var html = '';
   for (var i = 0; i < linhas.length; i++) {
     var l = linhas[i];
-    html += '<div style="display:grid;grid-template-columns:110px 1fr 60px 60px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
+    html += '<div style="display:grid;grid-template-columns:110px 1fr 140px 60px 60px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Referência PHC</div>';
     html += '<div style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:5px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:28px" onclick="abrirPesquisa(' + i + ')">' + (l.referencia || '<span style="color:var(--text-muted);font-weight:400">pesquisar</span>') + '</div>';
@@ -116,6 +122,16 @@ function renderLinhas() {
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Designação</div>';
     html += '<input type="text" value="' + esc(l.designacao) + '" placeholder="Descrição..." onchange="linhas[' + i + '].designacao=this.value" class="input" style="font-size:12px;padding:5px 8px">';
+    html += '</div>';
+    html += '<div>';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Destino / Cliente</div>';
+    var csel = '<select onchange="linhas[' + i + '].cliente_id=this.value" class="input" style="font-size:11px;padding:5px 6px">';
+    for (var ci = 0; ci < clienteOpts.length; ci++) {
+      var sel = (l.cliente_id == clienteOpts[ci].id) ? ' selected' : '';
+      csel += '<option value="' + clienteOpts[ci].id + '"' + sel + '>' + clienteOpts[ci].nome + '</option>';
+    }
+    csel += '</select>';
+    html += csel;
     html += '</div>';
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Un.</div>';

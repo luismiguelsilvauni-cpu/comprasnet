@@ -109,6 +109,7 @@ class LinhaPedido(db.Model):
     preco_pcp_ref   = db.Column(db.Float, default=0)
     fornecedor_hab  = db.Column(db.String(200))
     observacoes     = db.Column(db.String(500))
+    cliente_id      = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
     # back-ref to PHC article for live data
     artigo          = db.relationship('ArtigoPHC', foreign_keys=[artigo_ref], lazy=True)
 

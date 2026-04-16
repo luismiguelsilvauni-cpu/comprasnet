@@ -193,7 +193,8 @@ def novo_pedido():
                 stock_atual=float(artigo.stock_atual if artigo else 0),
                 preco_custo_ref=float(artigo.preco_custo if artigo else 0),
                 preco_pcp_ref=float(artigo.preco_custo_ponderado if artigo else 0),
-                observacoes=l.get('observacoes','').strip()
+                observacoes=l.get('observacoes','').strip(),
+                cliente_id=int(l.get('cliente_id')) if l.get('cliente_id') else None
             ))
         db.session.commit()
         flash('Pedido criado!','success')
@@ -244,7 +245,8 @@ def salvar_linhas(pid):
             preco_custo_ref = float(artigo.preco_custo if artigo else 0),
             preco_pcp_ref   = float(artigo.preco_custo_ponderado if artigo else 0),
             fornecedor_hab  = l.get('fornecedor_hab','').strip(),
-            observacoes     = l.get('observacoes','').strip()
+            observacoes     = l.get('observacoes','').strip(),
+            cliente_id      = int(l.get('cliente_id')) if l.get('cliente_id') else None
         )
         db.session.add(linha)
     db.session.commit()
