@@ -2871,7 +2871,7 @@ def partilha():
                 PartilhaFicheiro.destinatario_id == current_user.id
             )
         ).order_by(PartilhaFicheiro.criado_em.desc()).all()
-    utilizadores = User.query.filter_by(ativo=True).order_by(User.nome).all()
+    utilizadores = User.query.order_by(User.nome).all()
     total_bytes = _tamanho_total_partilha()
     total_gb = total_bytes / (1024**3)
     return render_template('partilha.html',
