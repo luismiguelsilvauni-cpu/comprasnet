@@ -132,6 +132,23 @@ def dashboard():
     pedidos_aprovados= PedidoCompra.query.filter_by(estado='aprovado').count()
     total_orcamentos = Orcamento.query.count()
     pedidos_recentes = PedidoCompra.query.filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente'])).order_by(PedidoCompra.data_criacao.desc()).limit(8).all()
+
+    # Artigos pedidos para dashboard - pendentes/não encomendados primeiro, recebidos no fim
+    from sqlalchemy import case
+    artigos_pedidos = (db.session.query(LinhaPedido, PedidoCompra, User)
+        .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
+        .join(User, PedidoCompra.criado_por == User.id, isouter=True)
+        .filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente']))
+        .order_by(
+            case(
+                (LinhaPedido.status == 'recebido', 2),
+                (LinhaPedido.status == 'cancelado', 3),
+                else_=0
+            ),
+            PedidoCompra.data_criacao.desc()
+        )
+        .all()
+    )
     # Stock baixo: stock > 0 mas abaixo de threshold (excluir negativos)
     artigos_stock_baixo = ArtigoPHC.query.filter(
         ArtigoPHC.stock_atual > 0,
@@ -144,6 +161,7 @@ def dashboard():
         total_orcamentos=total_orcamentos,
         pedidos_recentes=pedidos_recentes,
         artigos_stock_baixo=artigos_stock_baixo,
+        artigos_pedidos=artigos_pedidos,
     )
 
 
