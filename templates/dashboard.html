@@ -285,6 +285,40 @@ const CORES = {
 
 function calNav(dir) { calMonth+=dir; if(calMonth>12){calMonth=1;calYear++;} if(calMonth<1){calMonth=12;calYear--;} window._calInit=false; carregarCalendario(); }
 
+function carregarArtigosPedidos() {
+  var el = document.getElementById('ap_container');
+  if (!el) return;
+  fetch('/api/dashboard/artigos-pedidos')
+    .then(function(r){ return r.json(); })
+    .then(function(rows) {
+      if (!rows.length) {
+        el.outerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem artigos pedidos activos</div>';
+        return;
+      }
+      var html = '<div style="max-height:280px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+      html += '<thead style="position:sticky;top:0;background:var(--surface2);z-index:1"><tr>';
+      ['Estado','Artigo','Qtd','Pedido','Data','Por',''].forEach(function(h){
+        html += '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)">'+h+'</th>';
+      });
+      html += '</tr></thead><tbody>';
+      rows.forEach(function(r) {
+        html += '<tr style="border-bottom:1px solid var(--border);'+(r.dim?'opacity:0.5':'')+'">';
+        html += '<td style="padding:5px 8px"><span onclick="dashAbrirStatus('+r.linha_id+','+r.pedido_id+',''+r.designacao.replace(/'/g,"\'")+'',' +'''+r.status+'')" style="cursor:pointer;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:'+r.status_bg+';color:'+r.status_color+';border:1px solid '+r.status_color+'40">'+r.status_label+'</span></td>';
+        html += '<td style="padding:5px 8px"><div style="font-weight:600">'+r.designacao+'</div>'+(r.referencia?'<div style="font-size:10px;color:var(--accent)">'+r.referencia+'</div>':'' )+'</td>';
+        html += '<td style="padding:5px 8px;font-family:monospace">'+r.quantidade+' '+r.unidade+'</td>';
+        html += '<td style="padding:5px 8px;color:var(--text-muted)">'+r.titulo+'</td>';
+        html += '<td style="padding:5px 8px;color:var(--text-muted);white-space:nowrap">'+r.data+'</td>';
+        html += '<td style="padding:5px 8px;color:var(--text-muted)">'+r.user_nome+'</td>';
+        html += '<td style="padding:5px 8px"><a href="/pedidos/'+r.pedido_id+'" style="font-size:11px;color:var(--accent)">→</a></td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      el.outerHTML = html;
+    })
+    .catch(function(e){ console.error('artigos pedidos:', e); });
+}
+
+
 function carregarCalendario() {
   const grid = document.getElementById('calGrid');
   const titulo = document.getElementById('calTitulo');
