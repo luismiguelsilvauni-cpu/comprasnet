@@ -1,58 +1,256 @@
 {% extends "base.html" %}
-{% block title %}Novo Pedido · ComprasNet{% endblock %}
+{% block title %}Novo Pedido · NavTech{% endblock %}
 {% block page_title %}Novo Pedido de Compra{% endblock %}
 {% block topbar_actions %}
-    <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+  <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">← Voltar</a>
 {% endblock %}
-
 {% block content %}
-<div style="max-width: 640px;">
-    <div class="card">
-        <div class="card-title">Informações do Pedido</div>
-        
-        <form method="POST">
-            <div class="form-group">
-                <label>Título do Pedido *</label>
-                <input type="text" name="titulo" placeholder="Ex: Compra de material de escritório Q1 2025" required autofocus>
-            </div>
-            
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Departamento</label>
-                    <input type="text" name="departamento" placeholder="Ex: Produção, Manutenção...">
-                </div>
-                <div class="form-group">
-                    <label>Prioridade</label>
-                    <select name="prioridade">
-                        <option value="baixa">⚪ Baixa</option>
-                        <option value="normal" selected>🔵 Normal</option>
-                        <option value="alta">🟡 Alta</option>
-                        <option value="urgente">🔴 Urgente</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Descrição / Justificação</label>
-                <textarea name="descricao" placeholder="Descreva o que necessita adquirir e porquê..."></textarea>
-            </div>
-            
-            <hr class="divider">
-            
-            <div class="flex gap-8" style="justify-content:flex-end">
-                <a href="{{ url_for('pedidos') }}" class="btn btn-ghost">Cancelar</a>
-                <button type="submit" class="btn btn-primary">Criar Pedido →</button>
-            </div>
-        </form>
-    </div>
-    
-    <div class="card mt-16" style="background: var(--surface2); border-style: dashed;">
-        <div style="font-size:13px; color:var(--text-muted);">
-            <strong style="color:var(--text)">ℹ Processo de compra:</strong>
-            Após criar o pedido, poderá carregar até <strong>3 orçamentos em PDF</strong> de diferentes fornecedores.
-            O sistema irá analisar automaticamente cada PDF e extrair preços, descontos e itens.
-            No final, seleciona o melhor orçamento e aprova a compra.
-        </div>
-    </div>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}
+    <div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<form method="POST" id="pedidoForm">
+<input type="hidden" name="linhas_json" id="linhas_json" value="[]">
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+<div>
+
+<!-- Artigos a comprar -->
+<div class="card" style="padding:14px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700">📦 Artigos a Comprar</div>
+    <button type="button" onclick="adicionarLinha()" class="btn btn-primary btn-sm">+ Adicionar Artigo</button>
+  </div>
+
+  <div id="linhas-container">
+    <!-- Lines added dynamically -->
+  </div>
+
+  <div id="sem-linhas" style="text-align:center;padding:20px;color:var(--text-muted);border:1px dashed var(--border);border-radius:8px">
+    <div style="font-size:24px;margin-bottom:6px">📦</div>
+    <div style="font-size:13px">Clique em "+ Adicionar Artigo" para começar</div>
+  </div>
 </div>
+
+<!-- Descrição -->
+<div class="card" style="padding:14px">
+  <div class="form-group" style="margin:0">
+    <label>Observações / Justificação</label>
+    <textarea name="descricao" class="input" rows="2" placeholder="Descreva o que necessita adquirir e porquê..."></textarea>
+  </div>
+</div>
+
+</div>
+
+<!-- Sidebar -->
+<div>
+<div class="card" style="padding:14px;margin-bottom:12px">
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Detalhes do Pedido</div>
+
+  <div class="form-group">
+    <label>Destino / Cliente</label>
+    <select name="cliente_id" class="input">
+      <option value="">📦 Stock Interno (default)</option>
+      {% for c in clientes %}
+      <option value="{{ c.id }}">{{ c.nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Departamento</label>
+    <input type="text" name="departamento" value="Compras" class="input">
+  </div>
+
+  <div class="form-group">
+    <label>Prioridade</label>
+    <select name="prioridade" class="input">
+      <option value="baixa">⚪ Baixa</option>
+      <option value="normal" selected>🔵 Normal</option>
+      <option value="alta">🟡 Alta</option>
+      <option value="urgente">🔴 Urgente</option>
+    </select>
+  </div>
+</div>
+
+<button type="submit" class="btn btn-primary" style="width:100%" onclick="return prepararSubmit()">
+  Criar Pedido →
+</button>
+</div>
+</div>
+</form>
+
+<!-- Artigo search modal -->
+<div id="artigoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:600px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <input type="text" id="artigoSearch" placeholder="🔍 Pesquisar artigo por referência ou designação..."
+        class="input" style="flex:1" oninput="pesquisarArtigo(this.value)">
+      <button onclick="fecharModal()" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <div id="artigoResultados" style="overflow-y:auto;flex:1;padding:8px"></div>
+  </div>
+</div>
+
+<script>
+var linhas = [];
+var linhaAtual = null;
+
+function adicionarLinha() {
+  var idx = linhas.length;
+  linhas.push({ referencia:'', designacao:'', unidade:'un', quantidade:1, observacoes:'' });
+  renderLinhas();
+  // Open search for new line
+  abrirPesquisa(idx);
+}
+
+function renderLinhas() {
+  var container = document.getElementById('linhas-container');
+  var semLinhas = document.getElementById('sem-linhas');
+  semLinhas.style.display = linhas.length ? 'none' : 'block';
+
+  container.innerHTML = linhas.map(function(l, i) {
+    return '<div style="display:grid;grid-template-columns:1fr 2fr 80px 70px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<div>' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Referência</div>' +
+        '<div style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer" onclick="abrirPesquisa('+i+')">' +
+          (l.referencia || '<span style="color:var(--text-muted)">— pesquisar —</span>') +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Designação</div>' +
+        '<input type="text" value="'+escHtml(l.designacao)+'" placeholder="Descrição do artigo" ' +
+          'onchange="linhas['+i+'].designacao=this.value" ' +
+          'style="width:100%;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text)">' +
+      '</div>' +
+      '<div>' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Unidade</div>' +
+        '<input type="text" value="'+escHtml(l.unidade)+'" ' +
+          'onchange="linhas['+i+'].unidade=this.value" ' +
+          'style="width:100%;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text)">' +
+      '</div>' +
+      '<div>' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Qtd</div>' +
+        '<input type="number" value="'+l.quantidade+'" min="0.01" step="0.01" ' +
+          'onchange="linhas['+i+'].quantidade=parseFloat(this.value)||1" ' +
+          'style="width:100%;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text)">' +
+      '</div>' +
+      '<div>' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Observações</div>' +
+        '<input type="text" value="'+escHtml(l.observacoes)+'" ' +
+          'onchange="linhas['+i+'].observacoes=this.value" ' +
+          'style="width:100%;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text)">' +
+      '</div>' +
+      '<button type="button" onclick="removerLinha('+i+')" ' +
+        'style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:4px">✕</button>' +
+    '</div>';
+  }).join('');
+
+  // Update title field (first line designacao as default title)
+  var titulo = document.querySelector('[name=titulo]');
+  if (!titulo) {
+    // Create hidden titulo field
+    var h = document.createElement('input');
+    h.type='hidden'; h.name='titulo'; h.id='titulo_hidden';
+    document.getElementById('pedidoForm').appendChild(h);
+  }
+}
+
+function removerLinha(i) {
+  linhas.splice(i, 1);
+  renderLinhas();
+}
+
+function abrirPesquisa(idx) {
+  linhaAtual = idx;
+  document.getElementById('artigoModal').style.display = 'flex';
+  document.getElementById('artigoSearch').value = '';
+  document.getElementById('artigoResultados').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Escreva para pesquisar...</div>';
+  setTimeout(function(){ document.getElementById('artigoSearch').focus(); }, 100);
+}
+
+function fecharModal() {
+  document.getElementById('artigoModal').style.display = 'none';
+}
+
+var searchTimer = null;
+function pesquisarArtigo(q) {
+  clearTimeout(searchTimer);
+  if (q.length < 2) {
+    document.getElementById('artigoResultados').innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Escreva pelo menos 2 caracteres...</div>';
+    return;
+  }
+  searchTimer = setTimeout(function() {
+    fetch('/api/artigos?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(artigos) {
+        if (!artigos.length) {
+          // Allow manual entry
+          document.getElementById('artigoResultados').innerHTML =
+            '<div style="padding:12px 14px">' +
+            '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Sem resultados no PHC. Pode adicionar manualmente:</div>' +
+            '<button onclick="selecionarManual(\''+escHtml(q)+'\')" class="btn btn-ghost btn-sm">+ Usar "'+escHtml(q)+'" como designação</button>' +
+            '</div>';
+          return;
+        }
+        document.getElementById('artigoResultados').innerHTML = artigos.map(function(a) {
+          return '<div onclick="selecionarArtigo('+JSON.stringify(a)+')" ' +
+            'style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center" ' +
+            'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+            '<div style="flex:1">' +
+              '<div style="font-size:12px;font-weight:700;color:var(--accent)">' + (a.referencia||'') + '</div>' +
+              '<div style="font-size:12px">' + (a.designacao||'') + '</div>' +
+              '<div style="font-size:10px;color:var(--text-muted)">Stock: ' + (a.stock_atual||0) + ' ' + (a.unidade||'un') + ' · Custo: ' + (a.preco_custo||0).toFixed(2) + ' €</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      });
+  }, 300);
+}
+
+function selecionarArtigo(a) {
+  if (linhaAtual === null) return;
+  linhas[linhaAtual].referencia = a.referencia || '';
+  linhas[linhaAtual].designacao = a.designacao || '';
+  linhas[linhaAtual].unidade = a.unidade || 'un';
+  fecharModal();
+  renderLinhas();
+}
+
+function selecionarManual(texto) {
+  if (linhaAtual === null) return;
+  linhas[linhaAtual].referencia = '';
+  linhas[linhaAtual].designacao = texto;
+  fecharModal();
+  renderLinhas();
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function prepararSubmit() {
+  if (!linhas.length) {
+    alert('Adicione pelo menos um artigo ao pedido.');
+    return false;
+  }
+  // Set titulo from first line
+  var titulo = linhas[0].designacao || linhas[0].referencia || 'Pedido';
+  if (linhas.length > 1) titulo += ' (+ ' + (linhas.length-1) + ' artigo(s))';
+  var tEl = document.getElementById('titulo_hidden') || document.querySelector('[name=titulo]');
+  if (tEl) tEl.value = titulo;
+  document.getElementById('linhas_json').value = JSON.stringify(linhas);
+  return true;
+}
+
+// Close modal on backdrop click
+document.getElementById('artigoModal').addEventListener('click', function(e) {
+  if (e.target === this) fecharModal();
+});
+
+// Init
+renderLinhas();
+</script>
 {% endblock %}

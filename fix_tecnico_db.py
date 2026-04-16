@@ -285,3 +285,11 @@ with app.app_context():
                 print(f"OK: recibo_salario.{col} adicionado")
             else:
                 print(f"OK: {col} ja existe")
+
+    # Add cliente_id to pedidos_compra
+    if 'pedidos_compra' in insp.get_table_names():
+        pc_cols = [c['name'] for c in insp.get_columns('pedidos_compra')]
+        if 'cliente_id' not in pc_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE pedidos_compra ADD COLUMN cliente_id INTEGER"))
+            print("OK: pedidos_compra.cliente_id adicionado")

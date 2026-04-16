@@ -161,18 +161,45 @@ def novo_pedido():
     if request.method == 'POST':
         titulo = request.form.get('titulo','').strip()
         if not titulo:
-            flash('O título é obrigatório.','error')
-            return render_template('novo_pedido.html')
+            flash('O artigo a comprar é obrigatório.','error')
+            clientes_list = Cliente.query.order_by(Cliente.nome).all()
+            return render_template('novo_pedido.html', clientes=clientes_list)
+        cliente_id = request.form.get('cliente_id','').strip()
         p = PedidoCompra(titulo=titulo,
             descricao=request.form.get('descricao','').strip(),
             prioridade=request.form.get('prioridade','normal'),
-            departamento=request.form.get('departamento','').strip(),
+            departamento=request.form.get('departamento','Compras').strip(),
+            cliente_id=int(cliente_id) if cliente_id else None,
             estado='aberto', criado_por=current_user.id,
             data_criacao=datetime.now())
-        db.session.add(p); db.session.commit()
+        db.session.add(p); db.session.flush()
+
+        # Save lines from form
+        import json as _json
+        linhas_json = request.form.get('linhas_json','[]')
+        try:
+            linhas = _json.loads(linhas_json)
+        except: linhas = []
+        for i, l in enumerate(linhas):
+            ref = l.get('referencia','').strip()
+            artigo = ArtigoPHC.query.filter_by(referencia=ref).first() if ref else None
+            db.session.add(LinhaPedido(
+                pedido_id=p.id, ordem=i,
+                artigo_ref=ref if artigo else None,
+                referencia=ref or l.get('designacao','')[:50],
+                designacao=l.get('designacao','').strip(),
+                unidade=l.get('unidade','un'),
+                quantidade=float(l.get('quantidade',1)),
+                stock_atual=float(artigo.stock_atual if artigo else 0),
+                preco_custo_ref=float(artigo.preco_custo if artigo else 0),
+                preco_pcp_ref=float(artigo.preco_custo_ponderado if artigo else 0),
+                observacoes=l.get('observacoes','').strip()
+            ))
+        db.session.commit()
         flash('Pedido criado!','success')
         return redirect(url_for('pedido_detalhe', pid=p.id))
-    return render_template('novo_pedido.html')
+    clientes_list = Cliente.query.order_by(Cliente.nome).all()
+    return render_template('novo_pedido.html', clientes=clientes_list)
 
 @app.route('/pedidos/<int:pid>')
 @login_required

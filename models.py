@@ -83,6 +83,7 @@ class PedidoCompra(db.Model):
     departamento   = db.Column(db.String(100))
     prioridade     = db.Column(db.String(20), default='normal')
     estado         = db.Column(db.String(30), default='aberto')
+    cliente_id     = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
     criado_por     = db.Column(db.Integer, db.ForeignKey('users.id'))
     aprovado_por   = db.Column(db.Integer, db.ForeignKey('users.id'))
     aprovador      = db.relationship('User', foreign_keys=[aprovado_por])
