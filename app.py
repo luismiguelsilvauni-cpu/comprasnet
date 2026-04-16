@@ -1963,6 +1963,22 @@ def detect_tunnel_url() -> str | None:
     return _tunnel_url
 
 
+@app.route('/conectividade')
+@login_required
+def conectividade():
+    tunnel_url = None
+    try:
+        import subprocess
+        r = subprocess.run(['curl', '-s', 'http://localhost:4040/api/tunnels'],
+            capture_output=True, text=True, timeout=2)
+        import json as _j
+        data = _j.loads(r.stdout)
+        tunnels = data.get('tunnels', [])
+        if tunnels:
+            tunnel_url = tunnels[0].get('public_url', '')
+    except: pass
+    return render_template('conectividade.html', tunnel_url=tunnel_url)
+
 @app.route('/acesso-externo')
 @login_required
 def acesso_externo():
