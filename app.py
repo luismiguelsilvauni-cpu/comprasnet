@@ -5679,32 +5679,10 @@ def salario_recibo_pdf(rid):
         mes_label=mes_label,
         cfg=cfg, empresa_nome=empresa_nome,
         upload_url=upload_url)
-    # Try pdfkit first, fallback to HTML for browser print
-    try:
-        import pdfkit
-        html_for_pdf = html.replace('window.onload', '//window.onload')
-        wk_opts = {'page-size':'A4','margin-top':'12mm','margin-bottom':'12mm',
-                   'margin-left':'12mm','margin-right':'12mm','encoding':'UTF-8','quiet':''}
-        wk_config = None
-        for wk_path in [r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
-                        r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe']:
-            if os.path.exists(wk_path):
-                wk_config = pdfkit.configuration(wkhtmltopdf=wk_path); break
-        fname = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}.pdf"
-        fpath = os.path.join(UPLOAD_SALARIOS, fname)
-        if wk_config:
-            pdfkit.from_string(html_for_pdf, fpath, options=wk_opts, configuration=wk_config)
-        else:
-            pdfkit.from_string(html_for_pdf, fpath, options=wk_opts)
-        r.pdf_filename = fname; r.pdf_path = fname
-        db.session.commit()
-        return send_from_directory(UPLOAD_SALARIOS, fname, as_attachment=False, download_name=fname)
-    except Exception as ex:
-        app.logger.warning(f"pdfkit error: {ex}")
-        from flask import make_response
-        resp = make_response(html)
-        resp.headers['Content-Type'] = 'text/html; charset=utf-8'
-        return resp
+    from flask import make_response
+    resp = make_response(html)
+    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return resp
 
 @app.route('/salarios/recibo/<int:rid>/email', methods=['POST'])
 @login_required
@@ -5730,55 +5708,56 @@ def salario_recibo_email(rid):
         corpo = 'Olá ' + func.nome + ',\n\nSegue em anexo o recibo de salário referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
         msg.attach(MIMEText(corpo))
 
-        # Generate PDF with pdfkit and attach
-        fname_pdf = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}.pdf"
-        pdf_path  = os.path.join(UPLOAD_SALARIOS, fname_pdf)
+        # Generate HTML recibo and attach as .html (recipient can print to PDF)
+        # When wkhtmltopdf is available on the server, this will be converted to PDF
+        fname_pdf = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}"
         try:
-            import pdfkit
             html_body = render_template('salario_recibo_print.html',
                 recibo=r, func=func, ano=r.ano, mes_label=mes_label,
                 cfg=cfg, empresa_nome=empresa,
-                upload_url='file:///' + app.config['UPLOAD_FOLDER'].replace('\\', '/').replace('\\', '/'))
-            # Remove auto-print script for PDF generation
-            html_body = html_body.replace('window.onload', '//window.onload')
-            wk_opts = {
-                'page-size': 'A4',
-                'margin-top': '12mm', 'margin-bottom': '12mm',
-                'margin-left': '12mm', 'margin-right': '12mm',
-                'encoding': 'UTF-8',
-                'no-outline': None,
-                'quiet': '',
-            }
-            # Try default path, then common Windows install paths
-            wk_config = None
+                upload_url=request.host_url.rstrip('/') + '/uploads')
+            # Try pdfkit if wkhtmltopdf is available
+            pdf_generated = False
             for wk_path in [
                 r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
                 r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe',
             ]:
                 if os.path.exists(wk_path):
-                    wk_config = pdfkit.configuration(wkhtmltopdf=wk_path)
+                    try:
+                        import pdfkit
+                        html_noscript = html_body.replace('window.onload', '//window.onload')
+                        wk_opts = {'page-size':'A4','margin-top':'12mm','margin-bottom':'12mm',
+                                   'margin-left':'12mm','margin-right':'12mm','encoding':'UTF-8','quiet':''}
+                        pdf_path_full = os.path.join(UPLOAD_SALARIOS, fname_pdf + '.pdf')
+                        pdfkit.from_string(html_noscript, pdf_path_full, options=wk_opts,
+                                           configuration=pdfkit.configuration(wkhtmltopdf=wk_path))
+                        with open(pdf_path_full, 'rb') as pf:
+                            part = MIMEBase('application', 'pdf')
+                            part.set_payload(pf.read())
+                            encoders.encode_base64(part)
+                            part.add_header('Content-Disposition', f'attachment; filename="{fname_pdf}.pdf"')
+                            msg.attach(part)
+                        pdf_generated = True
+                    except Exception as ex_wk:
+                        app.logger.warning(f"wkhtmltopdf error: {ex_wk}")
                     break
-            if wk_config:
-                pdfkit.from_string(html_body, pdf_path, options=wk_opts, configuration=wk_config)
-            else:
-                pdfkit.from_string(html_body, pdf_path, options=wk_opts)
-            # Update recibo with pdf path
-            r.pdf_filename = fname_pdf
-            r.pdf_path = fname_pdf
-            db.session.commit()
-        except Exception as ex_pdf:
-            app.logger.warning(f"pdfkit error: {ex_pdf}")
-            pdf_path = None
 
-        if pdf_path and os.path.exists(pdf_path):
-            with open(pdf_path, 'rb') as pf:
-                part = MIMEBase('application', 'pdf')
-                part.set_payload(pf.read())
+            if not pdf_generated:
+                # Fallback: attach HTML file (recipient prints to PDF)
+                part = MIMEBase('text', 'html', charset='utf-8')
+                part.set_payload(html_body.encode('utf-8'))
                 encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{fname_pdf}"')
+                part.add_header('Content-Disposition', f'attachment; filename="{fname_pdf}.html"')
                 msg.attach(part)
-        else:
-            app.logger.warning("PDF not generated - sending without attachment")
+                # Add note to email body
+                corpo_extra = '\n\nNota: O recibo está em anexo em formato HTML. Abra o ficheiro e imprima para PDF.'
+                msg_parts = msg.get_payload()
+                if msg_parts:
+                    msg_parts[0].set_payload(
+                        msg_parts[0].get_payload(decode=True).decode() + corpo_extra
+                    )
+        except Exception as ex_attach:
+            app.logger.warning(f"Attach error: {ex_attach}")
 
         port = getattr(cfg,'smtp_port',587) or 587
         if port == 465:
