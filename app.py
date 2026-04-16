@@ -204,18 +204,60 @@ def novo_pedido():
 
 @app.route('/pedidos/<int:pid>')
 @login_required
+def _get_fornecedores_artigo(artigo_ref):
+    """Get habitual suppliers for an article from PHC data."""
+    if not artigo_ref:
+        return []
+    try:
+        cfg = ConfigPHC.query.first()
+        if not cfg or not cfg.server:
+            return []
+        import pyodbc
+        conn_str = (f"DRIVER={{SQL Server}};SERVER={cfg.server};DATABASE={cfg.database};"
+                    f"UID={cfg.username};PWD={cfg.password}")
+        conn = pyodbc.connect(conn_str, timeout=3)
+        cur = conn.cursor()
+        # Query PHC for suppliers of this article
+        cur.execute("""
+            SELECT DISTINCT f.nome, f.ncont, sl.epv
+            FROM sl WITH(NOLOCK)
+            JOIN fornecedor f WITH(NOLOCK) ON sl.no = f.no
+            WHERE sl.ref = ? AND sl.ativo = 1
+            ORDER BY sl.epv DESC
+        """, artigo_ref)
+        rows = cur.fetchall()
+        conn.close()
+        return [{'nome': r[0], 'nif': r[1] or '', 'preco': float(r[2] or 0)} for r in rows[:5]]
+    except Exception as ex:
+        return []
+
+
 def pedido_detalhe(pid):
     p = PedidoCompra.query.get_or_404(pid)
     orcs = Orcamento.query.filter_by(pedido_id=pid).order_by(Orcamento.total).all()
+    # Get fornecedores habituais from PHC for each line
+    from models import FornecedorPHC
     linhas_json = json.dumps([{
         'id': l.id, 'referencia': l.referencia or '', 'designacao': l.designacao or '',
         'unidade': l.unidade or 'un', 'quantidade': l.quantidade,
         'stock_atual': l.stock_atual, 'preco_custo_ref': l.preco_custo_ref,
         'preco_pcp_ref': l.preco_pcp_ref, 'fornecedor_hab': l.fornecedor_hab or '',
-        'observacoes': l.observacoes or '', 'artigo_ref': l.artigo_ref or ''
+        'observacoes': l.observacoes or '', 'artigo_ref': l.artigo_ref or '',
+        'status': l.status or 'nao_encomendado',
+        'cliente_id': l.cliente_id or '',
+        'fornecedores_phc': _get_fornecedores_artigo(l.artigo_ref),
     } for l in p.linhas])
     return render_template('pedido_detalhe.html', pedido=p, orcamentos=orcs,
                            melhor=orcs[0] if orcs else None, linhas_json=linhas_json)
+
+@app.route('/pedidos/<int:pid>/linha/<int:lid>/status', methods=['POST'])
+@login_required
+def linha_status(pid, lid):
+    l = LinhaPedido.query.filter_by(id=lid, pedido_id=pid).first_or_404()
+    l.status = request.json.get('status', 'nao_encomendado')
+    db.session.commit()
+    return jsonify({'ok': True, 'status': l.status})
+
 
 # ── LINHAS DO PEDIDO ──────────────────────────────────────────────────────────
 

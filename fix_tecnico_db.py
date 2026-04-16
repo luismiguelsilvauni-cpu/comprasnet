@@ -301,3 +301,12 @@ with app.app_context():
             with db.engine.begin() as conn:
                 conn.execute(text("ALTER TABLE linhas_pedido ADD COLUMN cliente_id INTEGER"))
             print("OK: linhas_pedido.cliente_id adicionado")
+
+    # Add status to linhas_pedido
+    if 'linhas_pedido' in insp.get_table_names():
+        lp_cols = [c['name'] for c in insp.get_columns('linhas_pedido')]
+        for col, typ, default in [('status','VARCHAR(30)','nao_encomendado'),('cliente_id','INTEGER','NULL')]:
+            if col not in lp_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE linhas_pedido ADD COLUMN {col} {typ}"))
+                print(f"OK: linhas_pedido.{col} adicionado")

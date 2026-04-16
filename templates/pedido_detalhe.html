@@ -315,6 +315,7 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let linhas = {{ linhas_json | safe }};
+const pid = {{ pedido.id }};
 let modalArtigo = null;
 let searchTimer = null;
 
@@ -440,19 +441,51 @@ function removerLinha(btn){
   renderLinhas();
 }
 
+
+const STATUS = {
+  nao_encomendado: {label:'Não Encomendado', color:'#ef4444', bg:'rgba(239,68,68,.15)'},
+  pendente:        {label:'Pendente Chegada', color:'#f59e0b', bg:'rgba(245,158,11,.15)'},
+  recebido:        {label:'Recebido',         color:'#22c55e', bg:'rgba(34,197,94,.15)'},
+  cancelado:       {label:'Cancelado',        color:'#a855f7', bg:'rgba(168,85,247,.15)'},
+};
+function statusBadge(l, i) {
+  const s = STATUS[l.status] || STATUS.nao_encomendado;
+  return `<div style="position:relative;display:inline-block">
+    <span onclick="toggleStatusMenu(${i},this)" style="cursor:pointer;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:${s.bg};color:${s.color};white-space:nowrap">${s.label}</span>
+    <div id="smenu-${i}" style="display:none;position:absolute;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;min-width:160px;top:24px;left:0;box-shadow:0 4px 16px rgba(0,0,0,.3)">
+      ${Object.entries(STATUS).map(([k,v])=>`<div onclick="setStatus(${i},'${k}')" style="padding:6px 10px;cursor:pointer;font-size:12px;color:${v.color};border-radius:4px" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${v.label}</div>`).join('')}
+    </div>
+  </div>`;
+}
+function toggleStatusMenu(i, el) {
+  const m = document.getElementById('smenu-'+i);
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+  setTimeout(()=>document.addEventListener('click', ()=>m.style.display='none', {once:true}), 10);
+}
+function setStatus(i, status) {
+  const l = linhas[i];
+  fetch(`/pedidos/${pid}/linha/${l.id}/status`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({status})
+  }).then(r=>r.json()).then(d=>{ if(d.ok){ linhas[i].status=status; renderLinhas(); }});
+}
+function fornHab(l) {
+  if (!l.fornecedores_phc || !l.fornecedores_phc.length) return l.fornecedor_hab || '—';
+  return l.fornecedores_phc.map(f=>`<span style="font-size:10px;padding:2px 6px;background:var(--surface2);border-radius:4px;margin-right:3px;display:inline-block">${f.nome}${f.preco?` <span style="color:var(--accent)">${f.preco.toFixed(2)}€</span>`:''}</span>`).join('');
+}
+
 function renderLinhas(){
   const tbody = document.getElementById('linhasTbody') || criarTabela();
   tbody.innerHTML = linhas.map((l,i)=>`
     <tr class="linha-row">
       <td class="mono text-muted" style="font-size:11px">${i+1}</td>
+      <td>${statusBadge(l,i)}</td>
       <td><span class="mono" style="font-size:12px;color:var(--accent)">${l.referencia||'—'}</span>${l.artigo_ref?'<span class="badge badge-blue" style="font-size:10px;margin-left:4px">PHC</span>':''}</td>
       <td><input type="text" value="${escHtml(l.designacao)}" onchange="linhas[${i}].designacao=this.value" style="background:transparent;border:none;color:var(--text);font-size:13px;padding:0;width:100%"></td>
       <td><input type="number" value="${l.quantidade}" min="0.01" step="0.01" onchange="linhas[${i}].quantidade=parseFloat(this.value)||1" style="background:transparent;border:none;color:var(--text);font-family:monospace;font-size:13px;padding:0;width:60px"></td>
       <td class="mono text-muted">${l.unidade}</td>
       <td class="mono ${l.stock_atual<=0?'text-danger':l.stock_atual<5?'text-warning':'text-success'}">${(l.stock_atual||0).toFixed(2)}</td>
-      <td class="mono">${(l.preco_custo_ref||0).toFixed(4)} €</td>
-      <td class="mono">${(l.preco_pcp_ref||0).toFixed(4)} €</td>
-      <td><input type="text" value="${escHtml(l.fornecedor_hab||'')}" onchange="linhas[${i}].fornecedor_hab=this.value" placeholder="—" style="background:transparent;border:none;color:var(--text-muted);font-size:12px;padding:0;width:100%"></td>
+      <td style="font-size:11px">${fornHab(l)}</td>
       <td><button onclick="removerLinha(this)" class="btn btn-danger btn-sm" style="padding:3px 7px">✕</button></td>
     </tr>`).join('');
   document.getElementById('linhaCount').textContent = `(${linhas.length})`;
@@ -463,7 +496,7 @@ function renderLinhas(){
 function criarTabela(){
   const container = document.getElementById('linhasContainer');
   container.innerHTML = `<div class="table-wrap"><table id="linhasTable">
-    <thead><tr><th style="width:32px"></th><th>Referência</th><th>Designação</th><th style="width:60px">Qtd</th><th style="width:50px">Un</th><th style="width:90px">Stock PHC</th><th style="width:100px">P.Custo</th><th style="width:100px">P.Ponderado</th><th>Fornec. Hab.</th><th style="width:36px"></th></tr></thead>
+    <thead><tr><th style="width:32px"></th><th>Estado</th><th>Referência</th><th>Designação</th><th style="width:60px">Qtd</th><th style="width:50px">Un</th><th style="width:90px">Stock PHC</th><th>Fornecedores PHC</th><th style="width:36px"></th></tr></thead>
     <tbody id="linhasTbody"></tbody></table></div>
     <div id="emptyLinhas" style="display:none;text-align:center;padding:32px;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div>Sem artigos adicionados.</div></div>`;
   return document.getElementById('linhasTbody');
