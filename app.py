@@ -5679,10 +5679,32 @@ def salario_recibo_pdf(rid):
         mes_label=mes_label,
         cfg=cfg, empresa_nome=empresa_nome,
         upload_url=upload_url)
-    from flask import make_response
-    resp = make_response(html)
-    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
-    return resp
+    # Try pdfkit first, fallback to HTML for browser print
+    try:
+        import pdfkit
+        html_for_pdf = html.replace('window.onload', '//window.onload')
+        wk_opts = {'page-size':'A4','margin-top':'12mm','margin-bottom':'12mm',
+                   'margin-left':'12mm','margin-right':'12mm','encoding':'UTF-8','quiet':''}
+        wk_config = None
+        for wk_path in [r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
+                        r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe']:
+            if os.path.exists(wk_path):
+                wk_config = pdfkit.configuration(wkhtmltopdf=wk_path); break
+        fname = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}.pdf"
+        fpath = os.path.join(UPLOAD_SALARIOS, fname)
+        if wk_config:
+            pdfkit.from_string(html_for_pdf, fpath, options=wk_opts, configuration=wk_config)
+        else:
+            pdfkit.from_string(html_for_pdf, fpath, options=wk_opts)
+        r.pdf_filename = fname; r.pdf_path = fname
+        db.session.commit()
+        return send_from_directory(UPLOAD_SALARIOS, fname, as_attachment=False, download_name=fname)
+    except Exception as ex:
+        app.logger.warning(f"pdfkit error: {ex}")
+        from flask import make_response
+        resp = make_response(html)
+        resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+        return resp
 
 @app.route('/salarios/recibo/<int:rid>/email', methods=['POST'])
 @login_required
@@ -5708,39 +5730,55 @@ def salario_recibo_email(rid):
         corpo = 'Olá ' + func.nome + ',\n\nSegue em anexo o recibo de salário referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
         msg.attach(MIMEText(corpo))
 
-        # Generate Excel recibo and attach
+        # Generate PDF with pdfkit and attach
+        fname_pdf = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}.pdf"
+        pdf_path  = os.path.join(UPLOAD_SALARIOS, fname_pdf)
         try:
-            from io import BytesIO
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("gerar_recibo",
-                os.path.join(os.path.dirname(__file__), 'gerar_recibo.py'))
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            wb_excel = mod.gerar_recibo_excel(func, r, mes_label, r.ano, empresa)
-            buf = BytesIO()
-            wb_excel.save(buf); buf.seek(0)
-            fname_excel = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}.xlsx"
-            part = MIMEBase('application', 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            part.set_payload(buf.read())
-            encoders.encode_base64(part)
-            part.add_header('Content-Disposition', f'attachment; filename="{fname_excel}"')
-            msg.attach(part)
-        except Exception as ex_xl:
-            app.logger.warning(f"Excel attach error: {ex_xl}")
-            # Fallback: attach HTML
-            try:
-                html_body = render_template('salario_recibo_print.html',
-                    recibo=r, func=func, ano=r.ano, mes_label=mes_label,
-                    cfg=cfg, empresa_nome=empresa,
-                    upload_url=request.host_url.rstrip('/') + '/uploads')
-                part_html = MIMEBase('text', 'html')
-                part_html.set_payload(html_body.encode('utf-8'))
-                encoders.encode_base64(part_html)
-                part_html.add_header('Content-Disposition',
-                    f'attachment; filename="Recibo_{func.numero}_{r.ano}_{r.mes:02d}.html"')
-                msg.attach(part_html)
-            except Exception as ex_html:
-                app.logger.warning(f"HTML attach error: {ex_html}")
+            import pdfkit
+            html_body = render_template('salario_recibo_print.html',
+                recibo=r, func=func, ano=r.ano, mes_label=mes_label,
+                cfg=cfg, empresa_nome=empresa,
+                upload_url='file:///' + app.config['UPLOAD_FOLDER'].replace('\\', '/').replace('\\', '/'))
+            # Remove auto-print script for PDF generation
+            html_body = html_body.replace('window.onload', '//window.onload')
+            wk_opts = {
+                'page-size': 'A4',
+                'margin-top': '12mm', 'margin-bottom': '12mm',
+                'margin-left': '12mm', 'margin-right': '12mm',
+                'encoding': 'UTF-8',
+                'no-outline': None,
+                'quiet': '',
+            }
+            # Try default path, then common Windows install paths
+            wk_config = None
+            for wk_path in [
+                r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
+                r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe',
+            ]:
+                if os.path.exists(wk_path):
+                    wk_config = pdfkit.configuration(wkhtmltopdf=wk_path)
+                    break
+            if wk_config:
+                pdfkit.from_string(html_body, pdf_path, options=wk_opts, configuration=wk_config)
+            else:
+                pdfkit.from_string(html_body, pdf_path, options=wk_opts)
+            # Update recibo with pdf path
+            r.pdf_filename = fname_pdf
+            r.pdf_path = fname_pdf
+            db.session.commit()
+        except Exception as ex_pdf:
+            app.logger.warning(f"pdfkit error: {ex_pdf}")
+            pdf_path = None
+
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, 'rb') as pf:
+                part = MIMEBase('application', 'pdf')
+                part.set_payload(pf.read())
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', f'attachment; filename="{fname_pdf}"')
+                msg.attach(part)
+        else:
+            app.logger.warning("PDF not generated - sending without attachment")
 
         port = getattr(cfg,'smtp_port',587) or 587
         if port == 465:
