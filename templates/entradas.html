@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Entradas · NavTech{% endblock %}
+{% block page_title %}📥 Entradas de Equipamento{% endblock %}
+{% block topbar_actions %}
+  {% if em_estadia > 0 %}
+  <span style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px">⚠️ {{ em_estadia }} em estadia</span>
+  {% endif %}
+  <a href="{{ url_for('entrada_nova') }}" class="btn btn-primary btn-sm">+ Nova Entrada</a>
+{% endblock %}
+{% block content %}
+
+<!-- Filters -->
+<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+  <a href="{{ url_for('entradas') }}" class="btn btn-sm {% if not status_filtro %}btn-primary{% else %}btn-ghost{% endif %}">Todos</a>
+  {% for val, label in status_list %}
+  <a href="{{ url_for('entradas', status=val) }}" class="btn btn-sm {% if status_filtro == val %}btn-primary{% else %}btn-ghost{% endif %}" style="font-size:11px">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th style="width:60px">ID Nº</th>
+      <th style="width:100px">Data Rec.</th>
+      <th>Cliente</th>
+      <th>Marca</th>
+      <th>Modelo</th>
+      <th>Nº Série</th>
+      <th>Estado</th>
+      <th style="width:70px">Dias</th>
+      <th style="width:80px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for e in entradas %}
+  {% set is_estadia = e.status in ['orcamentado_estadia','concluido_estadia'] %}
+  <tr style="{% if is_estadia %}background:rgba(239,68,68,.05){% endif %}">
+    <td class="mono" style="font-weight:700;color:var(--accent)">#{{ '%04d'|format(e.numero) }}</td>
+    <td style="font-size:12px;color:var(--text-muted)">{{ e.data_rececao.strftime('%d/%m/%Y') }}</td>
+    <td style="font-weight:600">{{ e.cliente_nome[:30] }}</td>
+    <td style="font-size:12px">{{ e.marca or '—' }}</td>
+    <td style="font-size:12px">{{ e.modelo or '—' }}</td>
+    <td class="mono" style="font-size:11px;color:var(--text-muted)">{{ e.num_serie or '—' }}</td>
+    <td>
+      {% set sc = {'rececionado':'#3b6ef0','orcamentado':'#f59e0b','material_pedido':'#6366f1','em_reparacao':'#22c55e','faturado':'#06b6d4','orcamentado_estadia':'#ef4444','concluido_estadia':'#a855f7'} %}
+      {% set col = sc.get(e.status, '#999') %}
+      <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:{{ col }}20;color:{{ col }};border:1px solid {{ col }}40;white-space:nowrap">
+        {{ {'rececionado':'📥 Rececionado','orcamentado':'📋 Orçamentado','material_pedido':'📦 Mat. Pedido','em_reparacao':'🔧 Em Reparação','faturado':'🧾 Faturado','orcamentado_estadia':'⏳ Orç. – Estadia','concluido_estadia':'🏁 Conc. – Estadia'}.get(e.status, e.status) }}
+      </span>
+    </td>
+    <td class="mono" style="text-align:center;font-size:12px">
+      {% if e._dias_contagem is not none %}
+      <span style="{% if e._dias_contagem >= e._dias_limite %}color:#ef4444;font-weight:700{% elif e._dias_contagem >= e._dias_limite - 2 %}color:#f59e0b;font-weight:700{% else %}color:var(--text-muted){% endif %}">
+        {{ e._dias_contagem }}d
+      </span>
+      {% else %}—{% endif %}
+    </td>
+    <td style="display:flex;gap:4px;padding:6px">
+      <a href="{{ url_for('entrada_detalhe', eid=e.id) }}" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">Ver →</a>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">Sem entradas registadas</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+</div>
+{% endblock %}

@@ -320,3 +320,9 @@ with app.app_context():
     if 'partilha_ficheiros' not in insp.get_table_names():
         db.create_all()
         print("OK: partilha_ficheiros criada")
+
+    # Create entradas tables
+    for tbl in ['entradas_equipamento','entrada_historico']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: {tbl} criada")

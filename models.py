@@ -362,3 +362,34 @@ class EventoCalendario(db.Model):
     criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+
+class EntradaEquipamento(db.Model):
+    __tablename__ = 'entradas_equipamento'
+    id              = db.Column(db.Integer, primary_key=True)
+    numero          = db.Column(db.Integer, nullable=False, unique=True)  # sequential ID
+    data_rececao    = db.Column(db.Date, nullable=False)
+    cliente_nome    = db.Column(db.String(200), nullable=False)
+    marca           = db.Column(db.String(100))
+    modelo          = db.Column(db.String(100))
+    num_serie       = db.Column(db.String(100))
+    observacoes     = db.Column(db.Text, default='')
+    status          = db.Column(db.String(50), default='rececionado')
+    data_status     = db.Column(db.DateTime)          # when current status was set
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    historico       = db.relationship('EntradaHistorico', backref='entrada',
+                                      cascade='all, delete-orphan',
+                                      order_by='EntradaHistorico.criado_em.desc()')
+
+class EntradaHistorico(db.Model):
+    __tablename__ = 'entrada_historico'
+    id          = db.Column(db.Integer, primary_key=True)
+    entrada_id  = db.Column(db.Integer, db.ForeignKey('entradas_equipamento.id'), nullable=False)
+    status_ant  = db.Column(db.String(50))
+    status_novo = db.Column(db.String(50), nullable=False)
+    user_id     = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user_nome   = db.Column(db.String(120))
+    notas       = db.Column(db.String(400), default='')
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+

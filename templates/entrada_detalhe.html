@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Entrada #{{ '%04d'|format(e.numero) }} · NavTech{% endblock %}
+{% block page_title %}📥 Entrada #{{ '%04d'|format(e.numero) }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('entradas') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+  <a href="{{ url_for('entrada_editar', eid=e.id) }}" class="btn btn-ghost btn-sm">✏️ Editar</a>
+  <a href="{{ url_for('entrada_pdf', eid=e.id) }}" target="_blank" class="btn btn-ghost btn-sm">📄 PDF / Imprimir</a>
+{% endblock %}
+{% block content %}
+
+{% set SC = {'rececionado':'#3b6ef0','orcamentado':'#f59e0b','material_pedido':'#6366f1','em_reparacao':'#22c55e','faturado':'#06b6d4','orcamentado_estadia':'#ef4444','concluido_estadia':'#a855f7'} %}
+{% set col = SC.get(e.status, '#999') %}
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start">
+
+<!-- Left: info -->
+<div>
+  <div class="card" style="padding:16px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="font-size:32px;font-weight:800;color:var(--accent);font-family:monospace">#{{ '%04d'|format(e.numero) }}</div>
+      <div>
+        <div style="font-size:16px;font-weight:700">{{ e.cliente_nome }}</div>
+        <div style="font-size:12px;color:var(--text-muted)">Rececionado em {{ e.data_rececao.strftime('%d/%m/%Y') }}</div>
+      </div>
+      <div style="margin-left:auto">
+        <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:6px;background:{{ col }}20;color:{{ col }};border:1px solid {{ col }}40">
+          {{ status_dict.get(e.status, e.status) }}
+        </span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Marca</div><div style="font-size:14px">{{ e.marca or '—' }}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Modelo</div><div style="font-size:14px">{{ e.modelo or '—' }}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Nº Série</div><div style="font-size:14px;font-family:monospace">{{ e.num_serie or '—' }}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Estado desde</div><div style="font-size:13px">{{ e.data_status.strftime('%d/%m/%Y %H:%M') if e.data_status else '—' }}</div></div>
+    </div>
+
+    {% if e.observacoes %}
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Observações</div>
+      <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">{{ e.observacoes }}</div>
+    </div>
+    {% endif %}
+
+    {% if dias_contagem is not none %}
+    <div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:{% if dias_contagem >= 8 %}rgba(239,68,68,.1){% else %}rgba(245,158,11,.1){% endif %};border:1px solid {% if dias_contagem >= 8 %}rgba(239,68,68,.3){% else %}rgba(245,158,11,.3){% endif %}">
+      <div style="font-size:12px;font-weight:700;color:{% if dias_contagem >= 8 %}#ef4444{% else %}#f59e0b{% endif %}">
+        ⏱ {{ dias_contagem }} dia(s) útil(eis) neste estado
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- History -->
+  <div class="card" style="padding:14px">
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Histórico de Estados</div>
+    {% for h in e.historico %}
+    <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="width:3px;border-radius:2px;background:{{ SC.get(h.status_novo,'#999') }};flex-shrink:0"></div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          {% if h.status_ant %}<span style="font-size:11px;color:var(--text-muted)">{{ status_dict.get(h.status_ant, h.status_ant) }}</span><span style="color:var(--text-muted)">→</span>{% endif %}
+          <span style="font-size:11px;font-weight:700;color:{{ SC.get(h.status_novo,'#999') }}">{{ status_dict.get(h.status_novo, h.status_novo) }}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          👤 {{ h.user_nome or '—' }} · 🕐 {{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}
+          {% if h.notas %} · 📝 {{ h.notas }}{% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div style="color:var(--text-muted);font-size:12px">Sem histórico</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Right: status change -->
+<div>
+  <div class="card" style="padding:14px">
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:12px">Alterar Estado</div>
+    {% for val, label in status_list %}
+    {% set c = SC.get(val,'#999') %}
+    <button onclick="mudarStatus('{{ val }}')"
+      style="width:100%;text-align:left;padding:9px 12px;border-radius:7px;margin-bottom:6px;border:1px solid {{ c }}40;background:{% if e.status == val %}{{ c }}20{% else %}transparent{% endif %};color:{{ c }};cursor:pointer;font-size:12px;font-weight:{% if e.status == val %}700{% else %}500{% endif %};display:flex;align-items:center;gap:8px">
+      {% if e.status == val %}<span>●</span>{% else %}<span style="opacity:.3">○</span>{% endif %}
+      {{ label }}
+    </button>
+    {% endfor %}
+
+    <div style="margin-top:10px">
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Nota (opcional)</label>
+      <input type="text" id="statusNota" class="input" style="margin-top:4px;font-size:12px" placeholder="Ex: Aguarda peça X...">
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Status change modal confirmation -->
+<div id="statusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:360px;padding:20px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:8px">Confirmar alteração</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px" id="statusModalTxt"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('statusModal').style.display='none'" class="btn btn-ghost">Cancelar</button>
+      <button onclick="confirmarStatus()" class="btn btn-primary">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _novoStatus = null;
+var STATUS_LABELS = {{ status_dict | tojson }};
+
+function mudarStatus(status) {
+  if (status === '{{ e.status }}') return;
+  _novoStatus = status;
+  document.getElementById('statusModalTxt').textContent =
+    'Alterar para: ' + (STATUS_LABELS[status] || status);
+  document.getElementById('statusModal').style.display = 'flex';
+}
+
+function confirmarStatus() {
+  var nota = document.getElementById('statusNota').value.trim();
+  fetch('/entradas/{{ e.id }}/status', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: _novoStatus, notas: nota})
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else alert('Erro: ' + d.error);
+  });
+}
+
+document.getElementById('statusModal').addEventListener('click', function(e){
+  if(e.target===this) this.style.display='none';
+});
+</script>
+{% endblock %}

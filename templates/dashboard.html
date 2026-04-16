@@ -2,6 +2,9 @@
 {% block title %}Dashboard · ComprasNet{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block topbar_actions %}
+  {% if entradas_estadia and entradas_estadia > 0 %}
+  <a href="{{ url_for('entradas', status='orcamentado_estadia') }}" style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;text-decoration:none">⚠️ {{ entradas_estadia }} equip. em estadia</a>
+  {% endif %}
   <button onclick="atualizarDashboard()" class="btn btn-ghost btn-sm" title="Atualizar dados">🔄 Atualizar</button>
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>

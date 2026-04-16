@@ -154,7 +154,14 @@ def dashboard():
         ArtigoPHC.stock_atual > 0,
         ArtigoPHC.stock_atual <= 3
     ).order_by(ArtigoPHC.stock_atual).limit(10).all()
+    # Check entradas in estadia
+    try:
+        entradas_estadia = EntradaEquipamento.query.filter(
+            EntradaEquipamento.status.in_(['orcamentado_estadia','concluido_estadia'])
+        ).count()
+    except: entradas_estadia = 0
     return render_template('dashboard.html',
+        entradas_estadia=entradas_estadia,
         total_pedidos=total_pedidos,
         pedidos_abertos=pedidos_abertos,
         pedidos_aprovados=pedidos_aprovados,
@@ -2838,6 +2845,7 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
+    ('entradas',           '📥 Entradas'),
     ('partilha',           '📁 Partilha'),
     ('conectividade',      '🌐 Conectividade'),
     ('roadmap',            '🗺️ Roadmap'),
@@ -2845,6 +2853,209 @@ MENUS_DISPONIVEIS = [
     ('admin_config',       '⚙️ Configurações'),
     ('admin_utilizadores', '👥 Utilizadores'),
 ]
+
+# ── MÓDULO ENTRADAS ───────────────────────────────────────────────────────────
+
+ENTRADAS_STATUS = [
+    ('rececionado',         '📥 Rececionado'),
+    ('orcamentado',         '📋 Orçamentado'),
+    ('material_pedido',     '📦 Material Pedido'),
+    ('em_reparacao',        '🔧 Em Reparação'),
+    ('faturado',            '🧾 Faturado'),
+    ('orcamentado_estadia', '⏳ Orçamentado – Em Estadia'),
+    ('concluido_estadia',   '🏁 Concluído – Em Estadia'),
+]
+ENTRADAS_STATUS_DICT = dict(ENTRADAS_STATUS)
+
+# States that trigger day counting and auto-escalation
+ESTADIA_RULES = {
+    'orcamentado':  {'dias': 10, 'escalate': 'orcamentado_estadia'},
+    'faturado':     {'dias': 5,  'escalate': 'concluido_estadia'},
+}
+
+def _dias_uteis(data_inicio, data_fim):
+    """Count working days between two dates (Mon-Fri)."""
+    from datetime import date, timedelta
+    count = 0
+    cur = data_inicio
+    while cur < data_fim:
+        cur += timedelta(days=1)
+        if cur.weekday() < 5:  # Mon=0 ... Fri=4
+            count += 1
+    return count
+
+def _verificar_estadias():
+    """Check all entries and escalate status if working days exceeded."""
+    from datetime import date
+    changed = 0
+    for e in EntradaEquipamento.query.all():
+        rule = ESTADIA_RULES.get(e.status)
+        if not rule or not e.data_status:
+            continue
+        dias = _dias_uteis(e.data_status.date(), date.today())
+        if dias >= rule['dias']:
+            status_ant = e.status
+            e.status = rule['escalate']
+            e.data_status = datetime.now()
+            hist = EntradaHistorico(
+                entrada_id=e.id, status_ant=status_ant,
+                status_novo=e.status, user_nome='Sistema',
+                notas=f'Automático: {dias} dias úteis atingidos',
+                criado_em=datetime.now()
+            )
+            db.session.add(hist)
+            changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+@app.route('/entradas')
+@login_required
+def entradas():
+    _verificar_estadias()
+    status_f = request.args.get('status', '')
+    q = EntradaEquipamento.query
+    if status_f:
+        q = q.filter_by(status=status_f)
+    entradas_list = q.order_by(EntradaEquipamento.numero.desc()).all()
+    from datetime import date
+    # Compute dias for each entry
+    for e in entradas_list:
+        rule = ESTADIA_RULES.get(e.status)
+        if rule and e.data_status:
+            e._dias_contagem = _dias_uteis(e.data_status.date(), date.today())
+            e._dias_limite = rule['dias']
+        else:
+            e._dias_contagem = None
+            e._dias_limite = None
+    em_estadia = sum(1 for e in entradas_list if e.status in ('orcamentado_estadia','concluido_estadia'))
+    return render_template('entradas.html',
+        entradas=entradas_list, status_list=ENTRADAS_STATUS,
+        status_filtro=status_f, em_estadia=em_estadia)
+
+@app.route('/entradas/nova', methods=['GET','POST'])
+@login_required
+def entrada_nova():
+    if request.method == 'POST':
+        from datetime import date
+        # Auto increment number
+        last = db.session.query(db.func.max(EntradaEquipamento.numero)).scalar() or 0
+        e = EntradaEquipamento(
+            numero=last+1,
+            data_rececao=datetime.strptime(request.form['data_rececao'], '%Y-%m-%d').date(),
+            cliente_nome=request.form.get('cliente_nome','').strip(),
+            marca=request.form.get('marca','').strip(),
+            modelo=request.form.get('modelo','').strip(),
+            num_serie=request.form.get('num_serie','').strip(),
+            observacoes=request.form.get('observacoes','').strip(),
+            status='rececionado',
+            data_status=datetime.now(),
+            criado_por=current_user.id,
+            criado_em=datetime.now(),
+            atualizado_em=datetime.now(),
+        )
+        db.session.add(e)
+        db.session.flush()
+        db.session.add(EntradaHistorico(
+            entrada_id=e.id, status_ant=None, status_novo='rececionado',
+            user_id=current_user.id, user_nome=current_user.nome,
+            notas='Entrada criada', criado_em=datetime.now()
+        ))
+        db.session.commit()
+        flash(f'Entrada #{e.numero} criada com sucesso!', 'success')
+        return redirect(url_for('entrada_detalhe', eid=e.id))
+    from datetime import date
+    return render_template('entrada_form.html', entrada=None,
+        hoje=date.today().strftime('%Y-%m-%d'))
+
+@app.route('/entradas/<int:eid>')
+@login_required
+def entrada_detalhe(eid):
+    e = EntradaEquipamento.query.get_or_404(eid)
+    from datetime import date
+    rule = ESTADIA_RULES.get(e.status)
+    dias_contagem = _dias_uteis(e.data_status.date(), date.today()) if (rule and e.data_status) else None
+    return render_template('entrada_detalhe.html', e=e,
+        status_list=ENTRADAS_STATUS, dias_contagem=dias_contagem,
+        status_dict=ENTRADAS_STATUS_DICT)
+
+@app.route('/entradas/<int:eid>/editar', methods=['GET','POST'])
+@login_required
+def entrada_editar(eid):
+    e = EntradaEquipamento.query.get_or_404(eid)
+    if request.method == 'POST':
+        e.data_rececao  = datetime.strptime(request.form['data_rececao'], '%Y-%m-%d').date()
+        e.cliente_nome  = request.form.get('cliente_nome','').strip()
+        e.marca         = request.form.get('marca','').strip()
+        e.modelo        = request.form.get('modelo','').strip()
+        e.num_serie     = request.form.get('num_serie','').strip()
+        e.observacoes   = request.form.get('observacoes','').strip()
+        e.atualizado_em = datetime.now()
+        db.session.commit()
+        flash('Entrada actualizada.', 'success')
+        return redirect(url_for('entrada_detalhe', eid=eid))
+    return render_template('entrada_form.html', entrada=e,
+        hoje=e.data_rececao.strftime('%Y-%m-%d'))
+
+@app.route('/entradas/<int:eid>/status', methods=['POST'])
+@login_required
+def entrada_status(eid):
+    e = EntradaEquipamento.query.get_or_404(eid)
+    data = request.get_json() or {}
+    novo = data.get('status')
+    notas = data.get('notas','')
+    if novo not in ENTRADAS_STATUS_DICT:
+        return jsonify({'ok': False, 'error': 'Status inválido'})
+    ant = e.status
+    e.status = novo
+    e.data_status = datetime.now()
+    e.atualizado_em = datetime.now()
+    db.session.add(EntradaHistorico(
+        entrada_id=eid, status_ant=ant, status_novo=novo,
+        user_id=current_user.id, user_nome=current_user.nome,
+        notas=notas, criado_em=datetime.now()
+    ))
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/entradas/<int:eid>/pdf')
+@login_required
+def entrada_pdf(eid):
+    e = EntradaEquipamento.query.get_or_404(eid)
+    cfg = ConfigGeral.query.first()
+    empresa_nome = cfg.empresa_nome if cfg else 'NavTech'
+    html = render_template('entrada_pdf.html', e=e, cfg=cfg, empresa_nome=empresa_nome,
+        upload_url=request.host_url.rstrip('/') + '/uploads',
+        status_dict=ENTRADAS_STATUS_DICT)
+    # Try wkhtmltopdf
+    for wk_path in [r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
+                    r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe']:
+        if os.path.exists(wk_path):
+            try:
+                import pdfkit
+                pdf_bytes = pdfkit.from_string(html, False,
+                    options={'page-size':'A4','margin-top':'12mm','margin-bottom':'12mm',
+                             'margin-left':'12mm','margin-right':'12mm','encoding':'UTF-8','quiet':''},
+                    configuration=pdfkit.configuration(wkhtmltopdf=wk_path))
+                from flask import Response
+                return Response(pdf_bytes, mimetype='application/pdf',
+                    headers={'Content-Disposition': f'inline; filename="Entrada_{e.numero}.pdf"'})
+            except: pass
+    # Fallback: browser print
+    from flask import make_response
+    resp = make_response(html)
+    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return resp
+
+@app.route('/api/entradas/estadia-count')
+@login_required
+def api_entradas_estadia_count():
+    _verificar_estadias()
+    count = EntradaEquipamento.query.filter(
+        EntradaEquipamento.status.in_(['orcamentado_estadia','concluido_estadia'])
+    ).count()
+    return jsonify({'count': count})
+
 
 # ── MÓDULO PARTILHA ───────────────────────────────────────────────────────────
 

@@ -282,6 +282,11 @@
                 <span class="icon">📚</span><span>Biblioteca PDF</span>
             </a>
             {% endif %}
+            {% if pode_aceder('entradas') %}
+            <a href="{{ url_for('entradas') }}" class="nav-item {% if request.endpoint in ['entradas','entrada_nova','entrada_detalhe','entrada_editar'] %}active{% endif %}">
+                <span class="icon">📥</span><span>Entradas</span>
+            </a>
+            {% endif %}
             {% if pode_aceder('partilha') %}
             <a href="{{ url_for('partilha') }}" class="nav-item {% if request.endpoint == 'partilha' %}active{% endif %}">
                 <span class="icon">📁</span><span>Partilha</span>

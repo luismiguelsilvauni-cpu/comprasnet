@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<style>
+@page { size: A4; margin: 15mm 15mm 15mm 15mm; }
+@media print { .no-print { display:none !important; } }
+* { box-sizing: border-box; margin:0; padding:0; }
+body { font-family: Arial, sans-serif; font-size: 10pt; color: #1a1a1a; background: white; }
+
+.wrapper { border: 2px solid #1a1a1a; }
+
+.header { display:flex; align-items:center; padding:10px 14px; border-bottom:2px solid #1a1a1a; background:#f8f8f8; }
+.logo { width:120px; margin-right:14px; flex-shrink:0; }
+.logo img { max-width:120px; max-height:70px; object-fit:contain; }
+.empresa h1 { font-size:13pt; font-weight:bold; color:#003366; }
+.empresa p { font-size:8pt; color:#555; margin-top:2px; }
+.doc-title { text-align:right; flex-shrink:0; }
+.doc-title .lbl { font-size:14pt; font-weight:bold; color:#003366; }
+.doc-title .num { font-size:10pt; color:#555; margin-top:4px; }
+.empresa { flex:1; }
+
+.id-badge { background:#003366; color:white; text-align:center; padding:8px; border-bottom:2px solid #1a1a1a; font-size:14pt; font-weight:bold; letter-spacing:.1em; }
+
+.section { border-bottom:1px solid #ccc; }
+.section-title { background:#003366; color:white; font-size:8.5pt; font-weight:bold; padding:3px 12px; letter-spacing:.04em; }
+.fields { display:grid; grid-template-columns:1fr 1fr; gap:0; padding:10px 12px; }
+.field { padding:4px 8px; }
+.field-label { font-size:8pt; color:#666; font-weight:bold; text-transform:uppercase; margin-bottom:2px; }
+.field-val { font-size:11pt; font-weight:600; }
+.field-full { grid-column:1/-1; }
+
+.status-section { padding:10px 12px; }
+.status-badge { display:inline-block; padding:6px 16px; border-radius:6px; font-size:11pt; font-weight:bold; }
+
+.obs-section { padding:10px 12px; min-height:60px; }
+.obs-text { font-size:10pt; line-height:1.6; white-space:pre-wrap; }
+
+.hist-section { padding:10px 12px; }
+.hist-row { padding:4px 0; border-bottom:1px solid #eee; font-size:8.5pt; color:#444; display:flex; gap:8px; }
+.hist-row:last-child { border:none; }
+
+.sign-area { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:16px 12px; border-top:2px solid #1a1a1a; }
+.sign-line { border-top:1px solid #333; margin-top:30px; text-align:center; font-size:8pt; color:#555; padding-top:3px; }
+
+.footer { background:#f0f4f8; border-top:1px solid #ccc; padding:3px 12px; font-size:7.5pt; color:#777; text-align:center; }
+
+.no-print { position:fixed; bottom:20px; right:20px; }
+</style>
+</head>
+<body>
+
+<div class="no-print" style="display:flex;gap:8px">
+  <button onclick="window.print()" style="padding:8px 16px;background:#003366;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">🖨 Imprimir</button>
+</div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      {% if cfg and cfg.empresa_logo_path %}
+      <img src="{{ upload_url }}/{{ cfg.empresa_logo_path }}" alt="Logo">
+      {% else %}
+      <div style="width:120px;height:60px;background:#003366;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12pt">UCN</div>
+      {% endif %}
+    </div>
+    <div class="empresa">
+      <h1>{{ empresa_nome }}</h1>
+      {% if cfg and cfg.empresa_morada %}<p>{{ cfg.empresa_morada }}</p>{% endif %}
+      {% if cfg and cfg.empresa_nif %}<p>NIF: {{ cfg.empresa_nif }}</p>{% endif %}
+    </div>
+    <div class="doc-title">
+      <div class="lbl">FICHA DE ENTRADA</div>
+      <div class="num">{{ e.data_rececao.strftime('%d/%m/%Y') }}</div>
+    </div>
+  </div>
+
+  <!-- ID Badge -->
+  <div class="id-badge">ENTRADA Nº {{ '%04d'|format(e.numero) }}</div>
+
+  <!-- Equipment info -->
+  <div class="section">
+    <div class="section-title">DADOS DO EQUIPAMENTO</div>
+    <div class="fields">
+      <div class="field">
+        <div class="field-label">Cliente</div>
+        <div class="field-val">{{ e.cliente_nome }}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Data de Receção</div>
+        <div class="field-val">{{ e.data_rececao.strftime('%d/%m/%Y') }}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Marca</div>
+        <div class="field-val">{{ e.marca or '—' }}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Modelo</div>
+        <div class="field-val">{{ e.modelo or '—' }}</div>
+      </div>
+      <div class="field field-full">
+        <div class="field-label">Número de Série</div>
+        <div class="field-val" style="font-family:monospace">{{ e.num_serie or '—' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="section">
+    <div class="section-title">ESTADO ACTUAL</div>
+    <div class="status-section">
+      {% set SC = {'rececionado':'#3b6ef0','orcamentado':'#f59e0b','material_pedido':'#6366f1','em_reparacao':'#22c55e','faturado':'#06b6d4','orcamentado_estadia':'#ef4444','concluido_estadia':'#a855f7'} %}
+      {% set col = SC.get(e.status, '#999') %}
+      <span class="status-badge" style="background:{{ col }}20;color:{{ col }};border:2px solid {{ col }}60">
+        {{ status_dict.get(e.status, e.status) }}
+      </span>
+      {% if e.data_status %}
+      <span style="font-size:9pt;color:#666;margin-left:12px">desde {{ e.data_status.strftime('%d/%m/%Y %H:%M') }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Observations -->
+  <div class="section">
+    <div class="section-title">OBSERVAÇÕES / AVARIA REPORTADA</div>
+    <div class="obs-section">
+      <div class="obs-text">{{ e.observacoes or '—' }}</div>
+    </div>
+  </div>
+
+  <!-- History -->
+  {% if e.historico %}
+  <div class="section">
+    <div class="section-title">HISTÓRICO DE ESTADOS</div>
+    <div class="hist-section">
+      {% for h in e.historico|reverse %}
+      <div class="hist-row">
+        <span style="font-weight:700;color:{{ SC.get(h.status_novo,'#999') }}">{{ status_dict.get(h.status_novo, h.status_novo) }}</span>
+        <span>·</span>
+        <span>{{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}</span>
+        <span>·</span>
+        <span>{{ h.user_nome or '—' }}</span>
+        {% if h.notas %}<span>· {{ h.notas }}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Signature -->
+  <div class="sign-area">
+    <div>
+      <div style="font-size:9pt;color:#444">Vila do Conde, _____ / _____ / _________</div>
+      <div class="sign-line">(assinatura do cliente)</div>
+    </div>
+    <div>
+      <div class="sign-line">(carimbo e assinatura da empresa)</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    {{ empresa_nome }} · Ficha de Entrada Nº {{ '%04d'|format(e.numero) }} · Documento gerado em {{ e.atualizado_em.strftime('%d/%m/%Y') }}
+  </div>
+
+</div>
+
+<script>
+window.onload = function() { setTimeout(function(){ window.print(); }, 400); };
+</script>
+</body>
+</html>

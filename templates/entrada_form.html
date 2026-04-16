@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{% if entrada %}Editar{% else %}Nova{% endif %} Entrada · NavTech{% endblock %}
+{% block page_title %}{% if entrada %}✏️ Editar Entrada #{{ '%04d'|format(entrada.numero) }}{% else %}📥 Nova Entrada{% endif %}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('entradas') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}<div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>{% endfor %}{% endif %}
+{% endwith %}
+
+<div style="max-width:640px">
+<div class="card" style="padding:20px">
+  <form method="POST">
+    <div class="form-group">
+      <label>Data de Receção *</label>
+      <input type="date" name="data_rececao" value="{{ hoje }}" class="input" required>
+    </div>
+
+    <div class="form-group">
+      <label>Cliente *</label>
+      <input type="text" name="cliente_nome" value="{{ entrada.cliente_nome if entrada else '' }}" class="input" placeholder="Nome do cliente" required>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Marca</label>
+        <input type="text" name="marca" value="{{ entrada.marca if entrada else '' }}" class="input" placeholder="Ex: Volvo, Caterpillar...">
+      </div>
+      <div class="form-group">
+        <label>Modelo</label>
+        <input type="text" name="modelo" value="{{ entrada.modelo if entrada else '' }}" class="input" placeholder="Ex: FH 460, D6T...">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Nº de Série</label>
+      <input type="text" name="num_serie" value="{{ entrada.num_serie if entrada else '' }}" class="input" placeholder="Número de série do equipamento">
+    </div>
+
+    <div class="form-group">
+      <label>Observações</label>
+      <textarea name="observacoes" class="input" rows="4" placeholder="Descrição do problema, avaria reportada pelo cliente...">{{ entrada.observacoes if entrada else '' }}</textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <a href="{{ url_for('entradas') }}" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary">{% if entrada %}💾 Guardar{% else %}➕ Criar Entrada{% endif %}</button>
+    </div>
+  </form>
+</div>
+</div>
+{% endblock %}
