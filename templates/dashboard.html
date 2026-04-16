@@ -2,6 +2,7 @@
 {% block title %}Dashboard · ComprasNet{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block topbar_actions %}
+  <button onclick="atualizarDashboard()" class="btn btn-ghost btn-sm" title="Atualizar dados">🔄 Atualizar</button>
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
   <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
@@ -16,7 +17,7 @@
       <button onclick="document.getElementById('dashStatusModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1">✕</button>
     </div>
     <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Alterar estado para:</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Alterar estado:</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         <button onclick="dashSetStatus('nao_encomendado')" style="padding:10px;border-radius:8px;border:2px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;font-weight:700;font-size:12px">🔴 Não Encomendado</button>
         <button onclick="dashSetStatus('pendente')"        style="padding:10px;border-radius:8px;border:2px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:#f59e0b;cursor:pointer;font-weight:700;font-size:12px">⏳ Pendente Chegada</button>
@@ -26,7 +27,7 @@
       <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">Nota (opcional)</label>
       <input type="text" id="dsmNotas" placeholder="Ex: Encomendado ao fornecedor X..." style="width:100%;margin-top:4px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
     </div>
-    <div style="padding:10px 16px;max-height:160px;overflow-y:auto" id="dsmHistorico">
+    <div style="padding:12px 16px;max-height:200px;overflow-y:auto;background:var(--surface2)" id="dsmHistorico">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div>
     </div>
   </div>
@@ -356,6 +357,14 @@ const CORES = {
 
 function calNav(dir) { calMonth+=dir; if(calMonth>12){calMonth=1;calYear++;} if(calMonth<1){calMonth=12;calYear--;} window._calInit=false; carregarCalendario(); }
 
+function atualizarDashboard() {
+  var btn = event.target;
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  carregarArtigosPedidos();
+  setTimeout(function(){ btn.textContent = '🔄 Atualizar'; btn.disabled = false; }, 1000);
+}
+
 function carregarArtigosPedidos() {
   var el = document.getElementById('ap_container');
   if (!el) return;
@@ -676,7 +685,7 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved=>{
       <button onclick="document.getElementById('dashStatusModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1">✕</button>
     </div>
     <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Alterar estado para:</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Alterar estado:</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         <button onclick="dashSetStatus('nao_encomendado')" style="padding:10px;border-radius:8px;border:2px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;font-weight:700;font-size:12px">🔴 Não Encomendado</button>
         <button onclick="dashSetStatus('pendente')"        style="padding:10px;border-radius:8px;border:2px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:#f59e0b;cursor:pointer;font-weight:700;font-size:12px">⏳ Pendente Chegada</button>
@@ -686,7 +695,7 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved=>{
       <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">Nota (opcional)</label>
       <input type="text" id="dsmNotas" placeholder="Ex: Encomendado ao fornecedor X..." style="width:100%;margin-top:4px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
     </div>
-    <div style="padding:10px 16px;max-height:160px;overflow-y:auto" id="dsmHistorico">
+    <div style="padding:12px 16px;max-height:200px;overflow-y:auto;background:var(--surface2)" id="dsmHistorico">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px">Histórico</div>
     </div>
   </div>

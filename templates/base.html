@@ -344,11 +344,7 @@
                 <div class="user-role">{{ '🔑 Admin' if current_user.is_admin else current_user.departamento or 'Utilizador' }}</div>
             </div>
         </div>
-        <a href="/mobile" class="nav-item">
-            <span class="icon">📱</span><span>App Mobile</span>
-        </a>
-
-        <a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
+<a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">💬</span><span>Chat {% if cfg_ia and cfg_ia.provider == 'gemini' %}Gemini{% elif cfg_ia and cfg_ia.provider == 'lmstudio' %}LM Studio{% elif cfg_ia and cfg_ia.provider == 'ollama' %}Ollama{% elif cfg_ia and cfg_ia.provider == 'claude' %}Claude{% else %}IA{% endif %}</span>
         </a>
         <a href="{{ url_for('admin_update') }}" class="nav-item {% if request.endpoint == 'admin_update' %}active{% endif %}" style="margin-bottom:4px">
