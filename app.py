@@ -2330,6 +2330,7 @@ def api_calendario_eventos():
         'fornecedor':  e.fornecedor,
         'concluido':   e.concluido,
         'criado_por':  e.criado_por,
+        'criado_nome': User.query.get(e.criado_por).nome if e.criado_por else '—',
     } for e in eventos])
 
 

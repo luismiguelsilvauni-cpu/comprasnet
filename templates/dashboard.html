@@ -456,7 +456,9 @@ function renderCalendario(eventos) {
   if (!grid) return;
   const first = new Date(calYear,calMonth-1,1).getDay();
   const days  = new Date(calYear,calMonth,0).getDate();
-  const today = new Date().toISOString().split('T')[0];
+  // Fix timezone: use local date not UTC
+  const now = new Date();
+  const today = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
   // Build map of events per day (including multi-day spans)
   const byDate = {};
   eventos.forEach(e=>{
@@ -465,7 +467,7 @@ function renderCalendario(eventos) {
     let cur = new Date(start + 'T00:00:00');
     const endD = new Date(end + 'T00:00:00');
     while(cur <= endD) {
-      const ds = cur.toISOString().split('T')[0];
+      const ds = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(cur.getDate()).padStart(2,'0');
       if(!byDate[ds]) byDate[ds]=[];
       byDate[ds].push({...e, _isStart: ds===start, _isEnd: ds===end, _span: start!==end});
       cur.setDate(cur.getDate()+1);
@@ -488,7 +490,7 @@ function renderCalendario(eventos) {
       const rEnd   = e._isEnd   ? '3px' : '0';
       const label  = e._isStart ? e.titulo : (e._isEnd ? '↳ '+e.titulo : '');
       tag.style.cssText=`background:${cor.bg};border-left:${e._isStart?'2px solid '+cor.border:'none'};border-right:${e._isEnd?'none':'none'};border-radius:${rStart} ${rEnd} ${rEnd} ${rStart};padding:1px 4px;font-size:10px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;${e.concluido?'opacity:.4;text-decoration:line-through':''}${e._span&&!e._isStart?';margin-left:-4px;margin-right:-4px;padding-left:4px':''};`;
-      tag.textContent = label || '·'; tag.title=e.titulo;
+      tag.textContent = label || e.titulo; tag.title = e.titulo + (e.hora ? '\n🕐 ' + e.hora : '') + (e.descricao ? '\n📝 ' + e.descricao : '') + (e.criado_nome ? '\n👤 ' + e.criado_nome : '');
       tag.onclick=ev=>{ev.stopPropagation();abrirDetalheEvento(e);};
       cell.appendChild(tag);
     });
@@ -507,7 +509,11 @@ function abrirNovoEvento(date='') {
   document.getElementById('evModalTitle').textContent = 'Novo Evento';
   document.getElementById('evTitulo').value   = '';
   document.getElementById('evTipo').value     = 'manual';
-  document.getElementById('evDataInicio').value = date || new Date().toISOString().split('T')[0];
+  if (!date) {
+    const n = new Date();
+    date = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+  }
+  document.getElementById('evDataInicio').value = date;
   document.getElementById('evDataFim').value  = '';
   document.getElementById('evHora').value     = '';
   document.getElementById('evFornecedor').value = '';
