@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Partilha · NavTech{% endblock %}
+{% block page_title %}📁 Partilha de Ficheiros{% endblock %}
+{% block topbar_actions %}
+  <button onclick="abrirUpload()" class="btn btn-primary btn-sm">⬆ Enviar Ficheiro</button>
+{% endblock %}
+{% block content %}
+
+<!-- Storage bar -->
+<div class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:16px">
+  <div style="flex:1">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <span style="color:var(--text-muted)">Espaço utilizado</span>
+      <span style="font-weight:700">{{ '%.2f'|format(total_gb) }} GB / {{ max_gb }} GB</span>
+    </div>
+    <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+      {% set pct = (total_gb / max_gb * 100)|int %}
+      <div style="height:100%;width:{{ pct }}%;background:{% if pct > 80 %}var(--danger){% elif pct > 60 %}var(--warning){% else %}var(--success){% endif %};border-radius:3px;transition:.3s"></div>
+    </div>
+  </div>
+  <div style="font-size:24px">💾</div>
+</div>
+
+<!-- Files grid -->
+{% if ficheiros %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+{% for f in ficheiros %}
+{% set ext = f.nome_original.rsplit('.',1)[-1].lower() if '.' in f.nome_original else '' %}
+{% set is_img = ext in ['png','jpg','jpeg','gif','webp','svg'] %}
+{% set is_pdf = ext == 'pdf' %}
+{% set is_vid = ext in ['mp4','webm'] %}
+{% set is_audio = ext in ['mp3','wav','ogg'] %}
+<div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+  <!-- Preview area -->
+  <div style="height:140px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+    {% if is_img %}
+    <img src="/partilha/{{ f.id }}/preview" style="max-width:100%;max-height:140px;object-fit:cover;width:100%" onerror="this.style.display='none'">
+    {% elif is_pdf %}
+    <div style="font-size:48px">📄</div>
+    {% elif is_vid %}
+    <div style="font-size:48px">🎬</div>
+    {% elif is_audio %}
+    <div style="font-size:48px">🎵</div>
+    {% else %}
+    <div style="font-size:48px">📎</div>
+    {% endif %}
+    <!-- Visibility badge -->
+    <div style="position:absolute;top:6px;right:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;{% if f.visibilidade == 'todos' %}background:rgba(34,197,94,.2);color:#22c55e{% else %}background:rgba(59,110,240,.2);color:var(--accent){% endif %}">
+      {% if f.visibilidade == 'todos' %}🌐 Todos{% else %}🔒 {{ f.destinatario.nome[:12] if f.destinatario else 'Privado' }}{% endif %}
+    </div>
+  </div>
+  <!-- Info -->
+  <div style="padding:10px 12px;flex:1">
+    <div style="font-size:13px;font-weight:600;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ f.nome_original }}">{{ f.nome_original }}</div>
+    {% if f.descricao %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">{{ f.descricao[:60] }}</div>{% endif %}
+    <div style="font-size:11px;color:var(--text-muted)">
+      {{ '%.1f'|format(f.tamanho/1024/1024) }} MB · {{ f.uploader.nome[:15] if f.uploader else '—' }} · {{ f.criado_em.strftime('%d/%m/%Y') }}
+    </div>
+  </div>
+  <!-- Actions -->
+  <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px">
+    {% if ext in ['png','jpg','jpeg','gif','webp','svg','pdf','txt','mp4','mp3'] %}
+    <a href="/partilha/{{ f.id }}/preview" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center">👁 Ver</a>
+    {% endif %}
+    <a href="/partilha/{{ f.id }}/download" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center">⬇ Download</a>
+    {% if current_user.is_admin or current_user.id == f.criado_por %}
+    <button onclick="apagarFicheiro({{ f.id }}, '{{ f.nome_original|replace("'","\\'") }}')" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑</button>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:48px;margin-bottom:12px">📂</div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:6px">Sem ficheiros partilhados</div>
+  <div style="font-size:13px;margin-bottom:16px">Clique em "Enviar Ficheiro" para partilhar o primeiro documento</div>
+  <button onclick="abrirUpload()" class="btn btn-primary">⬆ Enviar Ficheiro</button>
+</div>
+{% endif %}
+
+<!-- Upload Modal -->
+<div id="uploadModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:460px;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:15px;font-weight:700;flex:1">⬆ Enviar Ficheiro</div>
+      <button onclick="fecharUpload()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px">
+      <!-- Drop zone -->
+      <div id="dropZone" onclick="document.getElementById('fileInput').click()"
+        style="border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;margin-bottom:14px;transition:.2s"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+        ondragleave="this.style.borderColor='var(--border)'"
+        ondrop="handleDrop(event)">
+        <div style="font-size:36px;margin-bottom:8px">📎</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">Clique ou arraste ficheiro</div>
+        <div style="font-size:11px;color:var(--text-muted)">Máx. 500 MB por ficheiro</div>
+        <div id="fileNome" style="margin-top:8px;font-size:12px;color:var(--accent);font-weight:600"></div>
+      </div>
+      <input type="file" id="fileInput" style="display:none" onchange="selecionarFicheiro(this)">
+
+      <div class="form-group">
+        <label>Descrição (opcional)</label>
+        <input type="text" id="upDescricao" class="input" placeholder="Ex: Relatório mensal, foto do equipamento...">
+      </div>
+
+      <div class="form-group">
+        <label>Visibilidade</label>
+        <select id="upVisibilidade" class="input" onchange="toggleDestinatario(this.value)">
+          <option value="todos">🌐 Visível para todos</option>
+          <option value="privado">🔒 Apenas para utilizador específico</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="destGrp" style="display:none">
+        <label>Destinatário</label>
+        <select id="upDestinatario" class="input">
+          <option value="">— Seleccione —</option>
+          {% for u in utilizadores %}
+          {% if u.id != current_user.id %}
+          <option value="{{ u.id }}">{{ u.nome }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="upProgress" style="display:none;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">A enviar...</div>
+        <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+          <div id="upBar" style="height:100%;width:0%;background:var(--accent);border-radius:3px;transition:.1s"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="fecharUpload()" class="btn btn-ghost">Cancelar</button>
+        <button onclick="enviarFicheiro()" class="btn btn-primary" id="btnEnviar">⬆ Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var _selectedFile = null;
+
+function abrirUpload() {
+  document.getElementById('uploadModal').style.display = 'flex';
+  document.getElementById('fileNome').textContent = '';
+  document.getElementById('upDescricao').value = '';
+  document.getElementById('upVisibilidade').value = 'todos';
+  document.getElementById('destGrp').style.display = 'none';
+  document.getElementById('upProgress').style.display = 'none';
+  _selectedFile = null;
+}
+
+function fecharUpload() {
+  document.getElementById('uploadModal').style.display = 'none';
+}
+
+function toggleDestinatario(v) {
+  document.getElementById('destGrp').style.display = v === 'privado' ? 'block' : 'none';
+}
+
+function selecionarFicheiro(input) {
+  if (input.files[0]) {
+    _selectedFile = input.files[0];
+    document.getElementById('fileNome').textContent = _selectedFile.name + ' (' + (_selectedFile.size/1024/1024).toFixed(1) + ' MB)';
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').style.borderColor = 'var(--border)';
+  var file = e.dataTransfer.files[0];
+  if (file) {
+    _selectedFile = file;
+    document.getElementById('fileNome').textContent = file.name + ' (' + (file.size/1024/1024).toFixed(1) + ' MB)';
+  }
+}
+
+function enviarFicheiro() {
+  if (!_selectedFile) { alert('Seleccione um ficheiro.'); return; }
+  var visib = document.getElementById('upVisibilidade').value;
+  var dest = document.getElementById('upDestinatario').value;
+  if (visib === 'privado' && !dest) { alert('Seleccione o destinatário.'); return; }
+
+  var fd = new FormData();
+  fd.append('ficheiro', _selectedFile);
+  fd.append('descricao', document.getElementById('upDescricao').value);
+  fd.append('visibilidade', visib === 'privado' ? 'privado' : 'todos');
+  if (dest) fd.append('destinatario_id', dest);
+
+  document.getElementById('upProgress').style.display = 'block';
+  document.getElementById('btnEnviar').disabled = true;
+
+  var xhr = new XMLHttpRequest();
+  xhr.upload.onprogress = function(e) {
+    if (e.lengthComputable) {
+      document.getElementById('upBar').style.width = (e.loaded/e.total*100) + '%';
+    }
+  };
+  xhr.onload = function() {
+    var d = JSON.parse(xhr.responseText);
+    if (d.ok) { fecharUpload(); location.reload(); }
+    else { alert('Erro: ' + d.error); document.getElementById('btnEnviar').disabled = false; }
+  };
+  xhr.open('POST', '/partilha/upload');
+  xhr.send(fd);
+}
+
+function apagarFicheiro(id, nome) {
+  if (!confirm('Apagar "' + nome + '"?')) return;
+  fetch('/partilha/' + id + '/apagar', {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert('Erro: '+d.error); });
+}
+
+document.getElementById('uploadModal').addEventListener('click', function(e){
+  if(e.target===this) fecharUpload();
+});
+</script>
+{% endblock %}

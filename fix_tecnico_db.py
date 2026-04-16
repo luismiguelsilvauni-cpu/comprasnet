@@ -315,3 +315,8 @@ with app.app_context():
     if 'linha_pedido_historico' not in insp.get_table_names():
         db.create_all()
         print("OK: linha_pedido_historico criada")
+
+    # Create partilha_ficheiros table
+    if 'partilha_ficheiros' not in insp.get_table_names():
+        db.create_all()
+        print("OK: partilha_ficheiros criada")

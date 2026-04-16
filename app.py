@@ -2838,12 +2838,108 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
+    ('partilha',           '📁 Partilha'),
     ('conectividade',      '🌐 Conectividade'),
     ('roadmap',            '🗺️ Roadmap'),
     ('changelog',          '📝 Changelog'),
     ('admin_config',       '⚙️ Configurações'),
     ('admin_utilizadores', '👥 Utilizadores'),
 ]
+
+# ── MÓDULO PARTILHA ───────────────────────────────────────────────────────────
+
+UPLOAD_PARTILHA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'partilha')
+os.makedirs(UPLOAD_PARTILHA, exist_ok=True)
+PARTILHA_MAX_GB = 5
+PARTILHA_EXTENSOES_PREVIEW = {'.pdf','.png','.jpg','.jpeg','.gif','.webp','.svg','.txt','.mp4','.mp3'}
+
+def _tamanho_total_partilha():
+    from sqlalchemy import func
+    r = db.session.query(func.sum(PartilhaFicheiro.tamanho)).scalar()
+    return r or 0
+
+@app.route('/partilha')
+@login_required
+def partilha():
+    if current_user.is_admin:
+        ficheiros = PartilhaFicheiro.query.order_by(PartilhaFicheiro.criado_em.desc()).all()
+    else:
+        ficheiros = PartilhaFicheiro.query.filter(
+            db.or_(
+                PartilhaFicheiro.visibilidade == 'todos',
+                PartilhaFicheiro.criado_por == current_user.id,
+                PartilhaFicheiro.destinatario_id == current_user.id
+            )
+        ).order_by(PartilhaFicheiro.criado_em.desc()).all()
+    utilizadores = User.query.filter_by(ativo=True).order_by(User.nome).all()
+    total_bytes = _tamanho_total_partilha()
+    total_gb = total_bytes / (1024**3)
+    return render_template('partilha.html',
+        ficheiros=ficheiros, utilizadores=utilizadores,
+        total_gb=total_gb, max_gb=PARTILHA_MAX_GB)
+
+@app.route('/partilha/upload', methods=['POST'])
+@login_required
+def partilha_upload():
+    if _tamanho_total_partilha() >= PARTILHA_MAX_GB * 1024**3:
+        return jsonify({'ok': False, 'error': 'Limite de 5GB atingido'})
+    f = request.files.get('ficheiro')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import uuid, mimetypes
+    ext = os.path.splitext(f.filename)[1].lower()
+    nome_unico = str(uuid.uuid4()) + ext
+    fpath = os.path.join(UPLOAD_PARTILHA, nome_unico)
+    f.save(fpath)
+    tamanho = os.path.getsize(fpath)
+    mime = mimetypes.guess_type(f.filename)[0] or 'application/octet-stream'
+    visib = request.form.get('visibilidade', 'todos')
+    dest_id = request.form.get('destinatario_id') or None
+    if dest_id: dest_id = int(dest_id)
+    pf = PartilhaFicheiro(
+        nome=nome_unico, nome_original=f.filename,
+        descricao=request.form.get('descricao','').strip(),
+        tamanho=tamanho, mime=mime, path=fpath,
+        criado_por=current_user.id,
+        visibilidade=visib, destinatario_id=dest_id,
+        criado_em=datetime.now()
+    )
+    db.session.add(pf); db.session.commit()
+    return jsonify({'ok': True, 'id': pf.id})
+
+@app.route('/partilha/<int:fid>/download')
+@login_required
+def partilha_download(fid):
+    pf = PartilhaFicheiro.query.get_or_404(fid)
+    # Check access
+    if not current_user.is_admin:
+        if pf.visibilidade != 'todos' and pf.criado_por != current_user.id and pf.destinatario_id != current_user.id:
+            return 'Sem acesso', 403
+    return send_from_directory(UPLOAD_PARTILHA, pf.nome, as_attachment=True, download_name=pf.nome_original)
+
+@app.route('/partilha/<int:fid>/preview')
+@login_required
+def partilha_preview(fid):
+    pf = PartilhaFicheiro.query.get_or_404(fid)
+    if not current_user.is_admin:
+        if pf.visibilidade != 'todos' and pf.criado_por != current_user.id and pf.destinatario_id != current_user.id:
+            return 'Sem acesso', 403
+    ext = os.path.splitext(pf.nome_original)[1].lower()
+    if ext not in PARTILHA_EXTENSOES_PREVIEW:
+        return redirect(url_for('partilha_download', fid=fid))
+    return send_from_directory(UPLOAD_PARTILHA, pf.nome, as_attachment=False)
+
+@app.route('/partilha/<int:fid>/apagar', methods=['POST'])
+@login_required
+def partilha_apagar(fid):
+    pf = PartilhaFicheiro.query.get_or_404(fid)
+    if not current_user.is_admin and pf.criado_por != current_user.id:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    try: os.remove(pf.path)
+    except: pass
+    db.session.delete(pf); db.session.commit()
+    return jsonify({'ok': True})
+
 
 # ── MÓDULO FUNCIONÁRIOS ───────────────────────────────────────────────────────
 
@@ -3043,6 +3139,23 @@ class LinhaPedidoHistorico(db.Model):
     user_nome   = db.Column(db.String(120))
     data        = db.Column(db.DateTime, default=datetime.now)
     notas       = db.Column(db.String(300))
+
+
+class PartilhaFicheiro(db.Model):
+    __tablename__ = 'partilha_ficheiros'
+    id            = db.Column(db.Integer, primary_key=True)
+    nome          = db.Column(db.String(255), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=False)
+    descricao     = db.Column(db.String(500), default='')
+    tamanho       = db.Column(db.BigInteger, default=0)
+    mime          = db.Column(db.String(100), default='')
+    path          = db.Column(db.String(500), nullable=False)
+    criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em     = db.Column(db.DateTime, default=datetime.now)
+    visibilidade  = db.Column(db.String(20), default='todos')  # 'todos' ou user id
+    destinatario_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    uploader      = db.relationship('User', foreign_keys=[criado_por])
+    destinatario  = db.relationship('User', foreign_keys=[destinatario_id])
 
 
 class RegistoPendente(db.Model):
