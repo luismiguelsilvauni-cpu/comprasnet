@@ -16,6 +16,7 @@
     <span style="font-size:12px;color:var(--text-muted)">Adicionar:</span>
     <button onclick="adicionarWidget('kpis')"             class="btn btn-ghost btn-sm" style="font-size:11px">+ KPIs</button>
     <button onclick="adicionarWidget('artigos_pedidos')" class="btn btn-ghost btn-sm" style="font-size:11px">+ Artigos Pedidos</button>
+    <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">↺ Repor Layout</button>
     <button onclick="adicionarWidget('pedidos_recentes')" class="btn btn-ghost btn-sm" style="font-size:11px">+ Pedidos</button>
     <button onclick="adicionarWidget('qr_mobile')"        class="btn btn-ghost btn-sm" style="font-size:11px">+ QR Mobile</button>
     <button onclick="adicionarWidget('stock_baixo')"      class="btn btn-ghost btn-sm" style="font-size:11px">+ Stock Baixo</button>
@@ -171,6 +172,11 @@ const DEFAULT_LAYOUT = [
   {id:'calendario', cols:12},
 ];
 
+function resetarLayout() {
+  if (!confirm('Repor o layout para o padrão?')) return;
+  localStorage.removeItem('dashboard_layout');
+  location.reload();
+}
 let currentLayout = [...DEFAULT_LAYOUT];
 let editMode = false;
 
