@@ -165,6 +165,52 @@ def dashboard():
     )
 
 
+@app.route('/api/dashboard/artigos-pedidos')
+@login_required
+def api_dashboard_artigos_pedidos():
+    from sqlalchemy import case as sa_case
+    artigos = (db.session.query(LinhaPedido, PedidoCompra, User)
+        .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
+        .join(User, PedidoCompra.criado_por == User.id, isouter=True)
+        .filter(PedidoCompra.estado.in_(["aberto","aprovado","pendente"]))
+        .order_by(
+            sa_case(
+                (LinhaPedido.status == "recebido", 2),
+                (LinhaPedido.status == "cancelado", 3),
+                else_=0
+            ),
+            PedidoCompra.data_criacao.desc()
+        ).all()
+    )
+    STATUS_INFO = {
+        "nao_encomendado": ("🔴 Não Enc.",  "#ef4444", "rgba(239,68,68,.15)"),
+        "pendente":         ("⏳ Pendente",  "#f59e0b", "rgba(245,158,11,.15)"),
+        "recebido":         ("✅ Recebido",  "#22c55e", "rgba(34,197,94,.15)"),
+        "cancelado":        ("❌ Cancelado", "#a855f7", "rgba(168,85,247,.15)"),
+    }
+    rows = []
+    for linha, pedido, user in artigos:
+        s = linha.status or "nao_encomendado"
+        lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
+        rows.append({
+            "linha_id": linha.id,
+            "pedido_id": pedido.id,
+            "designacao": linha.designacao or linha.referencia or "—",
+            "referencia": linha.referencia or "",
+            "quantidade": int(linha.quantidade or 1),
+            "unidade": linha.unidade or "un",
+            "titulo": pedido.titulo[:30],
+            "data": pedido.data_criacao.strftime("%d/%m/%Y"),
+            "user_nome": user.nome[:15] if user else "—",
+            "status": s,
+            "status_label": lbl,
+            "status_color": col,
+            "status_bg": bg,
+            "dim": s in ["recebido","cancelado"],
+        })
+    return jsonify(rows)
+
+
 @app.route('/pedidos')
 @login_required
 def pedidos():
