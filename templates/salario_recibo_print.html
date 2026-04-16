@@ -137,12 +137,11 @@ tr:nth-child(even) { background: #f7f9fc; }
       {% set base_g  = recibo.vencimento_base_g|float or venc %}
       {% set dias_rb = 30 %}
       {# Horas = RHT × Dias (F9 × 30) #}
-      {% set horas_rb = rht * dias_rb %}
-
+      {# E9 is blank in Excel - show blank for horas column #}
       <tr>
         <td>Remuneração Base</td>
         <td class="td-center">{{ dias_rb }}</td>
-        <td class="td-center">{{ '%.3f'|format(horas_rb) if horas_rb else '—' }}</td>
+        <td class="td-center"></td>
         <td class="td-center">{{ '%.3f'|format(rht) if rht else '—' }}</td>
         <td class="td-center">{{ '%.2f'|format(base_g) }}</td>
         <td>{{ '%.2f'|format(venc) }}</td>
