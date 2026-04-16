@@ -2834,6 +2834,7 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
+    ('conectividade',      '🌐 Conectividade'),
     ('roadmap',            '🗺️ Roadmap'),
     ('changelog',          '📝 Changelog'),
     ('admin_config',       '⚙️ Configurações'),

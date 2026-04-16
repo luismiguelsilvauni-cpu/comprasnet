@@ -174,7 +174,20 @@ const DEFAULT_LAYOUT = [
   {id:'calendario', cols:12},
 ];
 
-let currentLayout = [...DEFAULT_LAYOUT];
+let savedLayout = null;
+try {
+  const raw = localStorage.getItem('dashboard_layout');
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    // If saved layout doesn't have artigos_pedidos, reset it
+    if (!parsed.some(function(w){ return w.id === 'artigos_pedidos'; })) {
+      localStorage.removeItem('dashboard_layout');
+    } else {
+      savedLayout = parsed;
+    }
+  }
+} catch(e) { localStorage.removeItem('dashboard_layout'); }
+let currentLayout = savedLayout || [...DEFAULT_LAYOUT];
 let editMode = false;
 
 // ── Grid render ───────────────────────────────────────────────────────────────
