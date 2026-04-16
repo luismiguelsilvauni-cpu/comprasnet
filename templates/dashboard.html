@@ -2,6 +2,7 @@
 {% block title %}Dashboard · ComprasNet{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block topbar_actions %}
+  <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
   <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
 {% endblock %}
