@@ -5690,35 +5690,31 @@ def salario_recibo_email(rid):
     r = ReciboSalario.query.get_or_404(rid)
     func = Funcionario.query.get(r.funcionario_id)
     if not func.email:
-        return jsonify({'ok': False, 'error': 'Funcionário sem email'})
+        return jsonify({'ok': False, 'error': 'Funcionario sem email'})
     try:
         cfg = ConfigGeral.query.first()
         empresa = cfg.empresa_nome if cfg else 'Empresa'
-        mes_label = MESES_LABELS.get(r.mes, f'Mês {r.mes}')
+        mes_label = MESES_LABELS.get(r.mes, f'Mes {r.mes}')
         import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-        from email.mime.base import MIMEBase
-        from email import encoders
-
-        from email.header import Header
-        msg = MIMEMultipart()
-        msg['Subject'] = Header(f'[{empresa}] Recibo de Salario - {mes_label} {r.ano}', 'utf-8')
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg['Subject'] = f'[{empresa}] Recibo Salario {mes_label} {r.ano}'
         msg['From'] = getattr(cfg,'smtp_from','') or getattr(cfg,'smtp_user','')
         msg['To'] = func.email
-        corpo = 'Ola ' + func.nome + ',\n\nSegue em anexo o recibo de salario referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
-        msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
-
-        # Generate HTML recibo and attach as .html (recipient can print to PDF)
-        # When wkhtmltopdf is available on the server, this will be converted to PDF
-        fname_pdf = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}"
+        msg.set_content(
+            f'Ola {func.nome},\n\n'
+            f'Segue em anexo o recibo de salario referente a {mes_label} de {r.ano}.\n\n'
+            f'Com os melhores cumprimentos,\n{empresa}',
+            charset='utf-8'
+        )
         try:
             html_body = render_template('salario_recibo_print.html',
                 recibo=r, func=func, ano=r.ano, mes_label=mes_label,
                 cfg=cfg, empresa_nome=empresa,
                 upload_url=request.host_url.rstrip('/') + '/uploads')
-            # Try pdfkit if wkhtmltopdf is available
-            pdf_generated = False
+            html_clean = html_body.replace('window.onload', '//window.onload')
+            fname = f'Recibo_{func.numero}_{r.ano}_{r.mes:02d}'
+            pdf_done = False
             for wk_path in [
                 r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
                 r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe',
@@ -5726,42 +5722,28 @@ def salario_recibo_email(rid):
                 if os.path.exists(wk_path):
                     try:
                         import pdfkit
-                        html_noscript = html_body.replace('window.onload', '//window.onload')
+                        pdf_file = os.path.join(UPLOAD_SALARIOS, fname + '.pdf')
                         wk_opts = {'page-size':'A4','margin-top':'12mm','margin-bottom':'12mm',
                                    'margin-left':'12mm','margin-right':'12mm','encoding':'UTF-8','quiet':''}
-                        pdf_path_full = os.path.join(UPLOAD_SALARIOS, fname_pdf + '.pdf')
-                        pdfkit.from_string(html_noscript, pdf_path_full, options=wk_opts,
+                        pdfkit.from_string(html_clean, pdf_file, options=wk_opts,
                                            configuration=pdfkit.configuration(wkhtmltopdf=wk_path))
-                        with open(pdf_path_full, 'rb') as pf:
-                            part = MIMEBase('application', 'pdf')
-                            part.set_payload(pf.read())
-                            encoders.encode_base64(part)
-                            part.add_header('Content-Disposition', f'attachment; filename="{fname_pdf}.pdf"')
-                            msg.attach(part)
-                        pdf_generated = True
+                        with open(pdf_file,'rb') as pf:
+                            msg.add_attachment(pf.read(), maintype='application', subtype='pdf',
+                                               filename=fname+'.pdf')
+                        pdf_done = True
                     except Exception as ex_wk:
-                        app.logger.warning(f"wkhtmltopdf error: {ex_wk}")
+                        app.logger.warning(f'wkhtmltopdf: {ex_wk}')
                     break
-
-            if not pdf_generated:
-                # Fallback: attach HTML file (recipient prints to PDF)
-                part = MIMEText(html_body, 'html', 'utf-8')
-                part.add_header('Content-Disposition', f'attachment; filename="{fname_pdf}.html"')
-                msg.attach(part)
-                # Add note to email body
-                corpo_extra = '\n\nNota: O recibo está em anexo em formato HTML. Abra o ficheiro e imprima para PDF.'
-                msg_parts = msg.get_payload()
-                if msg_parts:
-                    msg_parts[0].set_payload(
-                        msg_parts[0].get_payload(decode=True).decode() + corpo_extra
-                    )
-        except Exception as ex_attach:
-            app.logger.warning(f"Attach error: {ex_attach}")
-
+            if not pdf_done:
+                msg.add_attachment(html_clean.encode('utf-8'), maintype='text', subtype='html',
+                                   filename=fname+'.html')
+        except Exception as ex_a:
+            app.logger.warning(f'Attach error: {ex_a}')
         port = getattr(cfg,'smtp_port',587) or 587
         if port == 465:
-            import ssl; ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(cfg.smtp_host, port, timeout=15, context=ctx) as s:
+            import ssl
+            with smtplib.SMTP_SSL(cfg.smtp_host, port, timeout=15,
+                                   context=ssl.create_default_context()) as s:
                 if cfg.smtp_user: s.login(cfg.smtp_user, cfg.smtp_pass or '')
                 s.send_message(msg)
         else:
@@ -5773,8 +5755,9 @@ def salario_recibo_email(rid):
         return jsonify({'ok': True})
     except Exception as e:
         import traceback
-        app.logger.error(f"Email error full: {traceback.format_exc()}")
+        app.logger.error(f'Email error: {traceback.format_exc()}')
         return jsonify({'ok': False, 'error': str(e)})
+
 
 # Documentos Contabilísticos
 @app.route('/salarios/documentos', methods=['GET','POST'])
