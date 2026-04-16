@@ -310,3 +310,8 @@ with app.app_context():
                 with db.engine.begin() as conn:
                     conn.execute(text(f"ALTER TABLE linhas_pedido ADD COLUMN {col} {typ}"))
                 print(f"OK: linhas_pedido.{col} adicionado")
+
+    # Create linha_pedido_historico table
+    if 'linha_pedido_historico' not in insp.get_table_names():
+        db.create_all()
+        print("OK: linha_pedido_historico criada")

@@ -272,9 +272,32 @@ def pedido_detalhe(pid):
 @login_required
 def linha_status(pid, lid):
     l = LinhaPedido.query.filter_by(id=lid, pedido_id=pid).first_or_404()
-    l.status = request.json.get('status', 'nao_encomendado')
-    db.session.commit()
+    data = request.json or {}
+    novo_status = data.get('status', 'nao_encomendado')
+    notas = data.get('notas', '')
+    status_ant = l.status or 'nao_encomendado'
+    if novo_status != status_ant:
+        hist = LinhaPedidoHistorico(
+            linha_id=lid, pedido_id=pid,
+            status_ant=status_ant, status_novo=novo_status,
+            user_id=current_user.id, user_nome=current_user.nome,
+            notas=notas, data=datetime.now()
+        )
+        db.session.add(hist)
+        l.status = novo_status
+        db.session.commit()
     return jsonify({'ok': True, 'status': l.status})
+
+@app.route('/pedidos/<int:pid>/linha/<int:lid>/historico')
+@login_required
+def linha_historico(pid, lid):
+    hist = LinhaPedidoHistorico.query.filter_by(linha_id=lid).order_by(
+        LinhaPedidoHistorico.data.desc()).all()
+    return jsonify([{
+        'status_ant': h.status_ant, 'status_novo': h.status_novo,
+        'user_nome': h.user_nome, 'notas': h.notas or '',
+        'data': h.data.strftime('%d/%m/%Y %H:%M')
+    } for h in hist])
 
 
 # ── LINHAS DO PEDIDO ──────────────────────────────────────────────────────────
@@ -2940,6 +2963,19 @@ MESES_LABELS = {
     9:'Setembro', 10:'Outubro', 11:'Novembro', 12:'Dezembro',
     13:'Subsídio de Férias', 14:'Subsídio de Natal'
 }
+
+
+class LinhaPedidoHistorico(db.Model):
+    __tablename__ = 'linha_pedido_historico'
+    id          = db.Column(db.Integer, primary_key=True)
+    linha_id    = db.Column(db.Integer, db.ForeignKey('linhas_pedido.id'), nullable=False)
+    pedido_id   = db.Column(db.Integer, nullable=False)
+    status_ant  = db.Column(db.String(30))
+    status_novo = db.Column(db.String(30), nullable=False)
+    user_id     = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user_nome   = db.Column(db.String(120))
+    data        = db.Column(db.DateTime, default=datetime.now)
+    notas       = db.Column(db.String(300))
 
 
 class RegistoPendente(db.Model):
