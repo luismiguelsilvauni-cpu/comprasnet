@@ -5772,6 +5772,8 @@ def salario_recibo_email(rid):
                 s.send_message(msg)
         return jsonify({'ok': True})
     except Exception as e:
+        import traceback
+        app.logger.error(f"Email error full: {traceback.format_exc()}")
         return jsonify({'ok': False, 'error': str(e)})
 
 # Documentos Contabilísticos
