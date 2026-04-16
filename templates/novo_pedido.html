@@ -210,6 +210,11 @@ function pesquisarArtigo(q) {
   }, 300);
 }
 
+function selecionarArtigoIdx(idx) {
+  var a = (window._artigosMap || [])[idx];
+  if (a) selecionarArtigo(a);
+}
+
 function selecionarArtigo(a) {
   if (linhaAtual === null) return;
   linhas[linhaAtual].referencia = a.referencia || '';
