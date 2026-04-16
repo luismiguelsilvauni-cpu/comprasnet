@@ -220,8 +220,6 @@ def novo_pedido():
     clientes_list = Cliente.query.order_by(Cliente.nome).all()
     return render_template('novo_pedido.html', clientes=clientes_list)
 
-@app.route('/pedidos/<int:pid>')
-@login_required
 def _get_fornecedores_artigo(artigo_ref):
     """Get habitual suppliers for an article from PHC data."""
     if not artigo_ref:
@@ -250,6 +248,8 @@ def _get_fornecedores_artigo(artigo_ref):
         return []
 
 
+@app.route('/pedidos/<int:pid>')
+@login_required
 def pedido_detalhe(pid):
     p = PedidoCompra.query.get_or_404(pid)
     orcs = Orcamento.query.filter_by(pedido_id=pid).order_by(Orcamento.total).all()
