@@ -192,6 +192,8 @@ def api_dashboard_artigos_pedidos():
     for linha, pedido, user in artigos:
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
+        # Get last status change
+        hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
         rows.append({
             "linha_id": linha.id,
             "pedido_id": pedido.id,
@@ -199,14 +201,15 @@ def api_dashboard_artigos_pedidos():
             "referencia": linha.referencia or "",
             "quantidade": int(linha.quantidade or 1),
             "unidade": linha.unidade or "un",
-            "titulo": pedido.titulo[:30],
-            "data": pedido.data_criacao.strftime("%d/%m/%Y"),
-            "user_nome": user.nome[:15] if user else "—",
+            "data_pedido": pedido.data_criacao.strftime("%d/%m/%Y"),
+            "criado_por": user.nome[:20] if user else "—",
             "status": s,
             "status_label": lbl,
             "status_color": col,
             "status_bg": bg,
             "dim": s in ["recebido","cancelado"],
+            "data_status": hist.data.strftime("%d/%m/%Y %H:%M") if hist else "—",
+            "alterado_por": hist.user_nome[:20] if hist else "—",
         })
     return jsonify(rows)
 

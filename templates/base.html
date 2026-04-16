@@ -357,6 +357,11 @@
         <a href="{{ url_for('admin_health') }}" class="nav-item {% if request.endpoint == 'admin_health' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">🩺</span><span>Estado do Sistema</span>
         </a>
+        {% if current_user.is_admin or pode_aceder('conectividade') %}
+        <a href="{{ url_for('conectividade') }}" class="nav-item {% if request.endpoint in ['conectividade','acesso_externo'] %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">🌐</span><span>Conectividade</span>
+        </a>
+        {% endif %}
         <a href="{{ url_for('roadmap') }}" class="nav-item {% if request.endpoint == 'roadmap' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">📋</span><span>Backlog</span><span id="backlog-badge" style="margin-left:auto;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(245,158,11,.2);color:#f59e0b;display:none"></span>
         </a>
