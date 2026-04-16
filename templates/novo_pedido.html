@@ -211,49 +211,24 @@ function pesquisarArtigo(q) {
 }
 
 function selecionarArtigoIdx(idx) {
-  var a = (window._artigosMap || [])[idx];
-  if (a) selecionarArtigo(a);
-}
-
-function selecionarArtigo(a) {
-  if (linhaAtual === null) return;
+  var a = window._artigosMap[idx];
+  if (!a) { console.error('Artigo nao encontrado idx='+idx); return; }
+  console.log('Seleccionado:', a, 'linhaAtual=', linhaAtual);
+  if (linhaAtual === null || linhaAtual === undefined) {
+    console.error('linhaAtual nulo');
+    return;
+  }
   linhas[linhaAtual].referencia = a.referencia || '';
   linhas[linhaAtual].designacao = a.designacao || '';
   linhas[linhaAtual].unidade = a.unidade || 'un';
+  console.log('Linhas apos seleccao:', JSON.stringify(linhas));
   fecharModal();
   renderLinhas();
 }
 
-function selecionarManual(texto) {
-  if (linhaAtual === null) return;
-  linhas[linhaAtual].referencia = '';
-  linhas[linhaAtual].designacao = texto;
-  fecharModal();
-  renderLinhas();
+function selecionarArtigo(a) {
+  selecionarArtigoIdx(window._artigosMap ? window._artigosMap.indexOf(a) : -1);
 }
-
-function escHtml(s) {
-  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function prepararSubmit() {
-  if (!linhas.length) {
-    alert('Adicione pelo menos um artigo ao pedido.');
-    return false;
-  }
-  // Set titulo from first line
-  var titulo = linhas[0].designacao || linhas[0].referencia || 'Pedido';
-  if (linhas.length > 1) titulo += ' (+ ' + (linhas.length-1) + ' artigo(s))';
-  var tEl = document.getElementById('titulo_hidden') || document.querySelector('[name=titulo]');
-  if (tEl) tEl.value = titulo;
-  document.getElementById('linhas_json').value = JSON.stringify(linhas);
-  return true;
-}
-
-// Close modal on backdrop click
-document.getElementById('artigoModal').addEventListener('click', function(e) {
-  if (e.target === this) fecharModal();
-});
 
 // Init
 renderLinhas();
