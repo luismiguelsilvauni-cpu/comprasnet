@@ -5708,15 +5708,39 @@ def salario_recibo_email(rid):
         corpo = 'Olá ' + func.nome + ',\n\nSegue em anexo o recibo de salário referente a ' + mes_label + ' de ' + str(r.ano) + '.\n\nCom os melhores cumprimentos,\n' + empresa
         msg.attach(MIMEText(corpo))
 
-        if r.pdf_path:
-            ppath = os.path.join(UPLOAD_SALARIOS, r.pdf_path)
-            if os.path.exists(ppath):
-                with open(ppath,'rb') as pf:
-                    part = MIMEBase('application','octet-stream')
-                    part.set_payload(pf.read())
-                    encoders.encode_base64(part)
-                    part.add_header('Content-Disposition', f'attachment; filename="{r.pdf_filename}"')
-                    msg.attach(part)
+        # Generate Excel recibo and attach
+        try:
+            from io import BytesIO
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("gerar_recibo",
+                os.path.join(os.path.dirname(__file__), 'gerar_recibo.py'))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            wb_excel = mod.gerar_recibo_excel(func, r, mes_label, r.ano, empresa)
+            buf = BytesIO()
+            wb_excel.save(buf); buf.seek(0)
+            fname_excel = f"Recibo_{func.numero}_{r.ano}_{r.mes:02d}.xlsx"
+            part = MIMEBase('application', 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            part.set_payload(buf.read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename="{fname_excel}"')
+            msg.attach(part)
+        except Exception as ex_xl:
+            app.logger.warning(f"Excel attach error: {ex_xl}")
+            # Fallback: attach HTML
+            try:
+                html_body = render_template('salario_recibo_print.html',
+                    recibo=r, func=func, ano=r.ano, mes_label=mes_label,
+                    cfg=cfg, empresa_nome=empresa,
+                    upload_url=request.host_url.rstrip('/') + '/uploads')
+                part_html = MIMEBase('text', 'html')
+                part_html.set_payload(html_body.encode('utf-8'))
+                encoders.encode_base64(part_html)
+                part_html.add_header('Content-Disposition',
+                    f'attachment; filename="Recibo_{func.numero}_{r.ano}_{r.mes:02d}.html"')
+                msg.attach(part_html)
+            except Exception as ex_html:
+                app.logger.warning(f"HTML attach error: {ex_html}")
 
         port = getattr(cfg,'smtp_port',587) or 587
         if port == 465:
