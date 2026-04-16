@@ -295,29 +295,67 @@ function carregarArtigosPedidos() {
         el.outerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem artigos pedidos activos</div>';
         return;
       }
-      var html = '<div style="max-height:280px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
-      html += '<thead style="position:sticky;top:0;background:var(--surface2);z-index:1"><tr>';
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'max-height:280px;overflow-y:auto';
+      var tbl = document.createElement('table');
+      tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px';
+      var thead = '<thead style="position:sticky;top:0;background:var(--surface2);z-index:1"><tr>';
       ['Estado','Artigo','Qtd','Pedido','Data','Por',''].forEach(function(h){
-        html += '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)">'+h+'</th>';
+        thead += '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)">' + h + '</th>';
       });
-      html += '</tr></thead><tbody>';
+      thead += '</tr></thead>';
+      var tbody = document.createElement('tbody');
       rows.forEach(function(r) {
-        html += '<tr style="border-bottom:1px solid var(--border);'+(r.dim?'opacity:0.5':'')+'">';
-        html += '<td style="padding:5px 8px"><span onclick="dashAbrirStatus('+r.linha_id+','+r.pedido_id+',''+r.designacao.replace(/'/g,"\'")+'',' +'''+r.status+'')" style="cursor:pointer;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:'+r.status_bg+';color:'+r.status_color+';border:1px solid '+r.status_color+'40">'+r.status_label+'</span></td>';
-        html += '<td style="padding:5px 8px"><div style="font-weight:600">'+r.designacao+'</div>'+(r.referencia?'<div style="font-size:10px;color:var(--accent)">'+r.referencia+'</div>':'' )+'</td>';
-        html += '<td style="padding:5px 8px;font-family:monospace">'+r.quantidade+' '+r.unidade+'</td>';
-        html += '<td style="padding:5px 8px;color:var(--text-muted)">'+r.titulo+'</td>';
-        html += '<td style="padding:5px 8px;color:var(--text-muted);white-space:nowrap">'+r.data+'</td>';
-        html += '<td style="padding:5px 8px;color:var(--text-muted)">'+r.user_nome+'</td>';
-        html += '<td style="padding:5px 8px"><a href="/pedidos/'+r.pedido_id+'" style="font-size:11px;color:var(--accent)">→</a></td>';
-        html += '</tr>';
+        var tr = document.createElement('tr');
+        tr.style.cssText = 'border-bottom:1px solid var(--border)' + (r.dim ? ';opacity:0.5' : '');
+        // Status cell
+        var tdStatus = document.createElement('td');
+        tdStatus.style.padding = '5px 8px';
+        var span = document.createElement('span');
+        span.textContent = r.status_label;
+        span.style.cssText = 'cursor:pointer;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:' + r.status_bg + ';color:' + r.status_color + ';border:1px solid ' + r.status_color + '40';
+        span.onclick = (function(lid, pid, des, st){ return function(){ dashAbrirStatus(lid, pid, des, st); }; })(r.linha_id, r.pedido_id, r.designacao, r.status);
+        tdStatus.appendChild(span);
+        tr.appendChild(tdStatus);
+        // Artigo cell
+        var tdArt = document.createElement('td');
+        tdArt.style.padding = '5px 8px';
+        var d1 = document.createElement('div');
+        d1.style.fontWeight = '600';
+        d1.textContent = r.designacao;
+        tdArt.appendChild(d1);
+        if (r.referencia) {
+          var d2 = document.createElement('div');
+          d2.style.cssText = 'font-size:10px;color:var(--accent)';
+          d2.textContent = r.referencia;
+          tdArt.appendChild(d2);
+        }
+        tr.appendChild(tdArt);
+        // Simple cells
+        [r.quantidade + ' ' + r.unidade, r.titulo, r.data, r.user_nome].forEach(function(txt, i) {
+          var td = document.createElement('td');
+          td.style.cssText = 'padding:5px 8px;color:var(--text-muted)' + (i===0?';font-family:monospace':'') + (i===2?';white-space:nowrap':'');
+          td.textContent = txt;
+          tr.appendChild(td);
+        });
+        // Link cell
+        var tdLink = document.createElement('td');
+        tdLink.style.padding = '5px 8px';
+        var a = document.createElement('a');
+        a.href = '/pedidos/' + r.pedido_id;
+        a.style.cssText = 'font-size:11px;color:var(--accent)';
+        a.textContent = '→';
+        tdLink.appendChild(a);
+        tr.appendChild(tdLink);
+        tbody.appendChild(tr);
       });
-      html += '</tbody></table></div>';
-      el.outerHTML = html;
+      tbl.innerHTML = thead;
+      tbl.appendChild(tbody);
+      wrap.appendChild(tbl);
+      el.parentNode.replaceChild(wrap, el);
     })
     .catch(function(e){ console.error('artigos pedidos:', e); });
 }
-
 
 function carregarCalendario() {
   const grid = document.getElementById('calGrid');
