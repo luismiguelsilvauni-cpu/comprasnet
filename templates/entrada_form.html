@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{% if entrada %}Editar{% else %}Nova{% endif %} Entrada · NavTech{% endblock %}
+{% block title %}{% if entrada %}Editar #{{ '%04d'|format(entrada.numero) }}{% else %}Nova Entrada{% endif %} · NavTech{% endblock %}
 {% block page_title %}{% if entrada %}✏️ Editar Entrada #{{ '%04d'|format(entrada.numero) }}{% else %}📥 Nova Entrada{% endif %}{% endblock %}
 {% block topbar_actions %}
-  <a href="{{ url_for('entradas') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+  <a href="{{ url_for('entradas') }}" class="btn btn-ghost btn-sm">← Lista</a>
   {% if entrada %}
-  <button onclick="eliminarEntrada({{ entrada.id }}, {{ entrada.numero }})" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
+  <a href="{{ url_for('entrada_detalhe', eid=entrada.id) }}" class="btn btn-ghost btn-sm">Ver Ficha</a>
+  <button type="button" onclick="eliminar()" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
   {% endif %}
 {% endblock %}
 {% block content %}
@@ -12,100 +13,124 @@
   {% if messages %}{% for cat,msg in messages %}<div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>{% endfor %}{% endif %}
 {% endwith %}
 
-<div style="max-width:640px">
-<div class="card" style="padding:20px">
-  <form method="POST" id="entradaForm">
+<div style="max-width:660px">
+<div class="card" style="padding:22px">
 
-    <div class="form-group">
-      <label>Data de Receção *</label>
-      <input type="date" name="data_rececao" value="{{ entrada.data_rececao.strftime('%Y-%m-%d') if entrada else hoje }}" class="input" required>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pode introduzir uma data anterior à data de hoje</div>
+  <div style="font-size:12px;color:var(--accent);background:rgba(59,110,240,.08);border:1px solid rgba(59,110,240,.2);border-radius:6px;padding:8px 12px;margin-bottom:18px">
+    ℹ️ A data de receção pode ser anterior à data de hoje — útil para registos em atraso.
+  </div>
+
+  <form method="POST">
+    <input type="hidden" name="cliente_nome" id="clienteNomeHidden" value="{{ entrada.cliente_nome if entrada else '' }}">
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Data de Receção *</label>
+        <input type="date" name="data_rececao" class="input" required
+          value="{{ entrada.data_rececao.strftime('%Y-%m-%d') if entrada else hoje }}">
+      </div>
+      <div class="form-group">
+        <label>Nº Entrada</label>
+        <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-muted)">
+          {% if entrada %}#{{ '%04d'|format(entrada.numero) }}{% else %}Gerado automaticamente{% endif %}
+        </div>
+      </div>
     </div>
 
-    <!-- Cliente com pesquisa PHC -->
     <div class="form-group" style="position:relative">
       <label>Cliente *</label>
-      <input type="hidden" name="cliente_nome" id="clienteNomeHidden" value="{{ entrada.cliente_nome if entrada else '' }}">
-      <input type="text" id="clienteInput" class="input" placeholder="Pesquisar cliente no PHC..."
+      <input type="text" id="clienteInput" class="input" required autocomplete="off"
+        placeholder="Pesquisar no PHC ou escrever..."
         value="{{ entrada.cliente_nome if entrada else '' }}"
-        autocomplete="off"
-        oninput="pesquisarCliente(this.value)"
-        required>
-      <div id="clienteResultados" style="display:none;position:absolute;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;width:100%;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2);top:calc(100% + 2px)"></div>
+        oninput="pesquisarCliente(this.value)">
+      <div id="clienteDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.2)"></div>
     </div>
 
     <div class="grid-2">
       <div class="form-group">
         <label>Marca</label>
-        <input type="text" name="marca" value="{{ entrada.marca if entrada else '' }}" class="input" placeholder="Ex: Volvo, Caterpillar...">
+        <input type="text" name="marca" class="input" placeholder="Ex: Volvo, Caterpillar..."
+          value="{{ entrada.marca if entrada else '' }}">
       </div>
       <div class="form-group">
         <label>Modelo</label>
-        <input type="text" name="modelo" value="{{ entrada.modelo if entrada else '' }}" class="input" placeholder="Ex: FH 460, D6T...">
+        <input type="text" name="modelo" class="input" placeholder="Ex: FH 460, D6T..."
+          value="{{ entrada.modelo if entrada else '' }}">
       </div>
     </div>
 
     <div class="form-group">
       <label>Nº de Série</label>
-      <input type="text" name="num_serie" value="{{ entrada.num_serie if entrada else '' }}" class="input" placeholder="Número de série do equipamento">
+      <input type="text" name="num_serie" class="input" placeholder="Número de série"
+        value="{{ entrada.num_serie if entrada else '' }}">
     </div>
 
     <div class="form-group">
       <label>Observações / Avaria Reportada</label>
-      <textarea name="observacoes" class="input" rows="4" placeholder="Descrição do problema reportado pelo cliente...">{{ entrada.observacoes if entrada else '' }}</textarea>
+      <textarea name="observacoes" class="input" rows="4"
+        placeholder="Descrição do problema reportado pelo cliente...">{{ entrada.observacoes if entrada else '' }}</textarea>
     </div>
 
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
       <a href="{{ url_for('entradas') }}" class="btn btn-ghost">Cancelar</a>
-      <button type="submit" class="btn btn-primary">{% if entrada %}💾 Guardar{% else %}➕ Criar Entrada{% endif %}</button>
+      <button type="submit" class="btn btn-primary">
+        {% if entrada %}💾 Guardar Alterações{% else %}➕ Criar Entrada{% endif %}
+      </button>
     </div>
   </form>
 </div>
 </div>
 
 <script>
-var clienteTimer = null;
+var _timer = null;
+
+// Sync hidden field
+document.getElementById('clienteInput').addEventListener('input', function() {
+  document.getElementById('clienteNomeHidden').value = this.value;
+});
 
 function pesquisarCliente(q) {
   document.getElementById('clienteNomeHidden').value = q;
-  clearTimeout(clienteTimer);
-  var el = document.getElementById('clienteResultados');
-  if (q.length < 2) { el.style.display='none'; return; }
-  clienteTimer = setTimeout(function() {
+  var dd = document.getElementById('clienteDropdown');
+  clearTimeout(_timer);
+  if (q.length < 2) { dd.style.display = 'none'; return; }
+  _timer = setTimeout(function() {
     fetch('/api/clientes?q=' + encodeURIComponent(q))
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
-        if (!data.length) { el.style.display='none'; return; }
-        el.innerHTML = data.map(function(c) {
-          return '<div onclick="selecionarCliente(\'' + c.nome.replace(/'/g,"\\'") + '\')" ' +
+      .then(function(r) { return r.json(); })
+      .then(function(lista) {
+        if (!lista.length) { dd.style.display = 'none'; return; }
+        dd.innerHTML = lista.map(function(c) {
+          return '<div onclick="selCliente(\'' + c.nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')" ' +
             'style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px" ' +
-            'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
-            c.nome + '</div>';
+            'onmouseover="this.style.background=\'var(--surface2)\'" ' +
+            'onmouseout="this.style.background=\'\'">' + c.nome + '</div>';
         }).join('');
-        el.style.display = 'block';
+        dd.style.display = 'block';
       });
   }, 250);
 }
 
-function selecionarCliente(nome) {
+function selCliente(nome) {
   document.getElementById('clienteInput').value = nome;
   document.getElementById('clienteNomeHidden').value = nome;
-  document.getElementById('clienteResultados').style.display = 'none';
+  document.getElementById('clienteDropdown').style.display = 'none';
 }
 
-// Close dropdown on outside click
 document.addEventListener('click', function(e) {
-  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResultados')) {
-    document.getElementById('clienteResultados').style.display = 'none';
+  if (!e.target.closest('#clienteInput')) {
+    document.getElementById('clienteDropdown').style.display = 'none';
   }
 });
 
 {% if entrada %}
-function eliminarEntrada(id, num) {
-  if (!confirm('Eliminar Entrada #' + String(num).padStart(4,'0') + '? Esta acção não pode ser desfeita.')) return;
-  fetch('/entradas/' + id + '/eliminar', {method:'POST'})
-    .then(r=>r.json())
-    .then(d=>{ if(d.ok) window.location='/entradas'; else alert('Erro: '+d.error); });
+function eliminar() {
+  if (!confirm('Eliminar Entrada #{{ "%04d"|format(entrada.numero) }}?\nEsta acção não pode ser desfeita.')) return;
+  fetch('/entradas/{{ entrada.id }}/eliminar', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) window.location = '/entradas';
+      else alert('Erro: ' + d.error);
+    });
 }
 {% endif %}
 </script>
