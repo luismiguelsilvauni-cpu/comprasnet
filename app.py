@@ -3047,6 +3047,20 @@ def entrada_pdf(eid):
     resp.headers['Content-Type'] = 'text/html; charset=utf-8'
     return resp
 
+@app.route('/entradas/<int:eid>/eliminar', methods=['POST'])
+@login_required
+def entrada_eliminar(eid):
+    e = EntradaEquipamento.query.get_or_404(eid)
+    if not current_user.is_admin and e.criado_por != current_user.id:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    # Delete history first
+    EntradaHistorico.query.filter_by(entrada_id=eid).delete()
+    db.session.delete(e)
+    db.session.commit()
+    flash(f'Entrada #{e.numero:04d} eliminada.', 'success')
+    return jsonify({'ok': True})
+
+
 @app.route('/api/entradas/estadia-count')
 @login_required
 def api_entradas_estadia_count():

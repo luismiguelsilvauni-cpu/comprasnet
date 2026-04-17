@@ -4,6 +4,7 @@
 {% block topbar_actions %}
   <a href="{{ url_for('entradas') }}" class="btn btn-ghost btn-sm">← Voltar</a>
   <a href="{{ url_for('entrada_editar', eid=e.id) }}" class="btn btn-ghost btn-sm">✏️ Editar</a>
+  <button onclick="eliminarEntrada({{ e.id }}, {{ e.numero }})" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
   <a href="{{ url_for('entrada_pdf', eid=e.id) }}" target="_blank" class="btn btn-ghost btn-sm">📄 PDF / Imprimir</a>
 {% endblock %}
 {% block content %}
@@ -136,5 +137,12 @@ function confirmarStatus() {
 document.getElementById('statusModal').addEventListener('click', function(e){
   if(e.target===this) this.style.display='none';
 });
+
+function eliminarEntrada(id, num) {
+  if (!confirm('Eliminar Entrada #' + String(num).padStart(4,'0') + '? Esta acção não pode ser desfeita.')) return;
+  fetch('/entradas/' + id + '/eliminar', {method:'POST'})
+    .then(r=>r.json())
+    .then(d=>{ if(d.ok) window.location='/entradas'; else alert('Erro: '+d.error); });
+}
 </script>
 {% endblock %}

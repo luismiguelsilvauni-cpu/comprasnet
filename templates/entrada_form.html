@@ -3,6 +3,9 @@
 {% block page_title %}{% if entrada %}✏️ Editar Entrada #{{ '%04d'|format(entrada.numero) }}{% else %}📥 Nova Entrada{% endif %}{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('entradas') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+  {% if entrada %}
+  <button onclick="eliminarEntrada({{ entrada.id }}, {{ entrada.numero }})" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
+  {% endif %}
 {% endblock %}
 {% block content %}
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -11,15 +14,23 @@
 
 <div style="max-width:640px">
 <div class="card" style="padding:20px">
-  <form method="POST">
-    <div class="form-group">
-      <label>Data de Receção *</label>
-      <input type="date" name="data_rececao" value="{{ hoje }}" class="input" required>
-    </div>
+  <form method="POST" id="entradaForm">
 
     <div class="form-group">
+      <label>Data de Receção *</label>
+      <input type="date" name="data_rececao" value="{{ entrada.data_rececao.strftime('%Y-%m-%d') if entrada else hoje }}" class="input" required>
+    </div>
+
+    <!-- Cliente com pesquisa PHC -->
+    <div class="form-group" style="position:relative">
       <label>Cliente *</label>
-      <input type="text" name="cliente_nome" value="{{ entrada.cliente_nome if entrada else '' }}" class="input" placeholder="Nome do cliente" required>
+      <input type="hidden" name="cliente_nome" id="clienteNomeHidden" value="{{ entrada.cliente_nome if entrada else '' }}">
+      <input type="text" id="clienteInput" class="input" placeholder="Pesquisar cliente no PHC..."
+        value="{{ entrada.cliente_nome if entrada else '' }}"
+        autocomplete="off"
+        oninput="pesquisarCliente(this.value)"
+        required>
+      <div id="clienteResultados" style="display:none;position:absolute;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;width:100%;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2);top:calc(100% + 2px)"></div>
     </div>
 
     <div class="grid-2">
@@ -39,8 +50,8 @@
     </div>
 
     <div class="form-group">
-      <label>Observações</label>
-      <textarea name="observacoes" class="input" rows="4" placeholder="Descrição do problema, avaria reportada pelo cliente...">{{ entrada.observacoes if entrada else '' }}</textarea>
+      <label>Observações / Avaria Reportada</label>
+      <textarea name="observacoes" class="input" rows="4" placeholder="Descrição do problema reportado pelo cliente...">{{ entrada.observacoes if entrada else '' }}</textarea>
     </div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
@@ -50,4 +61,51 @@
   </form>
 </div>
 </div>
+
+<script>
+var clienteTimer = null;
+
+function pesquisarCliente(q) {
+  document.getElementById('clienteNomeHidden').value = q;
+  clearTimeout(clienteTimer);
+  var el = document.getElementById('clienteResultados');
+  if (q.length < 2) { el.style.display='none'; return; }
+  clienteTimer = setTimeout(function() {
+    fetch('/api/clientes?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (!data.length) { el.style.display='none'; return; }
+        el.innerHTML = data.map(function(c) {
+          return '<div onclick="selecionarCliente(\'' + c.nome.replace(/'/g,"\\'") + '\')" ' +
+            'style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px" ' +
+            'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+            c.nome + '</div>';
+        }).join('');
+        el.style.display = 'block';
+      });
+  }, 250);
+}
+
+function selecionarCliente(nome) {
+  document.getElementById('clienteInput').value = nome;
+  document.getElementById('clienteNomeHidden').value = nome;
+  document.getElementById('clienteResultados').style.display = 'none';
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#clienteInput') && !e.target.closest('#clienteResultados')) {
+    document.getElementById('clienteResultados').style.display = 'none';
+  }
+});
+
+{% if entrada %}
+function eliminarEntrada(id, num) {
+  if (!confirm('Eliminar Entrada #' + String(num).padStart(4,'0') + '? Esta acção não pode ser desfeita.')) return;
+  fetch('/entradas/' + id + '/eliminar', {method:'POST'})
+    .then(r=>r.json())
+    .then(d=>{ if(d.ok) window.location='/entradas'; else alert('Erro: '+d.error); });
+}
+{% endif %}
+</script>
 {% endblock %}
