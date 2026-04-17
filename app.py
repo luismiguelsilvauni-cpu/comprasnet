@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, EntradaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -2872,6 +2872,64 @@ ENTRADAS_STATUS = [
 ENTRADAS_STATUS_DICT = dict(ENTRADAS_STATUS)
 
 # States that trigger day counting and auto-escalation
+# ── ENTRADAS: DOCUMENTOS ─────────────────────────────────────────────────────
+UPLOAD_ENTRADAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'entradas')
+os.makedirs(UPLOAD_ENTRADAS, exist_ok=True)
+
+@app.route('/entradas/<int:eid>/documentos/upload', methods=['POST'])
+@login_required
+def entrada_doc_upload(eid):
+    EntradaEquipamento.query.get_or_404(eid)
+    f = request.files.get('ficheiro')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import uuid, mimetypes
+    ext = os.path.splitext(f.filename)[1].lower()
+    nome_unico = f'e{eid}_{uuid.uuid4().hex[:10]}{ext}'
+    fpath = os.path.join(UPLOAD_ENTRADAS, nome_unico)
+    f.save(fpath)
+    mime = mimetypes.guess_type(f.filename)[0] or 'application/octet-stream'
+    doc = EntradaDocumento(
+        entrada_id=eid, nome_original=f.filename,
+        nome_ficheiro=nome_unico,
+        descricao=request.form.get('descricao','').strip(),
+        tamanho=os.path.getsize(fpath), mime=mime,
+        criado_por=current_user.id, criado_em=datetime.now()
+    )
+    db.session.add(doc)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': doc.id,
+        'nome': doc.nome_original, 'mime': doc.mime,
+        'tamanho': doc.tamanho,
+        'uploader': current_user.nome,
+        'data': doc.criado_em.strftime('%d/%m/%Y %H:%M')})
+
+@app.route('/entradas/<int:eid>/documentos/<int:did>/download')
+@login_required
+def entrada_doc_download(eid, did):
+    doc = EntradaDocumento.query.filter_by(id=did, entrada_id=eid).first_or_404()
+    return send_from_directory(UPLOAD_ENTRADAS, doc.nome_ficheiro,
+        as_attachment=True, download_name=doc.nome_original)
+
+@app.route('/entradas/<int:eid>/documentos/<int:did>/preview')
+@login_required
+def entrada_doc_preview(eid, did):
+    doc = EntradaDocumento.query.filter_by(id=did, entrada_id=eid).first_or_404()
+    return send_from_directory(UPLOAD_ENTRADAS, doc.nome_ficheiro, as_attachment=False)
+
+@app.route('/entradas/<int:eid>/documentos/<int:did>/apagar', methods=['POST'])
+@login_required
+def entrada_doc_apagar(eid, did):
+    doc = EntradaDocumento.query.filter_by(id=did, entrada_id=eid).first_or_404()
+    if not current_user.is_admin and doc.criado_por != current_user.id:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    try: os.remove(os.path.join(UPLOAD_ENTRADAS, doc.nome_ficheiro))
+    except: pass
+    db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 ESTADIA_RULES = {
     'orcamentado':  {'dias': 10, 'escalate': 'orcamentado_estadia'},
     'faturado':     {'dias': 5,  'escalate': 'concluido_estadia'},
