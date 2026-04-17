@@ -376,6 +376,7 @@ class EntradaEquipamento(db.Model):
     status          = db.Column(db.String(50), default='rececionado')
     data_status     = db.Column(db.DateTime)          # when status was registered
     data_status_real = db.Column(db.Date, nullable=True)  # real date of current status
+    data_orcamento   = db.Column(db.Date, nullable=True)  # real date of budget emission
     criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)

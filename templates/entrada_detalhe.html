@@ -49,6 +49,19 @@
       </div>
     </div>
 
+    <!-- Data Orçamento (editable inline) -->
+    {% if e.status in ['orcamentado','material_pedido','em_reparacao','faturado','orcamentado_estadia','concluido_estadia'] %}
+    <div style="margin-top:12px;padding:10px 12px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:#f59e0b">📋 Data Orçamento:</span>
+      <input type="date" id="dataOrcamentoInput" class="input"
+        value="{{ e.data_orcamento.strftime('%Y-%m-%d') if e.data_orcamento else '' }}"
+        style="width:160px;font-size:12px;padding:4px 8px"
+        onchange="guardarDataOrcamento(this.value)">
+      <span id="dataOrcSaved" style="font-size:11px;color:var(--success);display:none">✅ Guardado</span>
+      <span style="font-size:11px;color:var(--text-muted)">Esta data é usada para calcular os dias úteis quando o estado é Orçamentado</span>
+    </div>
+    {% endif %}
+
     {% if e.data_status_real or e.data_status %}
     <div style="margin-top:12px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px">
       <span style="color:var(--text-muted)">Estado actual desde:</span>
@@ -198,6 +211,20 @@ function eliminar() {
   fetch('/entradas/{{ e.id }}/eliminar', { method: 'POST' })
     .then(function(r){ return r.json(); })
     .then(function(d){ if(d.ok) window.location='/entradas'; else alert('Erro: '+d.error); });
+}
+
+function guardarDataOrcamento(val) {
+  fetch('/entradas/{{ e.id }}/data-orcamento', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({data_orcamento: val})
+  }).then(r=>r.json()).then(d=>{
+    var el = document.getElementById('dataOrcSaved');
+    if (d.ok) {
+      el.style.display='inline';
+      setTimeout(function(){ el.style.display='none'; }, 2000);
+    } else alert('Erro: ' + d.error);
+  });
 }
 
 document.getElementById('statusModal').addEventListener('click', function(e){

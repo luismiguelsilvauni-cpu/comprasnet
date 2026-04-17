@@ -3088,6 +3088,24 @@ def entrada_eliminar(eid):
     return jsonify({'ok': True})
 
 
+@app.route('/entradas/<int:eid>/data-orcamento', methods=['POST'])
+@login_required
+def entrada_data_orcamento(eid):
+    e = EntradaEquipamento.query.get_or_404(eid)
+    data = request.get_json() or {}
+    ds = data.get('data_orcamento','')
+    try:
+        e.data_orcamento = datetime.strptime(ds, '%Y-%m-%d').date() if ds else None
+        # If status is orcamentado, also update data_status_real for day counting
+        if e.status == 'orcamentado' and e.data_orcamento:
+            e.data_status_real = e.data_orcamento
+        e.atualizado_em = datetime.now()
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)})
+
+
 @app.route('/api/entradas/estadia-count')
 @login_required
 def api_entradas_estadia_count():
