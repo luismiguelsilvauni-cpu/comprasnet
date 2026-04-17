@@ -1,4 +1,4 @@
-const CACHE_NAME = 'comprasnet-v1';
+const CACHE_NAME = 'comprasnet-v202604171551';
 const OFFLINE_URLS = [
   '/mobile',
   '/static/manifest.json',
