@@ -396,3 +396,16 @@ class EntradaHistorico(db.Model):
     data_real   = db.Column(db.Date, nullable=True)  # real date of event (can differ from criado_em)
     criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+class EntradaDocumento(db.Model):
+    __tablename__ = 'entrada_documentos'
+    id            = db.Column(db.Integer, primary_key=True)
+    entrada_id    = db.Column(db.Integer, db.ForeignKey('entradas_equipamento.id'), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=False)
+    nome_ficheiro = db.Column(db.String(255), nullable=False)
+    descricao     = db.Column(db.String(300), default='')
+    tamanho       = db.Column(db.Integer, default=0)
+    mime          = db.Column(db.String(100), default='')
+    criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
+    uploader      = db.relationship('User', foreign_keys=[criado_por])

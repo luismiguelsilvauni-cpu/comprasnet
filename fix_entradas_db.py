@@ -33,6 +33,17 @@ for tbl, col, typ in [
     else:
         print(f"OK: {tbl}.{col} ja existe")
 
+cur.execute("""CREATE TABLE IF NOT EXISTS entrada_documentos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entrada_id INTEGER NOT NULL REFERENCES entradas_equipamento(id),
+    nome_original VARCHAR(255) NOT NULL,
+    nome_ficheiro VARCHAR(255) NOT NULL,
+    descricao VARCHAR(300) DEFAULT '',
+    tamanho INTEGER DEFAULT 0,
+    mime VARCHAR(100) DEFAULT '',
+    criado_por INTEGER,
+    criado_em DATETIME)""")
+print("OK: entrada_documentos table ready")
 conn.commit()
 conn.close()
 print("Concluido.")

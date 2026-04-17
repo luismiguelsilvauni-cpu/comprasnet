@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -2991,9 +2991,10 @@ def entrada_detalhe(eid):
         dias_contagem = _dias_uteis(ref, date.today()) if ref else None
     else:
         dias_contagem = None
+    docs = EntradaDocumento.query.filter_by(entrada_id=eid).order_by(EntradaDocumento.criado_em.desc()).all()
     return render_template('entrada_detalhe.html', e=e,
         status_list=ENTRADAS_STATUS, dias_contagem=dias_contagem,
-        status_dict=ENTRADAS_STATUS_DICT)
+        status_dict=ENTRADAS_STATUS_DICT, docs=docs)
 
 @app.route('/entradas/<int:eid>/editar', methods=['GET','POST'])
 @login_required

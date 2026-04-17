@@ -89,6 +89,67 @@
     {% endif %}
   </div>
 
+
+  <!-- Documents -->
+  <div class="card" style="padding:14px;margin-top:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">📎 Documentos / Fotos</div>
+      <button type="button" onclick="document.getElementById('uploadInput').click()" class="btn btn-primary btn-sm">⬆ Adicionar</button>
+    </div>
+    <input type="file" id="uploadInput" style="display:none" multiple accept="image/*,.pdf,.txt,.mp4,.mp3" onchange="uploadFicheiros(this.files)">
+
+    <div id="docsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+      {% for doc in docs %}
+      {% set is_img = doc.mime and doc.mime.startswith('image/') %}
+      {% set is_pdf = doc.mime == 'application/pdf' %}
+      <div id="doc-{{ doc.id }}" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
+        <!-- Preview thumb -->
+        <div style="height:90px;background:var(--surface2);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer"
+             onclick="abrirPreview('{{ url_for('entrada_doc_preview', eid=e.id, did=doc.id) }}','{{ doc.mime }}','{{ doc.nome_original }}')">
+          {% if is_img %}
+          <img src="{{ url_for('entrada_doc_preview', eid=e.id, did=doc.id) }}" style="width:100%;height:90px;object-fit:cover" onerror="this.parentNode.innerHTML='🖼'">
+          {% elif is_pdf %}
+          <div style="font-size:32px">📄</div>
+          {% else %}
+          <div style="font-size:32px">📎</div>
+          {% endif %}
+        </div>
+        <!-- Info -->
+        <div style="padding:6px 8px;flex:1">
+          <div style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ doc.nome_original }}">{{ doc.nome_original[:20] }}</div>
+          <div style="font-size:9px;color:var(--text-muted)">{{ '%.1f'|format(doc.tamanho/1024) }} KB · {{ doc.criado_em.strftime('%d/%m') }}</div>
+        </div>
+        <!-- Actions -->
+        <div style="display:flex;border-top:1px solid var(--border)">
+          <a href="{{ url_for('entrada_doc_download', eid=e.id, did=doc.id) }}" style="flex:1;text-align:center;padding:5px;font-size:11px;color:var(--accent);text-decoration:none" title="Download">⬇</a>
+          <a href="{{ url_for('entrada_doc_preview', eid=e.id, did=doc.id) }}" target="_blank" style="flex:1;text-align:center;padding:5px;font-size:11px;color:var(--accent);text-decoration:none" title="Abrir">👁</a>
+          {% if current_user.is_admin or current_user.id == doc.criado_por %}
+          <button onclick="apagarDoc({{ doc.id }})" style="flex:1;background:none;border:none;padding:5px;font-size:11px;color:#ef4444;cursor:pointer" title="Apagar">🗑</button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <!-- Upload progress placeholders added dynamically -->
+    </div>
+
+    {% if not docs %}
+    <div id="semDocs" style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">
+      Sem documentos. Clique em "Adicionar" para fazer upload.
+    </div>
+    {% endif %}
+  </div>
+
+<!-- Preview Modal -->
+<div id="previewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9998;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+  <div style="display:flex;gap:8px;margin-bottom:4px">
+    <span id="previewNome" style="color:white;font-size:13px"></span>
+    <button onclick="document.getElementById('previewModal').style.display='none'" style="background:rgba(255,255,255,.15);border:none;color:white;padding:4px 10px;border-radius:5px;cursor:pointer">✕ Fechar</button>
+    <button onclick="window.print()" style="background:rgba(255,255,255,.15);border:none;color:white;padding:4px 10px;border-radius:5px;cursor:pointer">🖨 Imprimir</button>
+  </div>
+  <div id="previewContent" style="max-width:90vw;max-height:80vh;overflow:auto"></div>
+</div>
+
   <!-- History -->
   <div class="card" style="padding:14px">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Histórico de Estados</div>
@@ -212,6 +273,58 @@ function eliminar() {
     .then(function(r){ return r.json(); })
     .then(function(d){ if(d.ok) window.location='/entradas'; else alert('Erro: '+d.error); });
 }
+
+
+function uploadFicheiros(files) {
+  var semDocs = document.getElementById('semDocs');
+  if (semDocs) semDocs.style.display = 'none';
+  Array.from(files).forEach(function(file) {
+    var tmpId = 'tmp-' + Date.now();
+    var grid = document.getElementById('docsGrid');
+    var placeholder = document.createElement('div');
+    placeholder.id = tmpId;
+    placeholder.style.cssText = 'border:1px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px;min-height:130px';
+    placeholder.innerHTML = '<div style="font-size:10px;color:var(--text-muted);text-align:center">' + file.name.substring(0,18) + '</div><div style="width:80%;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden"><div id="bar-'+tmpId+'" style="height:100%;width:0;background:var(--accent);transition:.1s"></div></div>';
+    grid.insertBefore(placeholder, grid.firstChild);
+
+    var fd = new FormData();
+    fd.append('ficheiro', file);
+    var xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = function(ev) {
+      if (ev.lengthComputable) document.getElementById('bar-'+tmpId).style.width = (ev.loaded/ev.total*100)+'%';
+    };
+    xhr.onload = function() {
+      var d = JSON.parse(xhr.responseText);
+      if (d.ok) location.reload();
+      else { placeholder.innerHTML = '<div style="color:#ef4444;font-size:10px">Erro</div>'; }
+    };
+    xhr.open('POST', '/entradas/{{ e.id }}/documentos/upload');
+    xhr.send(fd);
+  });
+}
+
+function apagarDoc(did) {
+  if (!confirm('Apagar este documento?')) return;
+  fetch('/entradas/{{ e.id }}/documentos/' + did + '/apagar', {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) document.getElementById('doc-'+did).remove(); });
+}
+
+function abrirPreview(url, mime, nome) {
+  var modal = document.getElementById('previewModal');
+  var content = document.getElementById('previewContent');
+  document.getElementById('previewNome').textContent = nome;
+  if (mime && mime.startsWith('image/')) {
+    content.innerHTML = '<img src="'+url+'" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:8px">';
+  } else if (mime === 'application/pdf') {
+    content.innerHTML = '<iframe src="'+url+'" style="width:80vw;height:80vh;border:none;border-radius:8px"></iframe>';
+  } else {
+    window.open(url, '_blank'); return;
+  }
+  modal.style.display = 'flex';
+}
+document.getElementById('previewModal').addEventListener('click', function(e){
+  if(e.target===this) this.style.display='none';
+});
 
 function guardarDataOrcamento(val) {
   fetch('/entradas/{{ e.id }}/data-orcamento', {
