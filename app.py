@@ -156,12 +156,15 @@ def dashboard():
     ).order_by(ArtigoPHC.stock_atual).limit(10).all()
     # Check entradas in estadia
     try:
-        entradas_estadia = EntradaEquipamento.query.filter(
+        _verificar_estadias()
+        entradas_estadia_list = EntradaEquipamento.query.filter(
             EntradaEquipamento.status.in_(['orcamentado_estadia','concluido_estadia'])
-        ).count()
-    except: entradas_estadia = 0
+        ).order_by(EntradaEquipamento.data_status).all()
+        entradas_estadia = len(entradas_estadia_list)
+    except: entradas_estadia = 0; entradas_estadia_list = []
     return render_template('dashboard.html',
         entradas_estadia=entradas_estadia,
+        entradas_estadia_list=entradas_estadia_list,
         total_pedidos=total_pedidos,
         pedidos_abertos=pedidos_abertos,
         pedidos_aprovados=pedidos_aprovados,

@@ -9,6 +9,45 @@
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
   <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
+<!-- Hidden HTML for entradas_estadia widget -->
+<div id="entradas_estadia_html" style="display:none">
+{% if entradas_estadia_list %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;padding:2px">
+{% for e in entradas_estadia_list %}
+{% set is_orc = e.status == 'orcamentado_estadia' %}
+{% set col = '#ef4444' if is_orc else '#a855f7' %}
+{% set bg = 'rgba(239,68,68,.08)' if is_orc else 'rgba(168,85,247,.08)' %}
+{% set border = 'rgba(239,68,68,.3)' if is_orc else 'rgba(168,85,247,.3)' %}
+<div style="background:{{ bg }};border:1px solid {{ border }};border-radius:10px;padding:12px;position:relative">
+  <!-- Badge -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:{{ col }}20;color:{{ col }};border:1px solid {{ col }}40">
+      {% if is_orc %}⏳ Orç. – Em Estadia{% else %}🏁 Conc. – Em Estadia{% endif %}
+    </span>
+    <span style="font-size:20px;font-weight:800;color:{{ col }};font-family:monospace">#{{ '%04d'|format(e.numero) }}</span>
+  </div>
+  <!-- Client & equipment -->
+  <div style="font-size:13px;font-weight:700;margin-bottom:2px">{{ e.cliente_nome[:30] }}</div>
+  <div style="font-size:12px;color:var(--text-muted)">{{ e.marca or '' }}{% if e.marca and e.modelo %} · {% endif %}{{ e.modelo or '' }}{% if not e.marca and not e.modelo %}—{% endif %}</div>
+  {% if e.num_serie %}<div style="font-size:10px;color:var(--text-muted);font-family:monospace;margin-top:2px">S/N: {{ e.num_serie }}</div>{% endif %}
+  <!-- Date info -->
+  <div style="margin-top:8px;padding-top:8px;border-top:1px solid {{ border }};display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:11px;color:var(--text-muted)">
+      📅 Estado desde {{ e.data_status.strftime('%d/%m/%Y') if e.data_status else '—' }}
+    </div>
+    <a href="{{ url_for('entrada_detalhe', eid=e.id) }}" style="font-size:11px;font-weight:700;color:{{ col }};text-decoration:none;padding:3px 8px;border:1px solid {{ col }}40;border-radius:4px">Ver →</a>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:24px;color:var(--success)">
+  <div style="font-size:28px;margin-bottom:8px">✅</div>
+  <div style="font-size:13px;font-weight:600">Sem equipamentos em estadia</div>
+</div>
+{% endif %}
+</div>
+
 <!-- Status modal dashboard -->
 <div id="dashStatusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:440px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
@@ -212,6 +251,10 @@ const WIDGET_DATA = {
     label: '📋 Pedidos Recentes', cols: 8,
     html: function() { return `{% if pedidos_recentes %}<div class="table-wrap" style="margin:0"><table><thead><tr><th>Título</th><th>Estado</th><th>Data</th><th></th></tr></thead><tbody>{% for p in pedidos_recentes %}<tr><td style="font-size:13px">{{ p.titulo[:35] }}</td><td><span class="badge {% if p.estado=='aberto' %}badge-blue{% elif p.estado=='aprovado' %}badge-green{% else %}badge-yellow{% endif %}" style="font-size:10px">{{ p.estado }}</span></td><td style="font-size:12px;color:var(--text-muted)">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td><td><a href="/pedidos/{{ p.id }}" class="btn btn-ghost btn-sm">→</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem pedidos recentes</div>{% endif %}`; }
   },
+  entradas_estadia: {
+    label: '🚨 Entradas em Estadia', cols: 12,
+    html: function() { return document.getElementById('entradas_estadia_html').innerHTML; }
+  },
   artigos_pedidos: {
     label: '📦 Artigos Pedidos', cols: 12,
     html: function() {
@@ -243,6 +286,7 @@ const WIDGET_DATA = {
 
 const DEFAULT_LAYOUT = [
   {id:'kpis', cols:12},
+  {id:'entradas_estadia', cols:12},
   {id:'artigos_pedidos', cols:12},
   {id:'pedidos_recentes', cols:8},
   {id:'stock_baixo', cols:6},
@@ -250,7 +294,7 @@ const DEFAULT_LAYOUT = [
 ];
 
 // Version check - bump this when DEFAULT_LAYOUT changes
-const LAYOUT_VERSION = '4';
+const LAYOUT_VERSION = '5';
 let savedLayout = null;
 try {
   if (localStorage.getItem('dashboard_layout_version') !== LAYOUT_VERSION) {
@@ -682,6 +726,45 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved=>{
   renderGrid();
 }).catch(()=>renderGrid());
 </script>
+
+<!-- Hidden HTML for entradas_estadia widget -->
+<div id="entradas_estadia_html" style="display:none">
+{% if entradas_estadia_list %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;padding:2px">
+{% for e in entradas_estadia_list %}
+{% set is_orc = e.status == 'orcamentado_estadia' %}
+{% set col = '#ef4444' if is_orc else '#a855f7' %}
+{% set bg = 'rgba(239,68,68,.08)' if is_orc else 'rgba(168,85,247,.08)' %}
+{% set border = 'rgba(239,68,68,.3)' if is_orc else 'rgba(168,85,247,.3)' %}
+<div style="background:{{ bg }};border:1px solid {{ border }};border-radius:10px;padding:12px;position:relative">
+  <!-- Badge -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:{{ col }}20;color:{{ col }};border:1px solid {{ col }}40">
+      {% if is_orc %}⏳ Orç. – Em Estadia{% else %}🏁 Conc. – Em Estadia{% endif %}
+    </span>
+    <span style="font-size:20px;font-weight:800;color:{{ col }};font-family:monospace">#{{ '%04d'|format(e.numero) }}</span>
+  </div>
+  <!-- Client & equipment -->
+  <div style="font-size:13px;font-weight:700;margin-bottom:2px">{{ e.cliente_nome[:30] }}</div>
+  <div style="font-size:12px;color:var(--text-muted)">{{ e.marca or '' }}{% if e.marca and e.modelo %} · {% endif %}{{ e.modelo or '' }}{% if not e.marca and not e.modelo %}—{% endif %}</div>
+  {% if e.num_serie %}<div style="font-size:10px;color:var(--text-muted);font-family:monospace;margin-top:2px">S/N: {{ e.num_serie }}</div>{% endif %}
+  <!-- Date info -->
+  <div style="margin-top:8px;padding-top:8px;border-top:1px solid {{ border }};display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:11px;color:var(--text-muted)">
+      📅 Estado desde {{ e.data_status.strftime('%d/%m/%Y') if e.data_status else '—' }}
+    </div>
+    <a href="{{ url_for('entrada_detalhe', eid=e.id) }}" style="font-size:11px;font-weight:700;color:{{ col }};text-decoration:none;padding:3px 8px;border:1px solid {{ col }}40;border-radius:4px">Ver →</a>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:24px;color:var(--success)">
+  <div style="font-size:28px;margin-bottom:8px">✅</div>
+  <div style="font-size:13px;font-weight:600">Sem equipamentos em estadia</div>
+</div>
+{% endif %}
+</div>
 
 <!-- Status modal dashboard -->
 <div id="dashStatusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
