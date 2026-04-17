@@ -2867,6 +2867,7 @@ ENTRADAS_STATUS = [
     ('faturado',            '🧾 Faturado'),
     ('orcamentado_estadia', '⏳ Orçamentado – Em Estadia'),
     ('concluido_estadia',   '🏁 Concluído – Em Estadia'),
+    ('concluido_fechado',   '✔️ Concluído – Fechado'),
 ]
 ENTRADAS_STATUS_DICT = dict(ENTRADAS_STATUS)
 
@@ -3038,6 +3039,11 @@ def entrada_status(eid):
     e.data_status = datetime.now()
     e.data_status_real = data_real
     e.atualizado_em = datetime.now()
+    # If closing, calculate total days from reception to close
+    if novo == 'concluido_fechado':
+        e.data_fecho = data_real
+        if e.data_rececao:
+            e.dias_total = (data_real - e.data_rececao).days
     db.session.add(EntradaHistorico(
         entrada_id=eid, status_ant=ant, status_novo=novo,
         user_id=current_user.id, user_nome=current_user.nome,

@@ -12,7 +12,7 @@
 {% set SC = {
   'rececionado':'#3b6ef0','orcamentado':'#f59e0b','material_pedido':'#6366f1',
   'em_reparacao':'#22c55e','faturado':'#06b6d4',
-  'orcamentado_estadia':'#ef4444','concluido_estadia':'#a855f7'
+  'orcamentado_estadia':'#ef4444','concluido_estadia':'#a855f7','concluido_fechado':'#6b7280'
 } %}
 {% set col = SC.get(e.status, '#999') %}
 
@@ -59,6 +59,22 @@
         onchange="guardarDataOrcamento(this.value)">
       <span id="dataOrcSaved" style="font-size:11px;color:var(--success);display:none">✅ Guardado</span>
       <span style="font-size:11px;color:var(--text-muted)">Esta data é usada para calcular os dias úteis quando o estado é Orçamentado</span>
+    </div>
+    {% endif %}
+
+
+    <!-- Data Fecho (editable when concluido_fechado) -->
+    {% if e.status == 'concluido_fechado' %}
+    <div style="margin-top:8px;padding:10px 12px;background:rgba(107,114,128,.08);border:1px solid rgba(107,114,128,.25);border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:#6b7280">✔️ Data de Fecho:</span>
+      <input type="date" id="dataFechoInput" class="input"
+        value="{{ e.data_fecho.strftime('%Y-%m-%d') if e.data_fecho else '' }}"
+        style="width:160px;font-size:12px;padding:4px 8px"
+        onchange="guardarDataFecho(this.value)">
+      <span id="dataFechoSaved" style="font-size:11px;color:var(--success);display:none">✅ Guardado</span>
+      {% if e.dias_total is not none %}
+      <span style="font-size:12px;font-weight:700;color:#6b7280">· {{ e.dias_total }} dias desde receção</span>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -325,6 +341,21 @@ function abrirPreview(url, mime, nome) {
 document.getElementById('previewModal').addEventListener('click', function(e){
   if(e.target===this) this.style.display='none';
 });
+
+function guardarDataFecho(val) {
+  fetch('/entradas/{{ e.id }}/data-fecho', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({data_fecho: val})
+  }).then(r=>r.json()).then(d=>{
+    var el = document.getElementById('dataFechoSaved');
+    if (d.ok) {
+      el.style.display = 'inline';
+      if (d.dias_total !== null) {
+        setTimeout(function(){ location.reload(); }, 1000);
+      } else setTimeout(function(){ el.style.display='none'; }, 2000);
+    } else alert('Erro: ' + d.error);
+  });
+}
 
 function guardarDataOrcamento(val) {
   fetch('/entradas/{{ e.id }}/data-orcamento', {

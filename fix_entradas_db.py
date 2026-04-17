@@ -24,6 +24,8 @@ cur.execute("""CREATE TABLE IF NOT EXISTS entrada_historico (
 for tbl, col, typ in [
     ('entradas_equipamento', 'data_status_real', 'DATE'),
     ('entradas_equipamento', 'data_orcamento',   'DATE'),
+    ('entradas_equipamento', 'data_fecho',       'DATE'),
+    ('entradas_equipamento', 'dias_total',       'INTEGER'),
     ('entrada_historico',    'data_real',        'DATE'),
 ]:
     cols = [r[1] for r in cur.execute(f"PRAGMA table_info({tbl})").fetchall()]
