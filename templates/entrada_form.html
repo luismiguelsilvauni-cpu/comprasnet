@@ -19,6 +19,7 @@
     <div class="form-group">
       <label>Data de Receção *</label>
       <input type="date" name="data_rececao" value="{{ entrada.data_rececao.strftime('%Y-%m-%d') if entrada else hoje }}" class="input" required>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pode introduzir uma data anterior à data de hoje</div>
     </div>
 
     <!-- Cliente com pesquisa PHC -->

@@ -40,3 +40,18 @@ CREATE TABLE IF NOT EXISTS entrada_historico (
 conn.commit()
 conn.close()
 print("OK: tabelas entradas_equipamento e entrada_historico criadas")
+
+# Add new columns if missing
+cols = [r[1] for r in cur.execute("PRAGMA table_info(entradas_equipamento)").fetchall()]
+if 'data_status_real' not in cols:
+    cur.execute("ALTER TABLE entradas_equipamento ADD COLUMN data_status_real DATE")
+    print("OK: entradas_equipamento.data_status_real added")
+
+cols = [r[1] for r in cur.execute("PRAGMA table_info(entrada_historico)").fetchall()]
+if 'data_real' not in cols:
+    cur.execute("ALTER TABLE entrada_historico ADD COLUMN data_real DATE")
+    print("OK: entrada_historico.data_real added")
+
+conn.commit()
+conn.close()
+print("Migration complete")

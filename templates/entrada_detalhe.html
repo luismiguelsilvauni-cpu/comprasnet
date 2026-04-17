@@ -34,7 +34,11 @@
       <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Marca</div><div style="font-size:14px">{{ e.marca or '—' }}</div></div>
       <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Modelo</div><div style="font-size:14px">{{ e.modelo or '—' }}</div></div>
       <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Nº Série</div><div style="font-size:14px;font-family:monospace">{{ e.num_serie or '—' }}</div></div>
-      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Estado desde</div><div style="font-size:13px">{{ e.data_status.strftime('%d/%m/%Y %H:%M') if e.data_status else '—' }}</div></div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Estado desde (real)</div>
+        <div style="font-size:13px;font-weight:600">{{ e.data_status_real.strftime('%d/%m/%Y') if e.data_status_real else (e.data_status.strftime('%d/%m/%Y') if e.data_status else '—') }}</div>
+        {% if e.data_status %}<div style="font-size:10px;color:var(--text-muted)">Registado: {{ e.data_status.strftime('%d/%m/%Y %H:%M') }}</div>{% endif %}
+      </div>
     </div>
 
     {% if e.observacoes %}
@@ -65,7 +69,9 @@
           <span style="font-size:11px;font-weight:700;color:{{ SC.get(h.status_novo,'#999') }}">{{ status_dict.get(h.status_novo, h.status_novo) }}</span>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
-          👤 {{ h.user_nome or '—' }} · 🕐 {{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}
+          📅 {{ h.data_real.strftime('%d/%m/%Y') if h.data_real else h.criado_em.strftime('%d/%m/%Y') }} (real)
+          · 🕐 reg. {{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}
+          · 👤 {{ h.user_nome or '—' }}
           {% if h.notas %} · 📝 {{ h.notas }}{% endif %}
         </div>
       </div>
@@ -90,6 +96,11 @@
     {% endfor %}
 
     <div style="margin-top:10px">
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Data real do evento *</label>
+      <input type="date" id="statusDataReal" class="input" style="margin-top:4px;font-size:12px" value="">
+      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Data efectiva em que o evento ocorreu (pode ser anterior à data de registo)</div>
+    </div>
+    <div style="margin-top:8px">
       <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Nota (opcional)</label>
       <input type="text" id="statusNota" class="input" style="margin-top:4px;font-size:12px" placeholder="Ex: Aguarda peça X...">
     </div>
@@ -119,15 +130,21 @@ function mudarStatus(status) {
   _novoStatus = status;
   document.getElementById('statusModalTxt').textContent =
     'Alterar para: ' + (STATUS_LABELS[status] || status);
+  // Set data_real default to today
+  var hoje = new Date();
+  var hj = hoje.getFullYear() + '-' + String(hoje.getMonth()+1).padStart(2,'0') + '-' + String(hoje.getDate()).padStart(2,'0');
+  document.getElementById('statusDataReal').value = hj;
   document.getElementById('statusModal').style.display = 'flex';
 }
 
 function confirmarStatus() {
   var nota = document.getElementById('statusNota').value.trim();
+  var dataReal = document.getElementById('statusDataReal').value;
+  if (!dataReal) { alert('Por favor introduza a data real do evento.'); return; }
   fetch('/entradas/{{ e.id }}/status', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({status: _novoStatus, notas: nota})
+    body: JSON.stringify({status: _novoStatus, notas: nota, data_real: dataReal})
   }).then(r=>r.json()).then(d=>{
     if (d.ok) location.reload();
     else alert('Erro: ' + d.error);

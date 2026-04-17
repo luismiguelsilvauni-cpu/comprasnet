@@ -2893,9 +2893,13 @@ def _verificar_estadias():
     changed = 0
     for e in EntradaEquipamento.query.all():
         rule = ESTADIA_RULES.get(e.status)
-        if not rule or not e.data_status:
+        if not rule:
             continue
-        dias = _dias_uteis(e.data_status.date(), date.today())
+        # Use real date if set, otherwise registration date
+        ref_date = e.data_status_real or (e.data_status.date() if e.data_status else None)
+        if not ref_date:
+            continue
+        dias = _dias_uteis(ref_date, date.today())
         if dias >= rule['dias']:
             status_ant = e.status
             e.status = rule['escalate']
@@ -2925,9 +2929,14 @@ def entradas():
     # Compute dias for each entry
     for e in entradas_list:
         rule = ESTADIA_RULES.get(e.status)
-        if rule and e.data_status:
-            e._dias_contagem = _dias_uteis(e.data_status.date(), date.today())
-            e._dias_limite = rule['dias']
+        if rule:
+            ref = e.data_status_real or (e.data_status.date() if e.data_status else None)
+            if ref:
+                e._dias_contagem = _dias_uteis(ref, date.today())
+                e._dias_limite = rule['dias']
+            else:
+                e._dias_contagem = None
+                e._dias_limite = None
         else:
             e._dias_contagem = None
             e._dias_limite = None
@@ -2945,7 +2954,7 @@ def entrada_nova():
         last = db.session.query(db.func.max(EntradaEquipamento.numero)).scalar() or 0
         e = EntradaEquipamento(
             numero=last+1,
-            data_rececao=datetime.strptime(request.form['data_rececao'], '%Y-%m-%d').date(),
+            data_rececao=datetime.strptime(request.form.get('data_rececao', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
             cliente_nome=request.form.get('cliente_nome','').strip(),
             marca=request.form.get('marca','').strip(),
             modelo=request.form.get('modelo','').strip(),
@@ -2977,7 +2986,11 @@ def entrada_detalhe(eid):
     e = EntradaEquipamento.query.get_or_404(eid)
     from datetime import date
     rule = ESTADIA_RULES.get(e.status)
-    dias_contagem = _dias_uteis(e.data_status.date(), date.today()) if (rule and e.data_status) else None
+    if rule:
+        ref = e.data_status_real or (e.data_status.date() if e.data_status else None)
+        dias_contagem = _dias_uteis(ref, date.today()) if ref else None
+    else:
+        dias_contagem = None
     return render_template('entrada_detalhe.html', e=e,
         status_list=ENTRADAS_STATUS, dias_contagem=dias_contagem,
         status_dict=ENTRADAS_STATUS_DICT)
@@ -3007,16 +3020,27 @@ def entrada_status(eid):
     data = request.get_json() or {}
     novo = data.get('status')
     notas = data.get('notas','')
+    data_real_str = data.get('data_real','')
     if novo not in ENTRADAS_STATUS_DICT:
         return jsonify({'ok': False, 'error': 'Status inválido'})
+    # Parse real date
+    from datetime import date as date_type
+    data_real = None
+    if data_real_str:
+        try:
+            data_real = datetime.strptime(data_real_str, '%Y-%m-%d').date()
+        except: pass
+    if not data_real:
+        data_real = date_type.today()
     ant = e.status
     e.status = novo
     e.data_status = datetime.now()
+    e.data_status_real = data_real
     e.atualizado_em = datetime.now()
     db.session.add(EntradaHistorico(
         entrada_id=eid, status_ant=ant, status_novo=novo,
         user_id=current_user.id, user_nome=current_user.nome,
-        notas=notas, criado_em=datetime.now()
+        notas=notas, data_real=data_real, criado_em=datetime.now()
     ))
     db.session.commit()
     return jsonify({'ok': True})

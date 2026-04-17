@@ -374,7 +374,8 @@ class EntradaEquipamento(db.Model):
     num_serie       = db.Column(db.String(100))
     observacoes     = db.Column(db.Text, default='')
     status          = db.Column(db.String(50), default='rececionado')
-    data_status     = db.Column(db.DateTime)          # when current status was set
+    data_status     = db.Column(db.DateTime)          # when status was registered
+    data_status_real = db.Column(db.Date, nullable=True)  # real date of current status
     criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)
@@ -391,5 +392,6 @@ class EntradaHistorico(db.Model):
     user_id     = db.Column(db.Integer, db.ForeignKey('users.id'))
     user_nome   = db.Column(db.String(120))
     notas       = db.Column(db.String(400), default='')
+    data_real   = db.Column(db.Date, nullable=True)  # real date of event (can differ from criado_em)
     criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
 
