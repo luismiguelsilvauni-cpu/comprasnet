@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Assistências · NavTech{% endblock %}
+{% block page_title %}🔧 Assistências & Garantias{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('assistencia_nova') }}" class="btn btn-primary btn-sm">+ Nova Assistência</a>
+{% endblock %}
+{% block content %}
+
+<!-- Filters -->
+<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+  <a href="{{ url_for('assistencias') }}" class="btn btn-sm {% if not status_filtro %}btn-primary{% else %}btn-ghost{% endif %}">Todos</a>
+  {% for val,label in status_list %}
+  <a href="{{ url_for('assistencias', status=val) }}" class="btn btn-sm {% if status_filtro==val %}btn-primary{% else %}btn-ghost{% endif %}" style="font-size:11px">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<!-- Badges grid -->
+{% if items %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+{% for a in items %}
+{% set col = colors.get(a.status,'#999') %}
+{% set is_closed = a.status == 'faturado_fechado' %}
+<a href="{{ url_for('assistencia_detalhe', aid=a.id) }}" style="text-decoration:none;{% if is_closed %}opacity:.5{% endif %}">
+<div style="background:var(--surface);border:1px solid {{ col }}40;border-radius:12px;padding:14px;border-left:4px solid {{ col }};transition:.15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.15)'" onmouseout="this.style.boxShadow=''">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <span style="font-size:20px;font-weight:800;color:{{ col }};font-family:monospace">#{{ '%04d'|format(a.numero) }}</span>
+    <span style="flex:1;font-size:12px;font-weight:700;color:var(--text)">{{ a.requerente_nome[:30] }}</span>
+    <span style="font-size:9px;font-weight:700;padding:3px 7px;border-radius:4px;background:{{ col }}18;color:{{ col }};border:1px solid {{ col }}40;white-space:nowrap">
+      {{ {'rececionado':'📥 Rececionado','em_execucao':'🔧 Em Execução','obra_concluida':'✅ Concluída','comunicado':'📨 Comunicado','faturado_fechado':'🧾 Fechado'}.get(a.status,a.status) }}
+    </span>
+  </div>
+  <!-- Info -->
+  {% if a.num_requisicao %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">📋 Req: {{ a.num_requisicao }}</div>{% endif %}
+  {% if a.local_obra %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">📍 {{ a.local_obra[:50] }}</div>{% endif %}
+  {% if a.observacoes %}<div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.observacoes[:60] }}</div>{% endif %}
+  <!-- Dates -->
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:10px;color:var(--text-muted)">
+    {% if a.data_rececionado %}<span>📥 {{ a.data_rececionado.strftime('%d/%m/%y') }}</span>{% endif %}
+    {% if a.data_obra_concluida %}<span>✅ {{ a.data_obra_concluida.strftime('%d/%m/%y') }}</span>{% endif %}
+    {% if a.data_faturado %}<span>🧾 {{ a.data_faturado.strftime('%d/%m/%y') }}</span>{% endif %}
+    {% if a.dias_recepcao_conclusao is not none %}<span style="margin-left:auto;font-weight:700;color:{{ col }}">{{ a.dias_recepcao_conclusao }}d obra</span>{% endif %}
+  </div>
+  <!-- Docs count -->
+  {% if a.documentos %}
+  <div style="margin-top:6px;font-size:10px;color:var(--text-muted)">
+    📎 {{ a.documentos|selectattr('tipo','eq','documento')|list|length }} doc
+    {% set emails = a.documentos|selectattr('tipo','eq','email')|list %}
+    {% if emails %} · ✉️ {{ emails|length }} email{% endif %}
+  </div>
+  {% endif %}
+</div>
+</a>
+{% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:48px;margin-bottom:12px">🔧</div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:6px">Sem assistências registadas</div>
+  <button onclick="window.location='{{ url_for('assistencia_nova') }}'" class="btn btn-primary">+ Nova Assistência</button>
+</div>
+{% endif %}
+{% endblock %}

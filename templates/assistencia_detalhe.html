@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Assistência #{{ '%04d'|format(a.numero) }} · NavTech{% endblock %}
+{% block page_title %}🔧 Assistência #{{ '%04d'|format(a.numero) }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('assistencias') }}" class="btn btn-ghost btn-sm">← Lista</a>
+  <a href="{{ url_for('assistencia_editar', aid=a.id) }}" class="btn btn-ghost btn-sm">✏️ Editar</a>
+  <button type="button" onclick="eliminar()" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
+{% endblock %}
+{% block content %}
+
+{% set col = colors.get(a.status,'#999') %}
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start">
+
+<!-- LEFT -->
+<div>
+  <!-- Info card -->
+  <div class="card" style="padding:16px;margin-bottom:12px;border-left:4px solid {{ col }}">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div style="font-size:28px;font-weight:800;color:{{ col }};font-family:monospace">#{{ '%04d'|format(a.numero) }}</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:700">{{ a.requerente_nome }}</div>
+        {% if a.requerente_nif %}<div style="font-size:11px;color:var(--text-muted)">NIF: {{ a.requerente_nif }}</div>{% endif %}
+      </div>
+      <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:6px;background:{{ col }}18;color:{{ col }};border:1px solid {{ col }}40">
+        {{ status_dict.get(a.status,a.status) }}
+      </span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Nº Requisição</div><div style="font-size:13px">{{ a.num_requisicao or '—' }}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px">Local da Obra</div><div style="font-size:13px">{{ a.local_obra or '—' }}</div></div>
+    </div>
+    {% if a.observacoes %}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Observações</div>
+      <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">{{ a.observacoes }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Duration summary -->
+    {% if a.dias_recepcao_conclusao is not none or a.dias_conclusao_faturado is not none %}
+    <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap">
+      {% if a.dias_recepcao_conclusao is not none %}
+      <div style="padding:6px 12px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;font-size:12px">
+        📥→✅ <strong>{{ a.dias_recepcao_conclusao }} dias</strong> <span style="color:var(--text-muted)">(receção→conclusão)</span>
+      </div>
+      {% endif %}
+      {% if a.dias_conclusao_faturado is not none %}
+      <div style="padding:6px 12px;background:rgba(107,114,128,.1);border:1px solid rgba(107,114,128,.25);border-radius:6px;font-size:12px">
+        ✅→🧾 <strong>{{ a.dias_conclusao_faturado }} dias</strong> <span style="color:var(--text-muted)">(conclusão→faturado)</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Documents & Emails -->
+  <div class="card" style="padding:14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">📎 Documentos & Emails</div>
+      <div style="display:flex;gap:6px">
+        <button onclick="triggerUpload('documento')" class="btn btn-ghost btn-sm">📄 Doc/PDF</button>
+        <button onclick="triggerUpload('email')" class="btn btn-primary btn-sm">✉️ Email</button>
+      </div>
+    </div>
+    <input type="file" id="upDoc"   style="display:none" multiple accept=".pdf,.doc,.docx,.txt,.png,.jpg,.xlsx" onchange="upload(this.files,'documento')">
+    <input type="file" id="upEmail" style="display:none" multiple accept=".eml,.msg,.pdf,.txt" onchange="upload(this.files,'email')">
+
+    <!-- Emails section -->
+    {% set emails = docs|selectattr('tipo','eq','email')|list %}
+    {% if emails %}
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px">✉️ Emails ({{ emails|length }})</div>
+      {% for doc in emails %}
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(59,110,240,.06);border:1px solid rgba(59,110,240,.2);border-radius:6px;margin-bottom:5px">
+        <span style="font-size:18px">✉️</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ doc.nome_original }}</div>
+          <div style="font-size:10px;color:var(--text-muted)">{{ doc.criado_em.strftime('%d/%m/%Y %H:%M') }} · {{ doc.uploader.nome if doc.uploader else '—' }}{% if doc.descricao %} · {{ doc.descricao }}{% endif %}</div>
+        </div>
+        <a href="{{ url_for('assistencia_doc_preview', aid=a.id, did=doc.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">👁</a>
+        <a href="{{ url_for('assistencia_doc_download', aid=a.id, did=doc.id) }}" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">⬇</a>
+        {% if current_user.is_admin or current_user.id == doc.criado_por %}
+        <button onclick="apagarDoc({{ doc.id }})" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:none;padding:3px 6px;font-size:11px">🗑</button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Documents section -->
+    {% set pdfs = docs|selectattr('tipo','eq','documento')|list %}
+    {% if pdfs %}
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px">📄 Documentos ({{ pdfs|length }})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px">
+        {% for doc in pdfs %}
+        {% set is_img = doc.mime and doc.mime.startswith('image/') %}
+        <div id="doc-{{ doc.id }}" style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+          <div style="height:70px;background:var(--surface2);display:flex;align-items:center;justify-content:center;cursor:pointer"
+               onclick="abrirPreview('{{ url_for('assistencia_doc_preview', aid=a.id, did=doc.id) }}','{{ doc.mime }}','{{ doc.nome_original }}')">
+            {% if is_img %}<img src="{{ url_for('assistencia_doc_preview', aid=a.id, did=doc.id) }}" style="width:100%;height:70px;object-fit:cover">
+            {% elif doc.mime == 'application/pdf' %}<div style="font-size:28px">📄</div>
+            {% else %}<div style="font-size:28px">📎</div>{% endif %}
+          </div>
+          <div style="padding:5px 7px">
+            <div style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600" title="{{ doc.nome_original }}">{{ doc.nome_original[:18] }}</div>
+            <div style="font-size:9px;color:var(--text-muted)">{{ '%.0f'|format(doc.tamanho/1024) }}KB</div>
+          </div>
+          <div style="display:flex;border-top:1px solid var(--border)">
+            <a href="{{ url_for('assistencia_doc_download', aid=a.id, did=doc.id) }}" style="flex:1;text-align:center;padding:4px;font-size:11px;color:var(--accent);text-decoration:none" title="Download">⬇</a>
+            <a href="{{ url_for('assistencia_doc_preview', aid=a.id, did=doc.id) }}" target="_blank" style="flex:1;text-align:center;padding:4px;font-size:11px;color:var(--accent);text-decoration:none" title="Ver">👁</a>
+            {% if current_user.is_admin or current_user.id == doc.criado_por %}
+            <button onclick="apagarDoc({{ doc.id }})" style="flex:1;background:none;border:none;padding:4px;font-size:11px;color:#ef4444;cursor:pointer">🗑</button>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not docs %}
+    <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Sem documentos. Clique em "Doc/PDF" ou "Email" para adicionar.</div>
+    {% endif %}
+    <div id="uploadProgress" style="margin-top:8px"></div>
+  </div>
+
+  <!-- History -->
+  <div class="card" style="padding:14px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Histórico</div>
+    {% for h in a.historico %}
+    {% set hcol = colors.get(h.status_novo,'#999') %}
+    <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="width:3px;min-width:3px;background:{{ hcol }};border-radius:2px;margin-top:2px"></div>
+      <div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:3px">
+          {% if h.status_ant %}<span style="font-size:11px;color:var(--text-muted)">{{ status_dict.get(h.status_ant,h.status_ant) }}</span><span style="color:var(--text-muted)">→</span>{% endif %}
+          <span style="font-size:11px;font-weight:700;color:{{ hcol }}">{{ status_dict.get(h.status_novo,h.status_novo) }}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted)">
+          📅 <strong>{{ h.data_real.strftime('%d/%m/%Y') if h.data_real else '—' }}</strong>
+          · 🕐 reg. {{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}
+          · 👤 {{ h.user_nome or '—' }}
+          {% if h.notas %} · 📝 {{ h.notas }}{% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div style="color:var(--text-muted);font-size:12px">Sem histórico</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- RIGHT: status panel -->
+<div class="card" style="padding:14px;position:sticky;top:16px">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:12px">Alterar Estado</div>
+  {% for val,label in status_list %}
+  {% set c = colors.get(val,'#999') %}
+  <button type="button" onclick="abrirModal('{{ val }}','{{ label }}')"
+    style="width:100%;text-align:left;padding:8px 12px;border-radius:7px;margin-bottom:5px;
+    border:1px solid {{ c }}40;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;
+    {% if a.status==val %}background:{{ c }}18;font-weight:700;color:{{ c }}{% else %}background:transparent;color:var(--text){% endif %}">
+    <span style="font-size:8px;{% if a.status==val %}color:{{ c }}{% else %}color:var(--border){% endif %}">●</span>
+    {{ label }}
+    {% if a.status==val and a['data_'+val.replace('faturado_fechado','faturado')] is defined %}
+    {% endif %}
+  </button>
+  {% endfor %}
+
+  <!-- Date summary -->
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">
+    {% if a.data_rececionado %}<div style="margin-bottom:4px">📥 {{ a.data_rececionado.strftime('%d/%m/%Y') }}</div>{% endif %}
+    {% if a.data_em_execucao %}<div style="margin-bottom:4px">🔧 {{ a.data_em_execucao.strftime('%d/%m/%Y') }}</div>{% endif %}
+    {% if a.data_obra_concluida %}<div style="margin-bottom:4px">✅ {{ a.data_obra_concluida.strftime('%d/%m/%Y') }}</div>{% endif %}
+    {% if a.data_comunicado %}<div style="margin-bottom:4px">📨 {{ a.data_comunicado.strftime('%d/%m/%Y') }}</div>{% endif %}
+    {% if a.data_faturado %}<div style="margin-bottom:4px">🧾 {{ a.data_faturado.strftime('%d/%m/%Y') }}</div>{% endif %}
+  </div>
+</div>
+
+</div>
+
+<!-- Status Modal -->
+<div id="statusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:420px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1" id="modalTitulo">Alterar Estado</div>
+      <button onclick="fecharModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px">
+      <div class="form-group">
+        <label>📅 Data Real *</label>
+        <input type="date" id="modalData" class="input">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Data efectiva em que este estado ocorreu</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>📝 Nota (opcional)</label>
+        <input type="text" id="modalNota" class="input" placeholder="Ex: Obra concluída, aguarda faturação...">
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharModal()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="confirmar()" class="btn btn-primary" id="modalBtn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="previewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9998;align-items:center;justify-content:center;flex-direction:column;gap:10px">
+  <div style="display:flex;gap:8px">
+    <span id="previewNome" style="color:white;font-size:12px"></span>
+    <button onclick="document.getElementById('previewModal').style.display='none'" style="background:rgba(255,255,255,.15);border:none;color:white;padding:4px 12px;border-radius:5px;cursor:pointer">✕</button>
+  </div>
+  <div id="previewContent" style="max-width:90vw;max-height:85vh;overflow:auto"></div>
+</div>
+
+<script>
+var _status = null;
+function abrirModal(s,l) {
+  _status=s;
+  document.getElementById('modalTitulo').textContent='Alterar para: '+l;
+  var n=new Date();
+  document.getElementById('modalData').value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  document.getElementById('modalNota').value='';
+  document.getElementById('statusModal').style.display='flex';
+}
+function fecharModal(){ document.getElementById('statusModal').style.display='none'; _status=null; }
+function confirmar(){
+  if(!_status) return;
+  var d=document.getElementById('modalData').value;
+  if(!d){alert('Introduza a data.');return;}
+  var btn=document.getElementById('modalBtn');
+  btn.disabled=true; btn.textContent='A guardar...';
+  fetch('/assistencias/{{ a.id }}/status',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:_status,data_real:d,notas:document.getElementById('modalNota').value.trim()})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok) location.reload();
+    else{alert('Erro: '+d.error);btn.disabled=false;btn.textContent='Confirmar';}
+  });
+}
+document.getElementById('statusModal').addEventListener('click',function(e){if(e.target===this)fecharModal();});
+
+function triggerUpload(tipo){ document.getElementById(tipo==='email'?'upEmail':'upDoc').click(); }
+function upload(files,tipo){
+  var prog=document.getElementById('uploadProgress');
+  Array.from(files).forEach(function(file){
+    var fd=new FormData();
+    fd.append('ficheiro',file);
+    fd.append('tipo',tipo);
+    var bar='<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">A enviar: '+file.name+'</div><div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-bottom:8px"><div id="pb_'+Date.now()+'" style="height:100%;width:0;background:var(--accent);transition:.1s"></div></div>';
+    prog.insertAdjacentHTML('beforeend',bar);
+    var xhr=new XMLHttpRequest();
+    xhr.upload.onprogress=function(e){ if(e.lengthComputable){ var id=prog.lastElementChild.previousElementSibling.firstElementChild; if(id)id.style.width=(e.loaded/e.total*100)+'%'; }};
+    xhr.onload=function(){ if(JSON.parse(xhr.responseText).ok) location.reload(); };
+    xhr.open('POST','/assistencias/{{ a.id }}/documentos/upload');
+    xhr.send(fd);
+  });
+}
+function apagarDoc(did){
+  if(!confirm('Apagar este ficheiro?')) return;
+  fetch('/assistencias/{{ a.id }}/documentos/'+did+'/apagar',{method:'POST'})
+    .then(r=>r.json()).then(d=>{if(d.ok) location.reload();});
+}
+function abrirPreview(url,mime,nome){
+  var c=document.getElementById('previewContent');
+  document.getElementById('previewNome').textContent=nome;
+  if(mime&&mime.startsWith('image/')) c.innerHTML='<img src="'+url+'" style="max-width:88vw;max-height:82vh;object-fit:contain;border-radius:6px">';
+  else if(mime==='application/pdf') c.innerHTML='<iframe src="'+url+'" style="width:80vw;height:82vh;border:none;border-radius:6px"></iframe>';
+  else{window.open(url,'_blank');return;}
+  document.getElementById('previewModal').style.display='flex';
+}
+document.getElementById('previewModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+function eliminar(){
+  if(!confirm('Eliminar Assistência #{{ "%04d"|format(a.numero) }}?')) return;
+  fetch('/assistencias/{{ a.id }}/eliminar',{method:'POST'})
+    .then(r=>r.json()).then(d=>{if(d.ok)window.location='/assistencias';else alert('Erro: '+d.error);});
+}
+</script>
+{% endblock %}

@@ -411,3 +411,63 @@ class EntradaDocumento(db.Model):
     criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
     uploader      = db.relationship('User', foreign_keys=[criado_por])
+
+# ── ASSISTÊNCIAS ─────────────────────────────────────────────────────────────
+
+class Assistencia(db.Model):
+    __tablename__ = 'assistencias'
+    id              = db.Column(db.Integer, primary_key=True)
+    numero          = db.Column(db.Integer, nullable=False, unique=True)
+    # Requerente (fornecedor PHC ou texto livre)
+    requerente_nome = db.Column(db.String(200), nullable=False)
+    requerente_nif  = db.Column(db.String(30), default='')
+    num_requisicao  = db.Column(db.String(100), default='')
+    local_obra      = db.Column(db.String(300), default='')
+    observacoes     = db.Column(db.Text, default='')
+    # Status
+    status          = db.Column(db.String(30), default='rececionado')
+    # Real dates per status (set manually)
+    data_rececionado   = db.Column(db.Date, nullable=True)
+    data_em_execucao   = db.Column(db.Date, nullable=True)
+    data_obra_concluida= db.Column(db.Date, nullable=True)
+    data_comunicado    = db.Column(db.Date, nullable=True)
+    data_faturado      = db.Column(db.Date, nullable=True)
+    # Computed durations
+    dias_recepcao_conclusao = db.Column(db.Integer, nullable=True)
+    dias_conclusao_faturado = db.Column(db.Integer, nullable=True)
+    # Meta
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    # Relationships
+    historico       = db.relationship('AssistenciaHistorico', backref='assistencia',
+                        cascade='all, delete-orphan',
+                        order_by='AssistenciaHistorico.criado_em.desc()')
+    documentos      = db.relationship('AssistenciaDocumento', backref='assistencia',
+                        cascade='all, delete-orphan',
+                        order_by='AssistenciaDocumento.criado_em.desc()')
+
+class AssistenciaHistorico(db.Model):
+    __tablename__ = 'assistencia_historico'
+    id          = db.Column(db.Integer, primary_key=True)
+    assist_id   = db.Column(db.Integer, db.ForeignKey('assistencias.id'), nullable=False)
+    status_ant  = db.Column(db.String(30))
+    status_novo = db.Column(db.String(30), nullable=False)
+    data_real   = db.Column(db.Date, nullable=True)
+    user_nome   = db.Column(db.String(120))
+    notas       = db.Column(db.String(400), default='')
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+
+class AssistenciaDocumento(db.Model):
+    __tablename__ = 'assistencia_documentos'
+    id            = db.Column(db.Integer, primary_key=True)
+    assist_id     = db.Column(db.Integer, db.ForeignKey('assistencias.id'), nullable=False)
+    tipo          = db.Column(db.String(20), default='documento')  # 'email' or 'documento'
+    nome_original = db.Column(db.String(255), nullable=False)
+    nome_ficheiro = db.Column(db.String(255), nullable=False)
+    descricao     = db.Column(db.String(400), default='')
+    tamanho       = db.Column(db.Integer, default=0)
+    mime          = db.Column(db.String(100), default='')
+    criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
+    uploader      = db.relationship('User', foreign_keys=[criado_por])

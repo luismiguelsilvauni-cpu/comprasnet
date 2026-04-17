@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{% if a %}Editar #{{ '%04d'|format(a.numero) }}{% else %}Nova Assistência{% endif %} · NavTech{% endblock %}
+{% block page_title %}{% if a %}✏️ Editar #{{ '%04d'|format(a.numero) }}{% else %}🔧 Nova Assistência{% endif %}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('assistencias') }}" class="btn btn-ghost btn-sm">← Lista</a>
+  {% if a %}
+  <a href="{{ url_for('assistencia_detalhe', aid=a.id) }}" class="btn btn-ghost btn-sm">Ver Ficha</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}<div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>{% endfor %}{% endif %}
+{% endwith %}
+<div style="max-width:660px">
+<div class="card" style="padding:22px">
+  <form method="POST">
+    <input type="hidden" name="requerente_nome" id="reqNomeHidden" value="{{ a.requerente_nome if a else '' }}">
+    <input type="hidden" name="requerente_nif"  id="reqNifHidden"  value="{{ a.requerente_nif  if a else '' }}">
+
+    {% if not a %}
+    <div class="form-group">
+      <label>Data de Receção *</label>
+      <input type="date" name="data_rececionado" class="input" value="{{ hoje }}" required>
+    </div>
+    {% endif %}
+
+    <!-- Requerente search -->
+    <div class="form-group" style="position:relative">
+      <label>Requerente (Fornecedor) *</label>
+      <input type="text" id="reqInput" class="input" required autocomplete="off"
+        placeholder="Pesquisar fornecedor PHC ou escrever..."
+        value="{{ a.requerente_nome if a else '' }}"
+        oninput="pesquisarReq(this.value)">
+      <div id="reqNif" style="font-size:11px;color:var(--text-muted);margin-top:3px">
+        {% if a and a.requerente_nif %}NIF: {{ a.requerente_nif }}{% endif %}
+      </div>
+      <div id="reqDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.2)"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Nº de Requisição</label>
+      <input type="text" name="num_requisicao" class="input"
+        placeholder="Nº da requisição do cliente"
+        value="{{ a.num_requisicao if a else '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>Local da Obra</label>
+      <input type="text" name="local_obra" class="input"
+        placeholder="Localização / endereço da obra"
+        value="{{ a.local_obra if a else '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>Observações</label>
+      <textarea name="observacoes" class="input" rows="3"
+        placeholder="Descrição do serviço / garantia solicitada...">{{ a.observacoes if a else '' }}</textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
+      <a href="{{ url_for('assistencias') }}" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary">{% if a %}💾 Guardar{% else %}➕ Criar{% endif %}</button>
+    </div>
+  </form>
+</div>
+</div>
+<script>
+var _t = null;
+document.getElementById('reqInput').addEventListener('input', function(){
+  document.getElementById('reqNomeHidden').value = this.value;
+});
+function pesquisarReq(q) {
+  document.getElementById('reqNomeHidden').value = q;
+  var dd = document.getElementById('reqDropdown');
+  clearTimeout(_t);
+  if (q.length < 2) { dd.style.display='none'; return; }
+  _t = setTimeout(function(){
+    fetch('/api/assistencias/fornecedores?q='+encodeURIComponent(q))
+      .then(r=>r.json()).then(function(lista){
+        if (!lista.length) { dd.style.display='none'; return; }
+        dd.innerHTML = lista.map(function(f){
+          return '<div onclick="selReq(\''+f.nome.replace(/\'/g,"\\'")+'\',\''+f.nif+'\')" '+
+            'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px" '+
+            'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+            f.nome + (f.nif ? '<span style="color:var(--text-muted);font-size:11px;margin-left:8px">'+f.nif+'</span>' : '') +
+            '</div>';
+        }).join('');
+        dd.style.display = 'block';
+      });
+  }, 250);
+}
+function selReq(nome, nif) {
+  document.getElementById('reqInput').value = nome;
+  document.getElementById('reqNomeHidden').value = nome;
+  document.getElementById('reqNifHidden').value = nif;
+  document.getElementById('reqNif').textContent = nif ? 'NIF: '+nif : '';
+  document.getElementById('reqDropdown').style.display = 'none';
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('#reqInput')) document.getElementById('reqDropdown').style.display='none';
+});
+</script>
+{% endblock %}

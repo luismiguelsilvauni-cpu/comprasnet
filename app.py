@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, EntradaDocumento
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -2848,6 +2848,7 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
+    ('assistencias',       '🔧 Assistências'),
     ('entradas',           '📥 Entradas'),
     ('partilha',           '📁 Partilha'),
     ('conectividade',      '🌐 Conectividade'),
@@ -2856,6 +2857,223 @@ MENUS_DISPONIVEIS = [
     ('admin_config',       '⚙️ Configurações'),
     ('admin_utilizadores', '👥 Utilizadores'),
 ]
+
+# ── MÓDULO ASSISTÊNCIAS ───────────────────────────────────────────────────────
+
+UPLOAD_ASSIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'assistencias')
+os.makedirs(UPLOAD_ASSIST, exist_ok=True)
+
+ASSIST_STATUS = [
+    ('rececionado',      '📥 Rececionado'),
+    ('em_execucao',      '🔧 Em Execução'),
+    ('obra_concluida',   '✅ Obra Concluída'),
+    ('comunicado',       '📨 Comunicado'),
+    ('faturado_fechado', '🧾 Faturado – Fechado'),
+]
+ASSIST_STATUS_DICT = dict(ASSIST_STATUS)
+ASSIST_COLORS = {
+    'rececionado':      '#3b6ef0',
+    'em_execucao':      '#f59e0b',
+    'obra_concluida':   '#22c55e',
+    'comunicado':       '#06b6d4',
+    'faturado_fechado': '#6b7280',
+}
+
+def _assist_calc_durations(a):
+    """Recalculate duration fields."""
+    if a.data_rececionado and a.data_obra_concluida:
+        a.dias_recepcao_conclusao = (a.data_obra_concluida - a.data_rececionado).days
+    if a.data_obra_concluida and a.data_faturado:
+        a.dias_conclusao_faturado = (a.data_faturado - a.data_obra_concluida).days
+
+@app.route('/assistencias')
+@login_required
+def assistencias():
+    status_f = request.args.get('status','')
+    q = Assistencia.query
+    if status_f:
+        q = q.filter_by(status=status_f)
+    items = q.order_by(Assistencia.numero.desc()).all()
+    return render_template('assistencias.html', items=items,
+        status_list=ASSIST_STATUS, status_filtro=status_f,
+        colors=ASSIST_COLORS)
+
+@app.route('/assistencias/nova', methods=['GET','POST'])
+@login_required
+def assistencia_nova():
+    if request.method == 'POST':
+        last = db.session.query(db.func.max(Assistencia.numero)).scalar() or 0
+        from datetime import date
+        data_rec_str = request.form.get('data_rececionado','')
+        data_rec = datetime.strptime(data_rec_str, '%Y-%m-%d').date() if data_rec_str else date.today()
+        a = Assistencia(
+            numero=last+1,
+            requerente_nome=request.form.get('requerente_nome','').strip(),
+            requerente_nif=request.form.get('requerente_nif','').strip(),
+            num_requisicao=request.form.get('num_requisicao','').strip(),
+            local_obra=request.form.get('local_obra','').strip(),
+            observacoes=request.form.get('observacoes','').strip(),
+            status='rececionado',
+            data_rececionado=data_rec,
+            criado_por=current_user.id,
+            criado_em=datetime.now(), atualizado_em=datetime.now()
+        )
+        db.session.add(a); db.session.flush()
+        db.session.add(AssistenciaHistorico(
+            assist_id=a.id, status_ant=None, status_novo='rececionado',
+            data_real=data_rec, user_nome=current_user.nome,
+            notas='Criado', criado_em=datetime.now()
+        ))
+        db.session.commit()
+        flash(f'Assistência #{a.numero:04d} criada!', 'success')
+        return redirect(url_for('assistencia_detalhe', aid=a.id))
+    from datetime import date
+    return render_template('assistencia_form.html', a=None,
+        hoje=date.today().strftime('%Y-%m-%d'))
+
+@app.route('/assistencias/<int:aid>')
+@login_required
+def assistencia_detalhe(aid):
+    a = Assistencia.query.get_or_404(aid)
+    docs = AssistenciaDocumento.query.filter_by(assist_id=aid).order_by(
+        AssistenciaDocumento.criado_em.desc()).all()
+    return render_template('assistencia_detalhe.html', a=a, docs=docs,
+        status_list=ASSIST_STATUS, status_dict=ASSIST_STATUS_DICT,
+        colors=ASSIST_COLORS)
+
+@app.route('/assistencias/<int:aid>/editar', methods=['GET','POST'])
+@login_required
+def assistencia_editar(aid):
+    a = Assistencia.query.get_or_404(aid)
+    if request.method == 'POST':
+        a.requerente_nome = request.form.get('requerente_nome','').strip()
+        a.requerente_nif  = request.form.get('requerente_nif','').strip()
+        a.num_requisicao  = request.form.get('num_requisicao','').strip()
+        a.local_obra      = request.form.get('local_obra','').strip()
+        a.observacoes     = request.form.get('observacoes','').strip()
+        a.atualizado_em   = datetime.now()
+        db.session.commit()
+        flash('Actualizado.', 'success')
+        return redirect(url_for('assistencia_detalhe', aid=aid))
+    from datetime import date
+    return render_template('assistencia_form.html', a=a,
+        hoje=date.today().strftime('%Y-%m-%d'))
+
+@app.route('/assistencias/<int:aid>/status', methods=['POST'])
+@login_required
+def assistencia_status(aid):
+    a = Assistencia.query.get_or_404(aid)
+    data = request.get_json() or {}
+    novo = data.get('status')
+    notas = data.get('notas','')
+    data_real_str = data.get('data_real','')
+    if novo not in ASSIST_STATUS_DICT:
+        return jsonify({'ok': False, 'error': 'Status inválido'})
+    from datetime import date as dt
+    data_real = datetime.strptime(data_real_str, '%Y-%m-%d').date() if data_real_str else dt.today()
+    ant = a.status
+    a.status = novo
+    a.atualizado_em = datetime.now()
+    # Save date per status
+    if novo == 'rececionado':      a.data_rececionado    = data_real
+    elif novo == 'em_execucao':    a.data_em_execucao    = data_real
+    elif novo == 'obra_concluida': a.data_obra_concluida = data_real
+    elif novo == 'comunicado':     a.data_comunicado     = data_real
+    elif novo == 'faturado_fechado': a.data_faturado     = data_real
+    _assist_calc_durations(a)
+    db.session.add(AssistenciaHistorico(
+        assist_id=aid, status_ant=ant, status_novo=novo,
+        data_real=data_real, user_nome=current_user.nome,
+        notas=notas, criado_em=datetime.now()
+    ))
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/assistencias/<int:aid>/eliminar', methods=['POST'])
+@login_required
+def assistencia_eliminar(aid):
+    a = Assistencia.query.get_or_404(aid)
+    if not current_user.is_admin and a.criado_por != current_user.id:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    for doc in a.documentos:
+        try: os.remove(os.path.join(UPLOAD_ASSIST, doc.nome_ficheiro))
+        except: pass
+    db.session.delete(a); db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/assistencias/<int:aid>/documentos/upload', methods=['POST'])
+@login_required
+def assistencia_doc_upload(aid):
+    Assistencia.query.get_or_404(aid)
+    f = request.files.get('ficheiro')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import uuid, mimetypes
+    ext = os.path.splitext(f.filename)[1].lower()
+    nome_unico = f'a{aid}_{uuid.uuid4().hex[:10]}{ext}'
+    fpath = os.path.join(UPLOAD_ASSIST, nome_unico)
+    f.save(fpath)
+    mime = mimetypes.guess_type(f.filename)[0] or 'application/octet-stream'
+    tipo = request.form.get('tipo','documento')  # 'email' or 'documento'
+    doc = AssistenciaDocumento(
+        assist_id=aid, tipo=tipo,
+        nome_original=f.filename, nome_ficheiro=nome_unico,
+        descricao=request.form.get('descricao','').strip(),
+        tamanho=os.path.getsize(fpath), mime=mime,
+        criado_por=current_user.id, criado_em=datetime.now()
+    )
+    db.session.add(doc); db.session.commit()
+    return jsonify({'ok': True, 'id': doc.id, 'nome': doc.nome_original,
+        'tipo': doc.tipo, 'data': doc.criado_em.strftime('%d/%m/%Y %H:%M'),
+        'uploader': current_user.nome, 'descricao': doc.descricao})
+
+@app.route('/assistencias/<int:aid>/documentos/<int:did>/preview')
+@login_required
+def assistencia_doc_preview(aid, did):
+    doc = AssistenciaDocumento.query.filter_by(id=did, assist_id=aid).first_or_404()
+    return send_from_directory(UPLOAD_ASSIST, doc.nome_ficheiro, as_attachment=False)
+
+@app.route('/assistencias/<int:aid>/documentos/<int:did>/download')
+@login_required
+def assistencia_doc_download(aid, did):
+    doc = AssistenciaDocumento.query.filter_by(id=did, assist_id=aid).first_or_404()
+    return send_from_directory(UPLOAD_ASSIST, doc.nome_ficheiro,
+        as_attachment=True, download_name=doc.nome_original)
+
+@app.route('/assistencias/<int:aid>/documentos/<int:did>/apagar', methods=['POST'])
+@login_required
+def assistencia_doc_apagar(aid, did):
+    doc = AssistenciaDocumento.query.filter_by(id=did, assist_id=aid).first_or_404()
+    if not current_user.is_admin and doc.criado_por != current_user.id:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    try: os.remove(os.path.join(UPLOAD_ASSIST, doc.nome_ficheiro))
+    except: pass
+    db.session.delete(doc); db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/assistencias/fornecedores')
+@login_required
+def api_assist_fornecedores():
+    q = request.args.get('q','').strip()
+    if len(q) < 2: return jsonify([])
+    # Try PHC fornecedores
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if cfg_phc and cfg_phc.server:
+            import pyodbc
+            conn = pyodbc.connect(
+                f"DRIVER={{SQL Server}};SERVER={cfg_phc.server};DATABASE={cfg_phc.database};"
+                f"UID={cfg_phc.username};PWD={cfg_phc.password}", timeout=3)
+            cur = conn.cursor()
+            cur.execute("SELECT TOP 15 nome, ncont FROM fornecedor WHERE nome LIKE ? AND ativo=1 ORDER BY nome", f'%{q}%')
+            rows = [{'nome': r[0], 'nif': r[1] or ''} for r in cur.fetchall()]
+            conn.close()
+            if rows: return jsonify(rows)
+    except: pass
+    # Fallback: previous requerentes
+    prev = db.session.query(Assistencia.requerente_nome, Assistencia.requerente_nif)        .filter(Assistencia.requerente_nome.ilike(f'%{q}%'))        .distinct().limit(10).all()
+    return jsonify([{'nome': r[0], 'nif': r[1] or ''} for r in prev])
+
 
 # ── MÓDULO ENTRADAS ───────────────────────────────────────────────────────────
 
