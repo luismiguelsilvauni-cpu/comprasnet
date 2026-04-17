@@ -4,7 +4,6 @@ db_path = os.path.join(os.path.dirname(__file__), 'instance', 'compras.db')
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
-# Create tables if missing
 cur.execute("""CREATE TABLE IF NOT EXISTS entradas_equipamento (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     numero INTEGER NOT NULL UNIQUE,
@@ -22,7 +21,6 @@ cur.execute("""CREATE TABLE IF NOT EXISTS entrada_historico (
     user_nome VARCHAR(120), notas VARCHAR(400) DEFAULT '',
     data_real DATE, criado_em DATETIME)""")
 
-# Add missing columns
 for tbl, col, typ in [
     ('entradas_equipamento', 'data_status_real', 'DATE'),
     ('entrada_historico',    'data_real',        'DATE'),
