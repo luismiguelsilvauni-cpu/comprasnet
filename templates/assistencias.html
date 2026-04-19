@@ -6,58 +6,110 @@
 {% endblock %}
 {% block content %}
 
-<!-- Filters -->
-<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
-  <a href="{{ url_for('assistencias') }}" class="btn btn-sm {% if not status_filtro %}btn-primary{% else %}btn-ghost{% endif %}">Todos</a>
-  {% for val,label in status_list %}
-  <a href="{{ url_for('assistencias', status=val) }}" class="btn btn-sm {% if status_filtro==val %}btn-primary{% else %}btn-ghost{% endif %}" style="font-size:11px">{{ label }}</a>
-  {% endfor %}
+<!-- Search + Filters -->
+<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+  <div style="position:relative;flex:1;min-width:200px;max-width:340px">
+    <input type="text" id="searchInput" class="input" placeholder="🔍 Requerente, Nº requisição, local..."
+      value="{{ search or '' }}" oninput="filtrar()" style="padding-left:12px">
+  </div>
+  <select id="statusFilter" class="input" style="width:auto" onchange="filtrar()">
+    <option value="">Todos os estados</option>
+    {% for val,label in status_list %}
+    <option value="{{ val }}" {% if status_filtro==val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+    <option value="abertos" {% if status_filtro=='abertos' %}selected{% endif %}>🔵 Abertos (excl. fechados)</option>
+  </select>
+  <span id="countBadge" style="font-size:12px;color:var(--text-muted)"></span>
 </div>
 
-<!-- Badges grid -->
-{% if items %}
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+<!-- Items grid -->
+<div id="itemsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
 {% for a in items %}
 {% set col = colors.get(a.status,'#999') %}
 {% set is_closed = a.status == 'faturado_fechado' %}
-<a href="{{ url_for('assistencia_detalhe', aid=a.id) }}" style="text-decoration:none;{% if is_closed %}opacity:.5{% endif %}">
-<div style="background:var(--surface);border:1px solid {{ col }}40;border-radius:12px;padding:14px;border-left:4px solid {{ col }};transition:.15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.15)'" onmouseout="this.style.boxShadow=''">
-  <!-- Header -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-    <span style="font-size:20px;font-weight:800;color:{{ col }};font-family:monospace">#{{ '%04d'|format(a.numero) }}</span>
-    <span style="flex:1;font-size:12px;font-weight:700;color:var(--text)">{{ a.requerente_nome[:30] }}</span>
-    <span style="font-size:9px;font-weight:700;padding:3px 7px;border-radius:4px;background:{{ col }}18;color:{{ col }};border:1px solid {{ col }}40;white-space:nowrap">
-      {{ {'rececionado':'📥 Rececionado','em_execucao':'🔧 Em Execução','obra_concluida':'✅ Concluída','comunicado':'📨 Comunicado','faturado_fechado':'🧾 Fechado'}.get(a.status,a.status) }}
-    </span>
+{% set dias_obra = a._dias_obra if a._dias_obra is defined else none %}
+{% set dias_alerta = a._dias_alerta if a._dias_alerta is defined else none %}
+<div class="assist-card" data-status="{{ a.status }}"
+     data-search="{{ (a.requerente_nome + ' ' + a.num_requisicao + ' ' + a.local_obra)|lower }}"
+     style="{% if is_closed %}opacity:.45{% endif %}">
+  <a href="{{ url_for('assistencia_detalhe', aid=a.id) }}" style="text-decoration:none">
+  <div style="background:var(--surface);border:1px solid {{ col }}40;border-radius:12px;padding:14px;border-left:4px solid {{ col }};transition:.15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.15)'" onmouseout="this.style.boxShadow=''">
+
+    {% if dias_alerta is not none %}
+    <div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:5px;padding:4px 8px;font-size:10px;font-weight:700;color:#ef4444;margin-bottom:8px">
+      ⚠️ {{ dias_alerta }} dias em {{ {'obra_concluida':'Obra Concluída','comunicado':'Comunicado'}.get(a.status,a.status) }} — sem faturar
+    </div>
+    {% endif %}
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="font-size:20px;font-weight:800;color:{{ col }};font-family:monospace">#{{ '%04d'|format(a.numero) }}</span>
+      <span style="flex:1;font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.requerente_nome[:28] }}</span>
+      <span style="font-size:9px;font-weight:700;padding:3px 7px;border-radius:4px;background:{{ col }}18;color:{{ col }};border:1px solid {{ col }}40;white-space:nowrap">
+        {{ {'rececionado':'📥 Rec.','em_execucao':'🔧 Exec.','obra_concluida':'✅ Conc.','comunicado':'📨 Com.','faturado_fechado':'🧾 Fech.'}.get(a.status,a.status) }}
+      </span>
+    </div>
+
+    {% if a.num_requisicao %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">📋 {{ a.num_requisicao }}</div>{% endif %}
+    {% if a.local_obra %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">📍 {{ a.local_obra[:50] }}</div>{% endif %}
+    {% if a.observacoes %}<div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.observacoes[:55] }}</div>{% endif %}
+
+    <div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--border);display:flex;gap:10px;font-size:10px;color:var(--text-muted);flex-wrap:wrap">
+      {% if a.data_rececionado %}<span>📥 {{ a.data_rececionado.strftime('%d/%m/%y') }}</span>{% endif %}
+      {% if a.data_obra_concluida %}<span>✅ {{ a.data_obra_concluida.strftime('%d/%m/%y') }}</span>{% endif %}
+      {% if a.data_faturado %}<span>🧾 {{ a.data_faturado.strftime('%d/%m/%y') }}</span>{% endif %}
+      {% if a.dias_recepcao_conclusao is not none %}
+      <span style="margin-left:auto;font-weight:700;color:{{ col }}">{{ a.dias_recepcao_conclusao }}d obra</span>
+      {% endif %}
+    </div>
+
+    {% if a.documentos %}
+    <div style="margin-top:5px;font-size:10px;color:var(--text-muted)">
+      📎 {{ a.documentos|selectattr('tipo','eq','documento')|list|length }} doc
+      {% set em = a.documentos|selectattr('tipo','eq','email')|list %}
+      {% if em %} · ✉️ {{ em|length }} email{% endif %}
+    </div>
+    {% endif %}
   </div>
-  <!-- Info -->
-  {% if a.num_requisicao %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">📋 Req: {{ a.num_requisicao }}</div>{% endif %}
-  {% if a.local_obra %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">📍 {{ a.local_obra[:50] }}</div>{% endif %}
-  {% if a.observacoes %}<div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.observacoes[:60] }}</div>{% endif %}
-  <!-- Dates -->
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:10px;color:var(--text-muted)">
-    {% if a.data_rececionado %}<span>📥 {{ a.data_rececionado.strftime('%d/%m/%y') }}</span>{% endif %}
-    {% if a.data_obra_concluida %}<span>✅ {{ a.data_obra_concluida.strftime('%d/%m/%y') }}</span>{% endif %}
-    {% if a.data_faturado %}<span>🧾 {{ a.data_faturado.strftime('%d/%m/%y') }}</span>{% endif %}
-    {% if a.dias_recepcao_conclusao is not none %}<span style="margin-left:auto;font-weight:700;color:{{ col }}">{{ a.dias_recepcao_conclusao }}d obra</span>{% endif %}
-  </div>
-  <!-- Docs count -->
-  {% if a.documentos %}
-  <div style="margin-top:6px;font-size:10px;color:var(--text-muted)">
-    📎 {{ a.documentos|selectattr('tipo','eq','documento')|list|length }} doc
-    {% set emails = a.documentos|selectattr('tipo','eq','email')|list %}
-    {% if emails %} · ✉️ {{ emails|length }} email{% endif %}
-  </div>
-  {% endif %}
+  </a>
 </div>
-</a>
 {% endfor %}
 </div>
-{% else %}
+
+<div id="semResultados" style="display:none;text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:36px;margin-bottom:8px">🔍</div>
+  <div>Sem resultados para os filtros aplicados</div>
+</div>
+
+{% if not items %}
 <div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
   <div style="font-size:48px;margin-bottom:12px">🔧</div>
   <div style="font-size:16px;font-weight:600;margin-bottom:6px">Sem assistências registadas</div>
-  <button onclick="window.location='{{ url_for('assistencia_nova') }}'" class="btn btn-primary">+ Nova Assistência</button>
+  <a href="{{ url_for('assistencia_nova') }}" class="btn btn-primary">+ Nova Assistência</a>
 </div>
 {% endif %}
+
+<script>
+var cards = document.querySelectorAll('.assist-card');
+var countBadge = document.getElementById('countBadge');
+var semRes = document.getElementById('semResultados');
+
+function filtrar() {
+  var q = document.getElementById('searchInput').value.toLowerCase().trim();
+  var st = document.getElementById('statusFilter').value;
+  var vis = 0;
+  cards.forEach(function(c) {
+    var matchSearch = !q || c.dataset.search.includes(q);
+    var matchStatus;
+    if (!st) matchStatus = true;
+    else if (st === 'abertos') matchStatus = c.dataset.status !== 'faturado_fechado';
+    else matchStatus = c.dataset.status === st;
+    var show = matchSearch && matchStatus;
+    c.style.display = show ? '' : 'none';
+    if (show) vis++;
+  });
+  countBadge.textContent = vis + ' resultado(s)';
+  semRes.style.display = (vis === 0 && cards.length > 0) ? 'block' : 'none';
+}
+filtrar();
+</script>
 {% endblock %}

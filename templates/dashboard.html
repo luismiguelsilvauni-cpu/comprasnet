@@ -2,6 +2,9 @@
 {% block title %}Dashboard · ComprasNet{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block topbar_actions %}
+  {% if assist_alerta_count and assist_alerta_count > 0 %}
+  <a href="{{ url_for('assistencias') }}" style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;text-decoration:none">🔧 {{ assist_alerta_count }} assist. sem faturar</a>
+  {% endif %}
   {% if entradas_estadia and entradas_estadia > 0 %}
   <a href="{{ url_for('entradas', status='orcamentado_estadia') }}" style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;text-decoration:none">⚠️ {{ entradas_estadia }} equip. em estadia</a>
   {% endif %}
@@ -9,6 +12,38 @@
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
   <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
+<!-- Hidden HTML for assist_alerta widget -->
+<div id="assist_alerta_html" style="display:none">
+{% if assist_alerta %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:2px">
+{% for a in assist_alerta %}
+{% set col = '#06b6d4' if a.status == 'comunicado' else '#22c55e' %}
+<div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:{{ col }}20;color:{{ col }}">
+      {{ '📨 Comunicado' if a.status=='comunicado' else '✅ Obra Concluída' }}
+    </span>
+    <span style="font-size:20px;font-weight:800;color:#ef4444;font-family:monospace">#{{ '%04d'|format(a.numero) }}</span>
+  </div>
+  <div style="font-size:13px;font-weight:700;margin-bottom:2px">{{ a.requerente_nome[:28] }}</div>
+  {% if a.num_requisicao %}<div style="font-size:11px;color:var(--text-muted)">📋 {{ a.num_requisicao }}</div>{% endif %}
+  <div style="margin-top:8px;padding:6px 10px;background:rgba(239,68,68,.1);border-radius:5px;font-size:11px;font-weight:700;color:#ef4444">
+    ⚠️ {{ a._dias_alerta }} dias sem faturar
+  </div>
+  <div style="margin-top:8px">
+    <a href="{{ url_for('assistencia_detalhe', aid=a.id) }}" style="font-size:11px;font-weight:700;color:#ef4444;text-decoration:none;padding:4px 10px;border:1px solid rgba(239,68,68,.4);border-radius:4px">Ver →</a>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:20px;color:var(--success)">
+  <div style="font-size:28px;margin-bottom:6px">✅</div>
+  <div style="font-size:13px;font-weight:600">Sem assistências com alertas</div>
+</div>
+{% endif %}
+</div>
+
 <!-- Hidden HTML for entradas_estadia widget -->
 <div id="entradas_estadia_html" style="display:none">
 {% if entradas_estadia_list %}
@@ -251,6 +286,10 @@ const WIDGET_DATA = {
     label: '📋 Pedidos Recentes', cols: 8,
     html: function() { return `{% if pedidos_recentes %}<div class="table-wrap" style="margin:0"><table><thead><tr><th>Título</th><th>Estado</th><th>Data</th><th></th></tr></thead><tbody>{% for p in pedidos_recentes %}<tr><td style="font-size:13px">{{ p.titulo[:35] }}</td><td><span class="badge {% if p.estado=='aberto' %}badge-blue{% elif p.estado=='aprovado' %}badge-green{% else %}badge-yellow{% endif %}" style="font-size:10px">{{ p.estado }}</span></td><td style="font-size:12px;color:var(--text-muted)">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td><td><a href="/pedidos/{{ p.id }}" class="btn btn-ghost btn-sm">→</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem pedidos recentes</div>{% endif %}`; }
   },
+  assist_alerta: {
+    label: '🔧 Assistências – Alertas', cols: 12,
+    html: function() { return document.getElementById('assist_alerta_html').innerHTML; }
+  },
   entradas_estadia: {
     label: '🚨 Entradas em Estadia', cols: 12,
     html: function() { return document.getElementById('entradas_estadia_html').innerHTML; }
@@ -286,6 +325,7 @@ const WIDGET_DATA = {
 
 const DEFAULT_LAYOUT = [
   {id:'kpis', cols:12},
+  {id:'assist_alerta', cols:12},
   {id:'entradas_estadia', cols:12},
   {id:'artigos_pedidos', cols:12},
   {id:'pedidos_recentes', cols:8},
@@ -294,7 +334,7 @@ const DEFAULT_LAYOUT = [
 ];
 
 // Version check - bump this when DEFAULT_LAYOUT changes
-const LAYOUT_VERSION = '5';
+const LAYOUT_VERSION = '6';
 let savedLayout = null;
 try {
   if (localStorage.getItem('dashboard_layout_version') !== LAYOUT_VERSION) {
@@ -726,6 +766,38 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved=>{
   renderGrid();
 }).catch(()=>renderGrid());
 </script>
+
+<!-- Hidden HTML for assist_alerta widget -->
+<div id="assist_alerta_html" style="display:none">
+{% if assist_alerta %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:2px">
+{% for a in assist_alerta %}
+{% set col = '#06b6d4' if a.status == 'comunicado' else '#22c55e' %}
+<div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:{{ col }}20;color:{{ col }}">
+      {{ '📨 Comunicado' if a.status=='comunicado' else '✅ Obra Concluída' }}
+    </span>
+    <span style="font-size:20px;font-weight:800;color:#ef4444;font-family:monospace">#{{ '%04d'|format(a.numero) }}</span>
+  </div>
+  <div style="font-size:13px;font-weight:700;margin-bottom:2px">{{ a.requerente_nome[:28] }}</div>
+  {% if a.num_requisicao %}<div style="font-size:11px;color:var(--text-muted)">📋 {{ a.num_requisicao }}</div>{% endif %}
+  <div style="margin-top:8px;padding:6px 10px;background:rgba(239,68,68,.1);border-radius:5px;font-size:11px;font-weight:700;color:#ef4444">
+    ⚠️ {{ a._dias_alerta }} dias sem faturar
+  </div>
+  <div style="margin-top:8px">
+    <a href="{{ url_for('assistencia_detalhe', aid=a.id) }}" style="font-size:11px;font-weight:700;color:#ef4444;text-decoration:none;padding:4px 10px;border:1px solid rgba(239,68,68,.4);border-radius:4px">Ver →</a>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:20px;color:var(--success)">
+  <div style="font-size:28px;margin-bottom:6px">✅</div>
+  <div style="font-size:13px;font-weight:600">Sem assistências com alertas</div>
+</div>
+{% endif %}
+</div>
 
 <!-- Hidden HTML for entradas_estadia widget -->
 <div id="entradas_estadia_html" style="display:none">

@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -154,6 +154,21 @@ def dashboard():
         ArtigoPHC.stock_atual > 0,
         ArtigoPHC.stock_atual <= 3
     ).order_by(ArtigoPHC.stock_atual).limit(10).all()
+    # Check assistencias com obra concluida/comunicado > 5 dias sem faturar
+    try:
+        from datetime import date as _date
+        _hoje = _date.today()
+        assist_alerta = []
+        for _a in Assistencia.query.filter(Assistencia.status.in_(['obra_concluida','comunicado'])).all():
+            _ref = _a.data_obra_concluida if _a.status == 'obra_concluida' else _a.data_comunicado
+            if _ref:
+                _dias = (_hoje - _ref).days
+                if _dias > 5:
+                    _a._dias_alerta = _dias
+                    assist_alerta.append(_a)
+        assist_alerta_count = len(assist_alerta)
+    except: assist_alerta = []; assist_alerta_count = 0
+
     # Check entradas in estadia
     try:
         _verificar_estadias()
@@ -165,6 +180,8 @@ def dashboard():
     return render_template('dashboard.html',
         entradas_estadia=entradas_estadia,
         entradas_estadia_list=entradas_estadia_list,
+        assist_alerta=assist_alerta,
+        assist_alerta_count=assist_alerta_count,
         total_pedidos=total_pedidos,
         pedidos_abertos=pedidos_abertos,
         pedidos_aprovados=pedidos_aprovados,
@@ -2893,7 +2910,18 @@ def assistencias():
     q = Assistencia.query
     if status_f:
         q = q.filter_by(status=status_f)
+    from datetime import date as _dt
+    _hoje = _dt.today()
     items = q.order_by(Assistencia.numero.desc()).all()
+    for _a in items:
+        # Dias alerta (obra concluida/comunicado sem faturar > 5 dias)
+        if _a.status in ('obra_concluida','comunicado'):
+            _ref = _a.data_obra_concluida if _a.status == 'obra_concluida' else _a.data_comunicado
+            if _ref:
+                _d = (_hoje - _ref).days
+                _a._dias_alerta = _d if _d > 5 else None
+            else: _a._dias_alerta = None
+        else: _a._dias_alerta = None
     return render_template('assistencias.html', items=items,
         status_list=ASSIST_STATUS, status_filtro=status_f,
         colors=ASSIST_COLORS)
@@ -3027,6 +3055,63 @@ def assistencia_doc_upload(aid):
         'tipo': doc.tipo, 'data': doc.criado_em.strftime('%d/%m/%Y %H:%M'),
         'uploader': current_user.nome, 'descricao': doc.descricao})
 
+@app.route('/assistencias/<int:aid>/documentos/<int:did>/email-view')
+@login_required
+def assistencia_email_view(aid, did):
+    """Render .eml/.msg as readable HTML without download."""
+    doc = AssistenciaDocumento.query.filter_by(id=did, assist_id=aid).first_or_404()
+    fpath = os.path.join(UPLOAD_ASSIST, doc.nome_ficheiro)
+    ext = os.path.splitext(doc.nome_original)[1].lower()
+    try:
+        if ext == '.eml':
+            import email as _email
+            with open(fpath, 'rb') as f:
+                msg = _email.message_from_bytes(f.read())
+            subject = msg.get('Subject', '(sem assunto)')
+            from_addr = msg.get('From', '')
+            to_addr = msg.get('To', '')
+            date_h = msg.get('Date', '')
+            body = ''
+            if msg.is_multipart():
+                for part in msg.walk():
+                    ct = part.get_content_type()
+                    if ct == 'text/html':
+                        body = part.get_payload(decode=True).decode('utf-8','replace'); break
+                    elif ct == 'text/plain' and not body:
+                        body = '<pre style="white-space:pre-wrap;font-family:Arial">' + part.get_payload(decode=True).decode('utf-8','replace') + '</pre>'
+            else:
+                payload = msg.get_payload(decode=True)
+                body = '<pre style="white-space:pre-wrap;font-family:Arial">' + (payload.decode('utf-8','replace') if payload else '') + '</pre>'
+            html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+body{{font-family:Arial,sans-serif;max-width:900px;margin:20px auto;padding:0 16px;color:#333}}
+.header{{background:#f5f5f5;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px}}
+.label{{font-weight:700;color:#555;min-width:60px;display:inline-block}}
+</style></head><body>
+<div class="header">
+<div><span class="label">Assunto:</span> {subject}</div>
+<div><span class="label">De:</span> {from_addr}</div>
+<div><span class="label">Para:</span> {to_addr}</div>
+<div><span class="label">Data:</span> {date_h}</div>
+</div>
+<div>{body}</div>
+</body></html>"""
+            from flask import make_response
+            resp = make_response(html)
+            resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+            return resp
+        else:
+            # For .msg or other, fallback to plain text
+            with open(fpath, 'rb') as f:
+                content = f.read().decode('utf-8','replace')
+            html = f'<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><pre style="white-space:pre-wrap;font-family:monospace;font-size:12px">{content}</pre></body></html>'
+            from flask import make_response
+            resp = make_response(html)
+            resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+            return resp
+    except Exception as ex:
+        return f'<html><body><p>Erro ao abrir email: {ex}</p></body></html>', 500
+
+
 @app.route('/assistencias/<int:aid>/documentos/<int:did>/preview')
 @login_required
 def assistencia_doc_preview(aid, did):
@@ -3070,8 +3155,16 @@ def api_assist_fornecedores():
             conn.close()
             if rows: return jsonify(rows)
     except: pass
-    # Fallback: previous requerentes
-    prev = db.session.query(Assistencia.requerente_nome, Assistencia.requerente_nif)        .filter(Assistencia.requerente_nome.ilike(f'%{q}%'))        .distinct().limit(10).all()
+    # Try local FornecedorPHC table
+    try:
+        forn = FornecedorPHC.query.filter(FornecedorPHC.nome.ilike(f'%{q}%')).limit(15).all()
+        if forn:
+            return jsonify([{'nome': f.nome, 'nif': getattr(f,'ncont','') or ''} for f in forn])
+    except: pass
+    # Fallback: previous requerentes in assistencias
+    prev = db.session.query(Assistencia.requerente_nome, Assistencia.requerente_nif)\
+        .filter(Assistencia.requerente_nome.ilike(f'%{q}%'))\
+        .distinct().limit(10).all()
     return jsonify([{'nome': r[0], 'nif': r[1] or ''} for r in prev])
 
 

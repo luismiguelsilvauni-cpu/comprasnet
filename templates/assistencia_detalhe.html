@@ -78,7 +78,12 @@
           <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ doc.nome_original }}</div>
           <div style="font-size:10px;color:var(--text-muted)">{{ doc.criado_em.strftime('%d/%m/%Y %H:%M') }} · {{ doc.uploader.nome if doc.uploader else '—' }}{% if doc.descricao %} · {{ doc.descricao }}{% endif %}</div>
         </div>
+        {% set ext = doc.nome_original.rsplit('.',1)[-1].lower() if '.' in doc.nome_original else '' %}
+        {% if ext in ['eml','msg'] %}
+        <a href="{{ url_for('assistencia_email_view', aid=a.id, did=doc.id) }}" target="_blank" class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:11px">📧 Abrir</a>
+        {% else %}
         <a href="{{ url_for('assistencia_doc_preview', aid=a.id, did=doc.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">👁</a>
+        {% endif %}
         <a href="{{ url_for('assistencia_doc_download', aid=a.id, did=doc.id) }}" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">⬇</a>
         {% if current_user.is_admin or current_user.id == doc.criado_por %}
         <button onclick="apagarDoc({{ doc.id }})" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:none;padding:3px 6px;font-size:11px">🗑</button>
