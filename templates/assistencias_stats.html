@@ -122,6 +122,7 @@ function gerarAnalise() {
     '- Usa linguagem profissional mas directa\n' +
     '- Máximo 220 palavras';
 
+  console.log('A enviar para /api/chat...', {message: prompt.substring(0,100)+'...'});
   fetch('/api/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -130,26 +131,32 @@ function gerarAnalise() {
       system: 'Es um analista de operacoes industriais. Responde sempre em portugues de Portugal. Sê conciso e directo.'
     })
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r){
+    console.log('Resposta HTTP:', r.status);
+    return r.json();
+  })
   .then(function(d) {
+    console.log('Dados recebidos:', d);
     document.getElementById('analiseLoading').style.display = 'none';
     document.getElementById('btnAnalise').disabled = false;
     document.getElementById('btnAnalise').textContent = '🔄 Actualizar';
-    var texto = d.text || d.ok === false && ('Erro: ' + (d.error || 'desconhecido'));
-    if (texto && d.ok !== false) {
+    if (d.ok !== false && (d.text || d.response)) {
+      var texto = d.text || d.response || '';
       document.getElementById('analiseTexto').textContent = texto;
       document.getElementById('analiseData').textContent = new Date().toLocaleString('pt-PT');
       document.getElementById('analiseContainer').style.display = 'block';
     } else {
-      document.getElementById('analiseErro').textContent = texto || 'Sem resposta da IA';
+      var err = d.error || d.message || JSON.stringify(d);
+      document.getElementById('analiseErro').textContent = 'Erro: ' + err;
       document.getElementById('analiseErro').style.display = 'block';
     }
   })
   .catch(function(e){
+    console.error('Fetch error:', e);
     document.getElementById('analiseLoading').style.display = 'none';
     document.getElementById('btnAnalise').disabled = false;
     document.getElementById('btnAnalise').textContent = '✨ Gerar Análise';
-    document.getElementById('analiseErro').textContent = 'Erro: ' + e;
+    document.getElementById('analiseErro').textContent = 'Erro de ligação: ' + e.toString();
     document.getElementById('analiseErro').style.display = 'block';
   });
 }
