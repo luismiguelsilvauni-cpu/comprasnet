@@ -136,18 +136,40 @@
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Histórico</div>
     {% for h in a.historico %}
     {% set hcol = colors.get(h.status_novo,'#999') %}
-    <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+    <div id="hist-{{ h.id }}" style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
       <div style="width:3px;min-width:3px;background:{{ hcol }};border-radius:2px;margin-top:2px"></div>
-      <div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:3px">
+      <div style="flex:1">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
           {% if h.status_ant %}<span style="font-size:11px;color:var(--text-muted)">{{ status_dict.get(h.status_ant,h.status_ant) }}</span><span style="color:var(--text-muted)">→</span>{% endif %}
           <span style="font-size:11px;font-weight:700;color:{{ hcol }}">{{ status_dict.get(h.status_novo,h.status_novo) }}</span>
+          <span style="margin-left:auto;display:flex;gap:4px">
+            <button onclick="editarHist({{ h.id }},'{{ h.data_real.strftime('%Y-%m-%d') if h.data_real else '' }}','{{ (h.notas or '')|replace("'","\'") }}')"
+              style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--accent);padding:2px 5px;border-radius:4px;border:1px solid var(--border)">✏️</button>
+            <button onclick="eliminarHist({{ h.id }})"
+              style="background:none;border:none;cursor:pointer;font-size:11px;color:#ef4444;padding:2px 5px;border-radius:4px;border:1px solid rgba(239,68,68,.3)">🗑</button>
+          </span>
         </div>
-        <div style="font-size:11px;color:var(--text-muted)">
+        <div id="hist-view-{{ h.id }}" style="font-size:11px;color:var(--text-muted)">
           📅 <strong>{{ h.data_real.strftime('%d/%m/%Y') if h.data_real else '—' }}</strong>
           · 🕐 reg. {{ h.criado_em.strftime('%d/%m/%Y %H:%M') }}
           · 👤 {{ h.user_nome or '—' }}
           {% if h.notas %} · 📝 {{ h.notas }}{% endif %}
+        </div>
+        <div id="hist-edit-{{ h.id }}" style="display:none;margin-top:6px;display:none">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">📅 Data real</div>
+              <input type="date" id="hist-data-{{ h.id }}" class="input" style="font-size:12px;padding:4px 8px;width:160px">
+            </div>
+            <div style="flex:1;min-width:140px">
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">📝 Nota</div>
+              <input type="text" id="hist-nota-{{ h.id }}" class="input" style="font-size:12px;padding:4px 8px">
+            </div>
+            <div style="display:flex;gap:4px;align-self:flex-end">
+              <button onclick="guardarHist({{ h.id }})" class="btn btn-primary btn-sm">💾</button>
+              <button onclick="fecharEditHist({{ h.id }})" class="btn btn-ghost btn-sm">✕</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -276,6 +298,36 @@ function abrirPreview(url,mime,nome){
   document.getElementById('previewModal').style.display='flex';
 }
 document.getElementById('previewModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+function editarHist(id, dataReal, nota) {
+  document.getElementById('hist-view-'+id).style.display = 'none';
+  var editEl = document.getElementById('hist-edit-'+id);
+  editEl.style.display = 'block';
+  document.getElementById('hist-data-'+id).value = dataReal;
+  document.getElementById('hist-nota-'+id).value = nota;
+}
+function fecharEditHist(id) {
+  document.getElementById('hist-edit-'+id).style.display = 'none';
+  document.getElementById('hist-view-'+id).style.display = 'block';
+}
+function guardarHist(id) {
+  var dataReal = document.getElementById('hist-data-'+id).value;
+  var nota = document.getElementById('hist-nota-'+id).value;
+  fetch('/assistencias/{{ a.id }}/historico/'+id+'/editar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({data_real: dataReal, notas: nota})
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else alert('Erro: '+d.error);
+  });
+}
+function eliminarHist(id) {
+  if (!confirm('Eliminar este registo do histórico?')) return;
+  fetch('/assistencias/{{ a.id }}/historico/'+id+'/eliminar', {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      if (d.ok) { document.getElementById('hist-'+id).remove(); }
+      else alert('Erro: '+d.error);
+    });
+}
 function eliminar(){
   if(!confirm('Eliminar Assistência #{{ "%04d"|format(a.numero) }}?')) return;
   fetch('/assistencias/{{ a.id }}/eliminar',{method:'POST'})

@@ -3114,6 +3114,43 @@ def assistencia_status(aid):
     db.session.commit()
     return jsonify({'ok': True})
 
+@app.route('/assistencias/<int:aid>/historico/<int:hid>/editar', methods=['POST'])
+@login_required
+def assistencia_hist_editar(aid, hid):
+    h = AssistenciaHistorico.query.filter_by(id=hid, assist_id=aid).first_or_404()
+    data = request.get_json() or {}
+    from datetime import date as _dt
+    # Update fields
+    if 'data_real' in data:
+        try: h.data_real = datetime.strptime(data['data_real'], '%Y-%m-%d').date() if data['data_real'] else None
+        except: pass
+    if 'notas' in data:
+        h.notas = data['notas']
+    # If this is the current status entry, also update the assistencia date
+    a = Assistencia.query.get(aid)
+    if a and h.status_novo == a.status:
+        if h.data_real:
+            if h.status_novo == 'rececionado':      a.data_rececionado    = h.data_real
+            elif h.status_novo == 'em_execucao':    a.data_em_execucao    = h.data_real
+            elif h.status_novo == 'obra_concluida': a.data_obra_concluida = h.data_real
+            elif h.status_novo == 'comunicado':     a.data_comunicado     = h.data_real
+            elif h.status_novo == 'faturado_fechado': a.data_faturado     = h.data_real
+            _assist_calc_durations(a)
+        a.atualizado_em = datetime.now()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/assistencias/<int:aid>/historico/<int:hid>/eliminar', methods=['POST'])
+@login_required
+def assistencia_hist_eliminar(aid, hid):
+    h = AssistenciaHistorico.query.filter_by(id=hid, assist_id=aid).first_or_404()
+    if not current_user.is_admin and h.user_nome != current_user.nome:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    db.session.delete(h)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 @app.route('/assistencias/<int:aid>/eliminar', methods=['POST'])
 @login_required
 def assistencia_eliminar(aid):
