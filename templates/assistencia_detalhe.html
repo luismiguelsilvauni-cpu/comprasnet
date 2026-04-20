@@ -42,17 +42,17 @@
     <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap">
       {% if a.dias_recepcao_conclusao is not none %}
       <div style="padding:6px 12px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;font-size:12px">
-        📥→✅ <strong>{{ a.dias_recepcao_conclusao }} dias</strong> <span style="color:var(--text-muted)">(receção→conclusão)</span>
+        📥→✅ <strong style="color:{% if a.dias_recepcao_conclusao < 0 %}#ef4444{% else %}inherit{% endif %}">{% if a.dias_recepcao_conclusao < 0 %}⚠️ {% endif %}{{ a.dias_recepcao_conclusao }} dias</strong> <span style="color:var(--text-muted)">(receção→conclusão)</span>
       </div>
       {% endif %}
       {% if a.dias_conclusao_comunicado is not none %}
       <div style="padding:6px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:6px;font-size:12px">
-        ✅→📨 <strong>{{ a.dias_conclusao_comunicado }} dias</strong> <span style="color:var(--text-muted)">(conclusão→comunicado)</span>
+        ✅→📨 <strong style="color:{% if a.dias_conclusao_comunicado < 0 %}#ef4444{% else %}inherit{% endif %}">{% if a.dias_conclusao_comunicado < 0 %}⚠️ {% endif %}{{ a.dias_conclusao_comunicado }} dias</strong> <span style="color:var(--text-muted)">(conclusão→comunicado)</span>
       </div>
       {% endif %}
       {% if a.dias_conclusao_faturado is not none %}
       <div style="padding:6px 12px;background:rgba(107,114,128,.1);border:1px solid rgba(107,114,128,.25);border-radius:6px;font-size:12px">
-        ✅→🧾 <strong>{{ a.dias_conclusao_faturado }} dias</strong> <span style="color:var(--text-muted)">(conclusão→faturado)</span>
+        ✅→🧾 <strong style="color:{% if a.dias_conclusao_faturado < 0 %}#ef4444{% else %}inherit{% endif %}">{% if a.dias_conclusao_faturado < 0 %}⚠️ {% endif %}{{ a.dias_conclusao_faturado }} dias</strong> <span style="color:var(--text-muted)">(conclusão→faturado)</span>
       </div>
       {% endif %}
     </div>
@@ -347,8 +347,12 @@ function guardarHist(id) {
       status_novo: selNovo ? selNovo.value : null
     })
   }).then(r=>r.json()).then(d=>{
-    if (d.ok) location.reload();
-    else alert('Erro: '+d.error);
+    if (d.ok) {
+      if (d.warnings && d.warnings.length > 0) {
+        alert('Guardado — mas foram detectadas datas inconsistentes:\n\n' + d.warnings.join('\n\n') + '\n\nPor favor verifique e corrija as datas.');
+      }
+      location.reload();
+    } else alert('Erro: '+d.error);
   });
 }
 function eliminarHist(id) {

@@ -2936,7 +2936,7 @@ def _recalc_assistencia_dates(a):
 
 
 def _assist_calc_durations(a):
-    """Recalculate duration fields."""
+    """Recalculate duration fields. Negative values stored as-is but flagged."""
     if a.data_rececionado and a.data_obra_concluida:
         a.dias_recepcao_conclusao = (a.data_obra_concluida - a.data_rececionado).days
     if a.data_obra_concluida and a.data_comunicado:
@@ -3188,7 +3188,16 @@ def assistencia_hist_editar(aid, hid):
         _recalc_assistencia_dates(a)
         a.atualizado_em = datetime.now()
     db.session.commit()
-    return jsonify({'ok': True})
+    # Check for negative durations and return warnings
+    warnings = []
+    if a:
+        if a.dias_recepcao_conclusao is not None and a.dias_recepcao_conclusao < 0:
+            warnings.append(f'⚠️ Data de Obra Concluída ({a.data_obra_concluida}) é anterior à Receção ({a.data_rececionado}). Verifique as datas.')
+        if a.dias_conclusao_comunicado is not None and a.dias_conclusao_comunicado < 0:
+            warnings.append(f'⚠️ Data de Comunicado ({a.data_comunicado}) é anterior à Obra Concluída ({a.data_obra_concluida}). Verifique as datas.')
+        if a.dias_conclusao_faturado is not None and a.dias_conclusao_faturado < 0:
+            warnings.append(f'⚠️ Data de Faturação ({a.data_faturado}) é anterior à Obra Concluída ({a.data_obra_concluida}). Verifique as datas.')
+    return jsonify({'ok': True, 'warnings': warnings})
 
 @app.route('/assistencias/<int:aid>/historico/<int:hid>/eliminar', methods=['POST'])
 @login_required
