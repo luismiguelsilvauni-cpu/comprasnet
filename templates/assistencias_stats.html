@@ -6,6 +6,34 @@
   <button onclick="location.reload()" class="btn btn-ghost btn-sm">🔄 Atualizar</button>
 {% endblock %}
 {% block content %}
+<script>
+var yearsData  = {{ years_data  | safe }};
+var monthsData = {{ months_data | safe }};
+var byStatus   = {{ by_status   | safe }};
+var topReq     = {{ top_req     | safe }};
+var statusDict = {{ status_dict | safe }};
+var colorsMap  = {{ colors_json | safe }};
+
+var statsData = {
+  total: {{ total }},
+  n_fechadas: {{ n_fechadas }},
+  n_abertas: {{ n_abertas }},
+  avg_obra: {{ avg_obra }},
+  avg_com: {{ avg_com }},
+  avg_fat: {{ avg_fat }},
+  max_obra: {{ max_obra }},
+  min_obra: {{ min_obra }},
+  years_summary: '',
+  top_req_summary: '',
+};
+// Fill summaries after yearsData/topReq are populated
+document.addEventListener('DOMContentLoaded', function() {
+  statsData.years_summary = yearsData.map(function(d){
+    return d.year + ': ' + d.total + ' total, avg_obra=' + (d.avg_obra||'n/a') + 'd, avg_com=' + (d.avg_com||'n/a') + 'd';
+  }).join('\n');
+  statsData.top_req_summary = topReq.slice(0,5).map(function(r){ return r[0]+': '+r[1]; }).join('\n');
+});
+</script>
 
 <!-- KPI Cards -->
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px">
@@ -239,12 +267,7 @@ function gerarAnalise() {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-var yearsData  = {{ years_data  | safe }};
-var monthsData = {{ months_data | safe }};
-var byStatus   = {{ by_status   | safe }};
-var topReq     = {{ top_req     | safe }};
-var statusDict = {{ status_dict | safe }};
-var colorsMap  = {{ colors_json | safe }};
+// Data vars moved to top of page
 
 var isDark = document.documentElement.getAttribute('data-theme') === 'dark'
   || window.matchMedia('(prefers-color-scheme: dark)').matches;
