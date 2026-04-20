@@ -2102,12 +2102,30 @@ def api_gemini_models():
                         'label': m.get('displayName', name),
                         'description': m.get('description', '')[:80],
                     })
-        # Sort: flash first, then pro
+        # Always include known stable models even if not in list
+        known = [
+            {'id':'gemini-2.0-flash',            'label':'Gemini 2.0 Flash',              'description':'Rápido e eficiente'},
+            {'id':'gemini-2.0-flash-lite',        'label':'Gemini 2.0 Flash Lite',         'description':'Mais leve'},
+            {'id':'gemini-1.5-flash',             'label':'Gemini 1.5 Flash',              'description':'Estável'},
+            {'id':'gemini-1.5-flash-latest',      'label':'Gemini 1.5 Flash (latest)',     'description':'Versão mais recente 1.5'},
+            {'id':'gemini-1.5-pro',               'label':'Gemini 1.5 Pro',               'description':'Mais capaz, mais lento'},
+            {'id':'gemini-2.0-flash-exp',         'label':'Gemini 2.0 Flash Exp',          'description':'Experimental'},
+        ]
+        existing_ids = {m['id'] for m in models}
+        for k in known:
+            if k['id'] not in existing_ids:
+                models.insert(0, k)
         models.sort(key=lambda x: (0 if 'flash' in x['id'] else 1, x['id']))
         return jsonify({'models': models})
     except urllib.error.HTTPError as e:
         body = e.read().decode()
-        return jsonify({'error': f'Erro HTTP {e.code}: {body[:150]}'}), 500
+        # Even on error, return the known stable models
+        return jsonify({'models': [
+            {'id':'gemini-2.0-flash',        'label':'Gemini 2.0 Flash',        'description':'Recomendado'},
+            {'id':'gemini-1.5-flash',        'label':'Gemini 1.5 Flash',        'description':'Estável'},
+            {'id':'gemini-1.5-pro',          'label':'Gemini 1.5 Pro',          'description':'Mais capaz'},
+            {'id':'gemini-2.0-flash-lite',   'label':'Gemini 2.0 Flash Lite',   'description':'Mais rápido'},
+        ], 'warning': f'API retornou {e.code} — a mostrar modelos conhecidos'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
