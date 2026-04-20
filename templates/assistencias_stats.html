@@ -49,6 +49,112 @@
 </div>
 
 
+<!-- AI Analysis Panel -->
+<div class="card" style="padding:16px;margin-bottom:20px;border:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.04)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🤖</span>
+      <div>
+        <div style="font-size:13px;font-weight:700">Análise Inteligente</div>
+        <div style="font-size:11px;color:var(--text-muted)">Resumo gerado automaticamente a partir dos dados actuais</div>
+      </div>
+    </div>
+    <button onclick="gerarAnalise()" id="btnAnalise" class="btn btn-primary btn-sm">
+      ✨ Gerar Análise
+    </button>
+  </div>
+  <div id="analiseContainer" style="display:none">
+    <div id="analiseTexto" style="font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap"></div>
+    <div style="margin-top:10px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px">
+      ⚡ Análise gerada por IA com base nos dados actuais · <span id="analiseData"></span>
+    </div>
+  </div>
+  <div id="analiseLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">
+    <div style="font-size:24px;margin-bottom:8px">⏳</div>
+    <div style="font-size:13px">A analisar os dados...</div>
+  </div>
+  <div id="analiseErro" style="display:none;color:#ef4444;font-size:12px;padding:8px"></div>
+</div>
+
+<script>
+// Prepare stats data for AI
+var statsData = {
+  total: {{ total }},
+  n_fechadas: {{ n_fechadas }},
+  n_abertas: {{ n_abertas }},
+  avg_obra: {{ avg_obra }},
+  avg_com: {{ avg_com }},
+  avg_fat: {{ avg_fat }},
+  max_obra: {{ max_obra }},
+  min_obra: {{ min_obra }},
+  years_summary: yearsData.map(function(d){
+    return d.year + ': ' + d.total + ' total, avg_obra=' + (d.avg_obra||'n/a') + 'd, avg_com=' + (d.avg_com||'n/a') + 'd';
+  }).join('\n'),
+  top_req_summary: topReq.slice(0,5).map(function(r){ return r[0] + ': ' + r[1]; }).join('\n'),
+};
+
+function gerarAnalise() {
+  document.getElementById('analiseContainer').style.display = 'none';
+  document.getElementById('analiseErro').style.display = 'none';
+  document.getElementById('analiseLoading').style.display = 'block';
+  document.getElementById('btnAnalise').disabled = true;
+  document.getElementById('btnAnalise').textContent = '⏳ A gerar...';
+
+  var prompt = 'És um analista de operações para uma empresa de construção naval (UCN).\n' +
+    'Analisa os seguintes dados de assistências/garantias e escreve um resumo executivo em português de Portugal.\n\n' +
+    'DADOS ACTUAIS:\n' +
+    '- Total de assistências: ' + statsData.total + '\n' +
+    '- Fechadas: ' + statsData.n_fechadas + '\n' +
+    '- Em aberto: ' + statsData.n_abertas + '\n' +
+    '- Média dias Receção→Obra: ' + statsData.avg_obra + ' dias\n' +
+    '- Média dias Obra→Comunicado: ' + statsData.avg_com + ' dias\n' +
+    '- Média dias Obra→Faturação: ' + statsData.avg_fat + ' dias\n' +
+    '- Máximo dias execução: ' + statsData.max_obra + ' dias\n' +
+    '- Mínimo dias execução: ' + statsData.min_obra + ' dias\n\n' +
+    'EVOLUÇÃO ANUAL:\n' + statsData.years_summary + '\n\n' +
+    'TOP REQUERENTES:\n' + statsData.top_req_summary + '\n\n' +
+    'INSTRUÇÕES:\n' +
+    '- Escreve 4 parágrafos curtos\n' +
+    '- Parágrafo 1: Resumo do volume e estado actual\n' +
+    '- Parágrafo 2: Análise dos tempos de execução\n' +
+    '- Parágrafo 3: Tempo de reporte ao cliente (obra→comunicado)\n' +
+    '- Parágrafo 4: 2-3 recomendações concretas\n' +
+    '- Usa linguagem profissional mas directa\n' +
+    '- Máximo 220 palavras';
+
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      message: prompt,
+      system: 'Es um analista de operacoes industriais. Responde sempre em portugues de Portugal. Sê conciso e directo.'
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    document.getElementById('analiseLoading').style.display = 'none';
+    document.getElementById('btnAnalise').disabled = false;
+    document.getElementById('btnAnalise').textContent = '🔄 Actualizar';
+    var texto = d.text || d.ok === false && ('Erro: ' + (d.error || 'desconhecido'));
+    if (texto && d.ok !== false) {
+      document.getElementById('analiseTexto').textContent = texto;
+      document.getElementById('analiseData').textContent = new Date().toLocaleString('pt-PT');
+      document.getElementById('analiseContainer').style.display = 'block';
+    } else {
+      document.getElementById('analiseErro').textContent = texto || 'Sem resposta da IA';
+      document.getElementById('analiseErro').style.display = 'block';
+    }
+  })
+  .catch(function(e){
+    document.getElementById('analiseLoading').style.display = 'none';
+    document.getElementById('btnAnalise').disabled = false;
+    document.getElementById('btnAnalise').textContent = '✨ Gerar Análise';
+    document.getElementById('analiseErro').textContent = 'Erro: ' + e;
+    document.getElementById('analiseErro').style.display = 'block';
+  });
+}
+</script>
+
 <!-- Legenda das métricas -->
 <div class="card" style="padding:14px;margin-bottom:20px;background:rgba(59,110,240,.04);border:1px solid rgba(59,110,240,.15)">
   <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px">ℹ️ Guia de Métricas</div>
