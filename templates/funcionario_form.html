@@ -29,8 +29,12 @@
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
     <div class="form-group" style="margin:0"><label>BI / CC Nº</label><input type="text" name="num_cc" value="{{ f.num_cc if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>CC Validade</label><input type="date" name="cc_validade" value="{{ f.cc_validade.strftime('%Y-%m-%d') if f and f.cc_validade else '' }}" class="input"></div>
     <div class="form-group" style="margin:0"><label>NIF</label><input type="text" name="nif" value="{{ f.nif if f else '' }}" class="input"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
     <div class="form-group" style="margin:0"><label>Nº Passaporte</label><input type="text" name="num_passaporte" value="{{ f.num_passaporte if f else '' }}" class="input"></div>
+    <div class="form-group" style="margin:0"><label>Passaporte Validade</label><input type="date" name="passaporte_validade" value="{{ f.passaporte_validade.strftime('%Y-%m-%d') if f and f.passaporte_validade else '' }}" class="input"></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
     <div class="form-group" style="margin:0"><label>Filiação (Pai)</label><input type="text" name="filiacao_pai" value="{{ f.filiacao_pai if f else '' }}" class="input"></div>
@@ -85,9 +89,17 @@
   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">📎 Documentos</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
     {% for tipo, label in [('cc','CC/BI'),('passaporte','Passaporte'),('morada','Comprov. Morada')] %}
-    <div class="form-group" style="margin:0"><label>{{ label }} (PDF)</label>
+    <div class="form-group" style="margin:0">
+      <label>{{ label }} (PDF)</label>
       <input type="file" name="doc_{{ tipo }}" accept=".pdf" class="input" style="font-size:11px">
-      {% if f %}{%set d=f.documentos|selectattr('tipo','equalto',tipo)|first%}{% if d %}<div style="font-size:10px;color:var(--accent);margin-top:3px">✅ {{ d.pdf_filename }}</div>{% endif %}{% endif %}
+      <label style="font-size:10px;color:var(--text-muted);margin-top:4px;display:block">Validade</label>
+      <input type="date" name="{{ tipo }}_validade" class="input" style="font-size:11px"
+        value="{% if f %}{%set d=f.documentos|selectattr('tipo','equalto',tipo)|first%}{% if d and d.data_validade %}{{ d.data_validade.strftime('%Y-%m-%d') }}{% endif %}{% endif %}">
+      {% if f %}{%set d=f.documentos|selectattr('tipo','equalto',tipo)|first%}{% if d %}
+      <div style="font-size:10px;margin-top:3px;{% if d.data_validade and d.data_validade < hoje %}color:#ef4444;font-weight:700{% else %}color:var(--accent){% endif %}">
+        ✅ {{ d.pdf_filename }}{% if d.data_validade %} · val: {{ d.data_validade.strftime('%d/%m/%Y') }}{% if d.data_validade < hoje %} ⚠️ EXPIRADO{% endif %}{% endif %}
+      </div>
+      {% endif %}{% endif %}
     </div>
     {% endfor %}
   </div>

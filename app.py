@@ -154,6 +154,36 @@ def dashboard():
         ArtigoPHC.stock_atual > 0,
         ArtigoPHC.stock_atual <= 3
     ).order_by(ArtigoPHC.stock_atual).limit(10).all()
+    # Check funcionario documents expiring/expired
+    try:
+        from datetime import date as _dt, timedelta
+        _hoje = _dt.today()
+        _aviso = _hoje + timedelta(days=30)  # warn 30 days before
+        # CC and passaporte expiry on Funcionario
+        docs_expirados = []
+        docs_a_expirar = []
+        for f in Funcionario.query.all():
+            if f.cc_validade:
+                if f.cc_validade < _hoje:
+                    docs_expirados.append({'func': f.nome, 'tipo': 'CC', 'data': f.cc_validade, 'fid': f.id})
+                elif f.cc_validade <= _aviso:
+                    docs_a_expirar.append({'func': f.nome, 'tipo': 'CC', 'data': f.cc_validade, 'fid': f.id})
+            if f.passaporte_validade:
+                if f.passaporte_validade < _hoje:
+                    docs_expirados.append({'func': f.nome, 'tipo': 'Passaporte', 'data': f.passaporte_validade, 'fid': f.id})
+                elif f.passaporte_validade <= _aviso:
+                    docs_a_expirar.append({'func': f.nome, 'tipo': 'Passaporte', 'data': f.passaporte_validade, 'fid': f.id})
+        # FuncionarioDocumento expiry
+        for doc in FuncionarioDocumento.query.filter(FuncionarioDocumento.data_validade != None).all():
+            if doc.data_validade < _hoje:
+                f = Funcionario.query.get(doc.funcionario_id)
+                docs_expirados.append({'func': f.nome if f else '?', 'tipo': doc.titulo, 'data': doc.data_validade, 'fid': doc.funcionario_id})
+            elif doc.data_validade <= _aviso:
+                f = Funcionario.query.get(doc.funcionario_id)
+                docs_a_expirar.append({'func': f.nome if f else '?', 'tipo': doc.titulo, 'data': doc.data_validade, 'fid': doc.funcionario_id})
+        docs_alert_count = len(docs_expirados) + len(docs_a_expirar)
+    except: docs_expirados=[]; docs_a_expirar=[]; docs_alert_count=0
+
     # Check assistencias com obra concluida/comunicado > 5 dias sem faturar
     try:
         from datetime import date as _date
@@ -182,6 +212,9 @@ def dashboard():
         entradas_estadia_list=entradas_estadia_list,
         assist_alerta=assist_alerta,
         assist_alerta_count=assist_alerta_count,
+        docs_expirados=docs_expirados,
+        docs_a_expirar=docs_a_expirar,
+        docs_alert_count=docs_alert_count,
         total_pedidos=total_pedidos,
         pedidos_abertos=pedidos_abertos,
         pedidos_aprovados=pedidos_aprovados,
@@ -3796,8 +3829,10 @@ class Funcionario(db.Model):
     data_admissao       = db.Column(db.Date)
     data_nascimento     = db.Column(db.Date)
     num_cc              = db.Column(db.String(50))
+    cc_validade         = db.Column(db.Date, nullable=True)
     nif                 = db.Column(db.String(20))
     num_passaporte      = db.Column(db.String(50))
+    passaporte_validade = db.Column(db.Date, nullable=True)
     filiacao_pai        = db.Column(db.String(200))
     filiacao_mae        = db.Column(db.String(200))
     situacao_militar    = db.Column(db.String(100))
@@ -3871,6 +3906,7 @@ class FuncionarioDocumento(db.Model):
     titulo          = db.Column(db.String(300), nullable=False)
     pdf_filename    = db.Column(db.String(500))
     pdf_path        = db.Column(db.String(1000))
+    data_validade   = db.Column(db.Date, nullable=True)
     criado_em       = db.Column(db.DateTime, default=datetime.now)
 
 class FuncionarioFormacao(db.Model):
@@ -6392,7 +6428,8 @@ def funcionario_novo():
             ativo=request.form.get('ativo')=='1',
             data_nascimento=di('data_nascimento'),
             morada=d('morada'), nif=d('nif'),
-            num_cc=d('num_cc'), num_passaporte=d('num_passaporte'),
+            num_cc=d('num_cc'), cc_validade=datetime.strptime(d('cc_validade'), '%Y-%m-%d').date() if d('cc_validade') else None,
+            num_passaporte=d('num_passaporte'), passaporte_validade=datetime.strptime(d('passaporte_validade'), '%Y-%m-%d').date() if d('passaporte_validade') else None,
             agregado_familiar=int(request.form.get('agregado_familiar',0) or 0),
             telemovel=d('telemovel'), email=d('email'),
             contacto_emergencia=d('contacto_emergencia'),
@@ -6407,7 +6444,8 @@ def funcionario_novo():
         db.session.commit()
         flash(f'Funcionário {f.nome} criado.', 'success')
         return redirect(url_for('funcionario_detalhe', fid=f.id))
-    return render_template('funcionario_form.html', f=None)
+    from datetime import date as _d
+    return render_template('funcionario_form.html', f=None, hoje=_d.today())
 
 @app.route('/funcionarios/<int:fid>')
 @login_required
@@ -6439,7 +6477,10 @@ def funcionario_editar(fid):
         func.data_nascimento=di('data_nascimento')
         func.data_admissao=di('data_admissao')
         func.morada=d('morada'); func.nif=d('nif')
-        func.num_cc=d('num_cc'); func.num_passaporte=d('num_passaporte')
+        func.num_cc=d('num_cc')
+        func.cc_validade=datetime.strptime(d('cc_validade'),'%Y-%m-%d').date() if d('cc_validade') else None
+        func.num_passaporte=d('num_passaporte')
+        func.passaporte_validade=datetime.strptime(d('passaporte_validade'),'%Y-%m-%d').date() if d('passaporte_validade') else None
         func.filiacao_pai=d('filiacao_pai'); func.filiacao_mae=d('filiacao_mae')
         func.situacao_militar=d('situacao_militar'); func.estado_civil=d('estado_civil')
         func.conjuge=d('conjuge')
@@ -6460,7 +6501,8 @@ def funcionario_editar(fid):
         db.session.commit()
         flash('Dados actualizados.', 'success')
         return redirect(url_for('funcionario_detalhe', fid=fid))
-    return render_template('funcionario_form.html', f=func)
+    from datetime import date as _d
+    return render_template('funcionario_form.html', f=func, hoje=_d.today())
 
 @app.route('/funcionarios/<int:fid>/apagar', methods=['POST'])
 @login_required
@@ -6612,6 +6654,7 @@ def _rh_upload_docs(fid, files):
                 db.session.add(FuncionarioDocumento(
                     funcionario_id=fid, tipo=tipo,
                     titulo={'cc':'Cartão de Cidadão','passaporte':'Passaporte','morada':'Comprovativo de Morada'}[tipo],
+                    data_validade=datetime.strptime(request.form.get(f'{tipo}_validade',''),'%Y-%m-%d').date() if request.form.get(f'{tipo}_validade') else None,
                     pdf_filename=f.filename, pdf_path=safe))
 
 

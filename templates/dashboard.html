@@ -2,6 +2,9 @@
 {% block title %}Dashboard · ComprasNet{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block topbar_actions %}
+  {% if docs_alert_count and docs_alert_count > 0 %}
+  <a href="{{ url_for('funcionarios') }}" style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;text-decoration:none">📋 {{ docs_alert_count }} doc(s) expirado/a expirar</a>
+  {% endif %}
   {% if assist_alerta_count and assist_alerta_count > 0 %}
   <a href="{{ url_for('assistencias') }}" style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;text-decoration:none">🔧 {{ assist_alerta_count }} assist. sem faturar</a>
   {% endif %}
@@ -12,6 +15,37 @@
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
   <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
+<!-- Hidden HTML for docs_validade widget -->
+<div id="docs_validade_html" style="display:none">
+{% if docs_expirados or docs_a_expirar %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:2px">
+{% for d in docs_expirados %}
+<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:12px">
+  <div style="font-size:10px;font-weight:700;color:#ef4444;margin-bottom:6px">🔴 EXPIRADO</div>
+  <div style="font-size:13px;font-weight:700">{{ d.func }}</div>
+  <div style="font-size:12px;color:var(--text-muted)">{{ d.tipo }}</div>
+  <div style="font-size:11px;color:#ef4444;margin-top:4px">Validade: {{ d.data.strftime('%d/%m/%Y') }}</div>
+  <a href="{{ url_for('funcionario_ficha', fid=d.fid) }}" style="font-size:11px;color:#ef4444;text-decoration:none;margin-top:8px;display:inline-block;padding:3px 8px;border:1px solid rgba(239,68,68,.4);border-radius:4px">Atualizar →</a>
+</div>
+{% endfor %}
+{% for d in docs_a_expirar %}
+<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px">
+  <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-bottom:6px">🟡 A EXPIRAR EM BREVE</div>
+  <div style="font-size:13px;font-weight:700">{{ d.func }}</div>
+  <div style="font-size:12px;color:var(--text-muted)">{{ d.tipo }}</div>
+  <div style="font-size:11px;color:#f59e0b;margin-top:4px">Validade: {{ d.data.strftime('%d/%m/%Y') }}</div>
+  <a href="{{ url_for('funcionario_ficha', fid=d.fid) }}" style="font-size:11px;color:#f59e0b;text-decoration:none;margin-top:8px;display:inline-block;padding:3px 8px;border:1px solid rgba(245,158,11,.4);border-radius:4px">Ver →</a>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:20px;color:var(--success)">
+  <div style="font-size:28px;margin-bottom:6px">✅</div>
+  <div style="font-size:13px;font-weight:600">Todos os documentos válidos</div>
+</div>
+{% endif %}
+</div>
+
 <!-- Hidden HTML for assist_alerta widget -->
 <div id="assist_alerta_html" style="display:none">
 {% if assist_alerta %}
@@ -286,6 +320,10 @@ const WIDGET_DATA = {
     label: '📋 Pedidos Recentes', cols: 8,
     html: function() { return `{% if pedidos_recentes %}<div class="table-wrap" style="margin:0"><table><thead><tr><th>Título</th><th>Estado</th><th>Data</th><th></th></tr></thead><tbody>{% for p in pedidos_recentes %}<tr><td style="font-size:13px">{{ p.titulo[:35] }}</td><td><span class="badge {% if p.estado=='aberto' %}badge-blue{% elif p.estado=='aprovado' %}badge-green{% else %}badge-yellow{% endif %}" style="font-size:10px">{{ p.estado }}</span></td><td style="font-size:12px;color:var(--text-muted)">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td><td><a href="/pedidos/{{ p.id }}" class="btn btn-ghost btn-sm">→</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div style="text-align:center;padding:32px;color:var(--text-muted)">Sem pedidos recentes</div>{% endif %}`; }
   },
+  docs_validade: {
+    label: '📋 Documentos / Validades', cols: 12,
+    html: function() { return document.getElementById('docs_validade_html').innerHTML; }
+  },
   assist_alerta: {
     label: '🔧 Assistências – Alertas', cols: 12,
     html: function() { return document.getElementById('assist_alerta_html').innerHTML; }
@@ -325,6 +363,7 @@ const WIDGET_DATA = {
 
 const DEFAULT_LAYOUT = [
   {id:'kpis', cols:12},
+  {id:'docs_validade', cols:12},
   {id:'assist_alerta', cols:12},
   {id:'entradas_estadia', cols:12},
   {id:'artigos_pedidos', cols:12},
@@ -334,7 +373,7 @@ const DEFAULT_LAYOUT = [
 ];
 
 // Version check - bump this when DEFAULT_LAYOUT changes
-const LAYOUT_VERSION = '6';
+const LAYOUT_VERSION = '7';
 let savedLayout = null;
 try {
   if (localStorage.getItem('dashboard_layout_version') !== LAYOUT_VERSION) {
@@ -766,6 +805,37 @@ fetch('/api/dashboard/layout').then(r=>r.json()).then(saved=>{
   renderGrid();
 }).catch(()=>renderGrid());
 </script>
+
+<!-- Hidden HTML for docs_validade widget -->
+<div id="docs_validade_html" style="display:none">
+{% if docs_expirados or docs_a_expirar %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:2px">
+{% for d in docs_expirados %}
+<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:12px">
+  <div style="font-size:10px;font-weight:700;color:#ef4444;margin-bottom:6px">🔴 EXPIRADO</div>
+  <div style="font-size:13px;font-weight:700">{{ d.func }}</div>
+  <div style="font-size:12px;color:var(--text-muted)">{{ d.tipo }}</div>
+  <div style="font-size:11px;color:#ef4444;margin-top:4px">Validade: {{ d.data.strftime('%d/%m/%Y') }}</div>
+  <a href="{{ url_for('funcionario_ficha', fid=d.fid) }}" style="font-size:11px;color:#ef4444;text-decoration:none;margin-top:8px;display:inline-block;padding:3px 8px;border:1px solid rgba(239,68,68,.4);border-radius:4px">Atualizar →</a>
+</div>
+{% endfor %}
+{% for d in docs_a_expirar %}
+<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px">
+  <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-bottom:6px">🟡 A EXPIRAR EM BREVE</div>
+  <div style="font-size:13px;font-weight:700">{{ d.func }}</div>
+  <div style="font-size:12px;color:var(--text-muted)">{{ d.tipo }}</div>
+  <div style="font-size:11px;color:#f59e0b;margin-top:4px">Validade: {{ d.data.strftime('%d/%m/%Y') }}</div>
+  <a href="{{ url_for('funcionario_ficha', fid=d.fid) }}" style="font-size:11px;color:#f59e0b;text-decoration:none;margin-top:8px;display:inline-block;padding:3px 8px;border:1px solid rgba(245,158,11,.4);border-radius:4px">Ver →</a>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:20px;color:var(--success)">
+  <div style="font-size:28px;margin-bottom:6px">✅</div>
+  <div style="font-size:13px;font-weight:600">Todos os documentos válidos</div>
+</div>
+{% endif %}
+</div>
 
 <!-- Hidden HTML for assist_alerta widget -->
 <div id="assist_alerta_html" style="display:none">
