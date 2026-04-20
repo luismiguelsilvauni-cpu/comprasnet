@@ -156,6 +156,21 @@
           {% if h.notas %} · 📝 {{ h.notas }}{% endif %}
         </div>
         <div id="hist-edit-{{ h.id }}" style="display:none;margin-top:6px;display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Estado anterior</div>
+              <select id="hist-sant-{{ h.id }}" class="input" style="font-size:12px;padding:4px 8px">
+                <option value="">— nenhum —</option>
+                {% for v,l in status_list %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Estado novo *</div>
+              <select id="hist-snovo-{{ h.id }}" class="input" style="font-size:12px;padding:4px 8px">
+                {% for v,l in status_list %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <div>
               <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">📅 Data real</div>
@@ -166,10 +181,11 @@
               <input type="text" id="hist-nota-{{ h.id }}" class="input" style="font-size:12px;padding:4px 8px">
             </div>
             <div style="display:flex;gap:4px;align-self:flex-end">
-              <button onclick="guardarHist({{ h.id }})" class="btn btn-primary btn-sm">💾</button>
+              <button onclick="guardarHist({{ h.id }})" class="btn btn-primary btn-sm">💾 Guardar</button>
               <button onclick="fecharEditHist({{ h.id }})" class="btn btn-ghost btn-sm">✕</button>
             </div>
           </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:4px">⚠️ Ao guardar, todas as datas da assistência são recalculadas a partir do histórico.</div>
         </div>
       </div>
     </div>
@@ -298,12 +314,16 @@ function abrirPreview(url,mime,nome){
   document.getElementById('previewModal').style.display='flex';
 }
 document.getElementById('previewModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
-function editarHist(id, dataReal, nota) {
+function editarHist(id, dataReal, nota, statusAnt, statusNovo) {
   document.getElementById('hist-view-'+id).style.display = 'none';
   var editEl = document.getElementById('hist-edit-'+id);
   editEl.style.display = 'block';
   document.getElementById('hist-data-'+id).value = dataReal;
   document.getElementById('hist-nota-'+id).value = nota;
+  var selAnt = document.getElementById('hist-sant-'+id);
+  var selNovo = document.getElementById('hist-snovo-'+id);
+  if (selAnt) selAnt.value = statusAnt || '';
+  if (selNovo) selNovo.value = statusNovo || '';
 }
 function fecharEditHist(id) {
   document.getElementById('hist-edit-'+id).style.display = 'none';
@@ -312,9 +332,15 @@ function fecharEditHist(id) {
 function guardarHist(id) {
   var dataReal = document.getElementById('hist-data-'+id).value;
   var nota = document.getElementById('hist-nota-'+id).value;
+  var selAnt = document.getElementById('hist-sant-'+id);
+  var selNovo = document.getElementById('hist-snovo-'+id);
   fetch('/assistencias/{{ a.id }}/historico/'+id+'/editar', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({data_real: dataReal, notas: nota})
+    body: JSON.stringify({
+      data_real: dataReal, notas: nota,
+      status_ant: selAnt ? selAnt.value : null,
+      status_novo: selNovo ? selNovo.value : null
+    })
   }).then(r=>r.json()).then(d=>{
     if (d.ok) location.reload();
     else alert('Erro: '+d.error);

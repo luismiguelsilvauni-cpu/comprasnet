@@ -2896,6 +2896,27 @@ ASSIST_COLORS = {
     'faturado_fechado': '#6b7280',
 }
 
+def _recalc_assistencia_dates(a):
+    """Recalculate all date fields from history entries (most recent per status_novo)."""
+    hist = AssistenciaHistorico.query.filter_by(assist_id=a.id).order_by(
+        AssistenciaHistorico.criado_em.asc()).all()
+    # Get most recent real date per status
+    dates = {}
+    for h in hist:
+        if h.data_real:
+            dates[h.status_novo] = h.data_real
+    # Apply
+    if 'rececionado'      in dates: a.data_rececionado    = dates['rececionado']
+    if 'em_execucao'      in dates: a.data_em_execucao    = dates['em_execucao']
+    if 'obra_concluida'   in dates: a.data_obra_concluida = dates['obra_concluida']
+    if 'comunicado'       in dates: a.data_comunicado     = dates['comunicado']
+    if 'faturado_fechado' in dates: a.data_faturado       = dates['faturado_fechado']
+    # Most recent status = current status
+    if hist:
+        a.status = hist[-1].status_novo
+    _assist_calc_durations(a)
+
+
 def _assist_calc_durations(a):
     """Recalculate duration fields."""
     if a.data_rececionado and a.data_obra_concluida:
@@ -3119,23 +3140,21 @@ def assistencia_status(aid):
 def assistencia_hist_editar(aid, hid):
     h = AssistenciaHistorico.query.filter_by(id=hid, assist_id=aid).first_or_404()
     data = request.get_json() or {}
-    from datetime import date as _dt
-    # Update fields
+    # Update data_real
     if 'data_real' in data:
         try: h.data_real = datetime.strptime(data['data_real'], '%Y-%m-%d').date() if data['data_real'] else None
         except: pass
     if 'notas' in data:
         h.notas = data['notas']
-    # If this is the current status entry, also update the assistencia date
+    # Update status_ant and status_novo if provided
+    if 'status_ant' in data:
+        h.status_ant = data['status_ant'] or None
+    if 'status_novo' in data and data['status_novo']:
+        h.status_novo = data['status_novo']
+    # Recalculate all assistencia dates from history (most recent per status)
     a = Assistencia.query.get(aid)
-    if a and h.status_novo == a.status:
-        if h.data_real:
-            if h.status_novo == 'rececionado':      a.data_rececionado    = h.data_real
-            elif h.status_novo == 'em_execucao':    a.data_em_execucao    = h.data_real
-            elif h.status_novo == 'obra_concluida': a.data_obra_concluida = h.data_real
-            elif h.status_novo == 'comunicado':     a.data_comunicado     = h.data_real
-            elif h.status_novo == 'faturado_fechado': a.data_faturado     = h.data_real
-            _assist_calc_durations(a)
+    if a:
+        _recalc_assistencia_dates(a)
         a.atualizado_em = datetime.now()
     db.session.commit()
     return jsonify({'ok': True})
