@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
   <div id="analiseLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">
     <div style="font-size:24px;margin-bottom:8px">⏳</div>
-    <div style="font-size:13px">A analisar os dados...</div>
+    <div style="font-size:13px">A analisar os dados... (pode demorar 15-30 segundos)</div>
   </div>
   <div id="analiseErro" style="display:none;color:#ef4444;font-size:12px;padding:8px"></div>
 </div>
@@ -128,27 +128,10 @@ function gerarAnalise() {
   document.getElementById('btnAnalise').disabled = true;
   document.getElementById('btnAnalise').textContent = '⏳ A gerar...';
 
-  var prompt = 'És um analista de operações para uma empresa de construção naval (UCN).\n' +
-    'Analisa os seguintes dados de assistências/garantias e escreve um resumo executivo em português de Portugal.\n\n' +
-    'DADOS ACTUAIS:\n' +
-    '- Total de assistências: ' + statsData.total + '\n' +
-    '- Fechadas: ' + statsData.n_fechadas + '\n' +
-    '- Em aberto: ' + statsData.n_abertas + '\n' +
-    '- Média dias Receção→Obra: ' + statsData.avg_obra + ' dias\n' +
-    '- Média dias Obra→Comunicado: ' + statsData.avg_com + ' dias\n' +
-    '- Média dias Obra→Faturação: ' + statsData.avg_fat + ' dias\n' +
-    '- Máximo dias execução: ' + statsData.max_obra + ' dias\n' +
-    '- Mínimo dias execução: ' + statsData.min_obra + ' dias\n\n' +
-    'EVOLUÇÃO ANUAL:\n' + statsData.years_summary + '\n\n' +
-    'TOP REQUERENTES:\n' + statsData.top_req_summary + '\n\n' +
-    'INSTRUÇÕES:\n' +
-    '- Escreve 4 parágrafos curtos\n' +
-    '- Parágrafo 1: Resumo do volume e estado actual\n' +
-    '- Parágrafo 2: Análise dos tempos de execução\n' +
-    '- Parágrafo 3: Tempo de reporte ao cliente (obra→comunicado)\n' +
-    '- Parágrafo 4: 2-3 recomendações concretas\n' +
-    '- Usa linguagem profissional mas directa\n' +
-    '- Máximo 220 palavras';
+  var prompt = 'Analisa estes dados de assistências/garantias de uma empresa naval. Responde em portugues de Portugal. 4 paragrafos curtos (max 180 palavras total): 1)estado geral 2)tempos execucao 3)tempo reporte cliente 4)recomendacoes.\n\n' +
+    'Total:' + statsData.total + ' Fechadas:' + statsData.n_fechadas + ' Abertas:' + statsData.n_abertas + '\n' +
+    'Media rec->obra:' + statsData.avg_obra + 'd obra->comunicado:' + statsData.avg_com + 'd obra->fat:' + statsData.avg_fat + 'd max:' + statsData.max_obra + 'd min:' + statsData.min_obra + 'd\n' +
+    'Anos:' + statsData.years_summary + '\nTop:' + statsData.top_req_summary;
 
   console.log('A enviar para /api/chat...', {message: prompt.substring(0,100)+'...'});
   fetch('/api/chat', {

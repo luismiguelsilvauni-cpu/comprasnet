@@ -1763,7 +1763,7 @@ def api_chat():
             import urllib.request
             req = urllib.request.Request(url, data=payload,
                 headers={'Content-Type':'application/json'}, method='POST')
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=120) as r:
                 resp = json.loads(r.read())
             text = resp['candidates'][0]['content']['parts'][0]['text']
             return jsonify({'ok': True, 'text': text, 'provider': 'gemini', 'model': model})
