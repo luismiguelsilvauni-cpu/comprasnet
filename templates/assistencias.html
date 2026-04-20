@@ -2,6 +2,7 @@
 {% block title %}Assistências · NavTech{% endblock %}
 {% block page_title %}🔧 Assistências & Garantias{% endblock %}
 {% block topbar_actions %}
+  <a href="{{ url_for('assistencias_stats') }}" class="btn btn-ghost btn-sm">📊 Estatísticas</a>
   <a href="{{ url_for('assistencia_nova') }}" class="btn btn-primary btn-sm">+ Nova Assistência</a>
 {% endblock %}
 {% block content %}

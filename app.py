@@ -2926,6 +2926,103 @@ def assistencias():
         status_list=ASSIST_STATUS, status_filtro=status_f,
         colors=ASSIST_COLORS)
 
+@app.route('/assistencias/estatisticas')
+@login_required
+def assistencias_stats():
+    from datetime import date as _dt
+    from sqlalchemy import func, extract
+    _hoje = _dt.today()
+
+    # All closed assistencias with duration data
+    todas = Assistencia.query.all()
+    fechadas = [a for a in todas if a.status == 'faturado_fechado']
+    abertas = [a for a in todas if a.status != 'faturado_fechado']
+
+    # KPIs
+    total = len(todas)
+    n_fechadas = len(fechadas)
+    n_abertas = len(abertas)
+
+    duracoes_obra = [a.dias_recepcao_conclusao for a in fechadas if a.dias_recepcao_conclusao is not None]
+    duracoes_fat  = [a.dias_conclusao_faturado  for a in fechadas if a.dias_conclusao_faturado  is not None]
+
+    avg_obra = round(sum(duracoes_obra)/len(duracoes_obra), 1) if duracoes_obra else 0
+    avg_fat  = round(sum(duracoes_fat) /len(duracoes_fat),  1) if duracoes_fat  else 0
+    max_obra = max(duracoes_obra) if duracoes_obra else 0
+    max_fat  = max(duracoes_fat)  if duracoes_fat  else 0
+    min_obra = min(duracoes_obra) if duracoes_obra else 0
+
+    # Por ano/mês — agrupado por ano de data_rececionado
+    from collections import defaultdict
+    by_year = defaultdict(lambda: {'total':0,'fechadas':0,'sum_obra':0,'n_obra':0,'sum_fat':0,'n_fat':0})
+    by_month = defaultdict(lambda: {'total':0,'fechadas':0,'sum_obra':0,'n_obra':0})
+    by_status = defaultdict(int)
+
+    for a in todas:
+        by_status[a.status] += 1
+        yr = a.data_rececionado.year if a.data_rececionado else (a.criado_em.year if a.criado_em else _hoje.year)
+        mo = f"{yr}-{a.data_rececionado.month:02d}" if a.data_rececionado else str(yr)
+        by_year[yr]['total'] += 1
+        by_month[mo]['total'] += 1
+        if a.status == 'faturado_fechado':
+            by_year[yr]['fechadas'] += 1
+            by_month[mo]['fechadas'] += 1
+        if a.dias_recepcao_conclusao is not None:
+            by_year[yr]['sum_obra'] += a.dias_recepcao_conclusao
+            by_year[yr]['n_obra']   += 1
+            by_month[mo]['sum_obra'] += a.dias_recepcao_conclusao
+            by_month[mo]['n_obra']   += 1
+        if a.dias_conclusao_faturado is not None:
+            by_year[yr]['sum_fat'] += a.dias_conclusao_faturado
+            by_year[yr]['n_fat']   += 1
+
+    # Compute averages
+    years_data = []
+    for yr in sorted(by_year.keys()):
+        d = by_year[yr]
+        years_data.append({
+            'year': yr,
+            'total': d['total'],
+            'fechadas': d['fechadas'],
+            'avg_obra': round(d['sum_obra']/d['n_obra'],1) if d['n_obra'] else None,
+            'avg_fat':  round(d['sum_fat'] /d['n_fat'], 1) if d['n_fat']  else None,
+        })
+
+    months_data = []
+    for mo in sorted(by_month.keys())[-18:]:  # last 18 months
+        d = by_month[mo]
+        months_data.append({
+            'month': mo,
+            'total': d['total'],
+            'fechadas': d['fechadas'],
+            'avg_obra': round(d['sum_obra']/d['n_obra'],1) if d['n_obra'] else None,
+        })
+
+    # Top requerentes
+    req_count = defaultdict(int)
+    for a in todas:
+        req_count[a.requerente_nome] += 1
+    top_req = sorted(req_count.items(), key=lambda x: -x[1])[:10]
+
+    # Abertas por estado com dias em aberto
+    abertas_detail = []
+    for a in abertas:
+        ref = a.data_rececionado or (a.criado_em.date() if a.criado_em else _hoje)
+        dias = (_hoje - ref).days
+        abertas_detail.append({'status': a.status, 'dias': dias})
+
+    import json
+    return render_template('assistencias_stats.html',
+        total=total, n_fechadas=n_fechadas, n_abertas=n_abertas,
+        avg_obra=avg_obra, avg_fat=avg_fat, max_obra=max_obra, max_fat=max_fat, min_obra=min_obra,
+        years_data=json.dumps(years_data),
+        months_data=json.dumps(months_data),
+        by_status=json.dumps(dict(by_status)),
+        top_req=json.dumps(top_req),
+        status_dict=json.dumps(ASSIST_STATUS_DICT),
+        colors_json=json.dumps(ASSIST_COLORS),
+    )
+
 @app.route('/assistencias/nova', methods=['GET','POST'])
 @login_required
 def assistencia_nova():

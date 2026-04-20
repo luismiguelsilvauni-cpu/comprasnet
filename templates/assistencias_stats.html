@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Estatísticas Assistências · NavTech{% endblock %}
+{% block page_title %}📊 Estatísticas – Assistências & Garantias{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('assistencias') }}" class="btn btn-ghost btn-sm">← Lista</a>
+  <button onclick="location.reload()" class="btn btn-ghost btn-sm">🔄 Atualizar</button>
+{% endblock %}
+{% block content %}
+
+<!-- KPI Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px">
+  <div class="card" style="padding:14px;text-align:center">
+    <div style="font-size:28px;font-weight:800;color:var(--accent)">{{ total }}</div>
+    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Total</div>
+  </div>
+  <div class="card" style="padding:14px;text-align:center">
+    <div style="font-size:28px;font-weight:800;color:#22c55e">{{ n_fechadas }}</div>
+    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Fechadas</div>
+  </div>
+  <div class="card" style="padding:14px;text-align:center">
+    <div style="font-size:28px;font-weight:800;color:#f59e0b">{{ n_abertas }}</div>
+    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Em Aberto</div>
+  </div>
+  <div class="card" style="padding:14px;text-align:center">
+    <div style="font-size:28px;font-weight:800;color:#3b6ef0">{{ avg_obra }}<span style="font-size:14px">d</span></div>
+    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Média Rec.→Obra</div>
+  </div>
+  <div class="card" style="padding:14px;text-align:center">
+    <div style="font-size:28px;font-weight:800;color:#06b6d4">{{ avg_fat }}<span style="font-size:14px">d</span></div>
+    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Média Obra→Fat.</div>
+  </div>
+  <div class="card" style="padding:14px;text-align:center">
+    <div style="font-size:28px;font-weight:800;color:#ef4444">{{ max_obra }}<span style="font-size:14px">d</span></div>
+    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Máx. Obra</div>
+  </div>
+  <div class="card" style="padding:14px;text-align:center">
+    <div style="font-size:28px;font-weight:800;color:#22c55e">{{ min_obra }}<span style="font-size:14px">d</span></div>
+    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Mín. Obra</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
+
+  <!-- Barras por Ano -->
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px">📅 Tempos médios por Ano</div>
+    <canvas id="chartAnos" height="200"></canvas>
+  </div>
+
+  <!-- Distribuição por Estado (Donut) -->
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px">🔵 Distribuição por Estado</div>
+    <canvas id="chartStatus" height="200"></canvas>
+  </div>
+
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
+
+  <!-- Tendência mensal -->
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px">📈 Volume e Tempo Médio (últimos 18 meses)</div>
+    <canvas id="chartMeses" height="200"></canvas>
+  </div>
+
+  <!-- Top Requerentes -->
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">🏆 Top Requerentes</div>
+    <div id="topReqList"></div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+var yearsData  = {{ years_data  | safe }};
+var monthsData = {{ months_data | safe }};
+var byStatus   = {{ by_status   | safe }};
+var topReq     = {{ top_req     | safe }};
+var statusDict = {{ status_dict | safe }};
+var colorsMap  = {{ colors_json | safe }};
+
+var isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+  || window.matchMedia('(prefers-color-scheme: dark)').matches;
+var gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
+var textColor = isDark ? '#aaa' : '#666';
+Chart.defaults.color = textColor;
+Chart.defaults.borderColor = gridColor;
+
+// ── Barras por Ano ───────────────────────────────────────────────────────────
+new Chart(document.getElementById('chartAnos'), {
+  type: 'bar',
+  data: {
+    labels: yearsData.map(d=>d.year),
+    datasets: [
+      { label: 'Média Rec.→Obra (dias)', data: yearsData.map(d=>d.avg_obra),
+        backgroundColor: 'rgba(59,110,240,.7)', borderRadius:5 },
+      { label: 'Média Obra→Fat. (dias)', data: yearsData.map(d=>d.avg_fat),
+        backgroundColor: 'rgba(6,182,212,.7)', borderRadius:5 },
+      { label: 'Total', data: yearsData.map(d=>d.total), type:'line',
+        borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)',
+        tension:.3, pointRadius:4, yAxisID:'y2' },
+    ]
+  },
+  options: { responsive:true, interaction:{mode:'index'},
+    scales:{
+      y: { title:{display:true,text:'Dias',font:{size:11}}, grid:{color:gridColor} },
+      y2:{ position:'right', title:{display:true,text:'Nº',font:{size:11}},
+           grid:{drawOnChartArea:false} },
+      x: { grid:{color:gridColor} }
+    },
+    plugins:{ legend:{position:'bottom', labels:{font:{size:11}}} }
+  }
+});
+
+// ── Donut por Estado ─────────────────────────────────────────────────────────
+var stLabels = Object.keys(byStatus);
+var stData   = Object.values(byStatus);
+var stColors = stLabels.map(k=>colorsMap[k]||'#999');
+new Chart(document.getElementById('chartStatus'), {
+  type: 'doughnut',
+  data: {
+    labels: stLabels.map(k=>statusDict[k]||k),
+    datasets:[{ data:stData, backgroundColor:stColors, borderWidth:2,
+      borderColor: isDark ? '#1e1e1e' : '#fff' }]
+  },
+  options:{ responsive:true, cutout:'60%',
+    plugins:{ legend:{position:'bottom', labels:{font:{size:11}}} } }
+});
+
+// ── Tendência Mensal ─────────────────────────────────────────────────────────
+new Chart(document.getElementById('chartMeses'), {
+  type: 'bar',
+  data: {
+    labels: monthsData.map(d=>d.month),
+    datasets: [
+      { label: 'Total entradas', data: monthsData.map(d=>d.total),
+        backgroundColor:'rgba(99,102,241,.6)', borderRadius:4 },
+      { label: 'Fechadas', data: monthsData.map(d=>d.fechadas),
+        backgroundColor:'rgba(34,197,94,.6)', borderRadius:4 },
+      { label: 'Média Rec.→Obra (dias)', data: monthsData.map(d=>d.avg_obra),
+        type:'line', borderColor:'#f59e0b', backgroundColor:'transparent',
+        tension:.3, pointRadius:3, yAxisID:'y2' },
+    ]
+  },
+  options:{ responsive:true, interaction:{mode:'index'},
+    scales:{
+      y: { grid:{color:gridColor}, stacked:false },
+      y2:{ position:'right', title:{display:true,text:'Dias',font:{size:11}},
+           grid:{drawOnChartArea:false} },
+      x: { grid:{color:gridColor}, ticks:{maxRotation:45,font:{size:9}} }
+    },
+    plugins:{ legend:{position:'bottom', labels:{font:{size:11}}} }
+  }
+});
+
+// ── Top Requerentes ──────────────────────────────────────────────────────────
+var maxVal = topReq.length ? topReq[0][1] : 1;
+var el = document.getElementById('topReqList');
+el.innerHTML = topReq.map(function(r,i){
+  var pct = (r[1]/maxVal*100).toFixed(0);
+  return '<div style="margin-bottom:8px">' +
+    '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">' +
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%">' +
+        (i===0?'🥇':i===1?'🥈':i===2?'🥉':'  ') + ' ' + r[0] +
+      '</span>' +
+      '<span style="font-weight:700;color:var(--accent)">'+r[1]+'</span>' +
+    '</div>' +
+    '<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">' +
+      '<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:3px;transition:.5s"></div>' +
+    '</div></div>';
+}).join('');
+</script>
+{% endblock %}
