@@ -433,8 +433,9 @@ class Assistencia(db.Model):
     data_comunicado    = db.Column(db.Date, nullable=True)
     data_faturado      = db.Column(db.Date, nullable=True)
     # Computed durations
-    dias_recepcao_conclusao = db.Column(db.Integer, nullable=True)
-    dias_conclusao_faturado = db.Column(db.Integer, nullable=True)
+    dias_recepcao_conclusao  = db.Column(db.Integer, nullable=True)
+    dias_conclusao_comunicado = db.Column(db.Integer, nullable=True)  # obra→comunicado
+    dias_conclusao_faturado   = db.Column(db.Integer, nullable=True)
     # Meta
     criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)

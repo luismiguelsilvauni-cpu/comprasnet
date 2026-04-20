@@ -31,6 +31,11 @@ cur.execute("""CREATE TABLE IF NOT EXISTS assistencia_documentos (
     descricao VARCHAR(400) DEFAULT '', tamanho INTEGER DEFAULT 0,
     mime VARCHAR(100) DEFAULT '', criado_por INTEGER, criado_em DATETIME)""")
 
+# Add new column if missing
+cols = [r[1] for r in cur.execute("PRAGMA table_info(assistencias)").fetchall()]
+if 'dias_conclusao_comunicado' not in cols:
+    cur.execute("ALTER TABLE assistencias ADD COLUMN dias_conclusao_comunicado INTEGER")
+    print("OK: dias_conclusao_comunicado added")
 conn.commit()
 conn.close()
 print("OK: tabelas assistencias criadas")

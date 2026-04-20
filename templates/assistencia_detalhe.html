@@ -45,6 +45,11 @@
         📥→✅ <strong>{{ a.dias_recepcao_conclusao }} dias</strong> <span style="color:var(--text-muted)">(receção→conclusão)</span>
       </div>
       {% endif %}
+      {% if a.dias_conclusao_comunicado is not none %}
+      <div style="padding:6px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:6px;font-size:12px">
+        ✅→📨 <strong>{{ a.dias_conclusao_comunicado }} dias</strong> <span style="color:var(--text-muted)">(conclusão→comunicado)</span>
+      </div>
+      {% endif %}
       {% if a.dias_conclusao_faturado is not none %}
       <div style="padding:6px 12px;background:rgba(107,114,128,.1);border:1px solid rgba(107,114,128,.25);border-radius:6px;font-size:12px">
         ✅→🧾 <strong>{{ a.dias_conclusao_faturado }} dias</strong> <span style="color:var(--text-muted)">(conclusão→faturado)</span>

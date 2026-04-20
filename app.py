@@ -2921,6 +2921,8 @@ def _assist_calc_durations(a):
     """Recalculate duration fields."""
     if a.data_rececionado and a.data_obra_concluida:
         a.dias_recepcao_conclusao = (a.data_obra_concluida - a.data_rececionado).days
+    if a.data_obra_concluida and a.data_comunicado:
+        a.dias_conclusao_comunicado = (a.data_comunicado - a.data_obra_concluida).days
     if a.data_obra_concluida and a.data_faturado:
         a.dias_conclusao_faturado = (a.data_faturado - a.data_obra_concluida).days
 
@@ -2964,19 +2966,22 @@ def assistencias_stats():
     n_fechadas = len(fechadas)
     n_abertas = len(abertas)
 
-    duracoes_obra = [a.dias_recepcao_conclusao for a in fechadas if a.dias_recepcao_conclusao is not None]
-    duracoes_fat  = [a.dias_conclusao_faturado  for a in fechadas if a.dias_conclusao_faturado  is not None]
+    duracoes_obra  = [a.dias_recepcao_conclusao  for a in fechadas if a.dias_recepcao_conclusao  is not None]
+    duracoes_com   = [a.dias_conclusao_comunicado for a in todas    if a.dias_conclusao_comunicado is not None]
+    duracoes_fat   = [a.dias_conclusao_faturado   for a in fechadas if a.dias_conclusao_faturado   is not None]
 
     avg_obra = round(sum(duracoes_obra)/len(duracoes_obra), 1) if duracoes_obra else 0
+    avg_com  = round(sum(duracoes_com) /len(duracoes_com),  1) if duracoes_com  else 0
     avg_fat  = round(sum(duracoes_fat) /len(duracoes_fat),  1) if duracoes_fat  else 0
     max_obra = max(duracoes_obra) if duracoes_obra else 0
     max_fat  = max(duracoes_fat)  if duracoes_fat  else 0
     min_obra = min(duracoes_obra) if duracoes_obra else 0
+    max_com  = max(duracoes_com)  if duracoes_com  else 0
 
     # Por ano/mês — agrupado por ano de data_rececionado
     from collections import defaultdict
-    by_year = defaultdict(lambda: {'total':0,'fechadas':0,'sum_obra':0,'n_obra':0,'sum_fat':0,'n_fat':0})
-    by_month = defaultdict(lambda: {'total':0,'fechadas':0,'sum_obra':0,'n_obra':0})
+    by_year  = defaultdict(lambda: {'total':0,'fechadas':0,'sum_obra':0,'n_obra':0,'sum_com':0,'n_com':0,'sum_fat':0,'n_fat':0})
+    by_month = defaultdict(lambda: {'total':0,'fechadas':0,'sum_obra':0,'n_obra':0,'sum_com':0,'n_com':0})
     by_status = defaultdict(int)
 
     for a in todas:
@@ -2993,6 +2998,11 @@ def assistencias_stats():
             by_year[yr]['n_obra']   += 1
             by_month[mo]['sum_obra'] += a.dias_recepcao_conclusao
             by_month[mo]['n_obra']   += 1
+        if a.dias_conclusao_comunicado is not None:
+            by_year[yr]['sum_com']  += a.dias_conclusao_comunicado
+            by_year[yr]['n_com']    += 1
+            by_month[mo]['sum_com'] += a.dias_conclusao_comunicado
+            by_month[mo]['n_com']   += 1
         if a.dias_conclusao_faturado is not None:
             by_year[yr]['sum_fat'] += a.dias_conclusao_faturado
             by_year[yr]['n_fat']   += 1
@@ -3006,6 +3016,7 @@ def assistencias_stats():
             'total': d['total'],
             'fechadas': d['fechadas'],
             'avg_obra': round(d['sum_obra']/d['n_obra'],1) if d['n_obra'] else None,
+            'avg_com':  round(d['sum_com'] /d['n_com'], 1) if d['n_com']  else None,
             'avg_fat':  round(d['sum_fat'] /d['n_fat'], 1) if d['n_fat']  else None,
         })
 
@@ -3017,6 +3028,7 @@ def assistencias_stats():
             'total': d['total'],
             'fechadas': d['fechadas'],
             'avg_obra': round(d['sum_obra']/d['n_obra'],1) if d['n_obra'] else None,
+            'avg_com':  round(d['sum_com'] /d['n_com'], 1) if d['n_com']  else None,
         })
 
     # Top requerentes
@@ -3035,7 +3047,8 @@ def assistencias_stats():
     import json
     return render_template('assistencias_stats.html',
         total=total, n_fechadas=n_fechadas, n_abertas=n_abertas,
-        avg_obra=avg_obra, avg_fat=avg_fat, max_obra=max_obra, max_fat=max_fat, min_obra=min_obra,
+        avg_obra=avg_obra, avg_com=avg_com, avg_fat=avg_fat,
+        max_obra=max_obra, max_fat=max_fat, min_obra=min_obra, max_com=max_com,
         years_data=json.dumps(years_data),
         months_data=json.dumps(months_data),
         by_status=json.dumps(dict(by_status)),
