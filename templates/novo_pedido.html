@@ -235,20 +235,34 @@ function searchCliente(q) {
   clearTimeout(_cliTimer);
   _cliTimer = setTimeout(function(){
     fetch('/api/clientes/search?q='+encodeURIComponent(q))
-      .then(r=>r.json()).then(function(list){
-        if (!list.length) { dd.style.display='none'; return; }
-        dd.innerHTML = '<div onclick="selCli(\'\',\'Stock Interno\')" style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">📦 Stock Interno (default)</div>' +
-          list.map(function(c){
-            return '<div onclick="selCli(''+c.id+'',''+c.nome.replace(/'/g,"\'")+'')" style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">'+c.nome+'</div>';
-          }).join('');
-        dd.style.display='block';
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        dd.innerHTML = '';
+        // Stock interno option
+        var d0 = document.createElement('div');
+        d0.textContent = '📦 Stock Interno (default)';
+        d0.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)';
+        d0.onmouseenter = function(){ this.style.background='var(--surface2)'; };
+        d0.onmouseleave = function(){ this.style.background=''; };
+        d0.onclick = function(){ selCli('', 'Stock Interno'); };
+        dd.appendChild(d0);
+        list.forEach(function(c){
+          var d = document.createElement('div');
+          d.textContent = c.nome;
+          d.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)';
+          d.onmouseenter = function(){ this.style.background='var(--surface2)'; };
+          d.onmouseleave = function(){ this.style.background=''; };
+          d.onclick = (function(id, nome){ return function(){ selCli(id, nome); }; })(c.id, c.nome);
+          dd.appendChild(d);
+        });
+        dd.style.display = (list.length || true) ? 'block' : 'none';
       });
   }, 200);
 }
 function selCli(id, nome) {
   document.getElementById('clienteIdHidden').value = id;
   document.getElementById('clienteSearchInput').value = nome === 'Stock Interno' ? '' : nome;
-  document.getElementById('clienteSearchDrop').style.display='none';
+  document.getElementById('clienteSearchDrop').style.display = 'none';
 }
 
 var _cliLTimer = null;
