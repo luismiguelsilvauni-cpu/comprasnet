@@ -112,11 +112,10 @@ function renderLinhas() {
   var s = document.getElementById('sem-linhas');
   s.style.display = linhas.length ? 'none' : 'block';
   if (!linhas.length) { c.innerHTML = ''; return; }
-
   var html = '';
   for (var i = 0; i < linhas.length; i++) {
     var l = linhas[i];
-    html += '<div style="display:grid;grid-template-columns:110px 1fr 140px 60px 60px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
+    html += '<div style="display:grid;grid-template-columns:110px 1fr 180px 60px 60px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Referência PHC</div>';
     html += '<div style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:5px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:28px" onclick="abrirPesquisa(' + i + ')">' + (l.referencia || '<span style="color:var(--text-muted);font-weight:400">pesquisar</span>') + '</div>';
@@ -125,37 +124,40 @@ function renderLinhas() {
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Designação</div>';
     html += '<input type="text" value="' + esc(l.designacao) + '" placeholder="Descrição..." onchange="linhas[' + i + '].designacao=this.value" class="input" style="font-size:12px;padding:5px 8px">';
     html += '</div>';
-    html += '<div>';
+    // Destino/Cliente - search field
+    html += '<div style="position:relative">';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Destino / Cliente</div>';
     var cNome = '';
-    for (var ci=0;ci<clienteOpts.length;ci++){if(clienteOpts[ci].id==l.cliente_id){cNome=clienteOpts[ci].nome;break;}}
-    html += '<div style="position:relative">';
-    html += '<input type="text" id="cli-'+i+'" value="'+esc(cNome)+'" placeholder="Pesquisar..." class="input" style="font-size:11px;padding:5px 6px" autocomplete="off" oninput="searchLinhaCli('+i+',this.value)" onfocus="searchLinhaCli('+i+',this.value)">';
-    html += '<div id="cli-drop-'+i+'" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>';
-    html += '</div>';
-    html += '</div>';
-    html += '<div>';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Un.</div>';
-    html += '<input type="text" value="' + esc(l.unidade) + '" onchange="linhas[' + i + '].unidade=this.value" class="input" style="font-size:12px;padding:5px 8px">';
+    for (var ci=0; ci<clienteOpts.length; ci++) {
+      if (clienteOpts[ci].id == l.cliente_id) { cNome = clienteOpts[ci].nome; break; }
+    }
+    html += '<input type="text" id="cli-' + i + '" value="' + esc(cNome === 'Stock Interno (default)' ? '' : cNome) + '" placeholder="Pesquisar cliente..." class="input" style="font-size:11px;padding:5px 6px" autocomplete="off" oninput="searchLinhaCli(' + i + ',this.value)" onfocus="searchLinhaCli(' + i + ',this.value)">';
+    html += '<div id="cli-drop-' + i + '" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>';
     html += '</div>';
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Qtd</div>';
-    html += '<input type="number" value="' + l.quantidade + '" min="0.01" step="0.01" onchange="linhas[' + i + '].quantidade=parseFloat(this.value)||1" class="input" style="font-size:12px;padding:5px 8px">';
+    html += '<input type="number" value="' + (l.quantidade||1) + '" min="0.01" step="any" onchange="linhas[' + i + '].quantidade=parseFloat(this.value)||1" class="input" style="font-size:12px;padding:5px 6px">';
     html += '</div>';
-    html += '<button type="button" onclick="removerLinha(' + i + ')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;margin-bottom:2px">✕</button>';
+    html += '<div>';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Un.</div>';
+    html += '<input type="text" value="' + esc(l.unidade||'un') + '" onchange="linhas[' + i + '].unidade=this.value" class="input" style="font-size:12px;padding:5px 6px">';
+    html += '</div>';
+    html += '<div style="padding-bottom:2px"><button type="button" onclick="removerLinha(' + i + ')" class="btn btn-ghost btn-sm" style="color:#ef4444;padding:5px 8px">✕</button></div>';
     html += '</div>';
   }
   c.innerHTML = html;
 }
 
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function abrirPesquisa(idx) {
   linhaAtual = idx;
   document.getElementById('artigoModal').style.display = 'flex';
-  var inp = document.getElementById('artigoSearch');
-  inp.value = '';
-  inp.oninput = function() { pesquisar(this.value); };
-  document.getElementById('artigoResultados').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Escreva para pesquisar...</div>';
-  setTimeout(function(){ inp.focus(); }, 100);
+  document.getElementById('pesquisaInput').value = '';
+  document.getElementById('pesquisaResultados').innerHTML = '';
+  setTimeout(function(){ document.getElementById('pesquisaInput').focus(); }, 100);
 }
 
 function fecharModal() {
@@ -163,33 +165,20 @@ function fecharModal() {
   linhaAtual = -1;
 }
 
-var timer = null;
-function pesquisar(q) {
-  clearTimeout(timer);
-  if (q.length < 2) return;
-  timer = setTimeout(function() {
-    fetch('/api/artigos?q=' + encodeURIComponent(q))
-      .then(function(r){ return r.json(); })
-      .then(function(dados) {
-        artigosMap = dados;
-        var el = document.getElementById('artigoResultados');
-        if (!dados.length) {
-          el.innerHTML = '<div style="padding:12px 14px"><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Sem resultados no PHC.</div><button type="button" class="btn btn-ghost btn-sm" onclick="usarTexto(\'' + esc(q) + '\')">+ Usar "' + esc(q) + '" manualmente</button></div>';
-          return;
-        }
-        var html = '';
-        for (var i = 0; i < dados.length; i++) {
-          var a = dados[i];
-          html += '<div data-idx="' + i + '" onclick="selecionar(' + i + ')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border)">';
-          html += '<div style="font-size:12px;font-weight:700;color:var(--accent)">' + esc(a.referencia||'') + '</div>';
-          html += '<div style="font-size:12px">' + esc(a.designacao||'') + '</div>';
-          html += '<div style="font-size:10px;color:var(--text-muted)">Stock: ' + (a.stock_atual||0) + ' ' + esc(a.unidade||'un') + ' · ' + parseFloat(a.preco_custo||0).toFixed(2) + ' \u20ac</div>';
-          html += '</div>';
-        }
-        el.innerHTML = html;
-      })
-      .catch(function(err){ console.error('Fetch erro:', err); });
-  }, 300);
+function pesquisarArtigos(q) {
+  if (!q || q.length < 2) { document.getElementById('pesquisaResultados').innerHTML = ''; return; }
+  fetch('/api/artigos?q=' + encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      artigosMap = data;
+      var html = data.map(function(a, i){
+        return '<div onclick="selecionar(' + i + ')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">' +
+          '<span style="font-weight:700;color:var(--accent)">' + esc(a.referencia) + '</span> – ' + esc(a.designacao || '') + '</div>';
+      }).join('');
+      if (!html) html = '<div style="padding:12px;color:var(--text-muted)">Sem resultados</div>';
+      document.getElementById('pesquisaResultados').innerHTML = html;
+    })
+    .catch(function(err){ console.error('Fetch erro:', err); });
 }
 
 function selecionar(idx) {
@@ -210,10 +199,6 @@ function usarTexto(texto) {
   renderLinhas();
 }
 
-function esc(s) {
-  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
 function submeter() {
   if (!linhas.length) { alert('Adicione pelo menos um artigo.'); return; }
   var titulo = linhas[0].designacao || linhas[0].referencia || 'Pedido';
@@ -229,69 +214,90 @@ document.getElementById('artigoModal').addEventListener('click', function(e) {
 
 renderLinhas();
 
+// ── Cliente search (header) ───────────────────────────────────────────────────
 var _cliTimer = null;
 function searchCliente(q) {
   var dd = document.getElementById('clienteSearchDrop');
   clearTimeout(_cliTimer);
   _cliTimer = setTimeout(function(){
-    fetch('/api/clientes/search?q='+encodeURIComponent(q))
+    fetch('/api/clientes/search?q=' + encodeURIComponent(q))
       .then(function(r){ return r.json(); })
       .then(function(list){
         dd.innerHTML = '';
-        // Stock interno option
+        // Stock interno
         var d0 = document.createElement('div');
         d0.textContent = '📦 Stock Interno (default)';
         d0.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)';
-        d0.onmouseenter = function(){ this.style.background='var(--surface2)'; };
-        d0.onmouseleave = function(){ this.style.background=''; };
+        d0.onmouseenter = function(){ this.style.background = 'var(--surface2)'; };
+        d0.onmouseleave = function(){ this.style.background = ''; };
         d0.onclick = function(){ selCli('', 'Stock Interno'); };
         dd.appendChild(d0);
         list.forEach(function(c){
           var d = document.createElement('div');
           d.textContent = c.nome;
           d.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)';
-          d.onmouseenter = function(){ this.style.background='var(--surface2)'; };
-          d.onmouseleave = function(){ this.style.background=''; };
+          d.onmouseenter = function(){ this.style.background = 'var(--surface2)'; };
+          d.onmouseleave = function(){ this.style.background = ''; };
           d.onclick = (function(id, nome){ return function(){ selCli(id, nome); }; })(c.id, c.nome);
           dd.appendChild(d);
         });
-        dd.style.display = (list.length || true) ? 'block' : 'none';
+        dd.style.display = 'block';
       });
   }, 200);
 }
 function selCli(id, nome) {
   document.getElementById('clienteIdHidden').value = id;
-  document.getElementById('clienteSearchInput').value = nome === 'Stock Interno' ? '' : nome;
+  document.getElementById('clienteSearchInput').value = (nome === 'Stock Interno') ? '' : nome;
   document.getElementById('clienteSearchDrop').style.display = 'none';
 }
 
+// ── Cliente search (per linha) ────────────────────────────────────────────────
 var _cliLTimer = null;
 function searchLinhaCli(idx, q) {
-  var dd = document.getElementById('cli-drop-'+idx);
+  var dd = document.getElementById('cli-drop-' + idx);
   if (!dd) return;
   clearTimeout(_cliLTimer);
   _cliLTimer = setTimeout(function(){
-    fetch('/api/clientes/search?q='+encodeURIComponent(q))
-      .then(r=>r.json()).then(function(list){
-        if (!list.length && q.length > 0) { dd.style.display='none'; return; }
-        dd.innerHTML = '<div onclick="selLinhaCli('+idx+',\'\',\'Stock Interno\')" style="padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">📦 Stock Interno</div>' +
-          list.map(function(c){
-            return '<div onclick="selLinhaCli('+idx+',''+c.id+'',''+c.nome.replace(/'/g,"\'")+'')" style="padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">'+c.nome+'</div>';
-          }).join('');
-        dd.style.display='block';
+    fetch('/api/clientes/search?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        dd.innerHTML = '';
+        var d0 = document.createElement('div');
+        d0.textContent = '📦 Stock Interno';
+        d0.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border)';
+        d0.onmouseenter = function(){ this.style.background = 'var(--surface2)'; };
+        d0.onmouseleave = function(){ this.style.background = ''; };
+        d0.onclick = (function(i){ return function(){ selLinhaCli(i, '', 'Stock Interno'); }; })(idx);
+        dd.appendChild(d0);
+        list.forEach(function(c){
+          var d = document.createElement('div');
+          d.textContent = c.nome;
+          d.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border)';
+          d.onmouseenter = function(){ this.style.background = 'var(--surface2)'; };
+          d.onmouseleave = function(){ this.style.background = ''; };
+          d.onclick = (function(i, id, nome){ return function(){ selLinhaCli(i, id, nome); }; })(idx, c.id, c.nome);
+          dd.appendChild(d);
+        });
+        dd.style.display = 'block';
       });
   }, 200);
 }
 function selLinhaCli(idx, id, nome) {
   linhas[idx].cliente_id = id;
-  var inp = document.getElementById('cli-'+idx);
-  var dd  = document.getElementById('cli-drop-'+idx);
-  if (inp) inp.value = nome === 'Stock Interno' ? '' : nome;
+  var inp = document.getElementById('cli-' + idx);
+  var dd  = document.getElementById('cli-drop-' + idx);
+  if (inp) inp.value = (nome === 'Stock Interno') ? '' : nome;
   if (dd)  dd.style.display = 'none';
 }
+
 document.addEventListener('click', function(e){
-  if (!e.target.closest('#clienteSearchInput')) document.getElementById('clienteSearchDrop').style.display='none';
-  document.querySelectorAll('[id^="cli-drop-"]').forEach(function(d){ if(!e.target.closest('[id^="cli-"]')) d.style.display='none'; });
+  if (!e.target.closest('#clienteSearchInput')) {
+    var d = document.getElementById('clienteSearchDrop');
+    if (d) d.style.display = 'none';
+  }
+  if (!e.target.closest('[id^="cli-"]')) {
+    document.querySelectorAll('[id^="cli-drop-"]').forEach(function(d){ d.style.display = 'none'; });
+  }
 });
 </script>
 {% endblock %}
