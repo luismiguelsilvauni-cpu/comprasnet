@@ -76,10 +76,10 @@
 <div id="artigoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:580px;max-height:75vh;display:flex;flex-direction:column">
     <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px">
-      <input type="text" id="artigoSearch" placeholder="Pesquisar artigo (ref. ou designação)..." class="input" style="flex:1">
+      <input type="text" id="pesquisaInput" placeholder="Pesquisar artigo (ref. ou designação)..." class="input" style="flex:1" oninput="pesquisarArtigos(this.value)" autocomplete="off">
       <button type="button" onclick="fecharModal()" class="btn btn-ghost btn-sm">✕</button>
     </div>
-    <div id="artigoResultados" style="overflow-y:auto;flex:1;min-height:100px;padding:6px 0">
+    <div id="pesquisaResultados" style="overflow-y:auto;flex:1;min-height:100px;padding:6px 0">
       <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Escreva para pesquisar...</div>
     </div>
   </div>

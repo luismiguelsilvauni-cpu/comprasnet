@@ -1479,6 +1479,21 @@ def admin_config():
                 cfg.smtp_pass = smtp_pass_input
             cfg.smtp_from = request.form.get('smtp_from', '').strip()
             cfg.smtp_tls  = 1 if request.form.get('smtp_tls') else 0
+            # Salarios PIN
+            try:
+                if request.form.get('salarios_pin_clear'):
+                    cfg.salarios_pin = ''
+                elif request.form.get('salarios_pin','').strip():
+                    cfg.salarios_pin = request.form.get('salarios_pin','').strip()
+            except Exception:
+                from sqlalchemy import text
+                with db.engine.connect() as _c:
+                    try: _c.execute(text("ALTER TABLE config_geral ADD COLUMN salarios_pin VARCHAR(10) DEFAULT ''")); _c.commit()
+                    except: pass
+                if request.form.get('salarios_pin_clear'):
+                    cfg.salarios_pin = ''
+                elif request.form.get('salarios_pin','').strip():
+                    cfg.salarios_pin = request.form.get('salarios_pin','').strip()
             # Logo upload
             if 'logo' in request.files and request.files['logo'].filename:
                 logo = request.files['logo']
