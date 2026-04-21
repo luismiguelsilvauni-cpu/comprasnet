@@ -274,6 +274,26 @@ def api_dashboard_artigos_pedidos():
     return jsonify(rows)
 
 
+@app.route('/api/clientes/search')
+@login_required
+def api_clientes_search():
+    q = request.args.get('q','').strip()
+    clientes = Cliente.query.filter(Cliente.nome.ilike(f'%{q}%')).order_by(Cliente.nome).limit(20).all() if q else Cliente.query.order_by(Cliente.nome).limit(20).all()
+    return jsonify([{'id': c.id, 'nome': c.nome} for c in clientes])
+
+@app.route('/pedidos/<int:pid>/estado', methods=['POST'])
+@login_required
+def pedido_estado(pid):
+    p = PedidoCompra.query.get_or_404(pid)
+    data = request.get_json() or {}
+    novo = data.get('estado','')
+    if novo not in ['aberto','pedido','fechado','anulado','em_analise','aprovado','cancelado']:
+        return jsonify({'ok': False, 'error': 'Estado inválido'})
+    p.estado = novo
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 @app.route('/pedidos')
 @login_required
 def pedidos():
@@ -3554,10 +3574,12 @@ def entradas_stats():
     def avg(lst): return round(sum(lst)/len(lst),1) if lst else 0
     def safe(lst): return [x for x in lst if x is not None]
 
-    d_total   = safe([e.dias_total        for e in fechadas])
-    d_rf      = safe([e.dias_rec_faturado  for e in todas])
-    d_cmrp    = safe([e.dias_mat_reparacao for e in todas])
-    d_rpf     = safe([e.dias_reparacao_fat for e in todas])
+    d_total   = safe([e.dias_total          for e in fechadas])
+    d_rorc    = safe([e.dias_rec_orcamento  for e in todas])
+    d_rf      = safe([e.dias_rec_faturado   for e in todas])
+    d_orcorp  = safe([e.dias_orc_reparacao  for e in todas])
+    d_cmrp    = safe([e.dias_mat_reparacao  for e in todas])
+    d_rpf     = safe([e.dias_reparacao_fat  for e in todas])
 
     # By status count
     by_status = defaultdict(int)
@@ -3604,7 +3626,8 @@ def entradas_stats():
     import json
     return render_template('entradas_stats.html',
         total=len(todas), n_fechadas=len(fechadas), n_abertas=len(abertas),
-        avg_total=avg(d_total), avg_rf=avg(d_rf), avg_cmrp=avg(d_cmrp), avg_rpf=avg(d_rpf),
+        avg_total=avg(d_total), avg_rorc=avg(d_rorc), avg_rf=avg(d_rf),
+        avg_orcorp=avg(d_orcorp), avg_cmrp=avg(d_cmrp), avg_rpf=avg(d_rpf),
         max_total=max(d_total) if d_total else 0,
         min_total=min(d_total) if d_total else 0,
         years_data=json.dumps(years_data),

@@ -5,20 +5,21 @@
   {% if em_estadia > 0 %}
   <span style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px">⚠️ {{ em_estadia }} em estadia</span>
   {% endif %}
-  <button onclick="location.reload()" class="btn btn-ghost btn-sm" title="Forçar atualização">🔄 Atualizar</button>
+  <button onclick="location.reload()" class="btn btn-ghost btn-sm">🔄 Atualizar</button>
   <a href="{{ url_for('entradas_stats') }}" class="btn btn-ghost btn-sm">📊 Estatísticas</a>
   <a href="{{ url_for('entrada_nova') }}" class="btn btn-primary btn-sm">+ Nova Entrada</a>
 {% endblock %}
 {% block content %}
 
 <!-- Legenda -->
-<div style="font-size:11px;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;margin-bottom:10px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+<div style="font-size:11px;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
   <span style="font-weight:700;color:var(--text)">Siglas:</span>
-  <span><strong style="color:#6b7280">R-CF</strong> = Receção → Concluído Fechado</span>
-  <span><strong style="color:#06b6d4">R-F</strong> = Receção → Faturado</span>
-  <span><strong style="color:#f59e0b">CM-RP</strong> = Mat.Pedido → Em Reparação</span>
-  <span><strong style="color:#22c55e">RP-F</strong> = Em Reparação → Faturado</span>
-  <span><strong style="color:var(--text-muted)">Dias ⓘ</strong> = dias no estado actual</span>
+  <span><strong style="color:#a855f7">R-ORC</strong> = Receção→Orçamentado</span>
+  <span><strong style="color:#6b7280">R-CF</strong> = Receção→Concluído Fechado</span>
+  <span><strong style="color:#06b6d4">R-F</strong> = Receção→Faturado</span>
+  <span><strong style="color:#6366f1">ORC-RP</strong> = Orçamentado→Em Reparação</span>
+  <span><strong style="color:#f59e0b">CM-RP</strong> = Mat.Pedido→Em Reparação</span>
+  <span><strong style="color:#22c55e">RP-F</strong> = Em Reparação→Faturado</span>
 </div>
 
 <!-- Filters -->
@@ -30,22 +31,23 @@
 </div>
 
 <div class="card" style="padding:0;overflow:hidden">
-<div class="table-wrap" style="overflow-x:auto">
-<table style="min-width:900px">
+<div style="overflow-x:auto">
+<table style="min-width:1100px;width:100%;border-collapse:collapse">
   <thead>
-    <tr>
-      <th style="width:60px">ID Nº</th>
-      <th style="width:95px">Data Rec.</th>
-      <th>Cliente</th>
-      <th style="width:90px">Marca</th>
-      <th style="width:90px">Modelo</th>
-      <th>Estado</th>
-      <th style="width:55px;text-align:center" title="Dias no estado actual (orçamentado/faturado)">Dias ⓘ</th>
-      <th style="width:50px;text-align:center;color:#6b7280" title="Receção → Concluído Fechado">R-CF</th>
-      <th style="width:50px;text-align:center;color:#06b6d4" title="Receção → Faturado">R-F</th>
-      <th style="width:55px;text-align:center;color:#f59e0b" title="Material Pedido → Em Reparação">CM-RP</th>
-      <th style="width:50px;text-align:center;color:#22c55e" title="Em Reparação → Faturado">RP-F</th>
-      <th style="width:70px"></th>
+    <tr style="border-bottom:2px solid var(--border)">
+      <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap">Nº</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap">Data Rec.</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700">Cliente</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700">Marca/Modelo</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700">Estado</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:var(--text-muted)" title="Dias no estado actual">Dias</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#a855f7" title="Receção → Orçamentado">R-ORC</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#6b7280" title="Receção → Concluído Fechado">R-CF</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#06b6d4" title="Receção → Faturado">R-F</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#6366f1" title="Orçamentado → Em Reparação">ORC-RP</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#f59e0b" title="Material Pedido → Em Reparação">CM-RP</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#22c55e" title="Em Reparação → Faturado">RP-F</th>
+      <th style="padding:10px 8px;width:70px"></th>
     </tr>
   </thead>
   <tbody>
@@ -56,61 +58,69 @@
   {% set col = sc.get(e.status, '#999') %}
   {% set is_estadia = e.status in ['orcamentado_estadia','concluido_estadia'] %}
   {% set is_fechado = e.status == 'concluido_fechado' %}
-  <tr style="{% if is_fechado %}opacity:0.45{% elif is_estadia %}background:rgba(239,68,68,.05){% endif %}">
+  <tr style="border-bottom:1px solid var(--border);{% if is_fechado %}opacity:0.45{% elif is_estadia %}background:rgba(239,68,68,.04){% endif %}">
 
-    <td class="mono" style="font-weight:700;color:var(--accent)">#{{ '%04d'|format(e.numero) }}</td>
+    <td style="padding:8px 12px;font-family:monospace;font-weight:700;color:var(--accent);white-space:nowrap">#{{ '%04d'|format(e.numero) }}</td>
 
-    <td style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ e.data_rececao.strftime('%d/%m/%Y') }}</td>
+    <td style="padding:8px;font-size:12px;color:var(--text-muted);white-space:nowrap">{{ e.data_rececao.strftime('%d/%m/%Y') }}</td>
 
-    <td style="font-weight:600;font-size:13px">{{ e.cliente_nome[:28] }}</td>
+    <td style="padding:8px;font-weight:600;font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ e.cliente_nome[:25] }}</td>
 
-    <td style="font-size:12px;color:var(--text-muted)">{{ e.marca or '—' }}</td>
+    <td style="padding:8px;font-size:12px;color:var(--text-muted)">
+      {{ e.marca or '—' }}{% if e.modelo %} · {{ e.modelo }}{% endif %}
+    </td>
 
-    <td style="font-size:12px;color:var(--text-muted)">{{ e.modelo or '—' }}</td>
-
-    <td>
+    <td style="padding:8px">
       <span style="font-size:10px;font-weight:700;padding:3px 7px;border-radius:5px;background:{{ col }}20;color:{{ col }};border:1px solid {{ col }}40;white-space:nowrap">
         {{ {'rececionado':'📥 Rec.','orcamentado':'📋 Orç.','material_pedido':'📦 Mat.',
-            'em_reparacao':'🔧 Rep.','faturado':'🧾 Fat.','orcamentado_estadia':'⏳ Orç.Est.',
-            'concluido_estadia':'🏁 Conc.Est.','concluido_fechado':'✔️ Fechado'}.get(e.status,e.status) }}
+            'em_reparacao':'🔧 Rep.','faturado':'🧾 Fat.','orcamentado_estadia':'⏳ Est.',
+            'concluido_estadia':'🏁 Est.','concluido_fechado':'✔️ Fechado'}.get(e.status,e.status) }}
       </span>
     </td>
 
     <!-- Dias estado actual -->
-    <td style="text-align:center;font-size:11px;font-family:monospace">
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace">
       {% if e._dias_contagem is not none %}
-      <span style="{% if e._dias_contagem >= e._dias_limite %}color:#ef4444;font-weight:700{% elif e._dias_contagem >= e._dias_limite - 2 %}color:#f59e0b;font-weight:700{% else %}color:var(--text-muted){% endif %}">{{ e._dias_contagem }}d</span>
-      {% else %}
-      <span style="color:var(--border)">—</span>
-      {% endif %}
+      <span style="{% if e._dias_contagem >= e._dias_limite %}color:#ef4444;font-weight:700{% elif e._dias_contagem >= e._dias_limite-2 %}color:#f59e0b;font-weight:700{% else %}color:var(--text-muted){% endif %}">{{ e._dias_contagem }}d</span>
+      {% else %}<span style="color:var(--border)">—</span>{% endif %}
+    </td>
+
+    <!-- R-ORC -->
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;color:#a855f7;font-weight:600">
+      {% if e.dias_rec_orcamento is not none %}{{ e.dias_rec_orcamento }}d{% else %}<span style="color:var(--border)">—</span>{% endif %}
     </td>
 
     <!-- R-CF -->
-    <td style="text-align:center;font-size:11px;font-family:monospace;color:#6b7280">
-      {% if e.dias_total is not none %}<strong>{{ e.dias_total }}d</strong>{% else %}<span style="color:var(--border)">—</span>{% endif %}
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;color:#6b7280;font-weight:600">
+      {% if e.dias_total is not none %}{{ e.dias_total }}d{% else %}<span style="color:var(--border)">—</span>{% endif %}
     </td>
 
     <!-- R-F -->
-    <td style="text-align:center;font-size:11px;font-family:monospace;color:#06b6d4">
-      {% if e.dias_rec_faturado is not none %}<strong>{{ e.dias_rec_faturado }}d</strong>{% else %}<span style="color:var(--border)">—</span>{% endif %}
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;color:#06b6d4;font-weight:600">
+      {% if e.dias_rec_faturado is not none %}{{ e.dias_rec_faturado }}d{% else %}<span style="color:var(--border)">—</span>{% endif %}
+    </td>
+
+    <!-- ORC-RP -->
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;color:#6366f1;font-weight:600">
+      {% if e.dias_orc_reparacao is not none %}{{ e.dias_orc_reparacao }}d{% else %}<span style="color:var(--border)">—</span>{% endif %}
     </td>
 
     <!-- CM-RP -->
-    <td style="text-align:center;font-size:11px;font-family:monospace;color:#f59e0b">
-      {% if e.dias_mat_reparacao is not none %}<strong>{{ e.dias_mat_reparacao }}d</strong>{% else %}<span style="color:var(--border)">—</span>{% endif %}
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;color:#f59e0b;font-weight:600">
+      {% if e.dias_mat_reparacao is not none %}{{ e.dias_mat_reparacao }}d{% else %}<span style="color:var(--border)">—</span>{% endif %}
     </td>
 
     <!-- RP-F -->
-    <td style="text-align:center;font-size:11px;font-family:monospace;color:#22c55e">
-      {% if e.dias_reparacao_fat is not none %}<strong>{{ e.dias_reparacao_fat }}d</strong>{% else %}<span style="color:var(--border)">—</span>{% endif %}
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;color:#22c55e;font-weight:600">
+      {% if e.dias_reparacao_fat is not none %}{{ e.dias_reparacao_fat }}d{% else %}<span style="color:var(--border)">—</span>{% endif %}
     </td>
 
-    <td style="padding:5px 8px">
-      <a href="{{ url_for('entrada_detalhe', eid=e.id) }}" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">Ver →</a>
+    <td style="padding:6px 8px">
+      <a href="{{ url_for('entrada_detalhe', eid=e.id) }}" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px;white-space:nowrap">Ver →</a>
     </td>
   </tr>
   {% else %}
-  <tr><td colspan="12" style="text-align:center;padding:32px;color:var(--text-muted)">Sem entradas registadas</td></tr>
+  <tr><td colspan="13" style="text-align:center;padding:32px;color:var(--text-muted)">Sem entradas registadas</td></tr>
   {% endfor %}
   </tbody>
 </table>
