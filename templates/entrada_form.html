@@ -46,23 +46,49 @@
       <div id="clienteDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.2)"></div>
     </div>
 
-    <div class="grid-2">
-      <div class="form-group">
+    <!-- Marca + Grupo -->
+    <div class="grid-2" style="margin-bottom:4px">
+      <div class="form-group" style="margin-bottom:0">
         <label>Marca</label>
         <input type="text" name="marca" class="input" placeholder="Ex: Volvo, Caterpillar..."
           value="{{ entrada.marca if entrada else '' }}">
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:0">
+        <label style="color:var(--text-muted)">Marca <span style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:3px;border:1px solid var(--border)">Grupo</span></label>
+        <input type="text" name="marca_grupo" class="input" placeholder="Grupo empresarial da marca..."
+          value="{{ entrada.marca_grupo if entrada else '' }}"
+          style="border-style:dashed">
+      </div>
+    </div>
+
+    <!-- Modelo + Grupo -->
+    <div class="grid-2" style="margin-bottom:4px">
+      <div class="form-group" style="margin-bottom:0">
         <label>Modelo</label>
         <input type="text" name="modelo" class="input" placeholder="Ex: FH 460, D6T..."
           value="{{ entrada.modelo if entrada else '' }}">
       </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label style="color:var(--text-muted)">Modelo <span style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:3px;border:1px solid var(--border)">Grupo</span></label>
+        <input type="text" name="modelo_grupo" class="input" placeholder="Família ou série do modelo..."
+          value="{{ entrada.modelo_grupo if entrada else '' }}"
+          style="border-style:dashed">
+      </div>
     </div>
 
-    <div class="form-group">
-      <label>Nº de Série</label>
-      <input type="text" name="num_serie" class="input" placeholder="Número de série"
-        value="{{ entrada.num_serie if entrada else '' }}">
+    <!-- Nº Série + Grupo -->
+    <div class="grid-2" style="margin-bottom:0">
+      <div class="form-group" style="margin-bottom:0">
+        <label>Nº de Série</label>
+        <input type="text" name="num_serie" class="input" placeholder="Número de série"
+          value="{{ entrada.num_serie if entrada else '' }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label style="color:var(--text-muted)">Nº Série <span style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:3px;border:1px solid var(--border)">Grupo</span></label>
+        <input type="text" name="num_serie_grupo" class="input" placeholder="Nº série do equipamento-mãe..."
+          value="{{ entrada.num_serie_grupo if entrada else '' }}"
+          style="border-style:dashed">
+      </div>
     </div>
 
     <div class="form-group">

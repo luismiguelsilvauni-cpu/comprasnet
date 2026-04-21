@@ -371,8 +371,11 @@ class EntradaEquipamento(db.Model):
     data_rececao    = db.Column(db.Date, nullable=False)
     cliente_nome    = db.Column(db.String(200), nullable=False)
     marca           = db.Column(db.String(100))
+    marca_grupo     = db.Column(db.String(100))
     modelo          = db.Column(db.String(100))
+    modelo_grupo    = db.Column(db.String(100))
     num_serie       = db.Column(db.String(100))
+    num_serie_grupo = db.Column(db.String(100))
     observacoes     = db.Column(db.Text, default='')
     status          = db.Column(db.String(50), default='rececionado')
     data_status     = db.Column(db.DateTime)          # when status was registered
