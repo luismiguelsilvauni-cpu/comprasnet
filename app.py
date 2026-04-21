@@ -3857,6 +3857,37 @@ def entrada_eliminar(eid):
     return jsonify({'ok': True})
 
 
+@app.route('/entradas/<int:eid>/historico/<int:hid>/editar', methods=['POST'])
+@login_required
+def entrada_hist_editar(eid, hid):
+    h = EntradaHistorico.query.filter_by(id=hid, entrada_id=eid).first_or_404()
+    data = request.get_json() or {}
+    if 'data_real' in data:
+        try: h.data_real = datetime.strptime(data['data_real'], '%Y-%m-%d').date() if data['data_real'] else None
+        except: pass
+    if 'notas'       in data: h.notas      = data['notas']
+    if 'status_ant'  in data: h.status_ant = data['status_ant'] or None
+    if 'status_novo' in data and data['status_novo']: h.status_novo = data['status_novo']
+    e = EntradaEquipamento.query.get(eid)
+    if e:
+        _recalc_entrada_dates(e)
+        e.atualizado_em = datetime.now()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/entradas/<int:eid>/historico/<int:hid>/eliminar', methods=['POST'])
+@login_required
+def entrada_hist_eliminar(eid, hid):
+    h = EntradaHistorico.query.filter_by(id=hid, entrada_id=eid).first_or_404()
+    db.session.delete(h)
+    e = EntradaEquipamento.query.get(eid)
+    if e:
+        _recalc_entrada_dates(e)
+        e.atualizado_em = datetime.now()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 @app.route('/entradas/<int:eid>/data-orcamento', methods=['POST'])
 @login_required
 def entrada_data_orcamento(eid):
