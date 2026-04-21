@@ -87,6 +87,7 @@ class PedidoCompra(db.Model):
     criado_por     = db.Column(db.Integer, db.ForeignKey('users.id'))
     aprovado_por   = db.Column(db.Integer, db.ForeignKey('users.id'))
     aprovador      = db.relationship('User', foreign_keys=[aprovado_por])
+    cliente        = db.relationship('Cliente', foreign_keys=[cliente_id])
     data_criacao   = db.Column(db.DateTime, default=datetime.utcnow)
     data_aprovacao = db.Column(db.DateTime)
     linhas         = db.relationship('LinhaPedido', backref='pedido', lazy=True,
