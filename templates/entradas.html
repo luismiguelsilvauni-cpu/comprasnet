@@ -19,6 +19,9 @@
   <span><strong style="color:#06b6d4">R-F</strong> = Receção→Faturado</span>
   <span><strong style="color:#6366f1">ORC-RP</strong> = Orçamentado→Em Reparação</span>
   <span><strong style="color:#f59e0b">CM-RP</strong> = Mat.Pedido→Em Reparação</span>
+  <span><strong style="color:#0ea5e9">CM-S</strong> = Mat.Pedido→Em Stock</span>
+  <span><strong style="color:#10b981">S-RP</strong> = Stock→Em Reparação</span>
+  <span><strong style="color:#ec4899">RP-RC</strong> = Em Reparação→Rep.Concluída</span>
   <span><strong style="color:#22c55e">RP-F</strong> = Em Reparação→Faturado</span>
 </div>
 
@@ -47,6 +50,9 @@
       <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#06b6d4;width:42px" title="Receção → Faturado">R-F</th>
       <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#6366f1;width:52px" title="Orçamentado → Em Reparação">ORC-RP</th>
       <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#f59e0b;width:52px" title="Material Pedido → Em Reparação">CM-RP</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#0ea5e9;width:48px" title="Material Pedido → Material em Stock">CM-S</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#10b981;width:48px" title="Material em Stock → Em Reparação">S-RP</th>
+      <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#ec4899;width:50px" title="Em Reparação → Reparação Concluída">RP-RC</th>
       <th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;color:#22c55e;width:45px" title="Em Reparação → Faturado">RP-F</th>
       <th style="padding:10px 8px;width:65px"></th>
     </tr>
@@ -103,7 +109,15 @@
     <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;font-weight:700;color:#f59e0b">
       {% if e.dias_mat_reparacao is not none %}{{ e.dias_mat_reparacao }}d{% else %}<span style="color:var(--border);font-weight:400">—</span>{% endif %}
     </td>
-
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;font-weight:700;color:#0ea5e9">
+      {% if e.dias_mat_stock is not none %}{{ e.dias_mat_stock }}d{% else %}<span style="color:var(--border);font-weight:400">—</span>{% endif %}
+    </td>
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;font-weight:700;color:#10b981">
+      {% if e.dias_stock_reparacao is not none %}{{ e.dias_stock_reparacao }}d{% else %}<span style="color:var(--border);font-weight:400">—</span>{% endif %}
+    </td>
+    <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;font-weight:700;color:#ec4899">
+      {% if e.dias_reparacao_concluida is not none %}{{ e.dias_reparacao_concluida }}d{% else %}<span style="color:var(--border);font-weight:400">—</span>{% endif %}
+    </td>
     <td style="padding:8px;text-align:center;font-size:11px;font-family:monospace;font-weight:700;color:#22c55e">
       {% if e.dias_reparacao_fat is not none %}{{ e.dias_reparacao_fat }}d{% else %}<span style="color:var(--border);font-weight:400">—</span>{% endif %}
     </td>
@@ -113,7 +127,7 @@
     </td>
   </tr>
   {% else %}
-  <tr><td colspan="14" style="text-align:center;padding:32px;color:var(--text-muted)">Sem entradas registadas</td></tr>
+  <tr><td colspan="17" style="text-align:center;padding:32px;color:var(--text-muted)">Sem entradas registadas</td></tr>
   {% endfor %}
   </tbody>
 </table>

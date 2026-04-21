@@ -3425,14 +3425,17 @@ def api_assist_fornecedores():
 # ── MÓDULO ENTRADAS ───────────────────────────────────────────────────────────
 
 ENTRADAS_STATUS = [
-    ('rececionado',         '📥 Rececionado'),
-    ('orcamentado',         '📋 Orçamentado'),
-    ('material_pedido',     '📦 Material Pedido'),
-    ('em_reparacao',        '🔧 Em Reparação'),
-    ('faturado',            '🧾 Faturado'),
-    ('orcamentado_estadia', '⏳ Orçamentado – Em Estadia'),
-    ('concluido_estadia',   '🏁 Concluído – Em Estadia'),
-    ('concluido_fechado',   '✔️ Concluído – Fechado'),
+    ('rececionado',            '📥 Rececionado'),
+    ('pre_orcamento',          '📝 Pré-Orçamento'),
+    ('orcamentado',            '📋 Orçamentado'),
+    ('material_pedido',        '📦 Material Pedido'),
+    ('material_stock',         '🏪 Material em Stock'),
+    ('em_reparacao',           '🔧 Em Reparação'),
+    ('reparacao_concluida',    '✅ Reparação Concluída'),
+    ('faturado',               '🧾 Faturado'),
+    ('orcamentado_estadia',    '⏳ Orçamentado – Em Estadia'),
+    ('concluido_estadia',      '🏁 Concluído – Em Estadia'),
+    ('concluido_fechado',      '✔️ Concluído – Fechado'),
 ]
 ENTRADAS_STATUS_DICT = dict(ENTRADAS_STATUS)
 
@@ -3503,11 +3506,14 @@ def _recalc_entrada_dates(e):
     for h in hist:
         if h.data_real:
             dates[h.status_novo] = h.data_real
-    if 'orcamentado'       in dates: e.data_orcamento       = dates['orcamentado']
-    if 'material_pedido'   in dates: e.data_material_pedido = dates['material_pedido']
-    if 'em_reparacao'      in dates: e.data_em_reparacao    = dates['em_reparacao']
-    if 'faturado'          in dates: e.data_faturado        = dates['faturado']
-    if 'concluido_fechado' in dates:
+    if 'pre_orcamento'       in dates: e.data_pre_orcamento      = dates['pre_orcamento']
+    if 'orcamentado'          in dates: e.data_orcamento           = dates['orcamentado']
+    if 'material_pedido'      in dates: e.data_material_pedido     = dates['material_pedido']
+    if 'material_stock'       in dates: e.data_material_stock      = dates['material_stock']
+    if 'em_reparacao'         in dates: e.data_em_reparacao        = dates['em_reparacao']
+    if 'reparacao_concluida'  in dates: e.data_reparacao_concluida = dates['reparacao_concluida']
+    if 'faturado'             in dates: e.data_faturado            = dates['faturado']
+    if 'concluido_fechado'    in dates:
         e.data_fecho = dates['concluido_fechado']
         if e.data_rececao:
             e.dias_total = (e.data_fecho - e.data_rececao).days
@@ -3518,8 +3524,14 @@ def _recalc_entrada_dates(e):
         e.dias_rec_faturado = (e.data_faturado - e.data_rececao).days
     if e.data_orcamento and e.data_em_reparacao:
         e.dias_orc_reparacao = (e.data_em_reparacao - e.data_orcamento).days
+    if e.data_material_pedido and e.data_material_stock:
+        e.dias_mat_stock = (e.data_material_stock - e.data_material_pedido).days
+    if e.data_material_stock and e.data_em_reparacao:
+        e.dias_stock_reparacao = (e.data_em_reparacao - e.data_material_stock).days
     if e.data_material_pedido and e.data_em_reparacao:
         e.dias_mat_reparacao = (e.data_em_reparacao - e.data_material_pedido).days
+    if e.data_em_reparacao and e.data_reparacao_concluida:
+        e.dias_reparacao_concluida = (e.data_reparacao_concluida - e.data_em_reparacao).days
     if e.data_em_reparacao and e.data_faturado:
         e.dias_reparacao_fat = (e.data_faturado - e.data_em_reparacao).days
 
@@ -3643,13 +3655,17 @@ def entradas_stats():
         by_status=json.dumps(dict(by_status)),
         top_cli=json.dumps(top_cli),
         status_dict=json.dumps({k:v for k,v in [
-            ('rececionado','📥 Rececionado'),('orcamentado','📋 Orçamentado'),
-            ('material_pedido','📦 Mat. Pedido'),('em_reparacao','🔧 Em Reparação'),
+            ('rececionado','📥 Rececionado'),('pre_orcamento','📝 Pré-Orç.'),
+            ('orcamentado','📋 Orçamentado'),('material_pedido','📦 Mat. Pedido'),
+            ('material_stock','🏪 Mat. Stock'),('em_reparacao','🔧 Em Reparação'),
+            ('reparacao_concluida','✅ Rep. Concluída'),
             ('faturado','🧾 Faturado'),('orcamentado_estadia','⏳ Orç.-Estadia'),
             ('concluido_estadia','🏁 Conc.-Estadia'),('concluido_fechado','✔️ Fechado')]}),
-        colors_json=json.dumps({'rececionado':'#3b6ef0','orcamentado':'#f59e0b',
-            'material_pedido':'#6366f1','em_reparacao':'#22c55e','faturado':'#06b6d4',
-            'orcamentado_estadia':'#ef4444','concluido_estadia':'#a855f7','concluido_fechado':'#6b7280'}),
+        colors_json=json.dumps({'rececionado':'#3b6ef0','pre_orcamento':'#94a3b8',
+            'orcamentado':'#f59e0b','material_pedido':'#6366f1','material_stock':'#0ea5e9',
+            'em_reparacao':'#22c55e','reparacao_concluida':'#10b981',
+            'faturado':'#06b6d4','orcamentado_estadia':'#ef4444',
+            'concluido_estadia':'#a855f7','concluido_fechado':'#6b7280'}),
     )
 
 @app.route('/entradas')
@@ -3778,10 +3794,13 @@ def entrada_status(eid):
     e.data_status_real = data_real
     e.atualizado_em = datetime.now()
     # Store date per status
-    if novo == 'orcamentado':       e.data_orcamento       = data_real
-    elif novo == 'material_pedido': e.data_material_pedido = data_real
-    elif novo == 'em_reparacao':    e.data_em_reparacao    = data_real
-    elif novo == 'faturado':        e.data_faturado        = data_real
+    if novo == 'pre_orcamento':          e.data_pre_orcamento      = data_real
+    elif novo == 'orcamentado':          e.data_orcamento           = data_real
+    elif novo == 'material_pedido':      e.data_material_pedido     = data_real
+    elif novo == 'material_stock':       e.data_material_stock      = data_real
+    elif novo == 'em_reparacao':         e.data_em_reparacao        = data_real
+    elif novo == 'reparacao_concluida':  e.data_reparacao_concluida = data_real
+    elif novo == 'faturado':             e.data_faturado            = data_real
     elif novo == 'concluido_fechado':
         e.data_fecho = data_real
         if e.data_rececao:
@@ -6896,9 +6915,31 @@ def api_funcionario_faltas(fid, ano):
 
 # ── SALÁRIOS ROUTES ───────────────────────────────────────────────────────────
 
+@app.route('/salarios/pin', methods=['GET','POST'])
+@login_required
+def salarios_pin():
+    cfg = ConfigGeral.query.first()
+    pin_required = cfg and cfg.salarios_pin and cfg.salarios_pin.strip()
+    if not pin_required:
+        return redirect(url_for('salarios'))
+    if request.method == 'POST':
+        pin = request.form.get('pin','').strip()
+        if pin == cfg.salarios_pin:
+            from flask import session
+            session['salarios_ok'] = True
+            return redirect(url_for('salarios'))
+        return render_template('salarios_pin.html', erro=True)
+    return render_template('salarios_pin.html', erro=False)
+
+
 @app.route('/salarios')
 @login_required
 def salarios():
+    from flask import session
+    cfg_pin = ConfigGeral.query.first()
+    if cfg_pin and cfg_pin.salarios_pin and cfg_pin.salarios_pin.strip():
+        if not session.get('salarios_ok') and not current_user.is_admin:
+            return redirect(url_for('salarios_pin'))
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     return render_template('salarios.html', funcionarios=funcionarios)
 

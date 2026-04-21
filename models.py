@@ -332,6 +332,7 @@ class ConfigGeral(db.Model):
     # Claude chat
     claude_chat_ativo     = db.Column(db.Boolean,     default=True)
     claude_chat_sistema   = db.Column(db.Text,        default='És um assistente técnico especializado em equipamentos navais e hidráulicos. Responde sempre em português.')
+    salarios_pin          = db.Column(db.String(10),    default='')  # PIN to access salarios
 
 
 class NotaArtigo(db.Model):
@@ -382,7 +383,10 @@ class EntradaEquipamento(db.Model):
     data_status_real = db.Column(db.Date, nullable=True)  # real date of current status
     data_orcamento        = db.Column(db.Date, nullable=True)  # real date of budget emission
     data_material_pedido  = db.Column(db.Date, nullable=True)  # when material was ordered
+    data_pre_orcamento    = db.Column(db.Date, nullable=True)  # pre-budget
+    data_material_stock   = db.Column(db.Date, nullable=True)  # material arrived in stock
     data_em_reparacao     = db.Column(db.Date, nullable=True)  # when repair started
+    data_reparacao_concluida = db.Column(db.Date, nullable=True)  # repair completed
     data_faturado         = db.Column(db.Date, nullable=True)  # when invoiced
     data_fecho            = db.Column(db.Date, nullable=True)  # real closing date
     # Computed durations (days)
@@ -391,6 +395,9 @@ class EntradaEquipamento(db.Model):
     dias_rec_faturado     = db.Column(db.Integer, nullable=True)  # R→F
     dias_orc_reparacao    = db.Column(db.Integer, nullable=True)  # ORC→RP
     dias_mat_reparacao    = db.Column(db.Integer, nullable=True)  # CM→RP
+    dias_mat_stock        = db.Column(db.Integer, nullable=True)  # CM→STOCK
+    dias_stock_reparacao  = db.Column(db.Integer, nullable=True)  # STOCK→RP
+    dias_reparacao_concluida = db.Column(db.Integer, nullable=True)  # RP→RC
     dias_reparacao_fat    = db.Column(db.Integer, nullable=True)  # RP→F
     criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)

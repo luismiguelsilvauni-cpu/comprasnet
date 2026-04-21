@@ -326,3 +326,14 @@ with app.app_context():
         if tbl not in insp.get_table_names():
             db.create_all()
             print(f"OK: {tbl} criada")
+
+# Add salarios_pin to config_geral
+import sqlite3
+_db = os.path.join(os.path.dirname(__file__), 'instance', 'compras.db')
+_conn = sqlite3.connect(_db)
+_cur = _conn.cursor()
+_cols = [r[1] for r in _cur.execute("PRAGMA table_info(config_geral)").fetchall()]
+if 'salarios_pin' not in _cols:
+    _cur.execute("ALTER TABLE config_geral ADD COLUMN salarios_pin VARCHAR(10) DEFAULT ''")
+    print("OK: config_geral.salarios_pin")
+_conn.commit(); _conn.close()
