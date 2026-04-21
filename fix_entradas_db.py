@@ -42,6 +42,8 @@ all_cols = {
         ('data_faturado',      'DATE'),
         ('data_fecho',         'DATE'),
         ('dias_total',         'INTEGER'),
+        ('dias_rec_orcamento',  'INTEGER'),
+        ('dias_orc_reparacao',  'INTEGER'),
         ('dias_rec_faturado',  'INTEGER'),
         ('dias_mat_reparacao', 'INTEGER'),
         ('dias_reparacao_fat', 'INTEGER'),

@@ -131,7 +131,7 @@ def dashboard():
     pedidos_abertos  = PedidoCompra.query.filter_by(estado='aberto').count()
     pedidos_aprovados= PedidoCompra.query.filter_by(estado='aprovado').count()
     total_orcamentos = Orcamento.query.count()
-    pedidos_recentes = PedidoCompra.query.filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente'])).order_by(PedidoCompra.data_criacao.desc()).limit(8).all()
+    pedidos_recentes = PedidoCompra.query.filter(PedidoCompra.estado.in_(['aberto','pedido','aprovado','pendente','em_analise'])).order_by(PedidoCompra.data_criacao.desc()).limit(8).all()
 
     # Artigos pedidos para dashboard - pendentes/não encomendados primeiro, recebidos no fim
     from sqlalchemy import case
@@ -277,7 +277,7 @@ def api_dashboard_artigos_pedidos():
 @app.route('/pedidos')
 @login_required
 def pedidos():
-    estado = request.args.get('estado','aberto')
+    estado = request.args.get('estado','aberto') or 'aberto'
     q = PedidoCompra.query
     if estado and estado != 'todos': q = q.filter_by(estado=estado)
     return render_template('pedidos.html', pedidos=q.order_by(PedidoCompra.data_criacao.desc()).all(), estado_filtro=estado)
@@ -3484,8 +3484,12 @@ def _recalc_entrada_dates(e):
         if e.data_rececao:
             e.dias_total = (e.data_fecho - e.data_rececao).days
     # Durations
+    if e.data_rececao and e.data_orcamento:
+        e.dias_rec_orcamento = (e.data_orcamento - e.data_rececao).days
     if e.data_rececao and e.data_faturado:
         e.dias_rec_faturado = (e.data_faturado - e.data_rececao).days
+    if e.data_orcamento and e.data_em_reparacao:
+        e.dias_orc_reparacao = (e.data_em_reparacao - e.data_orcamento).days
     if e.data_material_pedido and e.data_em_reparacao:
         e.dias_mat_reparacao = (e.data_em_reparacao - e.data_material_pedido).days
     if e.data_em_reparacao and e.data_faturado:

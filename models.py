@@ -383,7 +383,9 @@ class EntradaEquipamento(db.Model):
     data_fecho            = db.Column(db.Date, nullable=True)  # real closing date
     # Computed durations (days)
     dias_total            = db.Column(db.Integer, nullable=True)  # R→CF
+    dias_rec_orcamento    = db.Column(db.Integer, nullable=True)  # R→ORC
     dias_rec_faturado     = db.Column(db.Integer, nullable=True)  # R→F
+    dias_orc_reparacao    = db.Column(db.Integer, nullable=True)  # ORC→RP
     dias_mat_reparacao    = db.Column(db.Integer, nullable=True)  # CM→RP
     dias_reparacao_fat    = db.Column(db.Integer, nullable=True)  # RP→F
     criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))

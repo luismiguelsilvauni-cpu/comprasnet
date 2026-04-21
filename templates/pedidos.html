@@ -1,8 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Pedidos de Compra · ComprasNet{% endblock %}
-{% block page_title %}Pedidos de Compra{% endblock %}
+{% block title %}Pedidos de Compra · ComprasNet<script>
+function mudarEstado(pid, novo) {
+  if (!novo) return;
+  fetch('/pedidos/'+pid+'/estado', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({estado: novo})
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else alert('Erro: '+d.error);
+  });
+}
+</script>
+{% endblock %}
+{% block page_title %}Pedidos de Compra<script>
+function mudarEstado(pid, novo) {
+  if (!novo) return;
+  fetch('/pedidos/'+pid+'/estado', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({estado: novo})
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else alert('Erro: '+d.error);
+  });
+}
+</script>
+{% endblock %}
 {% block topbar_actions %}
     <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary">+ Novo Pedido</a>
+<script>
+function mudarEstado(pid, novo) {
+  if (!novo) return;
+  fetch('/pedidos/'+pid+'/estado', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({estado: novo})
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else alert('Erro: '+d.error);
+  });
+}
+</script>
 {% endblock %}
 
 {% block content %}
@@ -14,6 +50,9 @@
         <a href="{{ url_for('pedidos', estado='em_analise') }}" class="badge {% if estado_filtro == 'em_analise' %}badge-yellow{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Em Análise</a>
         <a href="{{ url_for('pedidos', estado='aprovado') }}" class="badge {% if estado_filtro == 'aprovado' %}badge-green{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Aprovados</a>
         <a href="{{ url_for('pedidos', estado='cancelado') }}" class="badge {% if estado_filtro == 'cancelado' %}badge-red{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Cancelados</a>
+        <a href="{{ url_for('pedidos', estado='pedido') }}" class="badge {% if estado_filtro == 'pedido' %}badge-yellow{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Pedidos</a>
+        <a href="{{ url_for('pedidos', estado='fechado') }}" class="badge {% if estado_filtro == 'fechado' %}badge-green{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Fechados</a>
+        <a href="{{ url_for('pedidos', estado='anulado') }}" class="badge {% if estado_filtro == 'anulado' %}badge-red{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Anulados</a>
     </div>
 </div>
 
@@ -48,10 +87,21 @@
                     {% else %}<span class="badge badge-blue">Normal</span>{% endif %}
                 </td>
                 <td>
-                    {% if p.estado == 'aberto' %}<span class="badge badge-blue">Aberto</span>
+                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                    {% if p.estado == 'aberto' %}<span class="badge badge-blue">📂 Aberto</span>
+                    {% elif p.estado == 'pedido' %}<span class="badge badge-yellow">📤 Pedido</span>
                     {% elif p.estado == 'em_analise' %}<span class="badge badge-yellow">Em análise</span>
-                    {% elif p.estado == 'aprovado' %}<span class="badge badge-green">✓ Aprovado</span>
-                    {% elif p.estado == 'cancelado' %}<span class="badge badge-gray">Cancelado</span>{% endif %}
+                    {% elif p.estado == 'aprovado' or p.estado == 'fechado' %}<span class="badge badge-green">✔️ Fechado</span>
+                    {% elif p.estado == 'anulado' or p.estado == 'cancelado' %}<span class="badge badge-red">🚫 Anulado</span>
+                    {% else %}<span class="badge badge-gray">{{ p.estado }}</span>{% endif %}
+                    <select onchange="mudarEstado({{ p.id }},this.value);this.value=''" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);cursor:pointer">
+                      <option value="">✏️</option>
+                      <option value="aberto">📂 Aberto</option>
+                      <option value="pedido">📤 Pedido</option>
+                      <option value="fechado">✔️ Fechado</option>
+                      <option value="anulado">🚫 Anulado</option>
+                    </select>
+                    </div>
                 </td>
                 <td>
                     {% set n = p.orcamentos|length %}
@@ -62,6 +112,7 @@
                         </div>
                     </div>
                 </td>
+                <td style="font-size:12px;color:var(--text-muted)">{{ p.cliente.nome if p.cliente else "—" }}</td>
                 <td class="text-muted" style="font-size:12px">{{ p.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
                 <td><a href="{{ url_for('pedido_detalhe', pid=p.id) }}" class="btn btn-ghost btn-sm">Ver →</a></td>
             </tr>
@@ -80,4 +131,16 @@
     </div>
     {% endif %}
 </div>
+<script>
+function mudarEstado(pid, novo) {
+  if (!novo) return;
+  fetch('/pedidos/'+pid+'/estado', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({estado: novo})
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else alert('Erro: '+d.error);
+  });
+}
+</script>
 {% endblock %}
