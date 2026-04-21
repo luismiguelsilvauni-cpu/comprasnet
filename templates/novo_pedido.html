@@ -89,12 +89,7 @@
 var linhas = [];
 var linhaAtual = -1;
 var artigosMap = [];
-var clienteOpts = [
-  {id:'', nome:'Stock Interno (default)'}
-  {% for c in clientes %}
-  ,{id:'{{ c.id }}', nome:'{{ c.nome|replace("'", "\'") }}'}
-  {% endfor %}
-];
+var clienteOpts = []; // populated via API search
 
 function adicionarLinha() {
   linhas.push({referencia:'', designacao:'', unidade:'un', quantidade:1, observacoes:'', cliente_id:''});
@@ -127,10 +122,7 @@ function renderLinhas() {
     // Destino/Cliente - search field
     html += '<div style="position:relative">';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Destino / Cliente</div>';
-    var cNome = '';
-    for (var ci=0; ci<clienteOpts.length; ci++) {
-      if (clienteOpts[ci].id == l.cliente_id) { cNome = clienteOpts[ci].nome; break; }
-    }
+    var cNome = l.cliente_nome || '';
     html += '<input type="text" id="cli-' + i + '" value="' + esc(cNome === 'Stock Interno (default)' ? '' : cNome) + '" placeholder="Pesquisar cliente..." class="input" style="font-size:11px;padding:5px 6px" autocomplete="off" oninput="searchLinhaCli(' + i + ',this.value)" onfocus="searchLinhaCli(' + i + ',this.value)">';
     html += '<div id="cli-drop-' + i + '" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>';
     html += '</div>';
@@ -284,6 +276,7 @@ function searchLinhaCli(idx, q) {
 }
 function selLinhaCli(idx, id, nome) {
   linhas[idx].cliente_id = id;
+  linhas[idx].cliente_nome = nome === 'Stock Interno' ? '' : nome;
   var inp = document.getElementById('cli-' + idx);
   var dd  = document.getElementById('cli-drop-' + idx);
   if (inp) inp.value = (nome === 'Stock Interno') ? '' : nome;
