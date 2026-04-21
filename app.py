@@ -252,8 +252,15 @@ def api_dashboard_artigos_pedidos():
     for linha, pedido, user in artigos:
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
-        # Get last status change
         hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
+        # Get cliente name: from linha or from pedido
+        cliente_nome = "—"
+        if linha.cliente_id:
+            c = Cliente.query.get(linha.cliente_id)
+            if c: cliente_nome = c.nome
+        elif pedido.cliente_id:
+            c = Cliente.query.get(pedido.cliente_id)
+            if c: cliente_nome = c.nome
         rows.append({
             "linha_id": linha.id,
             "pedido_id": pedido.id,
@@ -263,6 +270,7 @@ def api_dashboard_artigos_pedidos():
             "unidade": linha.unidade or "un",
             "data_pedido": pedido.data_criacao.strftime("%d/%m/%Y"),
             "criado_por": user.nome[:20] if user else "—",
+            "cliente": cliente_nome,
             "status": s,
             "status_label": lbl,
             "status_color": col,

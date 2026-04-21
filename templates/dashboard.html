@@ -506,7 +506,7 @@ function carregarArtigosPedidos() {
       var tbl = document.createElement('table');
       tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px';
       var thead = '<thead style="position:sticky;top:0;background:var(--surface2);z-index:1"><tr>';
-      ['Estado','Artigo','Qtd','Data Pedido','Criado Por','Data Estado','Alterado Por',''].forEach(function(h){
+      ['Estado','Artigo','Destino/Cliente','Qtd','Data Pedido','Criado Por','Data Estado','Alterado Por',''].forEach(function(h){
         thead += '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)">' + h + '</th>';
       });
       thead += '</tr></thead>';
@@ -538,10 +538,10 @@ function carregarArtigosPedidos() {
         }
         tr.appendChild(tdArt);
         // Simple cells
-        [r.quantidade + ' ' + r.unidade, r.data_pedido, r.criado_por, r.data_status, r.alterado_por].forEach(function(txt, i) {
+        [r.cliente, r.quantidade + ' ' + r.unidade, r.data_pedido, r.criado_por, r.data_status, r.alterado_por].forEach(function(txt, i) {
           var td = document.createElement('td');
-          td.style.cssText = 'padding:5px 8px;color:var(--text-muted)' + (i===0?';font-family:monospace':'') + (i===1||i===3?';white-space:nowrap':'');
-          td.textContent = txt;
+          td.style.cssText = 'padding:5px 8px;color:var(--text-muted)' + (i===1?';font-family:monospace':'') + (i===2||i===4?';white-space:nowrap':'') + (i===0?';font-weight:600;color:var(--text)':'');
+          td.textContent = txt || '—';
           tr.appendChild(td);
         });
         // Link cell

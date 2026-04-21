@@ -342,6 +342,38 @@ document.getElementById('previewModal').addEventListener('click', function(e){
   if(e.target===this) this.style.display='none';
 });
 
+
+function ehEditar(id, dataReal, nota, sant, snovo) {
+  document.getElementById('eh-view-'+id).style.display = 'none';
+  document.getElementById('eh-edit-'+id).style.display = 'block';
+  document.getElementById('eh-data-'+id).value = dataReal;
+  document.getElementById('eh-nota-'+id).value = nota;
+  var s1 = document.getElementById('eh-sant-'+id);
+  var s2 = document.getElementById('eh-snovo-'+id);
+  if (s1) s1.value = sant || '';
+  if (s2) s2.value = snovo || '';
+}
+function ehFechar(id) {
+  document.getElementById('eh-edit-'+id).style.display = 'none';
+  document.getElementById('eh-view-'+id).style.display = 'block';
+}
+function ehGuardar(id) {
+  fetch('/entradas/{{ e.id }}/historico/'+id+'/editar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      data_real: document.getElementById('eh-data-'+id).value,
+      notas: document.getElementById('eh-nota-'+id).value,
+      status_ant: document.getElementById('eh-sant-'+id).value,
+      status_novo: document.getElementById('eh-snovo-'+id).value,
+    })
+  }).then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert('Erro: '+d.error); });
+}
+function ehEliminar(id) {
+  if (!confirm('Eliminar este registo do histórico?')) return;
+  fetch('/entradas/{{ e.id }}/historico/'+id+'/eliminar', {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) document.getElementById('eh-'+id).remove(); else alert('Erro: '+d.error); });
+}
+
 function guardarDataFecho(val) {
   fetch('/entradas/{{ e.id }}/data-fecho', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
