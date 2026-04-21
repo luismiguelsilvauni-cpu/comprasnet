@@ -164,8 +164,9 @@ function pesquisarArtigos(q) {
     .then(function(data){
       artigosMap = data;
       var html = data.map(function(a, i){
-        return '<div onclick="selecionar(' + i + ')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">' +
-          '<span style="font-weight:700;color:var(--accent)">' + esc(a.referencia) + '</span> – ' + esc(a.designacao || '') + '</div>';
+        var div = '<div onclick="selecionar(' + i + ')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)">';
+        div += '<span style="font-weight:700;color:var(--accent)">' + esc(a.referencia) + '</span> – ' + esc(a.designacao || '') + '</div>';
+        return div;
       }).join('');
       if (!html) html = '<div style="padding:12px;color:var(--text-muted)">Sem resultados</div>';
       document.getElementById('pesquisaResultados').innerHTML = html;
