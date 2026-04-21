@@ -5,10 +5,19 @@
   {% if em_estadia > 0 %}
   <span style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px">⚠️ {{ em_estadia }} em estadia</span>
   {% endif %}
+  <a href="{{ url_for('entradas_stats') }}" class="btn btn-ghost btn-sm">📊 Estatísticas</a>
   <a href="{{ url_for('entrada_nova') }}" class="btn btn-primary btn-sm">+ Nova Entrada</a>
 {% endblock %}
 {% block content %}
 
+<!-- Legenda siglas -->
+<div style="font-size:11px;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 12px;margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap">
+  <span>ⓘ <strong>Dias</strong>: dias no estado actual</span>
+  <span style="color:#6b7280"><strong>R-CF</strong>: Receção → Concluído Fechado</span>
+  <span style="color:#06b6d4"><strong>R-F</strong>: Receção → Faturado</span>
+  <span style="color:#f59e0b"><strong>CM-RP</strong>: Mat. Pedido → Em Reparação</span>
+  <span style="color:#22c55e"><strong>RP-F</strong>: Em Reparação → Faturado</span>
+</div>
 <!-- Filters -->
 <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
   <a href="{{ url_for('entradas') }}" class="btn btn-sm {% if not status_filtro %}btn-primary{% else %}btn-ghost{% endif %}">Todos</a>
@@ -29,8 +38,11 @@
       <th>Modelo</th>
       <th>Nº Série</th>
       <th>Estado</th>
-      <th style="width:70px">Dias</th>
-      <th style="width:80px">Total</th>
+      <th style="width:50px" title="Dias contabilizados no estado actual (orçamentado/faturado)">Dias ⓘ</th>
+      <th style="width:45px" title="R→CF: Receção até Concluído-Fechado">R-CF</th>
+      <th style="width:45px" title="R→F: Receção até Faturado">R-F</th>
+      <th style="width:45px" title="CM→RP: Material Pedido até Em Reparação">CM-RP</th>
+      <th style="width:45px" title="RP→F: Em Reparação até Faturado">RP-F</th>
       <th style="width:80px"></th>
     </tr>
   </thead>

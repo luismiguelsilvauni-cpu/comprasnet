@@ -49,3 +49,17 @@ print("OK: entrada_documentos table ready")
 conn.commit()
 conn.close()
 print("Concluido.")
+
+# Add new duration columns
+for col, typ in [
+    ('data_material_pedido', 'DATE'),
+    ('data_em_reparacao',    'DATE'),
+    ('data_faturado',        'DATE'),
+    ('dias_rec_faturado',    'INTEGER'),
+    ('dias_mat_reparacao',   'INTEGER'),
+    ('dias_reparacao_fat',   'INTEGER'),
+]:
+    cols_now = [r[1] for r in cur.execute("PRAGMA table_info(entradas_equipamento)").fetchall()]
+    if col not in cols_now:
+        cur.execute(f"ALTER TABLE entradas_equipamento ADD COLUMN {col} {typ}")
+        print(f"OK: entradas_equipamento.{col}")

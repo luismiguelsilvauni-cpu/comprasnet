@@ -3467,6 +3467,31 @@ def entrada_doc_apagar(eid, did):
     return jsonify({'ok': True})
 
 
+def _recalc_entrada_dates(e):
+    """Recalculate all date fields and durations for an entrada from its history."""
+    hist = EntradaHistorico.query.filter_by(entrada_id=e.id).order_by(
+        EntradaHistorico.criado_em.asc()).all()
+    dates = {}
+    for h in hist:
+        if h.data_real:
+            dates[h.status_novo] = h.data_real
+    if 'orcamentado'       in dates: e.data_orcamento       = dates['orcamentado']
+    if 'material_pedido'   in dates: e.data_material_pedido = dates['material_pedido']
+    if 'em_reparacao'      in dates: e.data_em_reparacao    = dates['em_reparacao']
+    if 'faturado'          in dates: e.data_faturado        = dates['faturado']
+    if 'concluido_fechado' in dates:
+        e.data_fecho = dates['concluido_fechado']
+        if e.data_rececao:
+            e.dias_total = (e.data_fecho - e.data_rececao).days
+    # Durations
+    if e.data_rececao and e.data_faturado:
+        e.dias_rec_faturado = (e.data_faturado - e.data_rececao).days
+    if e.data_material_pedido and e.data_em_reparacao:
+        e.dias_mat_reparacao = (e.data_em_reparacao - e.data_material_pedido).days
+    if e.data_em_reparacao and e.data_faturado:
+        e.dias_reparacao_fat = (e.data_faturado - e.data_em_reparacao).days
+
+
 ESTADIA_RULES = {
     'orcamentado':  {'dias': 10, 'escalate': 'orcamentado_estadia'},
     'faturado':     {'dias': 5,  'escalate': 'concluido_estadia'},
@@ -3511,6 +3536,86 @@ def _verificar_estadias():
     if changed:
         db.session.commit()
     return changed
+
+@app.route('/entradas/estatisticas')
+@login_required
+def entradas_stats():
+    from datetime import date as _dt
+    from collections import defaultdict
+    _hoje = _dt.today()
+    todas = EntradaEquipamento.query.all()
+    fechadas = [e for e in todas if e.status == 'concluido_fechado']
+    abertas  = [e for e in todas if e.status != 'concluido_fechado']
+
+    def avg(lst): return round(sum(lst)/len(lst),1) if lst else 0
+    def safe(lst): return [x for x in lst if x is not None]
+
+    d_total   = safe([e.dias_total        for e in fechadas])
+    d_rf      = safe([e.dias_rec_faturado  for e in todas])
+    d_cmrp    = safe([e.dias_mat_reparacao for e in todas])
+    d_rpf     = safe([e.dias_reparacao_fat for e in todas])
+
+    # By status count
+    by_status = defaultdict(int)
+    for e in todas: by_status[e.status] += 1
+
+    # By year
+    by_year = defaultdict(lambda:{'total':0,'fechadas':0,'sum_total':0,'n_total':0,
+                                   'sum_rf':0,'n_rf':0,'sum_cmrp':0,'n_cmrp':0,'sum_rpf':0,'n_rpf':0})
+    for e in todas:
+        yr = e.data_rececao.year if e.data_rececao else (e.criado_em.year if e.criado_em else _hoje.year)
+        by_year[yr]['total'] += 1
+        if e.status=='concluido_fechado': by_year[yr]['fechadas'] += 1
+        if e.dias_total        is not None: by_year[yr]['sum_total']+=e.dias_total;  by_year[yr]['n_total']+=1
+        if e.dias_rec_faturado is not None: by_year[yr]['sum_rf']  +=e.dias_rec_faturado; by_year[yr]['n_rf']+=1
+        if e.dias_mat_reparacao is not None: by_year[yr]['sum_cmrp']+=e.dias_mat_reparacao; by_year[yr]['n_cmrp']+=1
+        if e.dias_reparacao_fat is not None: by_year[yr]['sum_rpf'] +=e.dias_reparacao_fat; by_year[yr]['n_rpf']+=1
+
+    years_data = []
+    for yr in sorted(by_year.keys()):
+        d = by_year[yr]
+        years_data.append({'year':yr,'total':d['total'],'fechadas':d['fechadas'],
+            'avg_total': round(d['sum_total']/d['n_total'],1) if d['n_total'] else None,
+            'avg_rf':    round(d['sum_rf']   /d['n_rf'],   1) if d['n_rf']    else None,
+            'avg_cmrp':  round(d['sum_cmrp'] /d['n_cmrp'], 1) if d['n_cmrp']  else None,
+            'avg_rpf':   round(d['sum_rpf']  /d['n_rpf'],  1) if d['n_rpf']   else None,
+        })
+
+    # Top clientes
+    from collections import Counter
+    top_cli = Counter(e.cliente_nome for e in todas).most_common(10)
+
+    # By month (last 18)
+    by_month = defaultdict(lambda:{'total':0,'sum_rf':0,'n_rf':0})
+    for e in todas:
+        if e.data_rececao:
+            mo = f"{e.data_rececao.year}-{e.data_rececao.month:02d}"
+            by_month[mo]['total'] += 1
+            if e.dias_rec_faturado is not None:
+                by_month[mo]['sum_rf'] += e.dias_rec_faturado; by_month[mo]['n_rf'] += 1
+    months_data = [{'month':mo,'total':d['total'],
+        'avg_rf':round(d['sum_rf']/d['n_rf'],1) if d['n_rf'] else None}
+        for mo,d in sorted(by_month.items())[-18:]]
+
+    import json
+    return render_template('entradas_stats.html',
+        total=len(todas), n_fechadas=len(fechadas), n_abertas=len(abertas),
+        avg_total=avg(d_total), avg_rf=avg(d_rf), avg_cmrp=avg(d_cmrp), avg_rpf=avg(d_rpf),
+        max_total=max(d_total) if d_total else 0,
+        min_total=min(d_total) if d_total else 0,
+        years_data=json.dumps(years_data),
+        months_data=json.dumps(months_data),
+        by_status=json.dumps(dict(by_status)),
+        top_cli=json.dumps(top_cli),
+        status_dict=json.dumps({k:v for k,v in [
+            ('rececionado','📥 Rececionado'),('orcamentado','📋 Orçamentado'),
+            ('material_pedido','📦 Mat. Pedido'),('em_reparacao','🔧 Em Reparação'),
+            ('faturado','🧾 Faturado'),('orcamentado_estadia','⏳ Orç.-Estadia'),
+            ('concluido_estadia','🏁 Conc.-Estadia'),('concluido_fechado','✔️ Fechado')]}),
+        colors_json=json.dumps({'rececionado':'#3b6ef0','orcamentado':'#f59e0b',
+            'material_pedido':'#6366f1','em_reparacao':'#22c55e','faturado':'#06b6d4',
+            'orcamentado_estadia':'#ef4444','concluido_estadia':'#a855f7','concluido_fechado':'#6b7280'}),
+    )
 
 @app.route('/entradas')
 @login_required
@@ -3634,8 +3739,12 @@ def entrada_status(eid):
     e.data_status = datetime.now()
     e.data_status_real = data_real
     e.atualizado_em = datetime.now()
-    # If closing, calculate total days from reception to close
-    if novo == 'concluido_fechado':
+    # Store date per status
+    if novo == 'orcamentado':       e.data_orcamento       = data_real
+    elif novo == 'material_pedido': e.data_material_pedido = data_real
+    elif novo == 'em_reparacao':    e.data_em_reparacao    = data_real
+    elif novo == 'faturado':        e.data_faturado        = data_real
+    elif novo == 'concluido_fechado':
         e.data_fecho = data_real
         if e.data_rececao:
             e.dias_total = (data_real - e.data_rececao).days
@@ -3644,6 +3753,7 @@ def entrada_status(eid):
         user_id=current_user.id, user_nome=current_user.nome,
         notas=notas, data_real=data_real, criado_em=datetime.now()
     ))
+    _recalc_entrada_dates(e)
     db.session.commit()
     return jsonify({'ok': True})
 

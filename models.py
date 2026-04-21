@@ -376,9 +376,16 @@ class EntradaEquipamento(db.Model):
     status          = db.Column(db.String(50), default='rececionado')
     data_status     = db.Column(db.DateTime)          # when status was registered
     data_status_real = db.Column(db.Date, nullable=True)  # real date of current status
-    data_orcamento   = db.Column(db.Date, nullable=True)  # real date of budget emission
-    data_fecho       = db.Column(db.Date, nullable=True)   # real closing date
-    dias_total       = db.Column(db.Integer, nullable=True) # days from reception to close
+    data_orcamento        = db.Column(db.Date, nullable=True)  # real date of budget emission
+    data_material_pedido  = db.Column(db.Date, nullable=True)  # when material was ordered
+    data_em_reparacao     = db.Column(db.Date, nullable=True)  # when repair started
+    data_faturado         = db.Column(db.Date, nullable=True)  # when invoiced
+    data_fecho            = db.Column(db.Date, nullable=True)  # real closing date
+    # Computed durations (days)
+    dias_total            = db.Column(db.Integer, nullable=True)  # R→CF
+    dias_rec_faturado     = db.Column(db.Integer, nullable=True)  # R→F
+    dias_mat_reparacao    = db.Column(db.Integer, nullable=True)  # CM→RP
+    dias_reparacao_fat    = db.Column(db.Integer, nullable=True)  # RP→F
     criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Estatísticas Entradas · NavTech{% endblock %}
+{% block page_title %}📊 Estatísticas – Entradas de Equipamento{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('entradas') }}" class="btn btn-ghost btn-sm">← Lista</a>
+  <button onclick="location.reload()" class="btn btn-ghost btn-sm">🔄 Atualizar</button>
+{% endblock %}
+{% block content %}
+
+<script>
+var yearsData  = {{ years_data  | safe }};
+var monthsData = {{ months_data | safe }};
+var byStatus   = {{ by_status   | safe }};
+var topCli     = {{ top_cli     | safe }};
+var statusDict = {{ status_dict | safe }};
+var colorsMap  = {{ colors_json | safe }};
+var statsData  = {
+  total: {{ total }}, n_fechadas: {{ n_fechadas }}, n_abertas: {{ n_abertas }},
+  avg_total: {{ avg_total }}, avg_rf: {{ avg_rf }},
+  avg_cmrp: {{ avg_cmrp }}, avg_rpf: {{ avg_rpf }},
+  max_total: {{ max_total }}, min_total: {{ min_total }},
+};
+document.addEventListener('DOMContentLoaded', function(){
+  statsData.years_summary = yearsData.map(function(d){ return d.year+': '+d.total+' total, R-CF='+(d.avg_total||'n/a')+'d, R-F='+(d.avg_rf||'n/a')+'d'; }).join('\n');
+  statsData.top_summary = topCli.slice(0,5).map(function(r){ return r[0]+': '+r[1]; }).join('\n');
+});
+</script>
+
+<!-- AI Analysis -->
+<div class="card" style="padding:16px;margin-bottom:18px;border:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.04)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🤖</span>
+      <div><div style="font-size:13px;font-weight:700">Análise Inteligente</div>
+      <div style="font-size:11px;color:var(--text-muted)">Resumo gerado automaticamente com IA</div></div>
+    </div>
+    <button onclick="gerarAnalise()" id="btnAnalise" class="btn btn-primary btn-sm">✨ Gerar Análise</button>
+  </div>
+  <div id="analiseContainer" style="display:none">
+    <div id="analiseTexto" style="font-size:13px;line-height:1.7;white-space:pre-wrap"></div>
+    <div style="margin-top:8px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px">⚡ IA · <span id="analiseData"></span></div>
+  </div>
+  <div id="analiseLoading" style="display:none;text-align:center;padding:16px;color:var(--text-muted)">⏳ A analisar... (15-30 segundos)</div>
+  <div id="analiseErro" style="display:none;color:#ef4444;font-size:12px"></div>
+</div>
+
+<!-- Legenda -->
+<div class="card" style="padding:12px 16px;margin-bottom:16px;background:rgba(59,110,240,.04);border:1px solid rgba(59,110,240,.15)">
+  <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">ℹ️ Guia de Métricas</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;font-size:12px">
+    <div>📥→✔️ <strong style="color:#6b7280">R-CF</strong> — Receção até Concluído Fechado. Tempo total do processo.</div>
+    <div>📥→🧾 <strong style="color:#06b6d4">R-F</strong> — Receção até Faturado. Ciclo completo de faturação.</div>
+    <div>📦→🔧 <strong style="color:#f59e0b">CM-RP</strong> — Material Pedido até Em Reparação. Espera pelo material.</div>
+    <div>🔧→🧾 <strong style="color:#22c55e">RP-F</strong> — Em Reparação até Faturado. Tempo após conclusão até faturar.</div>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px">
+  <div class="card" style="padding:12px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--accent)">{{ total }}</div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Total</div></div>
+  <div class="card" style="padding:12px;text-align:center"><div style="font-size:26px;font-weight:800;color:#22c55e">{{ n_fechadas }}</div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Fechados</div></div>
+  <div class="card" style="padding:12px;text-align:center"><div style="font-size:26px;font-weight:800;color:#f59e0b">{{ n_abertas }}</div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Em Aberto</div></div>
+  <div class="card" style="padding:12px;text-align:center;border:1px solid rgba(107,114,128,.3)"><div style="font-size:26px;font-weight:800;color:#6b7280">{{ avg_total }}<span style="font-size:13px">d</span></div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Média R-CF</div></div>
+  <div class="card" style="padding:12px;text-align:center;border:1px solid rgba(6,182,212,.3)"><div style="font-size:26px;font-weight:800;color:#06b6d4">{{ avg_rf }}<span style="font-size:13px">d</span></div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Média R-F</div></div>
+  <div class="card" style="padding:12px;text-align:center;border:1px solid rgba(245,158,11,.3)"><div style="font-size:26px;font-weight:800;color:#f59e0b">{{ avg_cmrp }}<span style="font-size:13px">d</span></div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Média CM-RP</div></div>
+  <div class="card" style="padding:12px;text-align:center;border:1px solid rgba(34,197,94,.3)"><div style="font-size:26px;font-weight:800;color:#22c55e">{{ avg_rpf }}<span style="font-size:13px">d</span></div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Média RP-F</div></div>
+  <div class="card" style="padding:12px;text-align:center"><div style="font-size:26px;font-weight:800;color:#ef4444">{{ max_total }}<span style="font-size:13px">d</span></div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Máx. R-CF</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">📅 Tempos médios por Ano</div>
+    <canvas id="chartAnos" height="200"></canvas>
+  </div>
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">🔵 Estado actual</div>
+    <canvas id="chartStatus" height="200"></canvas>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">📈 Volume mensal (últimos 18 meses)</div>
+    <canvas id="chartMeses" height="200"></canvas>
+  </div>
+  <div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">🏆 Top Clientes</div>
+    <div id="topCliList"></div>
+  </div>
+</div>
+
+<script src="/static/chart.min.js"></script>
+<script>
+var isDark = document.documentElement.getAttribute('data-theme')==='dark' || window.matchMedia('(prefers-color-scheme:dark)').matches;
+var grid = isDark?'rgba(255,255,255,.08)':'rgba(0,0,0,.07)';
+var txt  = isDark?'#aaa':'#666';
+Chart.defaults.color = txt; Chart.defaults.borderColor = grid;
+
+new Chart(document.getElementById('chartAnos'),{type:'bar',data:{
+  labels:yearsData.map(d=>d.year),
+  datasets:[
+    {label:'R-CF (dias)',  data:yearsData.map(d=>d.avg_total), backgroundColor:'rgba(107,114,128,.7)',borderRadius:4},
+    {label:'R-F (dias)',   data:yearsData.map(d=>d.avg_rf),    backgroundColor:'rgba(6,182,212,.7)',  borderRadius:4},
+    {label:'CM-RP (dias)', data:yearsData.map(d=>d.avg_cmrp),  backgroundColor:'rgba(245,158,11,.7)', borderRadius:4},
+    {label:'RP-F (dias)',  data:yearsData.map(d=>d.avg_rpf),   backgroundColor:'rgba(34,197,94,.7)',  borderRadius:4},
+    {label:'Total',type:'line',data:yearsData.map(d=>d.total),borderColor:'#a855f7',backgroundColor:'transparent',tension:.3,pointRadius:4,yAxisID:'y2'},
+  ]},options:{responsive:true,interaction:{mode:'index'},
+  scales:{y:{grid:{color:grid}},y2:{position:'right',grid:{drawOnChartArea:false}},x:{grid:{color:grid}}},
+  plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}
+});
+
+var stLabels=Object.keys(byStatus);
+new Chart(document.getElementById('chartStatus'),{type:'doughnut',data:{
+  labels:stLabels.map(k=>statusDict[k]||k),
+  datasets:[{data:Object.values(byStatus),backgroundColor:stLabels.map(k=>colorsMap[k]||'#999'),borderWidth:2,borderColor:isDark?'#1e1e1e':'#fff'}]
+},options:{responsive:true,cutout:'60%',plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}});
+
+new Chart(document.getElementById('chartMeses'),{type:'bar',data:{
+  labels:monthsData.map(d=>d.month),
+  datasets:[
+    {label:'Total entradas',data:monthsData.map(d=>d.total),backgroundColor:'rgba(59,110,240,.6)',borderRadius:4},
+    {label:'R-F médio (dias)',type:'line',data:monthsData.map(d=>d.avg_rf),borderColor:'#06b6d4',backgroundColor:'transparent',tension:.3,pointRadius:3,yAxisID:'y2'},
+  ]},options:{responsive:true,interaction:{mode:'index'},
+  scales:{y:{grid:{color:grid}},y2:{position:'right',grid:{drawOnChartArea:false}},x:{grid:{color:grid},ticks:{maxRotation:45,font:{size:9}}}},
+  plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}
+});
+
+var maxV=topCli.length?topCli[0][1]:1;
+document.getElementById('topCliList').innerHTML=topCli.map(function(r,i){
+  var pct=(r[1]/maxV*100).toFixed(0);
+  return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':'  ')+' '+r[0]+'</span><span style="font-weight:700;color:var(--accent)">'+r[1]+'</span></div><div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:3px"></div></div></div>';
+}).join('');
+
+function gerarAnalise(){
+  document.getElementById('analiseContainer').style.display='none';
+  document.getElementById('analiseErro').style.display='none';
+  document.getElementById('analiseLoading').style.display='block';
+  document.getElementById('btnAnalise').disabled=true;
+  document.getElementById('btnAnalise').textContent='⏳ A gerar...';
+  var prompt='Analisa dados de reparações de equipamento de uma empresa naval. Responde em portugues de Portugal. 4 paragrafos curtos (max 180 palavras): 1)estado geral 2)tempos R-CF e R-F 3)tempos CM-RP e RP-F (espera material e pos-reparacao) 4)recomendacoes.\n\n'+
+    'Total:'+statsData.total+' Fechados:'+statsData.n_fechadas+' Abertos:'+statsData.n_abertas+'\n'+
+    'Media R-CF:'+statsData.avg_total+'d R-F:'+statsData.avg_rf+'d CM-RP:'+statsData.avg_cmrp+'d RP-F:'+statsData.avg_rpf+'d max:'+statsData.max_total+'d\n'+
+    'Anos:'+statsData.years_summary+'\nTop clientes:'+statsData.top_summary;
+  fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:prompt,system:'Es um analista de operacoes de reparacao industrial. Responde em portugues de Portugal. Sê conciso.'})
+  }).then(r=>r.json()).then(function(d){
+    document.getElementById('analiseLoading').style.display='none';
+    document.getElementById('btnAnalise').disabled=false;
+    document.getElementById('btnAnalise').textContent='🔄 Actualizar';
+    if(d.ok&&d.text){
+      document.getElementById('analiseTexto').textContent=d.text;
+      document.getElementById('analiseData').textContent=new Date().toLocaleString('pt-PT');
+      document.getElementById('analiseContainer').style.display='block';
+    }else{
+      var err=d.error||'Sem resposta';
+      if(err.indexOf('503')>=0||err.indexOf('Service')>=0) err='⚠️ Serviço Gemini temporariamente indisponível. Tente em 1-2 minutos. <button onclick="gerarAnalise()" class="btn btn-ghost btn-sm">🔄 Tentar novamente</button>';
+      document.getElementById('analiseErro').innerHTML=err;
+      document.getElementById('analiseErro').style.display='block';
+    }
+  }).catch(function(e){
+    document.getElementById('analiseLoading').style.display='none';
+    document.getElementById('btnAnalise').disabled=false;
+    document.getElementById('btnAnalise').textContent='✨ Gerar Análise';
+    document.getElementById('analiseErro').textContent='Erro: '+e;
+    document.getElementById('analiseErro').style.display='block';
+  });
+}
+</script>
+{% endblock %}
