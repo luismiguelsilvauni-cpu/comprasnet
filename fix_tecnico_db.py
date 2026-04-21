@@ -328,8 +328,8 @@ with app.app_context():
             print(f"OK: {tbl} criada")
 
 # Add salarios_pin to config_geral
-import sqlite3
-_db = os.path.join(os.path.dirname(__file__), 'instance', 'compras.db')
+import sqlite3, os as _os
+_db = _os.path.join(os.path.dirname(__file__), 'instance', 'compras.db')
 _conn = sqlite3.connect(_db)
 _cur = _conn.cursor()
 _cols = [r[1] for r in _cur.execute("PRAGMA table_info(config_geral)").fetchall()]
