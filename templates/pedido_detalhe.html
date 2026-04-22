@@ -34,7 +34,76 @@
 {% block page_title %}PC-{{ '%04d' % pedido.id }} · {{ pedido.titulo }}{% endblock %}
 {% block topbar_actions %}
     <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">← Pedidos</a>
+    <button onclick="abrirEditar()" class="btn btn-ghost btn-sm">✏️ Editar</button>
 {% endblock %}
+
+<!-- Edit Modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:500px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1">✏️ Editar Pedido PC-{{ '%04d' % pedido.id }}</div>
+      <button onclick="fecharEditar()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+
+      <div class="form-group" style="margin:0">
+        <label>Título / Descrição</label>
+        <input type="text" id="editTitulo" class="input" value="{{ pedido.titulo }}">
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label>Destino / Cliente</label>
+        <input type="hidden" id="editClienteId" value="{{ pedido.cliente_id or '' }}">
+        <div style="position:relative">
+          <input type="text" id="editClienteInput" class="input" autocomplete="off"
+            placeholder="Pesquisar cliente..."
+            value="{{ pedido.cliente.nome if pedido.cliente else '' }}"
+            oninput="searchEditCliente(this.value)"
+            onfocus="searchEditCliente(this.value)">
+          <div id="editClienteDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:400;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)"></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0">
+          <label>Departamento</label>
+          <input type="text" id="editDept" class="input" value="{{ pedido.departamento or '' }}">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Prioridade</label>
+          <select id="editPrioridade" class="input">
+            <option value="baixa" {% if pedido.prioridade=='baixa' %}selected{% endif %}>⚪ Baixa</option>
+            <option value="normal" {% if pedido.prioridade=='normal' %}selected{% endif %}>🔵 Normal</option>
+            <option value="alta" {% if pedido.prioridade=='alta' %}selected{% endif %}>🟡 Alta</option>
+            <option value="urgente" {% if pedido.prioridade=='urgente' %}selected{% endif %}>🔴 Urgente</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label>Estado</label>
+        <select id="editEstado" class="input">
+          <option value="aberto" {% if pedido.estado=='aberto' %}selected{% endif %}>📂 Aberto</option>
+          <option value="pedido" {% if pedido.estado=='pedido' %}selected{% endif %}>📤 Pedido</option>
+          <option value="em_analise" {% if pedido.estado=='em_analise' %}selected{% endif %}>🔍 Em Análise</option>
+          <option value="aprovado" {% if pedido.estado in ['aprovado','fechado'] %}selected{% endif %}>✔️ Fechado/Aprovado</option>
+          <option value="anulado" {% if pedido.estado in ['anulado','cancelado'] %}selected{% endif %}>🚫 Anulado</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label>Observações</label>
+        <textarea id="editDescricao" class="input" rows="2">{{ pedido.descricao or '' }}</textarea>
+      </div>
+
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharEditar()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarEditar()" class="btn btn-primary" id="editBtn">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 
 {% block content %}
 <!-- PDF Preview Modal -->
@@ -738,4 +807,85 @@ function showUploadStatus(msg,type){
 }
 </script>
 
+
+<script>
+// ── Edit modal ────────────────────────────────────────────────────────────────
+function abrirEditar() {
+  document.getElementById('editModal').style.display = 'flex';
+}
+function fecharEditar() {
+  document.getElementById('editModal').style.display = 'none';
+  document.getElementById('editClienteDrop').style.display = 'none';
+}
+function guardarEditar() {
+  var btn = document.getElementById('editBtn');
+  btn.disabled = true; btn.textContent = 'A guardar...';
+  fetch('/pedidos/{{ pedido.id }}/editar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      titulo:       document.getElementById('editTitulo').value.trim(),
+      descricao:    document.getElementById('editDescricao').value.trim(),
+      departamento: document.getElementById('editDept').value.trim(),
+      prioridade:   document.getElementById('editPrioridade').value,
+      estado:       document.getElementById('editEstado').value,
+      cliente_id:   document.getElementById('editClienteId').value,
+    })
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else { alert('Erro: '+d.error); btn.disabled=false; btn.textContent='💾 Guardar'; }
+  });
+}
+
+// ── Cliente search in edit modal ──────────────────────────────────────────────
+var _editCliTimer = null;
+function searchEditCliente(q) {
+  var dd = document.getElementById('editClienteDrop');
+  clearTimeout(_editCliTimer);
+  _editCliTimer = setTimeout(function(){
+    fetch('/api/clientes/search?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        dd.innerHTML = '';
+        // Stock interno option
+        var d0 = document.createElement('div');
+        d0.textContent = '📦 Stock Interno (sem cliente)';
+        d0.style.cssText = 'padding:9px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)';
+        d0.onmouseenter = function(){ this.style.background='var(--surface2)'; };
+        d0.onmouseleave = function(){ this.style.background=''; };
+        d0.onclick = function(){
+          document.getElementById('editClienteId').value = '';
+          document.getElementById('editClienteInput').value = '';
+          dd.style.display = 'none';
+        };
+        dd.appendChild(d0);
+        list.forEach(function(c){
+          var d = document.createElement('div');
+          d.textContent = c.nome;
+          d.style.cssText = 'padding:9px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)';
+          d.onmouseenter = function(){ this.style.background='var(--surface2)'; };
+          d.onmouseleave = function(){ this.style.background=''; };
+          d.onclick = (function(id, nome){ return function(){
+            document.getElementById('editClienteId').value = id;
+            document.getElementById('editClienteInput').value = nome;
+            dd.style.display = 'none';
+          }; })(c.id, c.nome);
+          dd.appendChild(d);
+        });
+        dd.style.display = 'block';
+      });
+  }, 200);
+}
+
+document.addEventListener('click', function(e){
+  if (!e.target.closest('#editClienteInput') && !e.target.closest('#editClienteDrop')) {
+    var dd = document.getElementById('editClienteDrop');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+document.getElementById('editModal').addEventListener('click', function(e){
+  if (e.target === this) fecharEditar();
+});
+</script>
 {% endblock %}
