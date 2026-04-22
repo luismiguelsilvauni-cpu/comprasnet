@@ -492,3 +492,65 @@ class AssistenciaDocumento(db.Model):
     criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
     uploader      = db.relationship('User', foreign_keys=[criado_por])
+
+# ── FICHAS TÉCNICAS ────────────────────────────────────────────────────────────
+
+class FichaTecnica(db.Model):
+    __tablename__ = 'fichas_tecnicas'
+    id              = db.Column(db.Integer, primary_key=True)
+    numero          = db.Column(db.Integer, nullable=False, unique=True)
+    # Grupo (gerador, embarcação, máquina, etc.)
+    grupo_designacao= db.Column(db.String(200), nullable=False)
+    grupo_marca     = db.Column(db.String(100), default='')
+    grupo_modelo    = db.Column(db.String(100), default='')
+    grupo_serie     = db.Column(db.String(100), default='')
+    grupo_ano       = db.Column(db.String(10),  default='')
+    # Motor / Equipamento principal
+    motor_marca     = db.Column(db.String(100), default='')
+    motor_modelo    = db.Column(db.String(100), default='')
+    motor_serie     = db.Column(db.String(100), default='')
+    motor_potencia  = db.Column(db.String(50),  default='')
+    motor_cilindros = db.Column(db.String(20),  default='')
+    # Info extra
+    cliente_nome    = db.Column(db.String(200), default='')
+    observacoes     = db.Column(db.Text, default='')
+    # Meta
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    # Relationships
+    componentes     = db.relationship('FichaComponente', backref='ficha',
+                        cascade='all, delete-orphan',
+                        order_by='FichaComponente.categoria, FichaComponente.ordem')
+    documentos      = db.relationship('FichaDocumento', backref='ficha',
+                        cascade='all, delete-orphan',
+                        order_by='FichaDocumento.criado_em.desc()')
+
+class FichaComponente(db.Model):
+    __tablename__ = 'ficha_componentes'
+    id          = db.Column(db.Integer, primary_key=True)
+    ficha_id    = db.Column(db.Integer, db.ForeignKey('fichas_tecnicas.id'), nullable=False)
+    categoria   = db.Column(db.String(100), default='Geral')  # Filtros, Correias, Fluidos...
+    ordem       = db.Column(db.Integer, default=0)
+    designacao  = db.Column(db.String(200), nullable=False)
+    part_number = db.Column(db.String(100), default='')
+    marca       = db.Column(db.String(100), default='')
+    referencia_equiv = db.Column(db.String(200), default='')  # equivalent refs
+    quantidade  = db.Column(db.String(20),  default='1')
+    unidade     = db.Column(db.String(20),  default='un')
+    intervalo   = db.Column(db.String(100), default='')  # e.g. "10 000h / 1 ano"
+    notas       = db.Column(db.String(400), default='')
+
+class FichaDocumento(db.Model):
+    __tablename__ = 'ficha_documentos'
+    id            = db.Column(db.Integer, primary_key=True)
+    ficha_id      = db.Column(db.Integer, db.ForeignKey('fichas_tecnicas.id'), nullable=False)
+    tipo          = db.Column(db.String(20),  default='documento')  # documento / foto
+    nome_original = db.Column(db.String(255), nullable=False)
+    nome_ficheiro = db.Column(db.String(255), nullable=False)
+    descricao     = db.Column(db.String(300), default='')
+    tamanho       = db.Column(db.Integer,     default=0)
+    mime          = db.Column(db.String(100), default='')
+    criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
+    uploader      = db.relationship('User', foreign_keys=[criado_por])

@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block title %}Ficha #{{ '%04d'|format(f.numero) }} · NavTech{% endblock %}
+{% block page_title %}📋 Ficha Técnica #{{ '%04d'|format(f.numero) }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('fichas') }}" class="btn btn-ghost btn-sm">← Lista</a>
+  <a href="{{ url_for('ficha_editar', fid=f.id) }}" class="btn btn-ghost btn-sm">✏️ Editar</a>
+  <button onclick="eliminar()" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}<div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>{% endfor %}{% endif %}
+{% endwith %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+  <!-- Grupo card -->
+  <div class="card" style="padding:16px;border-left:4px solid var(--accent)">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--accent);margin-bottom:10px">🏭 Grupo / Equipamento</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">{{ f.grupo_designacao }}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+      <div><span style="color:var(--text-muted)">Marca:</span> <strong>{{ f.grupo_marca or '—' }}</strong></div>
+      <div><span style="color:var(--text-muted)">Modelo:</span> <strong>{{ f.grupo_modelo or '—' }}</strong></div>
+      <div><span style="color:var(--text-muted)">Nº Série:</span> <span style="font-family:monospace">{{ f.grupo_serie or '—' }}</span></div>
+      <div><span style="color:var(--text-muted)">Ano:</span> <strong>{{ f.grupo_ano or '—' }}</strong></div>
+    </div>
+    {% if f.cliente_nome %}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px">
+      👤 <strong>{{ f.cliente_nome }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Motor card -->
+  <div class="card" style="padding:16px;border-left:4px solid #f59e0b">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#f59e0b;margin-bottom:10px">🔧 Motor</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">{{ f.motor_marca or '—' }} {{ f.motor_modelo or '' }}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+      <div><span style="color:var(--text-muted)">Nº Série:</span> <span style="font-family:monospace">{{ f.motor_serie or '—' }}</span></div>
+      <div><span style="color:var(--text-muted)">Potência:</span> <strong>{{ f.motor_potencia or '—' }}</strong></div>
+      <div><span style="color:var(--text-muted)">Cilindros:</span> <strong>{{ f.motor_cilindros or '—' }}</strong></div>
+    </div>
+    {% if f.observacoes %}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);white-space:pre-wrap">{{ f.observacoes }}</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Componentes -->
+<div class="card" style="padding:16px;margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700">🔩 Componentes & Peças</div>
+    <button onclick="abrirAddComp()" class="btn btn-primary btn-sm">+ Adicionar</button>
+  </div>
+
+  {% if f.componentes %}
+  {% set cats = f.componentes|map(attribute='categoria')|unique|list %}
+  {% for cat in cats %}
+  <div style="margin-bottom:16px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">{{ cat }}</div>
+    {% for c in f.componentes if c.categoria == cat %}
+    <div id="comp-{{ c.id }}" style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start">
+      <div style="flex:1">
+        <div id="cv-{{ c.id }}">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:3px">
+            <span style="font-size:13px;font-weight:600">{{ c.designacao }}</span>
+            {% if c.part_number %}<span style="font-size:11px;font-family:monospace;color:var(--accent);background:var(--surface2);padding:1px 6px;border-radius:4px">{{ c.part_number }}</span>{% endif %}
+            {% if c.marca %}<span style="font-size:11px;color:var(--text-muted)">{{ c.marca }}</span>{% endif %}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap">
+            {% if c.quantidade %}Qtd: <strong>{{ c.quantidade }} {{ c.unidade }}</strong>{% endif %}
+            {% if c.intervalo %}· ⏱ {{ c.intervalo }}{% endif %}
+            {% if c.referencia_equiv %}· Equiv: {{ c.referencia_equiv }}{% endif %}
+            {% if c.notas %}· 📝 {{ c.notas }}{% endif %}
+          </div>
+        </div>
+        <!-- Edit form (hidden) -->
+        <div id="ce-{{ c.id }}" style="display:none;margin-top:8px;padding:10px;background:var(--surface2);border-radius:8px">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:6px">
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Designação *</div>
+              <input id="ce-des-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.designacao }}"></div>
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Part Number</div>
+              <input id="ce-pn-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.part_number }}"></div>
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Marca</div>
+              <input id="ce-marca-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.marca }}"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:6px">
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Categoria</div>
+              <select id="ce-cat-{{ c.id }}" class="input" style="font-size:11px;padding:4px 6px">
+                {% for cat2 in categorias %}<option value="{{ cat2 }}" {% if cat2==c.categoria %}selected{% endif %}>{{ cat2 }}</option>{% endfor %}
+              </select></div>
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Qtd</div>
+              <input id="ce-qtd-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.quantidade }}"></div>
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Unidade</div>
+              <input id="ce-un-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.unidade }}"></div>
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Intervalo</div>
+              <input id="ce-int-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.intervalo }}" placeholder="Ex: 500h"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Refs. Equivalentes</div>
+              <input id="ce-eq-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.referencia_equiv }}"></div>
+            <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Notas</div>
+              <input id="ce-nt-{{ c.id }}" class="input" style="font-size:12px;padding:4px 8px" value="{{ c.notas }}"></div>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button onclick="guardarComp({{ c.id }})" class="btn btn-primary btn-sm">💾 Guardar</button>
+            <button onclick="fecharComp({{ c.id }})" class="btn btn-ghost btn-sm">✕</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button onclick="editarComp({{ c.id }})" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;padding:3px 7px;font-size:12px;color:var(--accent)">✏️</button>
+        <button onclick="eliminarComp({{ c.id }})" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:5px;cursor:pointer;padding:3px 7px;font-size:12px;color:#ef4444">🗑</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
+    Sem componentes. Clique em "+ Adicionar" para registar filtros, correias, etc.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Fotos & Documentos -->
+<div class="card" style="padding:16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700">📎 Fotos & Documentos</div>
+    <div style="display:flex;gap:6px">
+      <button onclick="triggerUpload('foto')" class="btn btn-ghost btn-sm">🖼 Foto</button>
+      <button onclick="triggerUpload('doc')" class="btn btn-primary btn-sm">📄 Documento</button>
+    </div>
+  </div>
+  <input type="file" id="upFoto" style="display:none" multiple accept="image/*" onchange="uploadFiles(this.files)">
+  <input type="file" id="upDoc"  style="display:none" multiple accept=".pdf,.doc,.docx,.xlsx,.txt" onchange="uploadFiles(this.files)">
+
+  <!-- Fotos grid -->
+  {% set fotos = f.documentos|selectattr('tipo','eq','foto')|list %}
+  {% if fotos %}
+  <div style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">🖼 FOTOS ({{ fotos|length }})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
+      {% for doc in fotos %}
+      <div id="fd-{{ doc.id }}" style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="height:80px;cursor:pointer;overflow:hidden" onclick="abrirPreview('{{ url_for('ficha_doc_preview', fid=f.id, did=doc.id) }}','{{ doc.mime }}','{{ doc.nome_original }}')">
+          <img src="{{ url_for('ficha_doc_preview', fid=f.id, did=doc.id) }}" style="width:100%;height:80px;object-fit:cover" onerror="this.parentNode.innerHTML='🖼'">
+        </div>
+        <div style="padding:4px 6px;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ doc.nome_original }}">{{ doc.nome_original[:20] }}</div>
+        <div style="display:flex;border-top:1px solid var(--border)">
+          <a href="{{ url_for('ficha_doc_download', fid=f.id, did=doc.id) }}" style="flex:1;text-align:center;padding:4px;font-size:11px;color:var(--accent);text-decoration:none">⬇</a>
+          <button onclick="apagarDoc({{ doc.id }})" style="flex:1;background:none;border:none;padding:4px;font-size:11px;color:#ef4444;cursor:pointer">🗑</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Documentos list -->
+  {% set docs = f.documentos|selectattr('tipo','eq','documento')|list %}
+  {% if docs %}
+  <div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">📄 DOCUMENTOS ({{ docs|length }})</div>
+    {% for doc in docs %}
+    <div id="fd-{{ doc.id }}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:6px;margin-bottom:5px">
+      <span style="font-size:20px">📄</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ doc.nome_original }}</div>
+        <div style="font-size:10px;color:var(--text-muted)">{{ doc.criado_em.strftime('%d/%m/%Y') }} · {{ '%.0f'|format(doc.tamanho/1024) }} KB</div>
+      </div>
+      <a href="{{ url_for('ficha_doc_preview', fid=f.id, did=doc.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">👁</a>
+      <a href="{{ url_for('ficha_doc_download', fid=f.id, did=doc.id) }}" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px">⬇</a>
+      <button onclick="apagarDoc({{ doc.id }})" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:none;padding:3px 8px;font-size:11px">🗑</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if not f.documentos %}
+  <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Sem ficheiros. Clique em "Foto" ou "Documento" para adicionar.</div>
+  {% endif %}
+  <div id="uploadProg" style="margin-top:8px"></div>
+</div>
+
+<!-- Add componente modal -->
+<div id="addCompModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:520px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1">➕ Adicionar Componente</div>
+      <button onclick="fecharAddComp()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
+        <div class="form-group" style="margin:0"><label>Designação *</label><input id="ac-des" class="input" placeholder="Ex: Filtro de óleo motor"></div>
+        <div class="form-group" style="margin:0"><label>Categoria</label>
+          <select id="ac-cat" class="input">
+            {% for c in categorias %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div class="form-group" style="margin:0"><label>Part Number</label><input id="ac-pn" class="input" placeholder="OEM ref."></div>
+        <div class="form-group" style="margin:0"><label>Marca</label><input id="ac-marca" class="input" placeholder="Ex: Mann"></div>
+        <div class="form-group" style="margin:0"><label>Refs. Equiv.</label><input id="ac-eq" class="input" placeholder="Outras refs."></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div class="form-group" style="margin:0"><label>Quantidade</label><input id="ac-qtd" class="input" value="1"></div>
+        <div class="form-group" style="margin:0"><label>Unidade</label><input id="ac-un" class="input" value="un"></div>
+        <div class="form-group" style="margin:0"><label>Intervalo</label><input id="ac-int" class="input" placeholder="Ex: 500h / 1 ano"></div>
+      </div>
+      <div class="form-group" style="margin:0"><label>Notas</label><input id="ac-nt" class="input" placeholder="Observações adicionais"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharAddComp()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="adicionarComp()" class="btn btn-primary" id="acBtn">✅ Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="previewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9998;align-items:center;justify-content:center;flex-direction:column;gap:10px">
+  <div style="display:flex;gap:8px">
+    <span id="previewNome" style="color:white;font-size:12px"></span>
+    <button onclick="document.getElementById('previewModal').style.display='none'" style="background:rgba(255,255,255,.15);border:none;color:white;padding:4px 12px;border-radius:5px;cursor:pointer">✕</button>
+  </div>
+  <div id="previewContent" style="max-width:90vw;max-height:85vh;overflow:auto"></div>
+</div>
+
+<script>
+// ── Componentes ───────────────────────────────────────────────────────────────
+function abrirAddComp() {
+  ['ac-des','ac-pn','ac-marca','ac-eq','ac-qtd','ac-un','ac-int','ac-nt'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = id === 'ac-qtd' ? '1' : id === 'ac-un' ? 'un' : '';
+  });
+  document.getElementById('addCompModal').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('ac-des').focus(); }, 100);
+}
+function fecharAddComp() { document.getElementById('addCompModal').style.display = 'none'; }
+
+function adicionarComp() {
+  var des = document.getElementById('ac-des').value.trim();
+  if (!des) { alert('Introduza a designação.'); return; }
+  var btn = document.getElementById('acBtn');
+  btn.disabled = true; btn.textContent = 'A guardar...';
+  fetch('/fichas/{{ f.id }}/componentes/adicionar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      designacao: des,
+      categoria: document.getElementById('ac-cat').value,
+      part_number: document.getElementById('ac-pn').value.trim(),
+      marca: document.getElementById('ac-marca').value.trim(),
+      referencia_equiv: document.getElementById('ac-eq').value.trim(),
+      quantidade: document.getElementById('ac-qtd').value.trim(),
+      unidade: document.getElementById('ac-un').value.trim(),
+      intervalo: document.getElementById('ac-int').value.trim(),
+      notas: document.getElementById('ac-nt').value.trim(),
+    })
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) location.reload();
+    else { alert('Erro: '+d.error); btn.disabled=false; btn.textContent='✅ Adicionar'; }
+  });
+}
+
+function editarComp(id) {
+  document.getElementById('cv-'+id).style.display = 'none';
+  document.getElementById('ce-'+id).style.display = 'block';
+}
+function fecharComp(id) {
+  document.getElementById('ce-'+id).style.display = 'none';
+  document.getElementById('cv-'+id).style.display = 'block';
+}
+function guardarComp(id) {
+  fetch('/fichas/{{ f.id }}/componentes/'+id+'/editar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      designacao: document.getElementById('ce-des-'+id).value,
+      part_number: document.getElementById('ce-pn-'+id).value,
+      marca: document.getElementById('ce-marca-'+id).value,
+      categoria: document.getElementById('ce-cat-'+id).value,
+      quantidade: document.getElementById('ce-qtd-'+id).value,
+      unidade: document.getElementById('ce-un-'+id).value,
+      intervalo: document.getElementById('ce-int-'+id).value,
+      referencia_equiv: document.getElementById('ce-eq-'+id).value,
+      notas: document.getElementById('ce-nt-'+id).value,
+    })
+  }).then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert('Erro: '+d.error); });
+}
+function eliminarComp(id) {
+  if (!confirm('Eliminar este componente?')) return;
+  fetch('/fichas/{{ f.id }}/componentes/'+id+'/eliminar', {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) document.getElementById('comp-'+id).remove(); else alert('Erro: '+d.error); });
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+function triggerUpload(tipo) { document.getElementById(tipo==='foto'?'upFoto':'upDoc').click(); }
+function uploadFiles(files) {
+  var prog = document.getElementById('uploadProg');
+  Array.from(files).forEach(function(file){
+    var fd = new FormData(); fd.append('ficheiro', file);
+    var bar = document.createElement('div');
+    bar.style.cssText = 'font-size:11px;color:var(--text-muted);margin-bottom:4px';
+    bar.textContent = 'A enviar: ' + file.name;
+    prog.appendChild(bar);
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function(){ if(JSON.parse(xhr.responseText).ok) location.reload(); };
+    xhr.open('POST', '/fichas/{{ f.id }}/documentos/upload');
+    xhr.send(fd);
+  });
+}
+function apagarDoc(did) {
+  if (!confirm('Eliminar este ficheiro?')) return;
+  fetch('/fichas/{{ f.id }}/documentos/'+did+'/apagar', {method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) document.getElementById('fd-'+did).remove(); else alert('Erro: '+d.error); });
+}
+function abrirPreview(url, mime, nome) {
+  var c = document.getElementById('previewContent');
+  document.getElementById('previewNome').textContent = nome;
+  if (mime && mime.startsWith('image/')) c.innerHTML = '<img src="'+url+'" style="max-width:88vw;max-height:82vh;object-fit:contain;border-radius:6px">';
+  else if (mime === 'application/pdf') c.innerHTML = '<iframe src="'+url+'" style="width:80vw;height:82vh;border:none;border-radius:6px"></iframe>';
+  else { window.open(url,'_blank'); return; }
+  document.getElementById('previewModal').style.display = 'flex';
+}
+document.getElementById('previewModal').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
+document.getElementById('addCompModal').addEventListener('click', function(e){ if(e.target===this) fecharAddComp(); });
+
+function eliminar() {
+  if (!confirm('Eliminar Ficha Técnica #{{ "%04d"|format(f.numero) }}?\nEsta acção não pode ser desfeita.')) return;
+  fetch('/fichas/{{ f.id }}/eliminar', {method:'POST'})
+    .then(function(){ window.location='/fichas'; });
+}
+</script>
+{% endblock %}

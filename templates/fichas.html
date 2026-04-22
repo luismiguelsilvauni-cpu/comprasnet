@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Fichas Técnicas · NavTech{% endblock %}
+{% block page_title %}📋 Fichas Técnicas{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('ficha_nova') }}" class="btn btn-primary btn-sm">+ Nova Ficha</a>
+{% endblock %}
+{% block content %}
+
+<!-- Search -->
+<form method="GET" style="margin-bottom:14px">
+  <div style="display:flex;gap:8px;max-width:480px">
+    <input type="text" name="q" value="{{ q }}" class="input" placeholder="🔍 Pesquisar por designação, marca, modelo, nº série, cliente...">
+    <button type="submit" class="btn btn-ghost">Pesquisar</button>
+    {% if q %}<a href="{{ url_for('fichas') }}" class="btn btn-ghost">✕</a>{% endif %}
+  </div>
+</form>
+
+{% if items %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">
+{% for f in items %}
+<a href="{{ url_for('ficha_detalhe', fid=f.id) }}" style="text-decoration:none">
+<div class="card" style="padding:16px;border-left:4px solid var(--accent);transition:.15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.15)'" onmouseout="this.style.boxShadow=''">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <span style="font-size:22px;font-weight:800;color:var(--accent);font-family:monospace">#{{ '%04d'|format(f.numero) }}</span>
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:700;color:var(--text)">{{ f.grupo_designacao }}</div>
+      {% if f.cliente_nome %}<div style="font-size:11px;color:var(--text-muted)">👤 {{ f.cliente_nome }}</div>{% endif %}
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">{{ f.componentes|length }} comp.</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px">
+    <div>
+      <div style="color:var(--text-muted);margin-bottom:2px">🏭 Grupo</div>
+      <div style="font-weight:600">{{ f.grupo_marca or '—' }} {{ f.grupo_modelo or '' }}</div>
+      {% if f.grupo_serie %}<div style="font-family:monospace;color:var(--text-muted)">S/N: {{ f.grupo_serie }}</div>{% endif %}
+    </div>
+    <div>
+      <div style="color:var(--text-muted);margin-bottom:2px">🔧 Motor</div>
+      <div style="font-weight:600">{{ f.motor_marca or '—' }} {{ f.motor_modelo or '' }}</div>
+      {% if f.motor_serie %}<div style="font-family:monospace;color:var(--text-muted)">S/N: {{ f.motor_serie }}</div>{% endif %}
+    </div>
+  </div>
+  {% if f.documentos %}
+  <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text-muted)">
+    📎 {{ f.documentos|selectattr('tipo','eq','documento')|list|length }} doc
+    · 🖼 {{ f.documentos|selectattr('tipo','eq','foto')|list|length }} foto
+  </div>
+  {% endif %}
+</div>
+</a>
+{% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:48px;margin-bottom:12px">📋</div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:6px">
+    {% if q %}Sem resultados para "{{ q }}"{% else %}Sem fichas técnicas{% endif %}
+  </div>
+  <a href="{{ url_for('ficha_nova') }}" class="btn btn-primary">+ Nova Ficha</a>
+</div>
+{% endif %}
+{% endblock %}

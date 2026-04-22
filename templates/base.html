@@ -282,6 +282,11 @@
                 <span class="icon">📚</span><span>Biblioteca PDF</span>
             </a>
             {% endif %}
+            {% if pode_aceder('fichas') %}
+            <a href="{{ url_for('fichas') }}" class="nav-item {% if request.endpoint in ['fichas','ficha_nova','ficha_detalhe','ficha_editar'] %}active{% endif %}">
+                <span class="icon">📋</span><span>Fichas Técnicas</span>
+            </a>
+            {% endif %}
             {% if pode_aceder('assistencias') %}
             <a href="{{ url_for('assistencias') }}" class="nav-item {% if request.endpoint in ['assistencias','assistencia_nova','assistencia_detalhe','assistencia_editar'] %}active{% endif %}">
                 <span class="icon">🔧</span><span>Assistências</span>

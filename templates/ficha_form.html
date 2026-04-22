@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{% if f %}Editar Ficha #{{ '%04d'|format(f.numero) }}{% else %}Nova Ficha Técnica{% endif %} · NavTech{% endblock %}
+{% block page_title %}{% if f %}✏️ Editar #{{ '%04d'|format(f.numero) }}{% else %}📋 Nova Ficha Técnica{% endif %}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('fichas') }}" class="btn btn-ghost btn-sm">← Lista</a>
+  {% if f %}<a href="{{ url_for('ficha_detalhe', fid=f.id) }}" class="btn btn-ghost btn-sm">Ver Ficha</a>{% endif %}
+{% endblock %}
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for cat,msg in messages %}<div class="alert alert-{{ cat }}" style="margin-bottom:12px">{{ msg }}</div>{% endfor %}{% endif %}
+{% endwith %}
+<div style="max-width:700px">
+<div class="card" style="padding:22px">
+<form method="POST">
+
+  <!-- Grupo -->
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">🏭 Grupo / Equipamento Principal</div>
+  <div class="form-group">
+    <label>Designação do Grupo *</label>
+    <input type="text" name="grupo_designacao" class="input" required
+      placeholder="Ex: Grupo Gerador, Embarcação Navio X, Máquina Y..."
+      value="{{ f.grupo_designacao if f else '' }}">
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    <div class="form-group" style="margin-bottom:0">
+      <label>Marca</label>
+      <input type="text" name="grupo_marca" class="input" placeholder="Ex: John Deere"
+        value="{{ f.grupo_marca if f else '' }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Modelo</label>
+      <input type="text" name="grupo_modelo" class="input" placeholder="Ex: 6068TF"
+        value="{{ f.grupo_modelo if f else '' }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Nº Série</label>
+      <input type="text" name="grupo_serie" class="input" placeholder="S/N"
+        value="{{ f.grupo_serie if f else '' }}">
+    </div>
+  </div>
+  <div class="form-group">
+    <label>Ano de Fabrico</label>
+    <input type="text" name="grupo_ano" class="input" style="max-width:120px"
+      placeholder="2018" value="{{ f.grupo_ano if f else '' }}">
+  </div>
+
+  <!-- Motor -->
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-top:16px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">🔧 Motor</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    <div class="form-group" style="margin-bottom:0">
+      <label>Marca Motor</label>
+      <input type="text" name="motor_marca" class="input" placeholder="Ex: Volvo"
+        value="{{ f.motor_marca if f else '' }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Modelo Motor</label>
+      <input type="text" name="motor_modelo" class="input" placeholder="Ex: TAD1241GE"
+        value="{{ f.motor_modelo if f else '' }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Nº Série Motor</label>
+      <input type="text" name="motor_serie" class="input" placeholder="S/N"
+        value="{{ f.motor_serie if f else '' }}">
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+    <div class="form-group" style="margin-bottom:0">
+      <label>Potência</label>
+      <input type="text" name="motor_potencia" class="input" placeholder="Ex: 320 kW / 430 CV"
+        value="{{ f.motor_potencia if f else '' }}">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>Cilindros / Conf.</label>
+      <input type="text" name="motor_cilindros" class="input" placeholder="Ex: 6 cil. / L6"
+        value="{{ f.motor_cilindros if f else '' }}">
+    </div>
+  </div>
+
+  <!-- Info extra -->
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-top:16px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">ℹ️ Informação Adicional</div>
+  <div class="form-group">
+    <label>Cliente / Proprietário</label>
+    <input type="text" name="cliente_nome" class="input" placeholder="Nome do cliente ou proprietário"
+      value="{{ f.cliente_nome if f else '' }}">
+  </div>
+  <div class="form-group">
+    <label>Observações</label>
+    <textarea name="observacoes" class="input" rows="3"
+      placeholder="Notas relevantes, histórico, condições especiais...">{{ f.observacoes if f else '' }}</textarea>
+  </div>
+
+  <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
+    <a href="{{ url_for('fichas') }}" class="btn btn-ghost">Cancelar</a>
+    <button type="submit" class="btn btn-primary">{% if f %}💾 Guardar{% else %}➕ Criar Ficha{% endif %}</button>
+  </div>
+</form>
+</div>
+</div>
+{% endblock %}

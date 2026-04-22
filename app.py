@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -2978,6 +2978,190 @@ class EquipamentoConsumivel(db.Model):
 
 # ── PERFIS E PERMISSÕES ──────────────────────────────────────────────────────
 
+# ── MÓDULO FICHAS TÉCNICAS ────────────────────────────────────────────────────
+
+UPLOAD_FICHAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'fichas')
+os.makedirs(UPLOAD_FICHAS, exist_ok=True)
+
+CATEGORIAS_PADRAO = [
+    'Filtros', 'Correias & Correntes', 'Fluidos & Lubrificantes',
+    'Juntas & Vedantes', 'Rolamentos', 'Elétrico & Sensores',
+    'Arrefecimento', 'Turbocompressor', 'Injeção', 'Outro'
+]
+
+@app.route('/fichas')
+@login_required
+def fichas():
+    q = request.args.get('q','').strip()
+    query = FichaTecnica.query
+    if q:
+        query = query.filter(
+            FichaTecnica.grupo_designacao.ilike(f'%{q}%') |
+            FichaTecnica.grupo_marca.ilike(f'%{q}%') |
+            FichaTecnica.motor_modelo.ilike(f'%{q}%') |
+            FichaTecnica.cliente_nome.ilike(f'%{q}%') |
+            FichaTecnica.grupo_serie.ilike(f'%{q}%')
+        )
+    items = query.order_by(FichaTecnica.numero.desc()).all()
+    return render_template('fichas.html', items=items, q=q)
+
+@app.route('/fichas/nova', methods=['GET','POST'])
+@login_required
+def ficha_nova():
+    if request.method == 'POST':
+        last = db.session.query(db.func.max(FichaTecnica.numero)).scalar() or 0
+        f = FichaTecnica(
+            numero=last+1,
+            grupo_designacao=request.form.get('grupo_designacao','').strip(),
+            grupo_marca=request.form.get('grupo_marca','').strip(),
+            grupo_modelo=request.form.get('grupo_modelo','').strip(),
+            grupo_serie=request.form.get('grupo_serie','').strip(),
+            grupo_ano=request.form.get('grupo_ano','').strip(),
+            motor_marca=request.form.get('motor_marca','').strip(),
+            motor_modelo=request.form.get('motor_modelo','').strip(),
+            motor_serie=request.form.get('motor_serie','').strip(),
+            motor_potencia=request.form.get('motor_potencia','').strip(),
+            motor_cilindros=request.form.get('motor_cilindros','').strip(),
+            cliente_nome=request.form.get('cliente_nome','').strip(),
+            observacoes=request.form.get('observacoes','').strip(),
+            criado_por=current_user.id,
+            criado_em=datetime.now(), atualizado_em=datetime.now()
+        )
+        db.session.add(f); db.session.commit()
+        flash(f'Ficha Técnica #{f.numero:04d} criada!', 'success')
+        return redirect(url_for('ficha_detalhe', fid=f.id))
+    return render_template('ficha_form.html', f=None, categorias=CATEGORIAS_PADRAO)
+
+@app.route('/fichas/<int:fid>')
+@login_required
+def ficha_detalhe(fid):
+    f = FichaTecnica.query.get_or_404(fid)
+    return render_template('ficha_detalhe.html', f=f, categorias=CATEGORIAS_PADRAO)
+
+@app.route('/fichas/<int:fid>/editar', methods=['GET','POST'])
+@login_required
+def ficha_editar(fid):
+    f = FichaTecnica.query.get_or_404(fid)
+    if request.method == 'POST':
+        f.grupo_designacao = request.form.get('grupo_designacao','').strip()
+        f.grupo_marca      = request.form.get('grupo_marca','').strip()
+        f.grupo_modelo     = request.form.get('grupo_modelo','').strip()
+        f.grupo_serie      = request.form.get('grupo_serie','').strip()
+        f.grupo_ano        = request.form.get('grupo_ano','').strip()
+        f.motor_marca      = request.form.get('motor_marca','').strip()
+        f.motor_modelo     = request.form.get('motor_modelo','').strip()
+        f.motor_serie      = request.form.get('motor_serie','').strip()
+        f.motor_potencia   = request.form.get('motor_potencia','').strip()
+        f.motor_cilindros  = request.form.get('motor_cilindros','').strip()
+        f.cliente_nome     = request.form.get('cliente_nome','').strip()
+        f.observacoes      = request.form.get('observacoes','').strip()
+        f.atualizado_em    = datetime.now()
+        db.session.commit()
+        flash('Ficha actualizada.', 'success')
+        return redirect(url_for('ficha_detalhe', fid=fid))
+    return render_template('ficha_form.html', f=f, categorias=CATEGORIAS_PADRAO)
+
+@app.route('/fichas/<int:fid>/eliminar', methods=['POST'])
+@login_required
+def ficha_eliminar(fid):
+    f = FichaTecnica.query.get_or_404(fid)
+    for doc in f.documentos:
+        try: os.remove(os.path.join(UPLOAD_FICHAS, doc.nome_ficheiro))
+        except: pass
+    db.session.delete(f); db.session.commit()
+    flash('Ficha eliminada.', 'success')
+    return redirect(url_for('fichas'))
+
+# ── Componentes ───────────────────────────────────────────────────────────────
+@app.route('/fichas/<int:fid>/componentes/adicionar', methods=['POST'])
+@login_required
+def ficha_comp_adicionar(fid):
+    FichaTecnica.query.get_or_404(fid)
+    data = request.get_json() or {}
+    c = FichaComponente(
+        ficha_id=fid,
+        categoria=data.get('categoria','Outro'),
+        designacao=data.get('designacao','').strip(),
+        part_number=data.get('part_number','').strip(),
+        marca=data.get('marca','').strip(),
+        referencia_equiv=data.get('referencia_equiv','').strip(),
+        quantidade=data.get('quantidade','1'),
+        unidade=data.get('unidade','un'),
+        intervalo=data.get('intervalo','').strip(),
+        notas=data.get('notas','').strip(),
+        ordem=FichaComponente.query.filter_by(ficha_id=fid).count()
+    )
+    db.session.add(c); db.session.commit()
+    return jsonify({'ok': True, 'id': c.id})
+
+@app.route('/fichas/<int:fid>/componentes/<int:cid>/editar', methods=['POST'])
+@login_required
+def ficha_comp_editar(fid, cid):
+    c = FichaComponente.query.filter_by(id=cid, ficha_id=fid).first_or_404()
+    data = request.get_json() or {}
+    for f in ['categoria','designacao','part_number','marca','referencia_equiv','quantidade','unidade','intervalo','notas']:
+        if f in data: setattr(c, f, data[f])
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/fichas/<int:fid>/componentes/<int:cid>/eliminar', methods=['POST'])
+@login_required
+def ficha_comp_eliminar(fid, cid):
+    c = FichaComponente.query.filter_by(id=cid, ficha_id=fid).first_or_404()
+    db.session.delete(c); db.session.commit()
+    return jsonify({'ok': True})
+
+# ── Documentos / Fotos ────────────────────────────────────────────────────────
+@app.route('/fichas/<int:fid>/documentos/upload', methods=['POST'])
+@login_required
+def ficha_doc_upload(fid):
+    FichaTecnica.query.get_or_404(fid)
+    file = request.files.get('ficheiro')
+    if not file or not file.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import uuid, mimetypes
+    ext = os.path.splitext(file.filename)[1].lower()
+    nome_unico = f'ft{fid}_{uuid.uuid4().hex[:10]}{ext}'
+    fpath = os.path.join(UPLOAD_FICHAS, nome_unico)
+    file.save(fpath)
+    mime = mimetypes.guess_type(file.filename)[0] or 'application/octet-stream'
+    tipo = 'foto' if mime.startswith('image/') else 'documento'
+    doc = FichaDocumento(
+        ficha_id=fid, tipo=tipo,
+        nome_original=file.filename, nome_ficheiro=nome_unico,
+        descricao=request.form.get('descricao','').strip(),
+        tamanho=os.path.getsize(fpath), mime=mime,
+        criado_por=current_user.id, criado_em=datetime.now()
+    )
+    db.session.add(doc); db.session.commit()
+    return jsonify({'ok': True, 'id': doc.id, 'nome': doc.nome_original,
+        'tipo': doc.tipo, 'mime': doc.mime,
+        'data': doc.criado_em.strftime('%d/%m/%Y %H:%M'),
+        'uploader': current_user.nome})
+
+@app.route('/fichas/<int:fid>/documentos/<int:did>/preview')
+@login_required
+def ficha_doc_preview(fid, did):
+    doc = FichaDocumento.query.filter_by(id=did, ficha_id=fid).first_or_404()
+    return send_from_directory(UPLOAD_FICHAS, doc.nome_ficheiro, as_attachment=False)
+
+@app.route('/fichas/<int:fid>/documentos/<int:did>/download')
+@login_required
+def ficha_doc_download(fid, did):
+    doc = FichaDocumento.query.filter_by(id=did, ficha_id=fid).first_or_404()
+    return send_from_directory(UPLOAD_FICHAS, doc.nome_ficheiro,
+        as_attachment=True, download_name=doc.nome_original)
+
+@app.route('/fichas/<int:fid>/documentos/<int:did>/apagar', methods=['POST'])
+@login_required
+def ficha_doc_apagar(fid, did):
+    doc = FichaDocumento.query.filter_by(id=did, ficha_id=fid).first_or_404()
+    try: os.remove(os.path.join(UPLOAD_FICHAS, doc.nome_ficheiro))
+    except: pass
+    db.session.delete(doc); db.session.commit()
+    return jsonify({'ok': True})
+
+
 MENUS_DISPONIVEIS = [
     ('dashboard',          '🏠 Dashboard'),
     ('pedidos',            '📋 Pedidos de Compra'),
@@ -2988,6 +3172,7 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
+    ('fichas',             '📋 Fichas Técnicas'),
     ('assistencias',       '🔧 Assistências'),
     ('entradas',           '📥 Entradas'),
     ('partilha',           '📁 Partilha'),
