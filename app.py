@@ -3638,12 +3638,15 @@ def entradas_stats():
     def avg(lst): return round(sum(lst)/len(lst),1) if lst else 0
     def safe(lst): return [x for x in lst if x is not None]
 
-    d_total   = safe([e.dias_total          for e in fechadas])
-    d_rorc    = safe([e.dias_rec_orcamento  for e in todas])
-    d_rf      = safe([e.dias_rec_faturado   for e in todas])
-    d_orcorp  = safe([e.dias_orc_reparacao  for e in todas])
-    d_cmrp    = safe([e.dias_mat_reparacao  for e in todas])
-    d_rpf     = safe([e.dias_reparacao_fat  for e in todas])
+    d_total   = safe([e.dias_total               for e in fechadas])
+    d_rorc    = safe([e.dias_rec_orcamento       for e in todas])
+    d_rf      = safe([e.dias_rec_faturado        for e in todas])
+    d_orcrp   = safe([e.dias_orc_reparacao       for e in todas])
+    d_cmrp    = safe([e.dias_mat_reparacao        for e in todas])
+    d_cms     = safe([e.dias_mat_stock            for e in todas])
+    d_srp     = safe([e.dias_stock_reparacao      for e in todas])
+    d_rpc     = safe([e.dias_reparacao_concluida  for e in todas])
+    d_rpf     = safe([e.dias_reparacao_fat        for e in todas])
 
     # By status count
     by_status = defaultdict(int)
@@ -3651,7 +3654,9 @@ def entradas_stats():
 
     # By year
     by_year = defaultdict(lambda:{'total':0,'fechadas':0,'sum_total':0,'n_total':0,
-                                   'sum_rf':0,'n_rf':0,'sum_cmrp':0,'n_cmrp':0,'sum_rpf':0,'n_rpf':0})
+                                   'sum_rf':0,'n_rf':0,'sum_cmrp':0,'n_cmrp':0,
+                                   'sum_cms':0,'n_cms':0,'sum_srp':0,'n_srp':0,
+                                   'sum_rpc':0,'n_rpc':0,'sum_rpf':0,'n_rpf':0})
     for e in todas:
         yr = e.data_rececao.year if e.data_rececao else (e.criado_em.year if e.criado_em else _hoje.year)
         by_year[yr]['total'] += 1
@@ -3659,6 +3664,9 @@ def entradas_stats():
         if e.dias_total        is not None: by_year[yr]['sum_total']+=e.dias_total;  by_year[yr]['n_total']+=1
         if e.dias_rec_faturado is not None: by_year[yr]['sum_rf']  +=e.dias_rec_faturado; by_year[yr]['n_rf']+=1
         if e.dias_mat_reparacao is not None: by_year[yr]['sum_cmrp']+=e.dias_mat_reparacao; by_year[yr]['n_cmrp']+=1
+        if e.dias_mat_stock is not None: by_year[yr]['sum_cms']+=e.dias_mat_stock; by_year[yr]['n_cms']+=1
+        if e.dias_stock_reparacao is not None: by_year[yr]['sum_srp']+=e.dias_stock_reparacao; by_year[yr]['n_srp']+=1
+        if e.dias_reparacao_concluida is not None: by_year[yr]['sum_rpc']+=e.dias_reparacao_concluida; by_year[yr]['n_rpc']+=1
         if e.dias_reparacao_fat is not None: by_year[yr]['sum_rpf'] +=e.dias_reparacao_fat; by_year[yr]['n_rpf']+=1
 
     years_data = []
@@ -3668,6 +3676,9 @@ def entradas_stats():
             'avg_total': round(d['sum_total']/d['n_total'],1) if d['n_total'] else None,
             'avg_rf':    round(d['sum_rf']   /d['n_rf'],   1) if d['n_rf']    else None,
             'avg_cmrp':  round(d['sum_cmrp'] /d['n_cmrp'], 1) if d['n_cmrp']  else None,
+            'avg_cms':   round(d['sum_cms']  /d['n_cms'],  1) if d['n_cms']   else None,
+            'avg_srp':   round(d['sum_srp']  /d['n_srp'],  1) if d['n_srp']   else None,
+            'avg_rpc':   round(d['sum_rpc']  /d['n_rpc'],  1) if d['n_rpc']   else None,
             'avg_rpf':   round(d['sum_rpf']  /d['n_rpf'],  1) if d['n_rpf']   else None,
         })
 
@@ -3691,7 +3702,8 @@ def entradas_stats():
     return render_template('entradas_stats.html',
         total=len(todas), n_fechadas=len(fechadas), n_abertas=len(abertas),
         avg_total=avg(d_total), avg_rorc=avg(d_rorc), avg_rf=avg(d_rf),
-        avg_orcorp=avg(d_orcorp), avg_cmrp=avg(d_cmrp), avg_rpf=avg(d_rpf),
+        avg_orcrp=avg(d_orcrp), avg_cmrp=avg(d_cmrp),
+        avg_cms=avg(d_cms), avg_srp=avg(d_srp), avg_rpc=avg(d_rpc), avg_rpf=avg(d_rpf),
         max_total=max(d_total) if d_total else 0,
         min_total=min(d_total) if d_total else 0,
         years_data=json.dumps(years_data),
@@ -3722,20 +3734,17 @@ def entradas():
         q = q.filter_by(status=status_f)
     entradas_list = q.order_by(EntradaEquipamento.numero.desc()).all()
     from datetime import date
-    # Compute dias for each entry
+    _hoje = date.today()
+    # Compute dias for each entry (days in current status)
     for e in entradas_list:
-        rule = ESTADIA_RULES.get(e.status)
-        if rule:
-            ref = e.data_status_real or (e.data_status.date() if e.data_status else None)
-            if ref:
-                e._dias_contagem = _dias_uteis(ref, date.today())
-                e._dias_limite = rule['dias']
-            else:
-                e._dias_contagem = None
-                e._dias_limite = None
+        ref = e.data_status_real or (e.data_status.date() if e.data_status else None)
+        if ref:
+            e._dias_contagem = (_hoje - ref).days
+            rule = ESTADIA_RULES.get(e.status)
+            e._dias_limite = rule['dias'] if rule else 9999
         else:
             e._dias_contagem = None
-            e._dias_limite = None
+            e._dias_limite = 9999
     em_estadia = sum(1 for e in entradas_list if e.status in ('orcamentado_estadia','concluido_estadia'))
     return render_template('entradas.html',
         entradas=entradas_list, status_list=ENTRADAS_STATUS,
