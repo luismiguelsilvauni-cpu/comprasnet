@@ -74,6 +74,16 @@
         .nav-item.active { background: var(--accent-glow); color: var(--accent); }
         .nav-item .icon { font-size: 20px; width: 22px; text-align: center; }
         .sidebar-bottom { padding: 12px; border-top: 1px solid var(--border); }
+        /* ── Dropdown nav groups ─────────────────────────────────────── */
+        .nav-dd-btn { width:100%; text-align:left; background:none; border:none; cursor:pointer; justify-content:flex-start; }
+        .nav-dd-btn .dd-arrow { margin-left:auto; font-size:10px; color:var(--text-muted); transition:transform .2s; }
+        .nav-dd-btn.open .dd-arrow { transform:rotate(90deg); }
+        .nav-dd-items { display:none; padding-left:8px; border-left:2px solid var(--border); margin-left:12px; margin-bottom:2px; }
+        .nav-dd-items.open { display:block; }
+        .nav-sub { font-size:12px !important; padding:6px 10px !important; }
+        .nav-sub .icon { font-size:14px !important; }
+        .nav-dropdown.active > .nav-dd-btn { color:var(--accent); }
+
         .user-info { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 6px; }
         .avatar {
             width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
@@ -251,90 +261,124 @@
         {% else %}
             <div class="logo-icon">📦</div>
             <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
-            <div class="app-sub">v1.0 · PHC Integration</div>
         {% endif %}
     </div>
-    <div class="sidebar-nav">
-        <div class="nav-section">
-            <div class="nav-label">Principal</div>
-            {% if pode_aceder('dashboard') %}
-            <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                <span class="icon">⊞</span><span>Dashboard</span>
-            </a>
-            {% endif %}
+
+    <!-- TOP NAV with dropdowns -->
+    <div style="padding:8px 6px 0">
+
+        <!-- Dashboard -->
+        {% if pode_aceder('dashboard') %}
+        <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+            <span class="icon">⊞</span><span>Dashboard</span>
+        </a>
+        {% endif %}
+
+        <!-- GESTÃO dropdown -->
+        {% set gestao_active = request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe','funcionarios','funcionario_novo','funcionario_ficha','funcionario_editar','salarios','salarios_pin','salarios_documentos','partilha'] %}
+        <div class="nav-dropdown {% if gestao_active %}active{% endif %}" id="dd-gestao">
+          <button class="nav-item nav-dd-btn {% if gestao_active %}active{% endif %}" onclick="toggleDD('gestao')">
+            <span class="icon">👥</span><span>Gestão</span><span class="dd-arrow">▸</span>
+          </button>
+          <div class="nav-dd-items" id="ddi-gestao">
             {% if pode_aceder('clientes') %}
-            <a href="{{ url_for('clientes') }}" class="nav-item {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
-                <span class="icon">👥</span><span>Clientes</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('pedidos') %}
-            <a href="{{ url_for('pedidos', estado='aberto') }}" class="nav-item {% if 'pedido' in request.endpoint and 'reposicao' not in request.endpoint %}active{% endif %}">
-                <span class="icon">📋</span><span>Pedidos de Compra</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('inventario') %}
-            <a href="{{ url_for('stock') }}" class="nav-item {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
-                <span class="icon">📊</span><span>Stock</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('biblioteca_modelos') %}
-            <a href="{{ url_for('biblioteca_modelos') }}" class="nav-item {% if 'biblioteca' in (request.endpoint or '') %}active{% endif %}">
-                <span class="icon">📚</span><span>Biblioteca PDF</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('fichas') %}
-            <a href="{{ url_for('fichas') }}" class="nav-item {% if request.endpoint in ['fichas','ficha_nova','ficha_detalhe','ficha_editar'] %}active{% endif %}">
-                <span class="icon">📋</span><span>Fichas Técnicas</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('assistencias') %}
-            <a href="{{ url_for('assistencias') }}" class="nav-item {% if request.endpoint in ['assistencias','assistencia_nova','assistencia_detalhe','assistencia_editar'] %}active{% endif %}">
-                <span class="icon">🔧</span><span>Assistências</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('entradas') %}
-            <a href="{{ url_for('entradas') }}" class="nav-item {% if request.endpoint in ['entradas','entrada_nova','entrada_detalhe','entrada_editar'] %}active{% endif %}">
-                <span class="icon">📥</span><span>Entradas</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('partilha') %}
-            <a href="{{ url_for('partilha') }}" class="nav-item {% if request.endpoint == 'partilha' %}active{% endif %}">
-                <span class="icon">📁</span><span>Partilha</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('salarios') %}
-            <a href="{{ url_for('salarios') }}" class="nav-item {% if 'salario' in request.endpoint %}active{% endif %}">
-                <span class="icon">💶</span><span>Salários</span>
+            <a href="{{ url_for('clientes') }}" class="nav-item nav-sub {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
+              <span class="icon">👥</span><span>Clientes</span>
             </a>
             {% endif %}
             {% if pode_aceder('funcionarios') %}
-            <a href="{{ url_for('funcionarios') }}" class="nav-item {% if 'funcionario' in request.endpoint %}active{% endif %}">
-                <span class="icon">👥</span><span>Funcionários</span>
+            <a href="{{ url_for('funcionarios') }}" class="nav-item nav-sub {% if 'funcionario' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">🪪</span><span>Funcionários</span>
             </a>
             {% endif %}
-            {% if pode_aceder('tecnico') %}
-            <a href="{{ url_for('tecnico') }}" class="nav-item {% if 'tecnico' in request.endpoint %}active{% endif %}">
-                <span class="icon">🔧</span><span>Técnico</span>
+            {% if pode_aceder('salarios') %}
+            <a href="{{ url_for('salarios') }}" class="nav-item nav-sub {% if 'salario' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">💶</span><span>Salários</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('partilha') %}
+            <a href="{{ url_for('partilha') }}" class="nav-item nav-sub {% if request.endpoint == 'partilha' %}active{% endif %}">
+              <span class="icon">📁</span><span>Partilha</span>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- LOGÍSTICA dropdown -->
+        {% set log_active = request.endpoint in ['pedidos','novo_pedido','pedido_detalhe','stock','stock_artigo','entradas','entrada_nova','entrada_detalhe','entrada_editar','inventario','reposicao','analisar_artigo','pendentes'] %}
+        <div class="nav-dropdown {% if log_active %}active{% endif %}" id="dd-log">
+          <button class="nav-item nav-dd-btn {% if log_active %}active{% endif %}" onclick="toggleDD('log')">
+            <span class="icon">📦</span><span>Logística</span><span class="dd-arrow">▸</span>
+          </button>
+          <div class="nav-dd-items" id="ddi-log">
+            {% if pode_aceder('pedidos') %}
+            <a href="{{ url_for('pedidos', estado='aberto') }}" class="nav-item nav-sub {% if 'pedido' in (request.endpoint or '') and 'reposicao' not in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">🛒</span><span>Pedidos de Compra</span>
             </a>
             {% endif %}
             {% if pode_aceder('inventario') %}
-            <a href="{{ url_for('inventario') }}" class="nav-item {% if request.endpoint == 'inventario' %}active{% endif %}">
-                <span class="icon">📊</span><span>Análise de Inventário</span>
+            <a href="{{ url_for('stock') }}" class="nav-item nav-sub {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
+              <span class="icon">📊</span><span>Stock</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('entradas') %}
+            <a href="{{ url_for('entradas') }}" class="nav-item nav-sub {% if request.endpoint in ['entradas','entrada_nova','entrada_detalhe','entrada_editar'] %}active{% endif %}">
+              <span class="icon">📥</span><span>Entradas</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('inventario') %}
+            <a href="{{ url_for('inventario') }}" class="nav-item nav-sub {% if request.endpoint == 'inventario' %}active{% endif %}">
+              <span class="icon">📈</span><span>Análise de Inventário</span>
             </a>
             {% endif %}
             {% if pode_aceder('reposicao') %}
-            <a href="{{ url_for('reposicao') }}" class="nav-item {% if request.endpoint == 'reposicao' or request.endpoint == 'analisar_artigo' %}active{% endif %}">
-                <span class="icon">📦</span><span>Reposição de Stock</span>
+            <a href="{{ url_for('reposicao') }}" class="nav-item nav-sub {% if request.endpoint in ['reposicao','analisar_artigo'] %}active{% endif %}">
+              <span class="icon">🔄</span><span>Reposição de Stock</span>
             </a>
             {% endif %}
-            <a href="{{ url_for('pendentes') }}" class="nav-item {% if request.endpoint == 'pendentes' %}active{% endif %}">
-                <span class="icon">🔗</span>
-                <span>Associações Pendentes</span>
-                <span id="sidebarBadgePendentes" style="margin-left:auto;background:var(--warning);color:#000;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center"></span>
+            <a href="{{ url_for('pendentes') }}" class="nav-item nav-sub {% if request.endpoint == 'pendentes' %}active{% endif %}">
+              <span class="icon">🔗</span><span>Associações Pendentes</span>
+              <span id="sidebarBadgePendentes" style="margin-left:auto;background:var(--warning);color:#000;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center"></span>
             </a>
+          </div>
         </div>
+
+        <!-- TÉCNICO dropdown -->
+        {% set tec_active = request.endpoint in ['assistencias','assistencia_nova','assistencia_detalhe','assistencia_editar','tecnico','tecnico_detalhe','fichas','ficha_nova','ficha_detalhe','ficha_editar','biblioteca_modelos'] %}
+        <div class="nav-dropdown {% if tec_active %}active{% endif %}" id="dd-tec">
+          <button class="nav-item nav-dd-btn {% if tec_active %}active{% endif %}" onclick="toggleDD('tec')">
+            <span class="icon">🔧</span><span>Técnico</span><span class="dd-arrow">▸</span>
+          </button>
+          <div class="nav-dd-items" id="ddi-tec">
+            {% if pode_aceder('assistencias') %}
+            <a href="{{ url_for('assistencias') }}" class="nav-item nav-sub {% if request.endpoint in ['assistencias','assistencia_nova','assistencia_detalhe','assistencia_editar'] %}active{% endif %}">
+              <span class="icon">🔧</span><span>Assistências</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('tecnico') %}
+            <a href="{{ url_for('tecnico') }}" class="nav-item nav-sub {% if 'tecnico' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">⚓</span><span>Base Dados Embarcações</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('fichas') %}
+            <a href="{{ url_for('fichas') }}" class="nav-item nav-sub {% if request.endpoint in ['fichas','ficha_nova','ficha_detalhe','ficha_editar'] %}active{% endif %}">
+              <span class="icon">📋</span><span>Fichas de Equipamentos</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('biblioteca_modelos') %}
+            <a href="{{ url_for('biblioteca_modelos') }}" class="nav-item nav-sub {% if 'biblioteca' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">📚</span><span>Biblioteca PDF</span>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+
+    </div><!-- end top nav -->
+
+    <!-- Bottom items -->
+    <div class="sidebar-nav" style="flex:1;padding-top:8px">
         {% if current_user.is_admin %}
-        <div class="nav-section" style="margin-top:12px">
+        <div class="nav-section" style="margin-top:4px">
             <div class="nav-label">Admin</div>
             <a href="{{ url_for('admin_utilizadores') }}" class="nav-item {% if request.endpoint in ['admin_utilizadores','admin_perfis','admin_registos_pendentes'] %}active{% endif %}">
                 <span class="icon">👥</span><span>Utilizadores</span>
@@ -356,6 +400,7 @@
         </div>
         {% endif %}
     </div>
+
     <div class="sidebar-bottom">
         <div class="user-info">
             <div class="avatar">{{ current_user.nome[0].upper() }}</div>
@@ -364,7 +409,7 @@
                 <div class="user-role">{{ '🔑 Admin' if current_user.is_admin else current_user.departamento or 'Utilizador' }}</div>
             </div>
         </div>
-<a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
+        <a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">💬</span><span>Chat {% if cfg_ia and cfg_ia.provider == 'gemini' %}Gemini{% elif cfg_ia and cfg_ia.provider == 'lmstudio' %}LM Studio{% elif cfg_ia and cfg_ia.provider == 'ollama' %}Ollama{% elif cfg_ia and cfg_ia.provider == 'claude' %}Claude{% else %}IA{% endif %}</span>
         </a>
         <a href="{{ url_for('admin_update') }}" class="nav-item {% if request.endpoint == 'admin_update' %}active{% endif %}" style="margin-bottom:4px">
@@ -380,9 +425,6 @@
         {% endif %}
         <a href="{{ url_for('roadmap') }}" class="nav-item {% if request.endpoint == 'roadmap' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">📋</span><span>Backlog</span><span id="backlog-badge" style="margin-left:auto;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(245,158,11,.2);color:#f59e0b;display:none"></span>
-        </a>
-        <a href="{{ url_for('changelog') }}" class="nav-item {% if request.endpoint == 'changelog' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">📋</span><span>Versions</span>
         </a>
         <a href="{{ url_for('logout') }}" class="logout-btn">
             <span>⎋</span><span>Sair</span>
@@ -423,6 +465,31 @@
 {% endwith %}
 
 <script>
+
+function toggleDD(id) {
+  var btn = document.querySelector('#dd-' + id + ' .nav-dd-btn');
+  var items = document.getElementById('ddi-' + id);
+  var isOpen = items.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.nav-dd-items').forEach(function(el){ el.classList.remove('open'); });
+  document.querySelectorAll('.nav-dd-btn').forEach(function(el){ el.classList.remove('open'); });
+  // Open clicked if was closed
+  if (!isOpen) {
+    items.classList.add('open');
+    btn.classList.add('open');
+  }
+}
+// Auto-open active dropdown on load
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.nav-dropdown.active').forEach(function(dd){
+    var id = dd.id.replace('dd-','');
+    var items = document.getElementById('ddi-' + id);
+    var btn = dd.querySelector('.nav-dd-btn');
+    if (items) items.classList.add('open');
+    if (btn) btn.classList.add('open');
+  });
+});
+
 // Update pending matches badge in sidebar
 (function() {
   fetch('/api/pendentes/count')
