@@ -302,6 +302,24 @@ def pedido_estado(pid):
     return jsonify({'ok': True})
 
 
+@app.route('/pedidos/<int:pid>/editar', methods=['POST'])
+@login_required
+def pedido_editar(pid):
+    p = PedidoCompra.query.get_or_404(pid)
+    data = request.get_json() or {}
+    if 'titulo'       in data and data['titulo'].strip():
+        p.titulo = data['titulo'].strip()
+    if 'descricao'    in data: p.descricao    = data['descricao'].strip()
+    if 'departamento' in data: p.departamento = data['departamento'].strip()
+    if 'prioridade'   in data: p.prioridade   = data['prioridade']
+    if 'estado'       in data: p.estado       = data['estado']
+    if 'cliente_id'   in data:
+        cid = data['cliente_id']
+        p.cliente_id = int(cid) if str(cid).strip() else None
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 @app.route('/pedidos')
 @login_required
 def pedidos():
