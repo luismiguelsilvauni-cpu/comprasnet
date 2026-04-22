@@ -253,14 +253,16 @@ def api_dashboard_artigos_pedidos():
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
         hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
-        # Get cliente name: linha first, then pedido header
+        # Get cliente name: pedido header takes priority (edited there)
         cliente_nome = "—"
         try:
-            if linha.cliente_id:
-                c = db.session.get(Cliente, linha.cliente_id)
-                if c: cliente_nome = c.nome
-            if cliente_nome == "—" and pedido.cliente_id:
+            # Pedido-level cliente first
+            if pedido.cliente_id:
                 c = db.session.get(Cliente, pedido.cliente_id)
+                if c: cliente_nome = c.nome
+            # Fall back to line-level if pedido has none
+            if cliente_nome == "—" and linha.cliente_id:
+                c = db.session.get(Cliente, linha.cliente_id)
                 if c: cliente_nome = c.nome
         except: pass
         rows.append({
@@ -315,9 +317,16 @@ def pedido_editar(pid):
     if 'departamento' in data: p.departamento = data['departamento'].strip()
     if 'prioridade'   in data: p.prioridade   = data['prioridade']
     if 'estado'       in data: p.estado       = data['estado']
-    if 'cliente_id'   in data:
+    if 'cliente_id' in data:
         cid = data['cliente_id']
-        p.cliente_id = int(cid) if str(cid).strip() else None
+        novo_cid = int(cid) if str(cid).strip() else None
+        old_cid = p.cliente_id
+        p.cliente_id = novo_cid
+        # Also update lines that had the same cliente as the pedido header
+        if old_cid != novo_cid:
+            for l in p.linhas:
+                if l.cliente_id == old_cid or l.cliente_id is None:
+                    l.cliente_id = novo_cid
     db.session.commit()
     return jsonify({'ok': True})
 
