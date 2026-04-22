@@ -494,7 +494,7 @@ function atualizarDashboard() {
 function carregarArtigosPedidos() {
   var el = document.getElementById('ap_container');
   if (!el) return;
-  fetch('/api/dashboard/artigos-pedidos')
+  fetch('/api/dashboard/artigos-pedidos?t=' + Date.now(), {cache:'no-store'})
     .then(function(r){ return r.json(); })
     .then(function(rows) {
       if (!rows.length) {

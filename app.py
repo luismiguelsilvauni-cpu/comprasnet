@@ -232,7 +232,7 @@ def api_dashboard_artigos_pedidos():
     artigos = (db.session.query(LinhaPedido, PedidoCompra, User)
         .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
         .join(User, PedidoCompra.criado_por == User.id, isouter=True)
-        .filter(PedidoCompra.estado.in_(["aberto","aprovado","pendente"]))
+        .filter(PedidoCompra.estado.in_(["aberto","pedido","aprovado","pendente","em_analise"]))
         .order_by(
             sa_case(
                 (LinhaPedido.status == "recebido", 2),
@@ -253,14 +253,16 @@ def api_dashboard_artigos_pedidos():
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
         hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
-        # Get cliente name: from linha or from pedido
+        # Get cliente name: linha first, then pedido header
         cliente_nome = "—"
-        if linha.cliente_id:
-            c = Cliente.query.get(linha.cliente_id)
-            if c: cliente_nome = c.nome
-        elif pedido.cliente_id:
-            c = Cliente.query.get(pedido.cliente_id)
-            if c: cliente_nome = c.nome
+        try:
+            if linha.cliente_id:
+                c = db.session.get(Cliente, linha.cliente_id)
+                if c: cliente_nome = c.nome
+            if cliente_nome == "—" and pedido.cliente_id:
+                c = db.session.get(Cliente, pedido.cliente_id)
+                if c: cliente_nome = c.nome
+        except: pass
         rows.append({
             "linha_id": linha.id,
             "pedido_id": pedido.id,
