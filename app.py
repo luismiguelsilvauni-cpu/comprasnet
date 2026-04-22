@@ -3703,7 +3703,7 @@ def entradas_stats():
     return render_template('entradas_stats.html',
         total=len(todas), n_fechadas=len(fechadas), n_abertas=len(abertas),
         avg_total=avg(d_total), avg_rorc=avg(d_rorc), avg_rf=avg(d_rf),
-        avg_orcrp=avg(d_orcrp), avg_cmrp=avg(d_cmrp),
+        avg_cmrp=avg(d_cmrp),
         avg_cms=avg(d_cms), avg_srp=avg(d_srp), avg_rpc=avg(d_rpc), avg_rpf=avg(d_rpf),
         max_total=max(d_total) if d_total else 0,
         min_total=min(d_total) if d_total else 0,
