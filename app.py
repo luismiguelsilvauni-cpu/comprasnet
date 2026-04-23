@@ -3060,8 +3060,7 @@ def ferias_add():
         criado_por=current_user.id, criado_em=datetime.now()
     )
     db.session.add(p); db.session.commit()
-    from models import Funcionario as F
-    f = F.query.get(p.funcionario_id)
+    f = Funcionario.query.get(p.funcionario_id)
     return jsonify({'ok': True, 'id': p.id,
         'cor': p.cor or _ferias_cor(p.funcionario_id),
         'funcionario_nome': f.nome if f else '?'})
