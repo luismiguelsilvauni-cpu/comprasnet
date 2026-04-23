@@ -47,24 +47,35 @@
 
 <!-- Upload form -->
 <div class="card" style="padding:18px;margin-bottom:18px">
-  <div style="font-size:14px;font-weight:600;margin-bottom:12px">📁 Seleccionar PDFs</div>
+  <div style="font-size:14px;font-weight:600;margin-bottom:12px">📁 Seleccionar PDFs para Importação em Massa</div>
   <form method="post" enctype="multipart/form-data" id="uploadForm">
-    <div class="upload-zone" id="dropZone"
-      onclick="document.getElementById('pdfInput').click()"
-      ondragover="event.preventDefault();this.classList.add('drag')"
-      ondragleave="this.classList.remove('drag')"
-      ondrop="event.preventDefault();this.classList.remove('drag');handleDrop(event.dataTransfer.files)">
-      <div style="font-size:36px;margin-bottom:10px">📂</div>
-      <div style="font-size:14px;font-weight:600;margin-bottom:4px">Clique ou arraste os PDFs aqui</div>
-      <div style="font-size:12px;color:var(--text-muted)">Pode seleccionar múltiplos ficheiros</div>
-      <input type="file" name="pdfs" id="pdfInput" multiple accept=".pdf,.PDF" onchange="mostrarFicheiros(this)">
+
+    <!-- File input visível e limpo - sem onclick no wrapper -->
+    <div style="margin-bottom:12px">
+      <input type="file" name="pdfs" id="pdfInput" multiple accept=".pdf,.PDF"
+        style="display:block;width:100%;padding:10px;border:2px dashed var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;font-size:13px"
+        onchange="mostrarFicheiros(this)">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Seleccione múltiplos ficheiros de uma vez (Ctrl+clique ou Shift+clique)
+      </div>
     </div>
-    <div id="fileList" style="display:none;margin-top:12px">
-      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">Pré-visualização da associação:</div>
+
+    <!-- Drop zone separado do input -->
+    <div id="dropZone" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;color:var(--text-muted);margin-bottom:12px;transition:.2s"
+      ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(59,110,240,.08)'"
+      ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
+      ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='';handleDrop(event.dataTransfer.files)">
+      <div style="font-size:24px;margin-bottom:4px">📂</div>
+      <div style="font-size:12px">Ou arraste os PDFs para aqui</div>
+    </div>
+
+    <div id="fileList" style="display:none;margin-top:8px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">Ficheiros seleccionados:</div>
       <div id="fileItems"></div>
     </div>
-    <div style="margin-top:12px;text-align:right">
-      <button type="submit" id="submitBtn" class="btn btn-primary">🚀 Importar Todos</button>
+
+    <div style="text-align:right">
+      <button type="submit" class="btn btn-primary">🚀 Importar Todos</button>
     </div>
   </form>
 </div>
