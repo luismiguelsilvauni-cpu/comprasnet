@@ -554,3 +554,36 @@ class FichaDocumento(db.Model):
     criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
     criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
     uploader      = db.relationship('User', foreign_keys=[criado_por])
+
+# ── MAPA DE FÉRIAS ─────────────────────────────────────────────────────────────
+
+class FeriasPeriodo(db.Model):
+    __tablename__ = 'ferias_periodos'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    ano             = db.Column(db.Integer, nullable=False)
+    data_inicio     = db.Column(db.Date, nullable=False)
+    data_fim        = db.Column(db.Date, nullable=False)
+    tipo            = db.Column(db.String(20), default='ferias')  # ferias / ponte
+    notas           = db.Column(db.String(200), default='')
+    cor             = db.Column(db.String(7), default='')  # hex color per employee
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    funcionario     = db.relationship('Funcionario', foreign_keys=[funcionario_id])
+
+class FeriasFeriado(db.Model):
+    __tablename__ = 'ferias_feriados'
+    id      = db.Column(db.Integer, primary_key=True)
+    ano     = db.Column(db.Integer, nullable=False)
+    data    = db.Column(db.Date, nullable=False, unique=True)
+    nome    = db.Column(db.String(100), nullable=False)
+    tipo    = db.Column(db.String(20), default='nacional')  # nacional / local / ponte
+
+# ── STATUS UTILIZADORES ────────────────────────────────────────────────────────
+
+class UserSession(db.Model):
+    __tablename__ = 'user_sessions'
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+    last_seen   = db.Column(db.DateTime, default=datetime.utcnow)
+    user        = db.relationship('User', foreign_keys=[user_id])

@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% block title %}Mapa de Férias {{ ano }} · NavTech{% endblock %}
+{% block page_title %}🏖 Mapa de Férias & Feriados {{ ano }}{% endblock %}
+{% block topbar_actions %}
+  <button onclick="anoAnterior()" class="btn btn-ghost btn-sm">◀ {{ ano - 1 }}</button>
+  <strong style="font-size:14px;padding:0 8px">{{ ano }}</strong>
+  <button onclick="anoSeguinte()" class="btn btn-ghost btn-sm">{{ ano + 1 }} ▶</button>
+  <button onclick="abrirAddFerias()" class="btn btn-primary btn-sm">+ Adicionar Férias</button>
+  <button onclick="abrirAddFeriado()" class="btn btn-ghost btn-sm">📅 Feriado/Ponte</button>
+{% endblock %}
+{% block content %}
+
+<script>
+var ANO = {{ ano }};
+var FUNCS = {{ funcs | tojson(attribute='id') if false else '[' + funcs|map(attribute='id')|list|join(',') + ']' }};
+var FUNCS_NOMES = { {% for f in funcs %}"{{ f.id }}": "{{ f.nome }}"{% if not loop.last %},{% endif %}{% endfor %} };
+var PERIODOS = {{ periodos_json | safe }};
+var FERIADOS = {{ feriados_json | safe }};
+var CORES = {{ func_cores | safe }};
+var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+</script>
+
+<!-- Legend -->
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+  <span style="font-size:11px;font-weight:700;color:var(--text-muted)">Funcionários:</span>
+  {% for f in funcs %}
+  <span style="display:flex;align-items:center;gap:4px;font-size:11px">
+    <span style="width:14px;height:14px;border-radius:3px;background:{{ func_cores | tojson | safe }}[{{ f.id }}]" id="leg-{{ f.id }}"></span>
+    {{ f.nome.split()[0] }}
+  </span>
+  {% endfor %}
+  <span style="margin-left:8px;display:flex;align-items:center;gap:4px;font-size:11px">
+    <span style="width:14px;height:14px;border-radius:3px;background:repeating-linear-gradient(45deg,#ef4444,#ef4444 3px,transparent 3px,transparent 6px)"></span> Feriado
+  </span>
+  <span style="display:flex;align-items:center;gap:4px;font-size:11px">
+    <span style="width:14px;height:14px;border-radius:3px;background:repeating-linear-gradient(45deg,#f59e0b,#f59e0b 3px,transparent 3px,transparent 6px)"></span> Ponte
+  </span>
+</div>
+
+<!-- Calendar container -->
+<div id="calendario" style="display:flex;flex-direction:column;gap:14px"></div>
+
+<!-- Edit modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:440px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1" id="editTitle">Editar Período</div>
+      <button onclick="fecharModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" id="editId">
+      <div id="editFuncRow" style="display:none">
+        <label style="font-size:11px;color:var(--text-muted)">Funcionário</label>
+        <select id="editFunc" class="input" style="margin-top:3px">
+          {% for f in funcs %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div id="editTipoRow">
+        <label style="font-size:11px;color:var(--text-muted)">Tipo</label>
+        <select id="editTipo" class="input" style="margin-top:3px">
+          <option value="ferias">🏖 Férias</option>
+          <option value="ponte">🌉 Ponte</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:11px;color:var(--text-muted)">Data Início</label>
+          <input type="date" id="editInicio" class="input" style="margin-top:3px"></div>
+        <div><label style="font-size:11px;color:var(--text-muted)">Data Fim</label>
+          <input type="date" id="editFim" class="input" style="margin-top:3px"></div>
+      </div>
+      <div><label style="font-size:11px;color:var(--text-muted)">Notas</label>
+        <input type="text" id="editNotas" class="input" style="margin-top:3px" placeholder="Opcional"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between">
+      <button id="editDeleteBtn" onclick="eliminarPeriodo()" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
+      <div style="display:flex;gap:8px">
+        <button onclick="fecharModal()" class="btn btn-ghost">Cancelar</button>
+        <button onclick="guardarModal()" class="btn btn-primary" id="editSaveBtn">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feriado modal -->
+<div id="feriadoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:380px;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1">📅 Feriado / Ponte</div>
+      <button onclick="fecharFeriado()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:11px;color:var(--text-muted)">Data</label>
+        <input type="date" id="ferData" class="input" style="margin-top:3px"></div>
+      <div><label style="font-size:11px;color:var(--text-muted)">Nome</label>
+        <input type="text" id="ferNome" class="input" style="margin-top:3px" placeholder="Ex: Feriado Municipal"></div>
+      <div><label style="font-size:11px;color:var(--text-muted)">Tipo</label>
+        <select id="ferTipo" class="input" style="margin-top:3px">
+          <option value="nacional">🇵🇹 Feriado Nacional</option>
+          <option value="local">📍 Feriado Local</option>
+          <option value="ponte">🌉 Ponte</option>
+        </select>
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharFeriado()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarFeriado()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function pad(n){ return String(n).padStart(2,'0'); }
+function dateStr(y,m,d){ return y+'-'+pad(m)+'-'+pad(d); }
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function dayOfWeek(y,m,d){ return new Date(y,m-1,d).getDay(); } // 0=Sun
+function isFeriado(dateStr){
+  return FERIADOS.find(function(f){ return f.data === dateStr; });
+}
+
+// ── Build calendar ────────────────────────────────────────────────────────────
+function buildCalendar() {
+  var cal = document.getElementById('calendario');
+  cal.innerHTML = '';
+  // Set legend colors
+  Object.keys(CORES).forEach(function(fid){
+    var el = document.getElementById('leg-'+fid);
+    if (el) el.style.background = CORES[fid];
+  });
+
+  for (var mes = 1; mes <= 12; mes++) {
+    var days = daysInMonth(ANO, mes);
+    var section = document.createElement('div');
+    section.className = 'card';
+    section.style.cssText = 'padding:12px;overflow-x:auto';
+
+    // Month header
+    var h = document.createElement('div');
+    h.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent)';
+    h.textContent = MESES[mes-1] + ' ' + ANO;
+    section.appendChild(h);
+
+    // Grid: day headers
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',1fr);gap:1px;min-width:'+(days*34)+'px';
+
+    // Day labels row
+    for (var d = 1; d <= days; d++) {
+      var dow = dayOfWeek(ANO, mes, d);
+      var ds = dateStr(ANO, mes, d);
+      var fer = isFeriado(ds);
+      var isWk = dow === 0 || dow === 6;
+      var cell = document.createElement('div');
+      cell.style.cssText = 'text-align:center;font-size:10px;padding:3px 0;border-radius:4px;cursor:pointer;' +
+        (fer ? 'background:'+(fer.tipo==='ponte'?'rgba(245,158,11,.25)':'rgba(239,68,68,.25)')+';color:'+(fer.tipo==='ponte'?'#f59e0b':'#ef4444')+';font-weight:700;' :
+         isWk ? 'color:var(--text-muted);background:var(--surface2);' : 'color:var(--text);');
+      cell.innerHTML = '<div style="font-size:8px">' + ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'][dow] + '</div><div style="font-weight:700">' + d + '</div>';
+      if (fer) {
+        cell.title = fer.nome + ' (' + fer.tipo + ')';
+        cell.onclick = (function(f){ return function(){ removeFeriado(f); }; })(fer);
+      } else {
+        cell.onclick = (function(ds2){ return function(){ abrirAddFeriadoData(ds2); }; })(ds);
+      }
+      grid.appendChild(cell);
+    }
+    section.appendChild(grid);
+
+    // Employee rows
+    var funcIds = Object.keys(FUNCS_NOMES).map(Number);
+    funcIds.forEach(function(fid) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',1fr);gap:1px;margin-top:2px;min-width:'+(days*34)+'px';
+
+      var cor = CORES[fid] || '#3b6ef0';
+      // Find periodos for this func in this month
+      var minD = dateStr(ANO, mes, 1);
+      var maxD = dateStr(ANO, mes, days);
+
+      for (var d2 = 1; d2 <= days; d2++) {
+        var ds2 = dateStr(ANO, mes, d2);
+        var cell2 = document.createElement('div');
+        cell2.style.cssText = 'height:20px;border-radius:2px;cursor:default;position:relative';
+        // Check if this day is in a period for this employee
+        var periodo = PERIODOS.find(function(p){
+          return p.funcionario_id === fid && p.data_inicio <= ds2 && p.data_fim >= ds2;
+        });
+        if (periodo) {
+          var pCor = periodo.cor || cor;
+          var isStart = periodo.data_inicio === ds2;
+          var isEnd   = periodo.data_fim   === ds2;
+          cell2.style.background = pCor;
+          cell2.style.opacity = periodo.tipo === 'ponte' ? '0.6' : '1';
+          cell2.style.borderRadius = (isStart ? '4px' : '0') + ' ' + (isEnd ? '4px' : '0') + ' ' + (isEnd ? '4px' : '0') + ' ' + (isStart ? '4px' : '0');
+          if (isStart) {
+            cell2.style.cursor = 'pointer';
+            var lbl = document.createElement('div');
+            lbl.style.cssText = 'position:absolute;left:4px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;z-index:1';
+            lbl.textContent = FUNCS_NOMES[fid].split(' ')[0];
+            cell2.appendChild(lbl);
+            cell2.onclick = (function(p){ return function(){ abrirEditPeriodo(p); }; })(periodo);
+          } else if (!isStart) {
+            cell2.style.cursor = 'pointer';
+            cell2.onclick = (function(p){ return function(){ abrirEditPeriodo(p); }; })(periodo);
+          }
+          if (periodo.notas) cell2.title = FUNCS_NOMES[fid] + ': ' + periodo.notas;
+        }
+        row.appendChild(cell2);
+      }
+      section.appendChild(row);
+    });
+
+    cal.appendChild(section);
+  }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function anoAnterior(){ window.location = '/ferias?ano='+(ANO-1); }
+function anoSeguinte(){ window.location = '/ferias?ano='+(ANO+1); }
+
+// ── Add/Edit period modal ─────────────────────────────────────────────────────
+var _editMode = false; // false = add, true = edit
+function abrirAddFerias() {
+  _editMode = false;
+  document.getElementById('editTitle').textContent = '+ Adicionar Férias';
+  document.getElementById('editId').value = '';
+  document.getElementById('editFuncRow').style.display = 'block';
+  document.getElementById('editDeleteBtn').style.display = 'none';
+  document.getElementById('editTipo').value = 'ferias';
+  var hoje = new Date(); var hs = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
+  document.getElementById('editInicio').value = hs;
+  document.getElementById('editFim').value = hs;
+  document.getElementById('editNotas').value = '';
+  document.getElementById('editModal').style.display = 'flex';
+}
+function abrirEditPeriodo(p) {
+  _editMode = true;
+  document.getElementById('editTitle').textContent = 'Editar Período — ' + p.funcionario_nome;
+  document.getElementById('editId').value = p.id;
+  document.getElementById('editFuncRow').style.display = 'none';
+  document.getElementById('editDeleteBtn').style.display = 'inline-flex';
+  document.getElementById('editTipo').value = p.tipo;
+  document.getElementById('editInicio').value = p.data_inicio;
+  document.getElementById('editFim').value = p.data_fim;
+  document.getElementById('editNotas').value = p.notas || '';
+  document.getElementById('editModal').style.display = 'flex';
+}
+function fecharModal(){ document.getElementById('editModal').style.display = 'none'; }
+
+function guardarModal() {
+  var btn = document.getElementById('editSaveBtn');
+  btn.disabled = true; btn.textContent = 'A guardar...';
+  var inicio = document.getElementById('editInicio').value;
+  var fim    = document.getElementById('editFim').value;
+  if (!inicio || !fim || inicio > fim) {
+    alert('Datas inválidas.'); btn.disabled=false; btn.textContent='💾 Guardar'; return;
+  }
+  if (_editMode) {
+    var pid = document.getElementById('editId').value;
+    fetch('/ferias/periodo/'+pid+'/editar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({data_inicio:inicio, data_fim:fim,
+        tipo:document.getElementById('editTipo').value,
+        notas:document.getElementById('editNotas').value})
+    }).then(r=>r.json()).then(function(d){
+      if (d.ok) location.reload(); else { alert('Erro: '+d.error); btn.disabled=false; btn.textContent='💾 Guardar'; }
+    });
+  } else {
+    fetch('/ferias/periodo/adicionar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        funcionario_id: document.getElementById('editFunc').value,
+        data_inicio:inicio, data_fim:fim,
+        tipo:document.getElementById('editTipo').value,
+        notas:document.getElementById('editNotas').value
+      })
+    }).then(r=>r.json()).then(function(d){
+      if (d.ok) location.reload(); else { alert('Erro: '+d.error); btn.disabled=false; btn.textContent='💾 Guardar'; }
+    });
+  }
+}
+function eliminarPeriodo() {
+  var pid = document.getElementById('editId').value;
+  if (!confirm('Eliminar este período de férias?')) return;
+  fetch('/ferias/periodo/'+pid+'/eliminar',{method:'POST'})
+    .then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); });
+}
+
+// ── Feriado modal ─────────────────────────────────────────────────────────────
+function abrirAddFeriado() {
+  var hoje = new Date(); var hs = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
+  document.getElementById('ferData').value = hs;
+  document.getElementById('ferNome').value = '';
+  document.getElementById('ferTipo').value = 'nacional';
+  document.getElementById('feriadoModal').style.display = 'flex';
+}
+function abrirAddFeriadoData(ds) {
+  document.getElementById('ferData').value = ds;
+  document.getElementById('ferNome').value = '';
+  document.getElementById('ferTipo').value = 'nacional';
+  document.getElementById('feriadoModal').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('ferNome').focus(); },100);
+}
+function fecharFeriado(){ document.getElementById('feriadoModal').style.display = 'none'; }
+function guardarFeriado() {
+  fetch('/ferias/feriado/adicionar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      data: document.getElementById('ferData').value,
+      nome: document.getElementById('ferNome').value.trim() || 'Feriado',
+      tipo: document.getElementById('ferTipo').value
+    })
+  }).then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); else alert('Erro: '+d.error); });
+}
+function removeFeriado(fer) {
+  if (!confirm('Remover "'+fer.nome+'"?')) return;
+  fetch('/ferias/feriado/'+fer.id+'/eliminar',{method:'POST'})
+    .then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); });
+}
+
+document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)fecharModal();});
+document.getElementById('feriadoModal').addEventListener('click',function(e){if(e.target===this)fecharFeriado();});
+
+buildCalendar();
+</script>
+{% endblock %}

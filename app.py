@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -2978,6 +2978,180 @@ class EquipamentoConsumivel(db.Model):
 
 # ── PERFIS E PERMISSÕES ──────────────────────────────────────────────────────
 
+# ── MAPA DE FÉRIAS ─────────────────────────────────────────────────────────────
+
+# Palette of distinct colors for employees
+FERIAS_CORES = [
+    '#3b6ef0','#22c55e','#f59e0b','#ef4444','#a855f7',
+    '#06b6d4','#ec4899','#10b981','#f97316','#6366f1',
+    '#84cc16','#14b8a6','#e11d48','#7c3aed','#0891b2',
+]
+
+def _ferias_cor(funcionario_id):
+    """Assign a stable color to each employee."""
+    return FERIAS_CORES[(funcionario_id - 1) % len(FERIAS_CORES)]
+
+# Default Portuguese public holidays
+PT_FERIADOS = [
+    (1,1,'Ano Novo'),(4,25,'25 de Abril'),(5,1,'Dia do Trabalhador'),
+    (6,10,'Dia de Portugal'),(8,15,'Assunção de Nossa Senhora'),
+    (10,5,'Implantação da República'),(11,1,'Dia de Todos os Santos'),
+    (12,1,'Restauração da Independência'),(12,8,'Imaculada Conceição'),
+    (12,25,'Natal'),
+]
+
+@app.route('/ferias')
+@login_required
+def ferias_mapa():
+    from datetime import date
+    ano = int(request.args.get('ano', date.today().year))
+    # Get all employees
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()         if hasattr(Funcionario, 'ativo') else         Funcionario.query.order_by(Funcionario.nome).all()
+    # Get periodos for this year
+    periodos = FeriasPeriodo.query.filter_by(ano=ano).all()
+    # Get feriados for this year
+    feriados = FeriasFeriado.query.filter_by(ano=ano).all()
+    # If no feriados exist for this year, seed defaults
+    if not feriados:
+        for mes, dia, nome in PT_FERIADOS:
+            try:
+                db.session.add(FeriasFeriado(
+                    ano=ano, data=date(ano,mes,dia), nome=nome, tipo='nacional'))
+            except: pass
+        try: db.session.commit()
+        except: db.session.rollback()
+        feriados = FeriasFeriado.query.filter_by(ano=ano).all()
+    import json
+    periodos_json = json.dumps([{
+        'id': p.id,
+        'funcionario_id': p.funcionario_id,
+        'funcionario_nome': p.funcionario.nome if p.funcionario else '?',
+        'data_inicio': p.data_inicio.isoformat(),
+        'data_fim': p.data_fim.isoformat(),
+        'tipo': p.tipo,
+        'notas': p.notas or '',
+        'cor': p.cor or _ferias_cor(p.funcionario_id),
+    } for p in periodos])
+    feriados_json = json.dumps([{
+        'id': f.id, 'data': f.data.isoformat(),
+        'nome': f.nome, 'tipo': f.tipo,
+    } for f in feriados])
+    return render_template('ferias.html',
+        ano=ano, funcs=funcs,
+        periodos_json=periodos_json,
+        feriados_json=feriados_json,
+        func_cores=json.dumps({f.id: _ferias_cor(f.id) for f in funcs}))
+
+@app.route('/ferias/periodo/adicionar', methods=['POST'])
+@login_required
+def ferias_add():
+    data = request.get_json() or {}
+    from datetime import date as _d
+    try:
+        inicio = datetime.strptime(data['data_inicio'], '%Y-%m-%d').date()
+        fim    = datetime.strptime(data['data_fim'],    '%Y-%m-%d').date()
+    except: return jsonify({'ok': False, 'error': 'Datas inválidas'})
+    p = FeriasPeriodo(
+        funcionario_id=int(data['funcionario_id']),
+        ano=inicio.year, data_inicio=inicio, data_fim=fim,
+        tipo=data.get('tipo','ferias'),
+        notas=data.get('notas','').strip(),
+        cor=data.get('cor',''),
+        criado_por=current_user.id, criado_em=datetime.now()
+    )
+    db.session.add(p); db.session.commit()
+    from models import Funcionario as F
+    f = F.query.get(p.funcionario_id)
+    return jsonify({'ok': True, 'id': p.id,
+        'cor': p.cor or _ferias_cor(p.funcionario_id),
+        'funcionario_nome': f.nome if f else '?'})
+
+@app.route('/ferias/periodo/<int:pid>/editar', methods=['POST'])
+@login_required
+def ferias_editar(pid):
+    p = FeriasPeriodo.query.get_or_404(pid)
+    data = request.get_json() or {}
+    if 'data_inicio' in data:
+        p.data_inicio = datetime.strptime(data['data_inicio'], '%Y-%m-%d').date()
+    if 'data_fim' in data:
+        p.data_fim = datetime.strptime(data['data_fim'], '%Y-%m-%d').date()
+    if 'notas' in data: p.notas = data['notas']
+    if 'tipo'  in data: p.tipo  = data['tipo']
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/ferias/periodo/<int:pid>/eliminar', methods=['POST'])
+@login_required
+def ferias_eliminar(pid):
+    p = FeriasPeriodo.query.get_or_404(pid)
+    db.session.delete(p); db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/ferias/feriado/adicionar', methods=['POST'])
+@login_required
+def feriado_add():
+    data = request.get_json() or {}
+    try: dt = datetime.strptime(data['data'], '%Y-%m-%d').date()
+    except: return jsonify({'ok': False, 'error': 'Data inválida'})
+    # Check if exists
+    existing = FeriasFeriado.query.filter_by(data=dt).first()
+    if existing:
+        existing.nome = data.get('nome', existing.nome)
+        existing.tipo = data.get('tipo', existing.tipo)
+        db.session.commit()
+        return jsonify({'ok': True, 'id': existing.id})
+    f = FeriasFeriado(ano=dt.year, data=dt,
+        nome=data.get('nome','Feriado'), tipo=data.get('tipo','nacional'))
+    db.session.add(f); db.session.commit()
+    return jsonify({'ok': True, 'id': f.id})
+
+@app.route('/ferias/feriado/<int:fid>/eliminar', methods=['POST'])
+@login_required
+def feriado_eliminar(fid):
+    f = FeriasFeriado.query.get_or_404(fid)
+    db.session.delete(f); db.session.commit()
+    return jsonify({'ok': True})
+
+# ── USER STATUS ────────────────────────────────────────────────────────────────
+
+@app.route('/api/user/heartbeat', methods=['POST'])
+@login_required
+def user_heartbeat():
+    us = UserSession.query.filter_by(user_id=current_user.id).first()
+    if us:
+        us.last_seen = datetime.now()
+    else:
+        db.session.add(UserSession(user_id=current_user.id, last_seen=datetime.now()))
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/users/status')
+@login_required
+def api_users_status():
+    from datetime import timedelta
+    now = datetime.now()
+    sessions = UserSession.query.all()
+    result = []
+    for s in sessions:
+        diff = (now - s.last_seen).total_seconds()
+        if diff < 120:     status = 'online'
+        elif diff < 3600:  status = 'recente'
+        else:              status = 'offline'
+        result.append({
+            'nome': s.user.nome if s.user else '?',
+            'status': status,
+            'mins': int(diff // 60),
+        })
+    # Add users never seen
+    all_users = User.query.filter_by(approved=True).all()         if hasattr(User, 'approved') else User.query.all()
+    seen_ids = {s.user_id for s in sessions}
+    for u in all_users:
+        if u.id not in seen_ids:
+            result.append({'nome': u.nome, 'status': 'offline', 'mins': None})
+    result.sort(key=lambda x: (0 if x['status']=='online' else 1 if x['status']=='recente' else 2, x['nome']))
+    return jsonify(result)
+
+
 # ── MÓDULO FICHAS TÉCNICAS ────────────────────────────────────────────────────
 
 UPLOAD_FICHAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'fichas')
@@ -3172,6 +3346,7 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
+    ('ferias',             '🏖 Mapa de Férias'),
     ('fichas',             '📋 Fichas Técnicas'),
     ('assistencias',       '🔧 Assistências'),
     ('entradas',           '📥 Entradas'),
