@@ -2938,9 +2938,11 @@ class Equipamento(db.Model):
     cliente_nome    = db.Column(db.String(200))
     embarcacao      = db.Column(db.String(200))
     # Motor
+    motor_marca     = db.Column(db.String(100))
     motor_modelo    = db.Column(db.String(200))
     motor_potencia  = db.Column(db.String(50))
     serial_number   = db.Column(db.String(100), index=True)
+    catalogo        = db.Column(db.String(100))
     base_code       = db.Column(db.String(100))
     manufactured_date = db.Column(db.String(50))
     # Caixa Redutora
@@ -3190,6 +3192,7 @@ def ficha_nova():
             grupo_modelo=request.form.get('grupo_modelo','').strip(),
             grupo_serie=request.form.get('grupo_serie','').strip(),
             grupo_ano=request.form.get('grupo_ano','').strip(),
+            motor_marca=request.form.get('motor_marca','').strip(),
             motor_marca=request.form.get('motor_marca','').strip(),
             motor_modelo=request.form.get('motor_modelo','').strip(),
             motor_serie=request.form.get('motor_serie','').strip(),
@@ -5295,6 +5298,7 @@ def tecnico_novo():
         e = Equipamento(
             cliente_nome=request.form.get('cliente_nome','').strip(),
             embarcacao=request.form.get('embarcacao','').strip(),
+            motor_marca=request.form.get('motor_marca','').strip(),
             motor_modelo=request.form.get('motor_modelo','').strip(),
             motor_potencia=request.form.get('motor_potencia','').strip(),
             serial_number=request.form.get('serial_number','').strip(),

@@ -53,7 +53,7 @@
       onclick="document.getElementById('pdfInput').click()"
       ondragover="event.preventDefault();this.classList.add('drag')"
       ondragleave="this.classList.remove('drag')"
-      ondrop="event.preventDefault();this.classList.remove('drag');document.getElementById('pdfInput').files=event.dataTransfer.files;mostrarFicheiros(document.getElementById('pdfInput'))">
+      ondrop="event.preventDefault();this.classList.remove('drag');handleDrop(event.dataTransfer.files)">
       <div style="font-size:36px;margin-bottom:10px">📂</div>
       <div style="font-size:14px;font-weight:600;margin-bottom:4px">Clique ou arraste os PDFs aqui</div>
       <div style="font-size:12px;color:var(--text-muted)">Pode seleccionar múltiplos ficheiros</div>
@@ -64,7 +64,7 @@
       <div id="fileItems"></div>
     </div>
     <div style="margin-top:12px;text-align:right">
-      <button type="submit" id="submitBtn" class="btn btn-primary" style="display:none">🚀 Upload e Associar</button>
+      <button type="submit" id="submitBtn" class="btn btn-primary">🚀 Importar Todos</button>
     </div>
   </form>
 </div>
@@ -165,7 +165,21 @@ function mostrarFicheiros(input) {
         (found ? '✅ match' : code ? '📁 outros' : '📁 outros') + '</span>' +
       '</div>';
   }).join('');
-  document.getElementById('submitBtn').style.display = 'block';
+  // Button always visible
+}
+
+function handleDrop(files) {
+  // Create a DataTransfer to assign to input
+  try {
+    var dt = new DataTransfer();
+    Array.from(files).forEach(function(f){ dt.items.add(f); });
+    document.getElementById('pdfInput').files = dt.files;
+    mostrarFicheiros(document.getElementById('pdfInput'));
+  } catch(e) {
+    // Fallback: just show count
+    document.getElementById('fileList').style.display = 'block';
+    document.getElementById('fileItems').innerHTML = '<div style="color:var(--text-muted);font-size:12px">' + files.length + ' ficheiro(s) seleccionado(s) via drag-drop. Clique em Importar.</div>';
+  }
 }
 </script>
 {% endblock %}

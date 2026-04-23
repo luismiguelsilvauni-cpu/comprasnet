@@ -266,6 +266,7 @@ class Embarcacao(db.Model):
     notas            = db.Column(db.Text)
     criado_em        = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em    = db.Column(db.DateTime, default=datetime.utcnow)
+    foto_path        = db.Column(db.String(300))   # main photo
     componentes      = db.relationship('ComponenteEmbarcacao', backref='embarcacao',
                                        lazy=True, cascade='all, delete-orphan')
 
@@ -279,7 +280,10 @@ class ComponenteEmbarcacao(db.Model):
     label            = db.Column(db.String(200))   # display name
     marca            = db.Column(db.String(100))
     modelo           = db.Column(db.String(100))
+    potencia         = db.Column(db.String(50))    # kW / CV
     num_serie        = db.Column(db.String(100))
+    catalogo         = db.Column(db.String(100))   # catalog ref
+    base_code        = db.Column(db.String(100))   # base/build code
     ano              = db.Column(db.Integer)
     # Flexible extra fields stored as JSON: [{"campo":"Diâmetro","valor":"50mm"}, ...]
     campos_extra     = db.Column(db.Text, default='[]')

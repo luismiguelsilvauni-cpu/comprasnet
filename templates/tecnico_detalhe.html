@@ -62,16 +62,37 @@
 .docrow:hover{border-color:var(--accent)}
 </style>
 
+{% set foto_doc = documentos|selectattr('componente','eq','foto_principal')|first if documentos else none %}
+<!-- Foto da embarcação -->
+<div style="display:flex;gap:16px;margin-bottom:14px;align-items:flex-start">
+  <div style="flex-shrink:0;width:200px;height:150px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2);position:relative">
+    {% if foto_doc %}
+    <img src="{{ url_for('tecnico_doc_preview', did=foto_doc.id) }}" style="width:100%;height:100%;object-fit:cover">
+    {% else %}
+    <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-direction:column;gap:6px">
+      <div style="font-size:36px">⚓</div>
+      <div style="font-size:11px">Sem foto</div>
+    </div>
+    {% endif %}
+    <label style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.6);color:white;padding:4px 8px;border-radius:5px;font-size:11px;cursor:pointer">
+      📷 Foto
+      <input type="file" accept="image/*" style="display:none" onchange="uploadFoto(this)">
+    </label>
+  </div>
+  <div style="flex:1">
 <!-- Header -->
 <div class="eq-header">
   <div class="eq-f"><label>Cliente</label><span>{{ equipamento.cliente_nome or '—' }}</span></div>
   <div class="eq-f"><label>Embarcação</label><span style="color:var(--accent)">{{ equipamento.embarcacao or '—' }}</span></div>
-  <div class="eq-f"><label>Motor</label><span>{{ equipamento.motor_modelo or '—' }}</span></div>
+  <div class="eq-f"><label>Marca Motor</label><span>{{ equipamento.motor_marca or '—' }}</span></div>
+  <div class="eq-f"><label>Modelo Motor</label><span>{{ equipamento.motor_modelo or '—' }}</span></div>
   <div class="eq-f"><label>Potência</label><span>{{ equipamento.motor_potencia or '—' }}</span></div>
   <div class="eq-f"><label>Nº Série</label><span class="mono">{{ equipamento.serial_number or '—' }}</span></div>
-  <div class="eq-f"><label>Caixa Red.</label><span>{{ equipamento.caixa_modelo or '—' }}</span></div>
-  <div class="eq-f"><label>Ratio</label><span class="mono">{{ equipamento.caixa_ratio or '—' }}</span></div>
-  <div class="eq-f"><label>Série Caixa</label><span class="mono">{{ equipamento.caixa_serial or '—' }}</span></div>
+  <div class="eq-f"><label>Catálogo</label><span class="mono">{{ equipamento.catalogo or '—' }}</span></div>
+  <div class="eq-f"><label>Base Code</label><span class="mono">{{ equipamento.base_code or equipamento.material or '—' }}</span></div>
+  <div class="eq-f"><label>Caixa Redutora / Alternador</label><span>{{ equipamento.caixa_modelo or '—' }}</span></div>
+  <div class="eq-f"><label>Ratio/Potência</label><span class="mono">{{ equipamento.caixa_ratio or '—' }}</span></div>
+  <div class="eq-f"><label>Nº Série</label><span class="mono">{{ equipamento.caixa_serial or '—' }}</span></div>
   {% if equipamento.material or equipamento.manufacturing_date or equipamento.base_engine_pt or equipamento.base_engine_eng or equipamento.fuel_system_pt or equipamento.fuel_system_eng %}
   <div style="flex-basis:100%;border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
     {% if equipamento.material %}
