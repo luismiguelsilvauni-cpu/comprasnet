@@ -3193,7 +3193,6 @@ def ficha_nova():
             grupo_serie=request.form.get('grupo_serie','').strip(),
             grupo_ano=request.form.get('grupo_ano','').strip(),
             motor_marca=request.form.get('motor_marca','').strip(),
-            motor_marca=request.form.get('motor_marca','').strip(),
             motor_modelo=request.form.get('motor_modelo','').strip(),
             motor_serie=request.form.get('motor_serie','').strip(),
             motor_potencia=request.form.get('motor_potencia','').strip(),
