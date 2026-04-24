@@ -666,6 +666,8 @@ function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&q
 function guardarLinha(lid, idx) {
   if (!lid) { alert('Guarde o pedido primeiro para poder editar linhas individualmente.'); return; }
   var l = linhas[idx];
+  var fj = l.fornecedores_json || [];
+  if (typeof fj === 'string') { try { fj = JSON.parse(fj); } catch(e){ fj=[]; } }
   fetch('/pedidos/linha/' + lid + '/editar', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -673,6 +675,8 @@ function guardarLinha(lid, idx) {
       referencia: l.referencia || '',
       quantidade: l.quantidade,
       unidade: l.unidade,
+      cliente_id: l.cliente_id || null,
+      fornecedores: fj,
     })
   }).then(r=>r.json()).then(d=>{
     if (d.ok) {
@@ -970,7 +974,7 @@ function searchLinhaFornDet(idx, q) {
         });
         dd.style.display = 'block';
       });
-  }, 200);
+  }, 80);
 }
 
 function addFornDet(idx, fid, fnome) {

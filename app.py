@@ -331,7 +331,11 @@ def linha_editar(lid):
         l.cliente_id = int(cid) if str(cid).strip() else None
     if 'fornecedores_json' in data:
         import json as _j
-        l.fornecedores_json = _j.dumps(data['fornecedores_json'])
+        fj = data['fornecedores_json']
+        l.fornecedores_json = _j.dumps(fj) if isinstance(fj, list) else fj
+    if 'fornecedores' in data:
+        import json as _jj
+        l.fornecedores_json = _jj.dumps(data['fornecedores'])
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -536,7 +540,8 @@ def salvar_linhas(pid):
             preco_pcp_ref   = float(artigo.preco_custo_ponderado if artigo else 0),
             fornecedor_hab  = l.get('fornecedor_hab','').strip(),
             observacoes     = l.get('observacoes','').strip(),
-            cliente_id      = int(l.get('cliente_id')) if l.get('cliente_id') else None
+            cliente_id      = int(l.get('cliente_id')) if str(l.get('cliente_id','')).strip() else None,
+            fornecedores_json = __import__('json').dumps(l.get('fornecedores',[]) or l.get('fornecedores_json',[]))
         )
         db.session.add(linha)
     db.session.commit()
@@ -4953,7 +4958,7 @@ def api_registar_commit():
 @login_required
 def api_fornecedores():
     q = request.args.get('q','').strip()
-    # Try local FornecedorPHC table
+    # Try local FornecedorPHC table FIRST (fast - no network)
     try:
         if q:
             local = FornecedorPHC.query.filter(FornecedorPHC.nome.ilike(f'%{q}%')).limit(15).all()
@@ -4963,6 +4968,21 @@ def api_fornecedores():
             return jsonify([{'id': f.no, 'no': f.no, 'nome': f.nome, 'ncont': getattr(f,'ncont','')} for f in local])
     except Exception:
         pass
+    # Fallback: previous fornecedores from pedido lines
+    try:
+        import json as _jf
+        prev_forn = set()
+        results = []
+        for l in LinhaPedido.query.filter(LinhaPedido.fornecedores_json != None).limit(200).all():
+            for f in _jf.loads(l.fornecedores_json or '[]'):
+                if f.get('nome') and (not q or q.lower() in f['nome'].lower()):
+                    key = f.get('id','') or f['nome']
+                    if key not in prev_forn:
+                        prev_forn.add(key)
+                        results.append({'id': f.get('id',''), 'no': f.get('id',''), 'nome': f['nome'], 'ncont': ''})
+        if results:
+            return jsonify(results[:15])
+    except: pass
     # Query PHC cl table directly (fornecedores sao clientes com ncont)
     try:
         cfg_phc = ConfigPHC.query.first()
