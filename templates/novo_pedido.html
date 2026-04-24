@@ -110,7 +110,7 @@ function renderLinhas() {
   var html = '';
   for (var i = 0; i < linhas.length; i++) {
     var l = linhas[i];
-    html += '<div style="display:grid;grid-template-columns:110px 1fr 160px 180px 60px 60px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
+    html += '<div style="display:grid;grid-template-columns:110px 1fr 150px 160px 60px 50px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Referência PHC</div>';
     html += '<div style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:5px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:28px" onclick="abrirPesquisa(' + i + ')">' + (l.referencia || '<span style="color:var(--text-muted);font-weight:400">pesquisar</span>') + '</div>';
@@ -125,6 +125,13 @@ function renderLinhas() {
     var cNome = l.cliente_nome || '';
     html += '<input type="text" id="cli-' + i + '" value="' + esc(cNome === 'Stock Interno (default)' ? '' : cNome) + '" placeholder="Pesquisar cliente..." class="input" style="font-size:11px;padding:5px 6px" autocomplete="off" oninput="searchLinhaCli(' + i + ',this.value)" onfocus="searchLinhaCli(' + i + ',this.value)">';
     html += '<div id="cli-drop-' + i + '" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>';
+    html += '</div>'; // end cliente
+    // Fornecedor(es)
+    html += '<div style="position:relative">';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Fornecedor(es)</div>';
+    html += '<div id="forn-tags-' + i + '" style="min-height:18px;margin-bottom:3px;display:flex;flex-wrap:wrap;gap:2px"></div>';
+    html += '<input type="text" id="forn-inp-' + i + '" class="input" placeholder="Pesquisar..." style="font-size:11px;padding:4px 6px" autocomplete="off" oninput="searchLinhaForn(' + i + ',this.value)" onfocus="searchLinhaForn(' + i + ',this.value)">';
+    html += '<div id="forn-drop-' + i + '" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>';
     html += '</div>';
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Qtd</div>';

@@ -253,17 +253,15 @@ def api_dashboard_artigos_pedidos():
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
         hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
-        # Get cliente name - expire to force fresh read
+        # Get cliente name - use direct query bypassing cache
         cliente_nome = "Stock"
         try:
-            db.session.expire(pedido)
-            db.session.expire(linha)
-            if linha.cliente_id:
-                c = Cliente.query.get(linha.cliente_id)
-                if c: cliente_nome = c.nome
-            elif pedido.cliente_id:
-                c = Cliente.query.get(pedido.cliente_id)
-                if c: cliente_nome = c.nome
+            cid = linha.cliente_id or pedido.cliente_id
+            if cid:
+                row = db.session.execute(
+                    db.text('SELECT nome FROM clientes WHERE id = :id'), {'id': cid}
+                ).fetchone()
+                if row: cliente_nome = row[0]
         except: pass
         # Get fornecedores
         import json as _json
