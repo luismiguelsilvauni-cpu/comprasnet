@@ -821,26 +821,26 @@ function apagarSel(){
   c.forEach(x=>{var i=document.createElement('input');i.type='hidden';i.name='opcao_ids';i.value=x.value;f.appendChild(i);});
   document.body.appendChild(f);f.submit();
 }
+
+
 // ── Foto Principal ────────────────────────────────────────────────────────────
 function uploadFotoPrincipal(input) {
   if (!input.files[0]) return;
   var st = document.getElementById('fotoUploadStatus');
-  if(st) st.textContent = '⏳ A enviar...';
-  // Preview immediately
+  if (st) st.textContent = '⏳ A enviar...';
   var reader = new FileReader();
   reader.onload = function(e) {
-    var existing = document.getElementById('fotoImg');
-    var ph = document.getElementById('fotoPlaceholder');
+    var img = document.getElementById('fotoImg');
+    var ph  = document.getElementById('fotoPlaceholder');
     if (ph) ph.style.display = 'none';
-    if (!existing) {
+    if (!img) {
       var box = document.getElementById('fotoBox');
-      var img = document.createElement('img');
+      img = document.createElement('img');
       img.id = 'fotoImg';
       img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
       box.insertBefore(img, box.firstChild);
-      existing = img;
     }
-    existing.src = e.target.result;
+    img.src = e.target.result;
   };
   reader.readAsDataURL(input.files[0]);
   var fd = new FormData();
@@ -848,16 +848,17 @@ function uploadFotoPrincipal(input) {
   fetch('/tecnico/{{ equipamento.id }}/foto', {method:'POST', body:fd})
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if(st) st.textContent = d.ok ? '✅ Guardada!' : '❌ ' + (d.error||'erro');
-      if(d.ok) setTimeout(function(){ if(st) st.textContent=''; }, 3000);
+      if (st) { st.textContent = d.ok ? '\u2705 Guardada!' : '\u274c ' + (d.error||'erro'); }
+      if (d.ok) setTimeout(function(){ if(st) st.textContent=''; }, 3000);
     })
-    .catch(function(e){ if(st) st.textContent = '❌ ' + e; });
+    .catch(function(e){ if(st) st.textContent = '\u274c Erro: ' + e; });
 }
 
 // ── Galeria ───────────────────────────────────────────────────────────────────
 function uploadGaleria(files) {
   Array.from(files).forEach(function(file) {
-    var fd = new FormData(); fd.append('foto', file);
+    var fd = new FormData();
+    fd.append('foto', file);
     var xhr = new XMLHttpRequest();
     xhr.onload = function() {
       try {
@@ -868,11 +869,18 @@ function uploadGaleria(files) {
           var el = document.createElement('div');
           el.id = 'gfoto-' + d.id;
           el.style.cssText = 'position:relative;border-radius:6px;overflow:hidden;height:70px;border:1px solid var(--border)';
-          el.innerHTML = '<img src="' + d.url + '" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="abrirPreviewFoto('' + d.url + '','' + escJs(d.nome) + '')">' +
-            '<button onclick="apagarFoto(' + d.id + ')" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:18px;padding:0">×</button>';
-          grid.insertBefore(el, prog);
-          var ph = grid.querySelector('[data-semfotos]');
-          if (ph) ph.remove();
+          var img2 = document.createElement('img');
+          img2.src = d.url;
+          img2.style.cssText = 'width:100%;height:100%;object-fit:cover;cursor:pointer';
+          img2.onclick = (function(url, nome){ return function(){ abrirPreviewFoto(url, nome); }; })(d.url, d.nome);
+          var btn2 = document.createElement('button');
+          btn2.innerHTML = '\xd7';
+          btn2.style.cssText = 'position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:18px;padding:0';
+          btn2.onclick = (function(did){ return function(){ apagarFoto(did); }; })(d.id);
+          el.appendChild(img2);
+          el.appendChild(btn2);
+          if (prog) grid.insertBefore(el, prog);
+          else grid.appendChild(el);
         }
       } catch(e){}
     };
@@ -885,25 +893,24 @@ function apagarFoto(did) {
   if (!confirm('Apagar esta foto?')) return;
   fetch('/tecnico/documento/' + did + '/apagar', {method:'POST'})
     .then(function(r){ return r.json(); })
-    .then(function(d){
-      var el = document.getElementById('gfoto-' + did);
-      if (el) el.remove();
-    });
+    .then(function(){ var el = document.getElementById('gfoto-' + did); if (el) el.remove(); });
 }
 
 function abrirPreviewFoto(url, nome) {
-  var c = document.createElement('div');
-  c.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px';
-  c.innerHTML = '<div style="color:white;font-size:12px">' + escHtml(nome) +
-    ' <button onclick="this.closest('div').remove()" style="background:rgba(255,255,255,.15);border:none;color:white;padding:3px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✕</button></div>' +
-    '<img src="' + url + '" style="max-width:90vw;max-height:85vh;object-fit:contain;border-radius:8px">';
-  c.onclick = function(e){ if(e.target===this) this.remove(); };
-  document.body.appendChild(c);
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;cursor:pointer';
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '\u2715 Fechar';
+  closeBtn.style.cssText = 'background:rgba(255,255,255,.15);border:none;color:white;padding:5px 14px;border-radius:5px;cursor:pointer;font-size:12px';
+  closeBtn.onclick = function(){ overlay.remove(); };
+  var img3 = document.createElement('img');
+  img3.src = url;
+  img3.style.cssText = 'max-width:90vw;max-height:85vh;object-fit:contain;border-radius:8px';
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(img3);
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
 }
-
-function escJs(s){ return (s||'').replace(/\/g,'\\').replace(/'/g,"\'"); }
-function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
 
 </script>
 <!-- Outros Ficheiros Modal -->

@@ -253,14 +253,16 @@ def api_dashboard_artigos_pedidos():
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
         hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
-        # Get cliente name
+        # Get cliente name - expire to force fresh read
         cliente_nome = "Stock"
         try:
+            db.session.expire(pedido)
+            db.session.expire(linha)
             if linha.cliente_id:
-                c = db.session.get(Cliente, linha.cliente_id)
+                c = Cliente.query.get(linha.cliente_id)
                 if c: cliente_nome = c.nome
             elif pedido.cliente_id:
-                c = db.session.get(Cliente, pedido.cliente_id)
+                c = Cliente.query.get(pedido.cliente_id)
                 if c: cliente_nome = c.nome
         except: pass
         # Get fornecedores

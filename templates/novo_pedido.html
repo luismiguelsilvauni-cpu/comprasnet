@@ -138,6 +138,10 @@ function renderLinhas() {
     html += '</div>';
   }
   c.innerHTML = html;
+  // Render fornecedor tags for all lines
+  for (var j = 0; j < linhas.length; j++) {
+    renderFornTags(j);
+  }
 }
 
 function esc(s) {
