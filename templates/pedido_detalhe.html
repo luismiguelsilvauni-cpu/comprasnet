@@ -933,12 +933,20 @@ function renderFornTagsDet(idx) {
   var el = document.getElementById('forn-tags-' + idx);
   if (!el) return;
   var fors = linhas[idx].fornecedores_json || [];
-  if (typeof fors === 'string') try { fors = JSON.parse(fors); } catch(e){ fors=[]; }
-  el.innerHTML = fors.map(function(f){
-    return '<span style="display:inline-flex;align-items:center;gap:2px;background:var(--accent);color:white;font-size:9px;padding:1px 5px;border-radius:8px">' +
-      escHtml(f.nome.split(' ')[0]) +
-      '<button onclick="removeFornDet(' + idx + ','' + String(f.id).replace(/'/g,"\'") + '')" style="background:none;border:none;color:white;cursor:pointer;font-size:11px;padding:0 1px;line-height:1">×</button></span>';
-  }).join('');
+  if (typeof fors === 'string') { try { fors = JSON.parse(fors); } catch(e){ fors=[]; } }
+  el.innerHTML = '';
+  fors.forEach(function(f) {
+    var span = document.createElement('span');
+    span.style.cssText = 'display:inline-flex;align-items:center;gap:2px;background:var(--accent);color:white;font-size:9px;padding:1px 5px;border-radius:8px;margin:1px';
+    var txt = document.createTextNode(f.nome.split(' ')[0]);
+    span.appendChild(txt);
+    var btn = document.createElement('button');
+    btn.innerHTML = '×';
+    btn.style.cssText = 'background:none;border:none;color:white;cursor:pointer;font-size:11px;padding:0 2px;line-height:1';
+    btn.onclick = (function(i2, fid){ return function(e){ e.stopPropagation(); removeFornDet(i2, fid); }; })(idx, f.id);
+    span.appendChild(btn);
+    el.appendChild(span);
+  });
 }
 
 function searchLinhaFornDet(idx, q) {
