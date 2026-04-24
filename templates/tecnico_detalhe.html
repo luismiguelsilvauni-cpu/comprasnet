@@ -821,6 +821,90 @@ function apagarSel(){
   c.forEach(x=>{var i=document.createElement('input');i.type='hidden';i.name='opcao_ids';i.value=x.value;f.appendChild(i);});
   document.body.appendChild(f);f.submit();
 }
+// ── Foto Principal ────────────────────────────────────────────────────────────
+function uploadFotoPrincipal(input) {
+  if (!input.files[0]) return;
+  var st = document.getElementById('fotoUploadStatus');
+  if(st) st.textContent = '⏳ A enviar...';
+  // Preview immediately
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var existing = document.getElementById('fotoImg');
+    var ph = document.getElementById('fotoPlaceholder');
+    if (ph) ph.style.display = 'none';
+    if (!existing) {
+      var box = document.getElementById('fotoBox');
+      var img = document.createElement('img');
+      img.id = 'fotoImg';
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+      box.insertBefore(img, box.firstChild);
+      existing = img;
+    }
+    existing.src = e.target.result;
+  };
+  reader.readAsDataURL(input.files[0]);
+  var fd = new FormData();
+  fd.append('foto', input.files[0]);
+  fetch('/tecnico/{{ equipamento.id }}/foto', {method:'POST', body:fd})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(st) st.textContent = d.ok ? '✅ Guardada!' : '❌ ' + (d.error||'erro');
+      if(d.ok) setTimeout(function(){ if(st) st.textContent=''; }, 3000);
+    })
+    .catch(function(e){ if(st) st.textContent = '❌ ' + e; });
+}
+
+// ── Galeria ───────────────────────────────────────────────────────────────────
+function uploadGaleria(files) {
+  Array.from(files).forEach(function(file) {
+    var fd = new FormData(); fd.append('foto', file);
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function() {
+      try {
+        var d = JSON.parse(xhr.responseText);
+        if (d.ok) {
+          var grid = document.getElementById('galeriaGrid');
+          var prog = document.getElementById('galeriaProgressos');
+          var el = document.createElement('div');
+          el.id = 'gfoto-' + d.id;
+          el.style.cssText = 'position:relative;border-radius:6px;overflow:hidden;height:70px;border:1px solid var(--border)';
+          el.innerHTML = '<img src="' + d.url + '" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="abrirPreviewFoto('' + d.url + '','' + escJs(d.nome) + '')">' +
+            '<button onclick="apagarFoto(' + d.id + ')" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:18px;padding:0">×</button>';
+          grid.insertBefore(el, prog);
+          var ph = grid.querySelector('[data-semfotos]');
+          if (ph) ph.remove();
+        }
+      } catch(e){}
+    };
+    xhr.open('POST', '/tecnico/{{ equipamento.id }}/foto-galeria');
+    xhr.send(fd);
+  });
+}
+
+function apagarFoto(did) {
+  if (!confirm('Apagar esta foto?')) return;
+  fetch('/tecnico/documento/' + did + '/apagar', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var el = document.getElementById('gfoto-' + did);
+      if (el) el.remove();
+    });
+}
+
+function abrirPreviewFoto(url, nome) {
+  var c = document.createElement('div');
+  c.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px';
+  c.innerHTML = '<div style="color:white;font-size:12px">' + escHtml(nome) +
+    ' <button onclick="this.closest('div').remove()" style="background:rgba(255,255,255,.15);border:none;color:white;padding:3px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✕</button></div>' +
+    '<img src="' + url + '" style="max-width:90vw;max-height:85vh;object-fit:contain;border-radius:8px">';
+  c.onclick = function(e){ if(e.target===this) this.remove(); };
+  document.body.appendChild(c);
+}
+
+function escJs(s){ return (s||'').replace(/\/g,'\\').replace(/'/g,"\'"); }
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+
 </script>
 <!-- Outros Ficheiros Modal -->
 <div id="outrosModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto">

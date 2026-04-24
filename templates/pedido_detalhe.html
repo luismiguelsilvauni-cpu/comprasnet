@@ -619,7 +619,10 @@ function renderLinhas(){
       <td class="mono text-muted">${l.unidade}</td>
       <td class="mono ${l.stock_atual<=0?'text-danger':l.stock_atual<5?'text-warning':'text-success'}">${(l.stock_atual||0).toFixed(2)}</td>
       <td style="font-size:11px">${fornHab(l)}</td>
-      <td><button onclick="removerLinha(this)" class="btn btn-danger btn-sm" style="padding:3px 7px">✕</button></td>
+      <td style="display:flex;gap:3px">
+        <button onclick="guardarLinha(${l.id},${i})" class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" title="Guardar">💾</button>
+        <button onclick="removerLinha(this)" class="btn btn-danger btn-sm" style="padding:3px 6px">✕</button>
+      </td>
     </tr>`).join('');
   document.getElementById('linhaCount').textContent = `(${linhas.length})`;
   const empty = document.getElementById('emptyLinhas');
@@ -636,6 +639,25 @@ function criarTabela(){
 }
 
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function guardarLinha(lid, idx) {
+  if (!lid) { alert('Guarde o pedido primeiro para poder editar linhas individualmente.'); return; }
+  var l = linhas[idx];
+  fetch('/pedidos/linha/' + lid + '/editar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      designacao: l.designacao,
+      referencia: l.referencia || '',
+      quantidade: l.quantidade,
+      unidade: l.unidade,
+    })
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok) {
+      var btn = document.querySelector('[onclick="guardarLinha('+lid+','+idx+')"]');
+      if (btn) { btn.textContent='✅'; setTimeout(function(){ btn.textContent='💾'; },1500); }
+    } else alert('Erro: '+d.error);
+  });
+}
 
 function guardarLinhas(){
   fetch('/pedidos/{{ pedido.id }}/linhas', {

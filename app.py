@@ -314,6 +314,37 @@ def pedido_estado(pid):
     return jsonify({'ok': True})
 
 
+@app.route('/pedidos/linha/<int:lid>/editar', methods=['POST'])
+@login_required
+def linha_editar(lid):
+    l = LinhaPedido.query.get_or_404(lid)
+    data = request.get_json() or {}
+    if 'designacao'  in data: l.designacao  = data['designacao'].strip()
+    if 'referencia'  in data: l.referencia  = data['referencia'].strip()
+    if 'quantidade'  in data:
+        try: l.quantidade = float(data['quantidade'])
+        except: pass
+    if 'unidade'     in data: l.unidade     = data['unidade'].strip()
+    if 'observacoes' in data: l.observacoes = data['observacoes'].strip()
+    if 'cliente_id'  in data:
+        cid = data['cliente_id']
+        l.cliente_id = int(cid) if str(cid).strip() else None
+    if 'fornecedores_json' in data:
+        import json as _j
+        l.fornecedores_json = _j.dumps(data['fornecedores_json'])
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/pedidos/linha/<int:lid>/eliminar', methods=['POST'])
+@login_required
+def linha_eliminar(lid):
+    l = LinhaPedido.query.get_or_404(lid)
+    pid = l.pedido_id
+    db.session.delete(l)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 @app.route('/pedidos/<int:pid>/editar', methods=['POST'])
 @login_required
 def pedido_editar(pid):
