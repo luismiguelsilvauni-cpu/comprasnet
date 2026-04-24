@@ -6239,6 +6239,32 @@ def extrair_factory_code(filename):
             break
     return code, catalog
 
+@app.route('/tecnico/<int:eid>/foto', methods=['POST'])
+@login_required
+def tecnico_foto(eid):
+    e = Equipamento.query.get_or_404(eid)
+    f = request.files.get('foto')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import uuid
+    ext = os.path.splitext(f.filename)[1].lower()
+    nome = f'foto_{eid}_{uuid.uuid4().hex[:8]}{ext}'
+    ensure_upload_dir()
+    f.save(os.path.join(UPLOAD_TECNICO, nome))
+    # Remove old principal photo doc
+    old = EquipamentoDocumento.query.filter_by(equipamento_id=eid, componente='foto_principal').first()
+    if old:
+        try: os.remove(os.path.join(UPLOAD_TECNICO, old.pdf_path or ''))
+        except: pass
+        db.session.delete(old)
+    doc = EquipamentoDocumento(
+        equipamento_id=eid, componente='foto_principal',
+        titulo='Foto Principal', pdf_filename=f.filename, pdf_path=nome)
+    db.session.add(doc)
+    db.session.commit()
+    return jsonify({'ok': True, 'url': '/tecnico/documento/' + str(doc.id) + '/ver'})
+
+
 @app.route('/tecnico/<int:eid>/upload-bulk', methods=['GET', 'POST'])
 @login_required
 def tecnico_upload_bulk(eid):
