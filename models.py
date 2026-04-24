@@ -111,6 +111,7 @@ class LinhaPedido(db.Model):
     fornecedor_hab  = db.Column(db.String(200))
     observacoes     = db.Column(db.String(500))
     cliente_id      = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
+    fornecedores_json = db.Column(db.Text, default='[]')  # JSON list [{id,nome,nif}]
     status          = db.Column(db.String(20), default='nao_encomendado')  # nao_encomendado/pendente/recebido/cancelado
     # back-ref to PHC article for live data
     artigo          = db.relationship('ArtigoPHC', foreign_keys=[artigo_ref], lazy=True)

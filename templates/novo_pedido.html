@@ -110,7 +110,7 @@ function renderLinhas() {
   var html = '';
   for (var i = 0; i < linhas.length; i++) {
     var l = linhas[i];
-    html += '<div style="display:grid;grid-template-columns:110px 1fr 180px 60px 60px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
+    html += '<div style="display:grid;grid-template-columns:110px 1fr 160px 180px 60px 60px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
     html += '<div>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Referência PHC</div>';
     html += '<div style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:5px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:28px" onclick="abrirPesquisa(' + i + ')">' + (l.referencia || '<span style="color:var(--text-muted);font-weight:400">pesquisar</span>') + '</div>';
@@ -244,6 +244,60 @@ function selCli(id, nome) {
   document.getElementById('clienteSearchDrop').style.display = 'none';
 }
 
+
+// ── Fornecedor search per linha ───────────────────────────────────────────────
+var _fornTimer = null;
+function searchLinhaForn(idx, q) {
+  var dd = document.getElementById('forn-drop-' + idx);
+  if (!dd) return;
+  clearTimeout(_fornTimer);
+  _fornTimer = setTimeout(function(){
+    fetch('/api/fornecedores?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        dd.innerHTML = '';
+        list.forEach(function(f){
+          var d = document.createElement('div');
+          d.textContent = f.nome + (f.ncont ? ' · ' + f.ncont : '');
+          d.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border)';
+          d.onmouseenter = function(){ this.style.background='var(--surface2)'; };
+          d.onmouseleave = function(){ this.style.background=''; };
+          d.onclick = (function(i,fid,fnome){ return function(){ addFornecedor(i,fid,fnome); }; })(idx, f.id || f.no || '', f.nome);
+          dd.appendChild(d);
+        });
+        dd.style.display = list.length ? 'block' : 'none';
+      });
+  }, 200);
+}
+function addFornecedor(idx, fid, fnome) {
+  if (!linhas[idx].fornecedores) linhas[idx].fornecedores = [];
+  // Avoid duplicates
+  if (!linhas[idx].fornecedores.find(function(f){ return f.id == fid; })) {
+    linhas[idx].fornecedores.push({id: fid, nome: fnome});
+  }
+  document.getElementById('forn-inp-' + idx).value = '';
+  document.getElementById('forn-drop-' + idx).style.display = 'none';
+  renderFornTags(idx);
+}
+function removeFornecedor(idx, fid) {
+  linhas[idx].fornecedores = (linhas[idx].fornecedores || []).filter(function(f){ return f.id != fid; });
+  renderFornTags(idx);
+}
+function renderFornTags(idx) {
+  var el = document.getElementById('forn-tags-' + idx);
+  if (!el) return;
+  var fors = linhas[idx].fornecedores || [];
+  el.innerHTML = fors.map(function(f){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--accent);color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin:2px">' +
+      esc(f.nome.split(' ')[0]) +
+      '<button onclick="removeFornecedor(' + idx + ','' + f.id + '')" style="background:none;border:none;color:white;cursor:pointer;font-size:12px;padding:0 2px">×</button></span>';
+  }).join('');
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('[id^="forn-inp-"]')) {
+    document.querySelectorAll('[id^="forn-drop-"]').forEach(function(d){ d.style.display='none'; });
+  }
+});
 // ── Cliente search (per linha) ────────────────────────────────────────────────
 var _cliLTimer = null;
 function searchLinhaCli(idx, q) {
@@ -277,7 +331,7 @@ function searchLinhaCli(idx, q) {
 }
 function selLinhaCli(idx, id, nome) {
   linhas[idx].cliente_id = id;
-  linhas[idx].cliente_nome = nome === 'Stock Interno' ? '' : nome;
+  linhas[idx].cliente_nome = (nome === 'Stock Interno' || nome === '') ? '' : nome;
   var inp = document.getElementById('cli-' + idx);
   var dd  = document.getElementById('cli-drop-' + idx);
   if (inp) inp.value = (nome === 'Stock Interno') ? '' : nome;

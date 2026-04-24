@@ -253,18 +253,23 @@ def api_dashboard_artigos_pedidos():
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
         hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
-        # Get cliente name: pedido header takes priority (edited there)
-        cliente_nome = "—"
+        # Get cliente name
+        cliente_nome = "Stock"
         try:
-            # Pedido-level cliente first
-            if pedido.cliente_id:
-                c = db.session.get(Cliente, pedido.cliente_id)
-                if c: cliente_nome = c.nome
-            # Fall back to line-level if pedido has none
-            if cliente_nome == "—" and linha.cliente_id:
+            if linha.cliente_id:
                 c = db.session.get(Cliente, linha.cliente_id)
                 if c: cliente_nome = c.nome
+            elif pedido.cliente_id:
+                c = db.session.get(Cliente, pedido.cliente_id)
+                if c: cliente_nome = c.nome
         except: pass
+        # Get fornecedores
+        import json as _json
+        try:
+            forn_list = _json.loads(linha.fornecedores_json or '[]')
+        except: forn_list = []
+        forn_nomes = [f.get('nome','') for f in forn_list if f.get('nome')]
+        forn_ids   = [str(f.get('id','')) for f in forn_list if f.get('id')]
         rows.append({
             "linha_id": linha.id,
             "pedido_id": pedido.id,
@@ -275,6 +280,9 @@ def api_dashboard_artigos_pedidos():
             "data_pedido": pedido.data_criacao.strftime("%d/%m/%Y"),
             "criado_por": user.nome[:20] if user else "—",
             "cliente": cliente_nome,
+            "fornecedor": forn_nomes[0] if forn_nomes else "—",
+            "fornecedores_ids": forn_ids,
+            "fornecedores_nomes": forn_nomes,
             "status": s,
             "status_label": lbl,
             "status_color": col,
@@ -5880,6 +5888,10 @@ def tecnico_doc_upload(eid):
 @login_required
 def tecnico_doc_ver(did):
     d = EquipamentoDocumento.query.get_or_404(did)
+    import mimetypes
+    mime = mimetypes.guess_type(d.pdf_filename or d.pdf_path or '')[0] or 'application/octet-stream'
+    if mime.startswith('image/'):
+        return send_from_directory(UPLOAD_TECNICO, d.pdf_path, as_attachment=False)
     return send_from_directory(UPLOAD_TECNICO, d.pdf_path,
                                as_attachment=False, download_name=d.pdf_filename)
 
@@ -6238,6 +6250,27 @@ def extrair_factory_code(filename):
             code = p.upper()
             break
     return code, catalog
+
+@app.route('/tecnico/<int:eid>/foto-galeria', methods=['POST'])
+@login_required
+def tecnico_foto_galeria(eid):
+    Equipamento.query.get_or_404(eid)
+    f = request.files.get('foto')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import uuid, mimetypes
+    ext = os.path.splitext(f.filename)[1].lower()
+    nome = f'galeria_{eid}_{uuid.uuid4().hex[:8]}{ext}'
+    ensure_upload_dir()
+    f.save(os.path.join(UPLOAD_TECNICO, nome))
+    doc = EquipamentoDocumento(
+        equipamento_id=eid, componente='foto_galeria',
+        titulo=f.filename, pdf_filename=f.filename, pdf_path=nome)
+    db.session.add(doc); db.session.commit()
+    return jsonify({'ok': True, 'id': doc.id,
+        'url': '/tecnico/documento/' + str(doc.id) + '/ver',
+        'nome': doc.pdf_filename})
+
 
 @app.route('/tecnico/<int:eid>/foto', methods=['POST'])
 @login_required

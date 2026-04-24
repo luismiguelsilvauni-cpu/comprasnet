@@ -506,13 +506,23 @@ function carregarArtigosPedidos() {
       var tbl = document.createElement('table');
       tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px';
       var thead = '<thead style="position:sticky;top:0;background:var(--surface2);z-index:1"><tr>';
-      ['Estado','Artigo','Destino/Cliente','Qtd','Data Pedido','Criado Por','Data Estado','Alterado Por',''].forEach(function(h){
+      ['Estado','Artigo','Destino/Cliente','Fornecedor','Qtd','Data Pedido','Criado Por','Data Estado','Alterado Por',''].forEach(function(h){
         thead += '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)">' + h + '</th>';
       });
       thead += '</tr></thead>';
+      // Search bar
+      var searchDiv = document.createElement('div');
+      searchDiv.style.cssText = 'margin-bottom:8px;display:flex;gap:8px;align-items:center';
+      searchDiv.innerHTML = '<input type="text" id="apSearch" class="input" placeholder="🔍 Pesquisar artigo, cliente, fornecedor..." style="max-width:340px;font-size:12px" oninput="filtrarArtigosPedidos()">';
+      wrap.insertBefore(searchDiv, wrap.firstChild);
+
       var tbody = document.createElement('tbody');
       rows.forEach(function(r) {
         var tr = document.createElement('tr');
+        tr.className = 'ap-row';
+        tr.dataset.cliente = r.cliente || '';
+        tr.dataset.fornecedores = (r.fornecedores_nomes || []).join(' ');
+        tr.dataset.artigo = r.designacao || '';
         tr.style.cssText = 'border-bottom:1px solid var(--border)' + (r.dim ? ';opacity:0.5' : '');
         // Status cell
         var tdStatus = document.createElement('td');
@@ -538,9 +548,9 @@ function carregarArtigosPedidos() {
         }
         tr.appendChild(tdArt);
         // Simple cells
-        [r.cliente, r.quantidade + ' ' + r.unidade, r.data_pedido, r.criado_por, r.data_status, r.alterado_por].forEach(function(txt, i) {
+        [r.cliente, r.fornecedor, r.quantidade + ' ' + r.unidade, r.data_pedido, r.criado_por, r.data_status, r.alterado_por].forEach(function(txt, i) {
           var td = document.createElement('td');
-          td.style.cssText = 'padding:5px 8px;color:var(--text-muted)' + (i===1?';font-family:monospace':'') + (i===2||i===4?';white-space:nowrap':'') + (i===0?';font-weight:600;color:var(--text)':'');
+          td.style.cssText = 'padding:5px 8px;color:var(--text-muted)' + (i===2?';font-family:monospace':'') + (i===3||i===5?';white-space:nowrap':'') + (i===0||i===1?';font-weight:600;color:var(--text)':'');
           td.textContent = txt || '—';
           tr.appendChild(td);
         });
@@ -561,6 +571,17 @@ function carregarArtigosPedidos() {
       el.parentNode.replaceChild(wrap, el);
     })
     .catch(function(e){ console.error('artigos pedidos:', e); });
+
+function filtrarArtigosPedidos() {
+  var q = (document.getElementById('apSearch') || {value:''}).value.toLowerCase();
+  if (!q) { document.querySelectorAll('.ap-row').forEach(function(r){ r.style.display=''; }); return; }
+  document.querySelectorAll('.ap-row').forEach(function(r) {
+    var cli = (r.dataset.cliente || '').toLowerCase();
+    var forn = (r.dataset.fornecedores || '').toLowerCase();
+    var art = (r.dataset.artigo || '').toLowerCase();
+    r.style.display = (cli.includes(q) || forn.includes(q) || art.includes(q)) ? '' : 'none';
+  });
+}
 }
 
 function carregarCalendario() {
