@@ -266,7 +266,10 @@ def api_dashboard_artigos_pedidos():
         # Get fornecedores
         import json as _json
         try:
-            forn_list = _json.loads(linha.fornecedores_json or '[]')
+            forn_raw = linha.fornecedores_json or '[]'
+            forn_list = _json.loads(forn_raw) if isinstance(forn_raw, str) else forn_raw
+            # Handle case where items are strings instead of dicts
+            forn_list = [f if isinstance(f, dict) else {'nome': str(f), 'id': ''} for f in forn_list]
         except: forn_list = []
         forn_nomes = [f.get('nome','') for f in forn_list if f.get('nome')]
         forn_ids   = [str(f.get('id','')) for f in forn_list if f.get('id')]
