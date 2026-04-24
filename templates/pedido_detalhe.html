@@ -619,12 +619,7 @@ function renderLinhas(){
       <td class="mono text-muted">${l.unidade}</td>
       <td class="mono ${l.stock_atual<=0?'text-danger':l.stock_atual<5?'text-warning':'text-success'}">${(l.stock_atual||0).toFixed(2)}</td>
       <td style="font-size:11px">${fornHab(l)}</td>
-      <td style="min-width:140px;position:relative">
-        <div id="forn-tags-${i}" style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:3px"></div>
-        <input type="text" id="forn-inp-${i}" class="input" placeholder="+ Fornecedor" style="font-size:10px;padding:3px 6px" autocomplete="off"
-          oninput="searchLinhaFornDet(${i},this.value)" onfocus="searchLinhaFornDet(${i},this.value)">
-        <div id="forn-drop-${i}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2);font-size:11px"></div>
-      </td>
+      <td style='min-width:140px;position:relative' id='forn-cell-${i}'></td>
       <td style="display:flex;gap:3px">
         <button onclick="guardarLinha(${l.id},${i})" class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" title="Guardar">💾</button>
         <button onclick="removerLinha(this)" class="btn btn-danger btn-sm" style="padding:3px 6px">✕</button>
@@ -634,7 +629,27 @@ function renderLinhas(){
   const empty = document.getElementById('emptyLinhas');
   if(empty) empty.style.display = linhas.length ? 'none' : 'block';
   // Render fornecedor tags
-  linhas.forEach(function(l,i){ renderFornTagsDet(i); });
+  linhas.forEach(function(l,i){
+    var cell = document.getElementById('forn-cell-' + i);
+    if (!cell) return;
+    var tagsDiv = document.createElement('div');
+    tagsDiv.id = 'forn-tags-' + i;
+    tagsDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;margin-bottom:3px';
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.id = 'forn-inp-' + i;
+    inp.className = 'input'; inp.placeholder = '+ Fornecedor';
+    inp.autocomplete = 'off';
+    inp.style.cssText = 'font-size:10px;padding:3px 6px;width:100%';
+    inp.oninput = (function(idx){ return function(){ searchLinhaFornDet(idx, this.value); }; })(i);
+    inp.onfocus = (function(idx){ return function(){ searchLinhaFornDet(idx, this.value); }; })(i);
+    var dd = document.createElement('div');
+    dd.id = 'forn-drop-' + i;
+    dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2);font-size:11px';
+    cell.appendChild(tagsDiv);
+    cell.appendChild(inp);
+    cell.appendChild(dd);
+    renderFornTagsDet(i);
+  });
 }
 
 function criarTabela(){
