@@ -469,6 +469,7 @@ def pedido_detalhe(pid):
         'status': l.status or 'nao_encomendado',
         'cliente_id': l.cliente_id or '',
         'fornecedores_phc': _get_fornecedores_artigo(l.artigo_ref),
+        'fornecedores_json': l.fornecedores_json or '[]',
     } for l in p.linhas])
     return render_template('pedido_detalhe.html', pedido=p, orcamentos=orcs,
                            melhor=orcs[0] if orcs else None, linhas_json=linhas_json)

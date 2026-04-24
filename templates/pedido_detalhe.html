@@ -619,6 +619,12 @@ function renderLinhas(){
       <td class="mono text-muted">${l.unidade}</td>
       <td class="mono ${l.stock_atual<=0?'text-danger':l.stock_atual<5?'text-warning':'text-success'}">${(l.stock_atual||0).toFixed(2)}</td>
       <td style="font-size:11px">${fornHab(l)}</td>
+      <td style="min-width:140px;position:relative">
+        <div id="forn-tags-${i}" style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:3px"></div>
+        <input type="text" id="forn-inp-${i}" class="input" placeholder="+ Fornecedor" style="font-size:10px;padding:3px 6px" autocomplete="off"
+          oninput="searchLinhaFornDet(${i},this.value)" onfocus="searchLinhaFornDet(${i},this.value)">
+        <div id="forn-drop-${i}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2);font-size:11px"></div>
+      </td>
       <td style="display:flex;gap:3px">
         <button onclick="guardarLinha(${l.id},${i})" class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" title="Guardar">💾</button>
         <button onclick="removerLinha(this)" class="btn btn-danger btn-sm" style="padding:3px 6px">✕</button>
@@ -627,12 +633,14 @@ function renderLinhas(){
   document.getElementById('linhaCount').textContent = `(${linhas.length})`;
   const empty = document.getElementById('emptyLinhas');
   if(empty) empty.style.display = linhas.length ? 'none' : 'block';
+  // Render fornecedor tags
+  linhas.forEach(function(l,i){ renderFornTagsDet(i); });
 }
 
 function criarTabela(){
   const container = document.getElementById('linhasContainer');
   container.innerHTML = `<div class="table-wrap"><table id="linhasTable">
-    <thead><tr><th style="width:32px"></th><th>Estado</th><th>Referência</th><th>Designação</th><th style="width:60px">Qtd</th><th style="width:50px">Un</th><th style="width:90px">Stock PHC</th><th>Fornecedores PHC</th><th style="width:36px"></th></tr></thead>
+    <thead><tr><th style="width:32px"></th><th>Estado</th><th>Referência</th><th>Designação</th><th style="width:60px">Qtd</th><th style="width:50px">Un</th><th style="width:90px">Stock PHC</th><th>Fornecedores PHC</th><th style="min-width:140px">Fornecedor Pedido</th><th style="width:36px"></th></tr></thead>
     <tbody id="linhasTbody"></tbody></table></div>
     <div id="emptyLinhas" style="display:none;text-align:center;padding:32px;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div>Sem artigos adicionados.</div></div>`;
   return document.getElementById('linhasTbody');
@@ -902,5 +910,83 @@ document.addEventListener('click', function(e){
 document.getElementById('editModal').addEventListener('click', function(e){
   if (e.target === this) fecharEditar();
 });
+
+// ── Fornecedor per linha (detalhe) ────────────────────────────────────────────
+var _fdTimer = null;
+
+function renderFornTagsDet(idx) {
+  var el = document.getElementById('forn-tags-' + idx);
+  if (!el) return;
+  var fors = linhas[idx].fornecedores_json || [];
+  if (typeof fors === 'string') try { fors = JSON.parse(fors); } catch(e){ fors=[]; }
+  el.innerHTML = fors.map(function(f){
+    return '<span style="display:inline-flex;align-items:center;gap:2px;background:var(--accent);color:white;font-size:9px;padding:1px 5px;border-radius:8px">' +
+      escHtml(f.nome.split(' ')[0]) +
+      '<button onclick="removeFornDet(' + idx + ','' + String(f.id).replace(/'/g,"\'") + '')" style="background:none;border:none;color:white;cursor:pointer;font-size:11px;padding:0 1px;line-height:1">×</button></span>';
+  }).join('');
+}
+
+function searchLinhaFornDet(idx, q) {
+  var dd = document.getElementById('forn-drop-' + idx);
+  if (!dd) return;
+  clearTimeout(_fdTimer);
+  _fdTimer = setTimeout(function(){
+    fetch('/api/fornecedores?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        dd.innerHTML = '';
+        if (!list.length) { dd.style.display='none'; return; }
+        list.forEach(function(f){
+          var d = document.createElement('div');
+          d.textContent = f.nome + (f.ncont ? ' · ' + f.ncont : '');
+          d.style.cssText = 'padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--border)';
+          d.onmouseenter = function(){ this.style.background='var(--surface2)'; };
+          d.onmouseleave = function(){ this.style.background=''; };
+          d.onclick = (function(i,fid,fnome){ return function(){ addFornDet(i,fid,fnome); }; })(idx, f.id||f.no||'', f.nome);
+          dd.appendChild(d);
+        });
+        dd.style.display = 'block';
+      });
+  }, 200);
+}
+
+function addFornDet(idx, fid, fnome) {
+  if (!linhas[idx].fornecedores_json) linhas[idx].fornecedores_json = [];
+  if (typeof linhas[idx].fornecedores_json === 'string')
+    try { linhas[idx].fornecedores_json = JSON.parse(linhas[idx].fornecedores_json); } catch(e){ linhas[idx].fornecedores_json=[]; }
+  if (!linhas[idx].fornecedores_json.find(function(f){ return String(f.id)===String(fid); }))
+    linhas[idx].fornecedores_json.push({id: fid, nome: fnome});
+  var inp = document.getElementById('forn-inp-' + idx);
+  var dd  = document.getElementById('forn-drop-' + idx);
+  if (inp) inp.value = '';
+  if (dd)  dd.style.display = 'none';
+  renderFornTagsDet(idx);
+  // Auto-save
+  var lid = linhas[idx].id;
+  if (lid) saveFornDet(idx, lid);
+}
+
+function removeFornDet(idx, fid) {
+  if (!linhas[idx].fornecedores_json) return;
+  var arr = linhas[idx].fornecedores_json;
+  if (typeof arr === 'string') try { arr = JSON.parse(arr); } catch(e){ arr=[]; }
+  linhas[idx].fornecedores_json = arr.filter(function(f){ return String(f.id) !== String(fid); });
+  renderFornTagsDet(idx);
+  var lid = linhas[idx].id;
+  if (lid) saveFornDet(idx, lid);
+}
+
+function saveFornDet(idx, lid) {
+  fetch('/pedidos/linha/' + lid + '/editar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({fornecedores_json: linhas[idx].fornecedores_json})
+  }).catch(function(){});
+}
+
+document.addEventListener('click', function(e){
+  if (!e.target.closest('[id^="forn-inp-"]'))
+    document.querySelectorAll('[id^="forn-drop-"]').forEach(function(d){ d.style.display='none'; });
+});
+
 </script>
 {% endblock %}
