@@ -107,49 +107,122 @@ function renderLinhas() {
   var s = document.getElementById('sem-linhas');
   s.style.display = linhas.length ? 'none' : 'block';
   if (!linhas.length) { c.innerHTML = ''; return; }
-  var html = '';
+
+  c.innerHTML = '';
   for (var i = 0; i < linhas.length; i++) {
     var l = linhas[i];
-    html += '<div style="display:grid;grid-template-columns:110px 1fr 150px 160px 60px 50px auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">';
-    html += '<div>';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Referência PHC</div>';
-    html += '<div style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:5px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:28px" onclick="abrirPesquisa(' + i + ')">' + (l.referencia || '<span style="color:var(--text-muted);font-weight:400">pesquisar</span>') + '</div>';
-    html += '</div>';
-    html += '<div>';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Designação</div>';
-    html += '<input type="text" value="' + esc(l.designacao) + '" placeholder="Descrição..." onchange="linhas[' + i + '].designacao=this.value" class="input" style="font-size:12px;padding:5px 8px">';
-    html += '</div>';
-    // Destino/Cliente - search field
-    html += '<div style="position:relative">';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Destino / Cliente</div>';
-    var cNome = l.cliente_nome || '';
-    html += '<input type="text" id="cli-' + i + '" value="' + esc(cNome === 'Stock Interno (default)' ? '' : cNome) + '" placeholder="Pesquisar cliente..." class="input" style="font-size:11px;padding:5px 6px" autocomplete="off" oninput="searchLinhaCli(' + i + ',this.value)" onfocus="searchLinhaCli(' + i + ',this.value)">';
-    html += '<div id="cli-drop-' + i + '" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>';
-    html += '</div>'; // end cliente
-    // Fornecedor(es)
-    html += '<div style="position:relative">';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Fornecedor(es)</div>';
-    html += '<div id="forn-tags-' + i + '" style="min-height:18px;margin-bottom:3px;display:flex;flex-wrap:wrap;gap:2px"></div>';
-    html += '<input type="text" id="forn-inp-' + i + '" class="input" placeholder="Pesquisar..." style="font-size:11px;padding:4px 6px" autocomplete="off" oninput="searchLinhaForn(' + i + ',this.value)" onfocus="searchLinhaForn(' + i + ',this.value)">';
-    html += '<div id="forn-drop-' + i + '" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>';
-    html += '</div>';
-    html += '<div>';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Qtd</div>';
-    html += '<input type="number" value="' + (l.quantidade||1) + '" min="0.01" step="any" onchange="linhas[' + i + '].quantidade=parseFloat(this.value)||1" class="input" style="font-size:12px;padding:5px 6px">';
-    html += '</div>';
-    html += '<div>';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Un.</div>';
-    html += '<input type="text" value="' + esc(l.unidade||'un') + '" onchange="linhas[' + i + '].unidade=this.value" class="input" style="font-size:12px;padding:5px 6px">';
-    html += '</div>';
-    html += '<div style="padding-bottom:2px"><button type="button" onclick="removerLinha(' + i + ')" class="btn btn-ghost btn-sm" style="color:#ef4444;padding:5px 8px">✕</button></div>';
-    html += '</div>';
-  }
-  c.innerHTML = html;
-  // Render fornecedor tags for all lines
-  for (var j = 0; j < linhas.length; j++) {
-    renderFornTags(j);
+    var row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:110px 1fr 140px 150px 55px 50px auto;gap:6px;align-items:start;padding:10px 0;border-bottom:1px solid var(--border)';
+
+    // 1 - Referência
+    var ref = document.createElement('div');
+    var refLabel = document.createElement('div');
+    refLabel.style.cssText = 'font-size:10px;color:var(--text-muted);margin-bottom:2px';
+    refLabel.textContent = 'Referência PHC';
+    var refBtn = document.createElement('div');
+    refBtn.style.cssText = 'font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;padding:5px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:28px';
+    refBtn.innerHTML = l.referencia ? esc(l.referencia) : '<span style="color:var(--text-muted);font-weight:400">pesquisar</span>';
+    refBtn.onclick = (function(idx){ return function(){ abrirPesquisa(idx); }; })(i);
+    ref.appendChild(refLabel); ref.appendChild(refBtn);
+    row.appendChild(ref);
+
+    // 2 - Designação
+    var des = document.createElement('div');
+    var desLabel = document.createElement('div');
+    desLabel.style.cssText = 'font-size:10px;color:var(--text-muted);margin-bottom:2px';
+    desLabel.textContent = 'Designação';
+    var desInp = document.createElement('input');
+    desInp.type = 'text'; desInp.className = 'input';
+    desInp.style.cssText = 'font-size:12px;padding:5px 8px';
+    desInp.value = l.designacao || ''; desInp.placeholder = 'Descrição...';
+    desInp.oninput = (function(idx){ return function(){ linhas[idx].designacao = this.value; }; })(i);
+    des.appendChild(desLabel); des.appendChild(desInp);
+    row.appendChild(des);
+
+    // 3 - Cliente/Destino
+    var cli = document.createElement('div');
+    cli.style.position = 'relative';
+    var cliLabel = document.createElement('div');
+    cliLabel.style.cssText = 'font-size:10px;color:var(--text-muted);margin-bottom:2px';
+    cliLabel.textContent = 'Destino/Cliente';
+    var cliInp = document.createElement('input');
+    cliInp.type = 'text'; cliInp.id = 'cli-' + i; cliInp.className = 'input';
+    cliInp.style.cssText = 'font-size:11px;padding:4px 6px';
+    cliInp.value = (l.cliente_nome && l.cliente_nome !== 'Stock Interno') ? l.cliente_nome : '';
+    cliInp.placeholder = 'Stock Interno';
+    cliInp.autocomplete = 'off';
+    cliInp.oninput = (function(idx){ return function(){ searchLinhaCli(idx, this.value); }; })(i);
+    cliInp.onfocus = (function(idx){ return function(){ searchLinhaCli(idx, this.value); }; })(i);
+    var cliDrop = document.createElement('div');
+    cliDrop.id = 'cli-drop-' + i;
+    cliDrop.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+    cli.appendChild(cliLabel); cli.appendChild(cliInp); cli.appendChild(cliDrop);
+    row.appendChild(cli);
+
+    // 4 - Fornecedor(es)
+    var forn = document.createElement('div');
+    forn.style.position = 'relative';
+    var fornLabel = document.createElement('div');
+    fornLabel.style.cssText = 'font-size:10px;color:var(--text-muted);margin-bottom:2px';
+    fornLabel.textContent = 'Fornecedor(es)';
+    var fornTags = document.createElement('div');
+    fornTags.id = 'forn-tags-' + i;
+    fornTags.style.cssText = 'min-height:18px;margin-bottom:3px;display:flex;flex-wrap:wrap;gap:2px';
+    var fornInp = document.createElement('input');
+    fornInp.type = 'text'; fornInp.id = 'forn-inp-' + i; fornInp.className = 'input';
+    fornInp.style.cssText = 'font-size:11px;padding:4px 6px';
+    fornInp.placeholder = 'Pesquisar...'; fornInp.autocomplete = 'off';
+    fornInp.oninput = (function(idx){ return function(){ searchLinhaForn(idx, this.value); }; })(i);
+    fornInp.onfocus = (function(idx){ return function(){ searchLinhaForn(idx, this.value); }; })(i);
+    var fornDrop = document.createElement('div');
+    fornDrop.id = 'forn-drop-' + i;
+    fornDrop.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:6px;max-height:150px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+    forn.appendChild(fornLabel); forn.appendChild(fornTags);
+    forn.appendChild(fornInp); forn.appendChild(fornDrop);
+    row.appendChild(forn);
+
+    // 5 - Qtd
+    var qtd = document.createElement('div');
+    var qtdLabel = document.createElement('div');
+    qtdLabel.style.cssText = 'font-size:10px;color:var(--text-muted);margin-bottom:2px';
+    qtdLabel.textContent = 'Qtd';
+    var qtdInp = document.createElement('input');
+    qtdInp.type = 'number'; qtdInp.className = 'input';
+    qtdInp.style.cssText = 'font-size:12px;padding:4px 6px';
+    qtdInp.value = l.quantidade || 1; qtdInp.min = '0.01'; qtdInp.step = 'any';
+    qtdInp.oninput = (function(idx){ return function(){ linhas[idx].quantidade = parseFloat(this.value)||1; }; })(i);
+    qtd.appendChild(qtdLabel); qtd.appendChild(qtdInp);
+    row.appendChild(qtd);
+
+    // 6 - Un
+    var un = document.createElement('div');
+    var unLabel = document.createElement('div');
+    unLabel.style.cssText = 'font-size:10px;color:var(--text-muted);margin-bottom:2px';
+    unLabel.textContent = 'Un.';
+    var unInp = document.createElement('input');
+    unInp.type = 'text'; unInp.className = 'input';
+    unInp.style.cssText = 'font-size:12px;padding:4px 6px';
+    unInp.value = l.unidade || 'un';
+    unInp.oninput = (function(idx){ return function(){ linhas[idx].unidade = this.value; }; })(i);
+    un.appendChild(unLabel); un.appendChild(unInp);
+    row.appendChild(un);
+
+    // 7 - Remove
+    var rm = document.createElement('div');
+    rm.style.cssText = 'padding-top:18px';
+    var rmBtn = document.createElement('button');
+    rmBtn.type = 'button'; rmBtn.className = 'btn btn-ghost btn-sm';
+    rmBtn.style.cssText = 'color:#ef4444;padding:5px 8px';
+    rmBtn.textContent = '✕';
+    rmBtn.onclick = (function(idx){ return function(){ linhas.splice(idx,1); renderLinhas(); }; })(i);
+    rm.appendChild(rmBtn);
+    row.appendChild(rm);
+
+    c.appendChild(row);
+    renderFornTags(i);
   }
 }
+
 
 function esc(s) {
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');

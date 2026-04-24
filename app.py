@@ -417,7 +417,8 @@ def novo_pedido():
                 preco_custo_ref=float(artigo.preco_custo if artigo else 0),
                 preco_pcp_ref=float(artigo.preco_custo_ponderado if artigo else 0),
                 observacoes=l.get('observacoes','').strip(),
-                cliente_id=int(l.get('cliente_id')) if l.get('cliente_id') else None
+                cliente_id=int(l.get('cliente_id')) if str(l.get('cliente_id','')).strip() else None,
+                fornecedores_json=_json.dumps(l.get('fornecedores', []))
             ))
         db.session.commit()
         flash('Pedido criado!','success')
