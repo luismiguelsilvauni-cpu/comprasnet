@@ -18,6 +18,7 @@ def recalc(e):
             # Fallback: use registration date if no real date
             dates[h.status_novo] = h.criado_em.date()
 
+    # data_orcamento may be set directly (inline editor) — only override from history if history has it
     # Apply dates to entry fields
     if 'pre_orcamento'       in dates: e.data_pre_orcamento      = dates['pre_orcamento']
     if 'orcamentado'         in dates: e.data_orcamento           = dates['orcamentado']
@@ -33,7 +34,10 @@ def recalc(e):
     def diff(d1, d2):
         if d1 and d2:
             v = (d2 - d1).days
-            return v if v >= 0 else None
+            if v < 0:
+                print(f'    ⚠️  Negativo: {d1} -> {d2} = {v}d')
+                return None  # Don't store negative values
+            return v
         return None
 
     e.dias_total              = diff(e.data_rececao, e.data_fecho)

@@ -298,65 +298,17 @@ function renderFornTags(idx) {
   var el = document.getElementById('forn-tags-' + idx);
   if (!el) return;
   var fors = linhas[idx].fornecedores || [];
-  el.innerHTML = fors.map(function(f){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--accent);color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin:2px">' +
-      esc(f.nome.split(' ')[0]) +
-      '<button onclick="removeFornecedor(' + idx + ','' + f.id + '')" style="background:none;border:none;color:white;cursor:pointer;font-size:12px;padding:0 2px">×</button></span>';
-  }).join('');
+  el.innerHTML = '';
+  fors.forEach(function(f) {
+    var span = document.createElement('span');
+    span.style.cssText = 'display:inline-flex;align-items:center;gap:2px;background:var(--accent);color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin:1px';
+    span.appendChild(document.createTextNode(f.nome.split(' ')[0]));
+    var btn = document.createElement('button');
+    btn.innerHTML = '×';
+    btn.style.cssText = 'background:none;border:none;color:white;cursor:pointer;font-size:12px;padding:0 2px';
+    btn.onclick = (function(i2, fid){ return function(e){ e.stopPropagation(); removeFornecedor(i2, fid); }; })(idx, f.id);
+    span.appendChild(btn);
+    el.appendChild(span);
+  });
 }
-document.addEventListener('click', function(e){
-  if (!e.target.closest('[id^="forn-inp-"]')) {
-    document.querySelectorAll('[id^="forn-drop-"]').forEach(function(d){ d.style.display='none'; });
-  }
-});
-// ── Cliente search (per linha) ────────────────────────────────────────────────
-var _cliLTimer = null;
-function searchLinhaCli(idx, q) {
-  var dd = document.getElementById('cli-drop-' + idx);
-  if (!dd) return;
-  clearTimeout(_cliLTimer);
-  _cliLTimer = setTimeout(function(){
-    fetch('/api/clientes/search?q=' + encodeURIComponent(q))
-      .then(function(r){ return r.json(); })
-      .then(function(list){
-        dd.innerHTML = '';
-        var d0 = document.createElement('div');
-        d0.textContent = '📦 Stock Interno';
-        d0.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border)';
-        d0.onmouseenter = function(){ this.style.background = 'var(--surface2)'; };
-        d0.onmouseleave = function(){ this.style.background = ''; };
-        d0.onclick = (function(i){ return function(){ selLinhaCli(i, '', 'Stock Interno'); }; })(idx);
-        dd.appendChild(d0);
-        list.forEach(function(c){
-          var d = document.createElement('div');
-          d.textContent = c.nome;
-          d.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border)';
-          d.onmouseenter = function(){ this.style.background = 'var(--surface2)'; };
-          d.onmouseleave = function(){ this.style.background = ''; };
-          d.onclick = (function(i, id, nome){ return function(){ selLinhaCli(i, id, nome); }; })(idx, c.id, c.nome);
-          dd.appendChild(d);
-        });
-        dd.style.display = 'block';
-      });
-  }, 200);
 }
-function selLinhaCli(idx, id, nome) {
-  linhas[idx].cliente_id = id;
-  linhas[idx].cliente_nome = (nome === 'Stock Interno' || nome === '') ? '' : nome;
-  var inp = document.getElementById('cli-' + idx);
-  var dd  = document.getElementById('cli-drop-' + idx);
-  if (inp) inp.value = (nome === 'Stock Interno') ? '' : nome;
-  if (dd)  dd.style.display = 'none';
-}
-
-document.addEventListener('click', function(e){
-  if (!e.target.closest('#clienteSearchInput')) {
-    var d = document.getElementById('clienteSearchDrop');
-    if (d) d.style.display = 'none';
-  }
-  if (!e.target.closest('[id^="cli-"]')) {
-    document.querySelectorAll('[id^="cli-drop-"]').forEach(function(d){ d.style.display = 'none'; });
-  }
-});
-</script>
-{% endblock %}

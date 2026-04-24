@@ -3953,6 +3953,8 @@ def _recalc_entrada_dates(e):
             dates[h.status_novo] = h.data_real
     if 'pre_orcamento'       in dates: e.data_pre_orcamento      = dates['pre_orcamento']
     if 'orcamentado'          in dates: e.data_orcamento           = dates['orcamentado']
+    # Also preserve manually-set data_orcamento if history has none
+    # (set via inline date editor — don't overwrite with None)
     if 'material_pedido'      in dates: e.data_material_pedido     = dates['material_pedido']
     if 'material_stock'       in dates: e.data_material_stock      = dates['material_stock']
     if 'em_reparacao'         in dates: e.data_em_reparacao        = dates['em_reparacao']
@@ -3962,6 +3964,8 @@ def _recalc_entrada_dates(e):
         e.data_fecho = dates['concluido_fechado']
         if e.data_rececao:
             e.dias_total = (e.data_fecho - e.data_rececao).days
+    # Also use inline-edited data_orcamento if history has none
+    # (data_orcamento may be set directly via the inline field)
     # Durations
     if e.data_rececao and e.data_orcamento:
         e.dias_rec_orcamento = (e.data_orcamento - e.data_rececao).days
@@ -4137,6 +4141,23 @@ def entradas():
     entradas_list = q.order_by(EntradaEquipamento.numero.desc()).all()
     from datetime import date
     _hoje = date.today()
+    # Ensure dias are calculated from date fields (in case DB column is NULL)
+    for e in entradas_list:
+        def _calc(d1, d2):
+            if d1 and d2 and d2 >= d1: return (d2 - d1).days
+            return None
+        if e.dias_rec_orcamento is None and e.data_rececao and e.data_orcamento:
+            e.dias_rec_orcamento = _calc(e.data_rececao, e.data_orcamento)
+        if e.dias_rec_faturado is None and e.data_rececao and e.data_faturado:
+            e.dias_rec_faturado = _calc(e.data_rececao, e.data_faturado)
+        if e.dias_orc_reparacao is None and e.data_orcamento and e.data_em_reparacao:
+            e.dias_orc_reparacao = _calc(e.data_orcamento, e.data_em_reparacao)
+        if e.dias_mat_reparacao is None and e.data_material_pedido and e.data_em_reparacao:
+            e.dias_mat_reparacao = _calc(e.data_material_pedido, e.data_em_reparacao)
+        if e.dias_reparacao_fat is None and e.data_em_reparacao and e.data_faturado:
+            e.dias_reparacao_fat = _calc(e.data_em_reparacao, e.data_faturado)
+        if e.dias_total is None and e.data_rececao and e.data_fecho:
+            e.dias_total = _calc(e.data_rececao, e.data_fecho)
     # Compute dias for each entry (days in current status)
     for e in entradas_list:
         try:
