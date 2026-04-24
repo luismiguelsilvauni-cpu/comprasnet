@@ -4953,13 +4953,14 @@ def api_registar_commit():
 @login_required
 def api_fornecedores():
     q = request.args.get('q','').strip()
-    if not q or len(q) < 2:
-        return jsonify([])
-    # Try local FornecedorPHC table first
+    # Try local FornecedorPHC table
     try:
-        local = FornecedorPHC.query.filter(FornecedorPHC.nome.ilike(f'%{q}%')).limit(10).all()
+        if q:
+            local = FornecedorPHC.query.filter(FornecedorPHC.nome.ilike(f'%{q}%')).limit(15).all()
+        else:
+            local = FornecedorPHC.query.order_by(FornecedorPHC.nome).limit(15).all()
         if local:
-            return jsonify([{'no': f.no, 'nome': f.nome} for f in local])
+            return jsonify([{'id': f.no, 'no': f.no, 'nome': f.nome, 'ncont': getattr(f,'ncont','')} for f in local])
     except Exception:
         pass
     # Query PHC cl table directly (fornecedores sao clientes com ncont)
