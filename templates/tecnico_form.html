@@ -46,8 +46,12 @@
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">Motor</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
       <div class="form-group" style="margin:0">
+        <label>Marca</label>
+        <input type="text" name="motor_marca" value="{{ equipamento.motor_marca if equipamento else '' }}" class="input" placeholder="Ex: Volvo, Caterpillar...">
+      </div>
+      <div class="form-group" style="margin:0">
         <label>Modelo</label>
-        <input type="text" name="motor_modelo" value="{{ equipamento.motor_modelo if equipamento else '' }}" class="input" placeholder="Ex: Volvo D13K">
+        <input type="text" name="motor_modelo" value="{{ equipamento.motor_modelo if equipamento else '' }}" class="input" placeholder="Ex: D13K, C18...">
       </div>
       <div class="form-group" style="margin:0">
         <label>Potência</label>

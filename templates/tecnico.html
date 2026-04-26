@@ -62,12 +62,11 @@ th.desc::after { content:' ↓';color:var(--accent) }
         <th>Estado</th>
         <th class="sortable" onclick="sortTable(1)">Cliente</th>
         <th class="sortable" onclick="sortTable(1)">Embarcação</th>
-        <th>Marca Motor</th>
         <th class="sortable" onclick="sortTable(2)">Modelo Motor</th>
         <th>Potência</th>
         <th class="sortable" onclick="sortTable(4)" style="color:#f59e0b">Nº Série</th>
-        <th class="sortable" onclick="sortTable(5)">Caixa Redutora / Alternador</th>
-        <th>Ratio/Potência</th>
+        <th class="sortable" onclick="sortTable(5)">Caixa Redutora<br>/Alternador</th>
+        <th>Ratio/<br>Potência</th>
         <th class="sortable" onclick="sortTable(7)">Nº Série</th>
         <th>PDFs</th>
         <th>Consumíveis</th>
@@ -100,7 +99,6 @@ th.desc::after { content:' ↓';color:var(--accent) }
         </td>
         <td>{{ e.cliente_nome or '—' }}</td>
         <td style="font-weight:600;color:var(--accent)">{{ e.embarcacao or '—' }}</td>
-        <td>{{ e.motor_marca or '—' }}</td>
         <td>{{ e.motor_modelo or '—' }}</td>
         <td>{{ e.motor_potencia or '—' }}</td>
         <td class="mono" style="color:#f59e0b">
