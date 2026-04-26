@@ -48,8 +48,24 @@
         <td class="mono text-muted">{{ c.abreviatura or '—' }}</td>
         <td class="mono">{{ c.nif or '—' }}</td>
         <td class="text-muted">{{ c.localidade or '—' }}</td>
-        <td class="text-muted">{{ c.telefone or c.telemovel or '—' }}</td>
-        <td class="text-muted" style="font-size:12px">{{ c.email or '—' }}</td>
+        <td style="padding:4px 8px;min-width:130px">
+          {% if c.telefone or c.telemovel %}<div style="font-size:10px;color:var(--text-muted)"><span style="font-size:9px;background:rgba(59,110,240,.12);color:var(--accent);padding:0 3px;border-radius:3px">PHC</span> {{ c.telefone or c.telemovel }}</div>{% endif %}
+          <div style="display:flex;align-items:center;gap:3px">
+            <span style="font-size:9px;background:rgba(34,197,94,.12);color:#22c55e;padding:0 3px;border-radius:3px;flex-shrink:0">NAV</span>
+            <input type="text" value="{{ c.nav_telefone or '' }}" placeholder="adicionar..."
+              style="background:transparent;border:none;border-bottom:1px dashed var(--border);font-size:11px;width:100%;padding:1px;min-width:90px"
+              onchange="editarNavCliente({{ c.id }},'nav_telefone',this.value)">
+          </div>
+        </td>
+        <td style="padding:4px 8px;min-width:150px">
+          {% if c.email %}<div style="font-size:10px;color:var(--text-muted)"><span style="font-size:9px;background:rgba(59,110,240,.12);color:var(--accent);padding:0 3px;border-radius:3px">PHC</span> {{ c.email[:22] }}</div>{% endif %}
+          <div style="display:flex;align-items:center;gap:3px">
+            <span style="font-size:9px;background:rgba(34,197,94,.12);color:#22c55e;padding:0 3px;border-radius:3px;flex-shrink:0">NAV</span>
+            <input type="text" value="{{ c.nav_email or '' }}" placeholder="adicionar..."
+              style="background:transparent;border:none;border-bottom:1px dashed var(--border);font-size:11px;width:100%;padding:1px;min-width:110px"
+              onchange="editarNavCliente({{ c.id }},'nav_email',this.value)">
+          </div>
+        </td>
         <td>
           {% set n = c.embarcacoes|length %}
           {% if n > 0 %}

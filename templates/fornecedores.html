@@ -3,6 +3,7 @@
 {% block page_title %}🏭 Fornecedores{% endblock %}
 {% block topbar_actions %}
   <button onclick="resyncFornecedores()" class="btn btn-ghost btn-sm" id="resyncBtn">🔄 Sincronizar PHC</button>
+  <button onclick="gravarAlteracoes()" class="btn btn-primary btn-sm" id="gravarBtn" style="display:none">💾 Gravar Alterações</button>
 {% endblock %}
 {% block content %}
 
@@ -161,7 +162,32 @@ function guardarMarcas() {
   });
 }
 
+var _pendingChanges = {};
+function marcarAlteracao() {
+  document.getElementById('gravarBtn').style.display = 'inline-flex';
+}
+function gravarAlteracoes() {
+  var btn = document.getElementById('gravarBtn');
+  var total = Object.keys(_pendingChanges).length;
+  if (!total) { btn.style.display='none'; return; }
+  btn.disabled = true; btn.textContent = '⏳ A gravar...';
+  var promises = Object.entries(_pendingChanges).map(function(entry) {
+    return fetch('/fornecedores/' + entry[0] + '/editar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(entry[1])
+    }).then(r=>r.json());
+  });
+  Promise.all(promises).then(function() {
+    _pendingChanges = {};
+    btn.textContent = '✅ Gravado!';
+    setTimeout(function(){ btn.style.display='none'; btn.textContent='💾 Gravar Alterações'; btn.disabled=false; }, 2000);
+  });
+}
 function editarNavCampo(fid, campo, valor) {
+  if (!_pendingChanges[fid]) _pendingChanges[fid] = {};
+  _pendingChanges[fid][campo] = valor;
+  marcarAlteracao();
+  // Auto-save immediately
   var data = {};
   data[campo] = valor;
   fetch('/fornecedores/' + fid + '/editar', {
