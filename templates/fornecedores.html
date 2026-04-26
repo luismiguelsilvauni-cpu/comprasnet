@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Fornecedores · NavTech{% endblock %}
 {% block page_title %}🏭 Fornecedores{% endblock %}
+{% block topbar_actions %}
+  <button onclick="resyncFornecedores()" class="btn btn-ghost btn-sm" id="resyncBtn">🔄 Sincronizar PHC</button>
+{% endblock %}
 {% block content %}
 
 <!-- Search + Filters -->
@@ -36,9 +39,17 @@
     <td style="padding:8px 12px;font-size:13px;font-weight:600">{{ f.nome }}</td>
     <td style="padding:8px;font-size:12px;font-family:monospace;color:var(--text-muted)">{{ f.nif or '—' }}</td>
     <td style="padding:8px;font-size:12px;color:var(--text-muted)">{{ f.localidade or '—' }}</td>
-    <td style="padding:8px;font-size:12px;color:var(--text-muted)">{{ f.telefone or '—' }}</td>
-    <td style="padding:8px;font-size:12px;color:var(--text-muted)">
-      {% if f.email %}<a href="mailto:{{ f.email }}" style="color:var(--accent)">{{ f.email[:28] }}</a>{% else %}—{% endif %}
+    <td style="padding:4px 8px">
+      <input type="text" value="{{ f.telefone or '' }}" placeholder="—"
+        style="background:transparent;border:none;border-bottom:1px dashed var(--border);font-size:12px;color:var(--text-muted);width:100%;padding:2px"
+        onchange="editarCampo({{ f.id }},'telefone',this.value)"
+        title="Clique para editar">
+    </td>
+    <td style="padding:4px 8px">
+      <input type="text" value="{{ f.email or '' }}" placeholder="—"
+        style="background:transparent;border:none;border-bottom:1px dashed var(--border);font-size:12px;color:var(--text-muted);width:100%;padding:2px"
+        onchange="editarCampo({{ f.id }},'email',this.value)"
+        title="Clique para editar">
     </td>
     <td style="padding:6px 8px">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -127,6 +138,17 @@ function guardarMarcas() {
   }).then(r=>r.json()).then(function(d){
     if (d.ok) location.reload();
     else alert('Erro: ' + d.error);
+  });
+}
+
+function editarCampo(fid, campo, valor) {
+  var data = {};
+  data[campo] = valor;
+  fetch('/fornecedores/' + fid + '/editar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json()).then(function(d){
+    if (!d.ok) alert('Erro ao guardar: ' + (d.error||''));
   });
 }
 

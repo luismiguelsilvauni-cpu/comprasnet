@@ -3254,6 +3254,21 @@ def fornecedores_resync():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
+@app.route('/fornecedores/<int:fid>/editar', methods=['POST'])
+@login_required
+def fornecedor_editar(fid):
+    f = FornecedorPHC.query.get_or_404(fid)
+    data = request.get_json() or {}
+    if 'email'    in data: f.email    = data['email'].strip()
+    if 'telefone' in data: f.telefone = data['telefone'].strip()
+    if 'morada'   in data: f.morada   = data['morada'].strip()
+    if 'localidade' in data: f.localidade = data['localidade'].strip()
+    db.session.commit()
+    if hasattr(app, '_forn_cache'):
+        del app._forn_cache
+    return jsonify({'ok': True})
+
+
 @app.route('/fornecedores/<int:fid>/marcas', methods=['POST'])
 @login_required
 def fornecedor_marcas(fid):
