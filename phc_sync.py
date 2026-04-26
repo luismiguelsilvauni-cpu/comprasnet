@@ -60,9 +60,13 @@ SELECT DISTINCT
     0                               AS inactivo,
     fo.fostamp                      AS stamp
 FROM fo
-INNER JOIN ft ON ft.no = fo.no
 WHERE fo.nome IS NOT NULL
   AND LEN(LTRIM(RTRIM(fo.nome))) > 0
+  AND fo.no IN (
+      SELECT DISTINCT ft.no FROM ft
+      WHERE ft.no IS NOT NULL
+        AND ISNULL(ft.anulado, 0) = 0
+  )
 ORDER BY fo.nome
 """
 
