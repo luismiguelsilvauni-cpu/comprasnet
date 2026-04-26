@@ -357,7 +357,6 @@ document.querySelector('[name=logo_filtro]')?.addEventListener('change', updateL
 
 document.querySelector('[name=logo]')?.addEventListener('change', function() {
   const r = new FileReader();
-  const r = new FileReader();
   r.onload = e => { const img = document.getElementById('logoPreview'); img.src = e.target.result; img.style.display='block'; };
   r.readAsDataURL(this.files[0]);
 });
@@ -371,24 +370,28 @@ function fazerBackup() {
     .then(()=>{ msg.textContent='✅ Backup concluído!'; setTimeout(()=>location.reload(),2000); })
     .catch(()=>{ msg.textContent='❌ Erro no backup'; });
 }
-  function testarPasta(tipo) {
-    var inp = document.getElementById(tipo === 'local' ? 'backupLocalPath' : 'backupRedePath');
-    var out = document.getElementById('teste' + (tipo === 'local' ? 'Local' : 'Rede'));
-    var path = inp.value.trim();
-    if (!path) { out.style.display='block'; out.innerHTML='⚠️ Indique um caminho.'; return; }
-    out.style.display='block'; out.innerHTML='⏳ A testar...'; out.style.color='var(--text-muted)';
-    fetch('/admin/testar-pasta', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({path: path, tipo: tipo})
-    }).then(function(resp){ return resp.json(); }).then(function(d){
-      if (d.ok) {
-        out.innerHTML = '✅ ' + d.msg;
-        out.style.color = '#22c55e';
-      } else {
-        out.innerHTML = '❌ ' + d.msg;
-        out.style.color = '#ef4444';
-      }
-    }).catch(function(){ out.innerHTML='❌ Erro de ligação'; out.style.color='#ef4444'; });
-  }
+
+
+function testarPasta(tipo) {
+
+  var inp = document.getElementById(tipo === 'local' ? 'backupLocalPath' : 'backupRedePath');
+  var out = document.getElementById('teste' + (tipo === 'local' ? 'Local' : 'Rede'));
+  var path = inp.value.trim();
+  if (!path) { out.style.display='block'; out.innerHTML='⚠️ Indique um caminho.'; return; }
+  out.style.display='block'; out.innerHTML='⏳ A testar...'; out.style.color='var(--text-muted)';
+  fetch('/admin/testar-pasta', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({path: path, tipo: tipo})
+  }).then(function(resp){ return resp.json(); }).then(function(d){
+    if (d.ok) {
+      out.innerHTML = '✅ ' + d.msg;
+      out.style.color = '#22c55e';
+    } else {
+      out.innerHTML = '❌ ' + d.msg;
+      out.style.color = '#ef4444';
+    }
+  }).catch(function(){ out.innerHTML='❌ Erro de ligação'; out.style.color='#ef4444'; });
+
+}
 </script>
 {% endblock %}
