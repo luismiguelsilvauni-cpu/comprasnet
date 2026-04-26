@@ -16,11 +16,28 @@
     <div class="grid-2">
       <div class="form-group">
         <label>Tipo</label>
-        <select name="tipo">
+        <select name="tipo" class="input">
           <option value="">— Seleccionar —</option>
-          <option>Lancha</option><option>Veleiro</option><option>Iate</option>
-          <option>Semi-rígido</option><option>Bote</option><option>Rebocador</option>
-          <option>Trabalho</option><option>Outro</option>
+          <optgroup label="🎣 Pesca">
+            <option {% if embarcacao and embarcacao.tipo=='Pesca - Cerco' %}selected{% endif %}>Pesca - Cerco</option>
+            <option {% if embarcacao and embarcacao.tipo=='Pesca - Artesanal' %}selected{% endif %}>Pesca - Artesanal</option>
+            <option {% if embarcacao and embarcacao.tipo=='Pesca - Longínqua' %}selected{% endif %}>Pesca - Longínqua</option>
+            <option {% if embarcacao and embarcacao.tipo=='Pesca - Armadilhas' %}selected{% endif %}>Pesca - Armadilhas</option>
+            <option {% if embarcacao and embarcacao.tipo=='Pesca - Polivalente' %}selected{% endif %}>Pesca - Polivalente</option>
+          </optgroup>
+          <optgroup label="⛵ Lazer">
+            <option {% if embarcacao and embarcacao.tipo=='Lancha' %}selected{% endif %}>Lancha</option>
+            <option {% if embarcacao and embarcacao.tipo=='Veleiro' %}selected{% endif %}>Veleiro</option>
+            <option {% if embarcacao and embarcacao.tipo=='Iate' %}selected{% endif %}>Iate</option>
+            <option {% if embarcacao and embarcacao.tipo=='Semi-rígido' %}selected{% endif %}>Semi-rígido</option>
+            <option {% if embarcacao and embarcacao.tipo=='Bote' %}selected{% endif %}>Bote</option>
+          </optgroup>
+          <optgroup label="🚢 Trabalho">
+            <option {% if embarcacao and embarcacao.tipo=='Rebocador' %}selected{% endif %}>Rebocador</option>
+            <option {% if embarcacao and embarcacao.tipo=='Carga' %}selected{% endif %}>Carga</option>
+            <option {% if embarcacao and embarcacao.tipo=='Trabalho' %}selected{% endif %}>Trabalho</option>
+          </optgroup>
+          <option {% if embarcacao and embarcacao.tipo=='Outro' %}selected{% endif %}>Outro</option>
         </select>
       </div>
       <div class="form-group">
@@ -59,4 +76,16 @@
   </div>
 </div>
 </div>
+{% endblock %}
+<script>
+function previewFoto(input) {
+  if (!input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var box = document.getElementById('fotoPreviewBox');
+    box.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover">';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+</script>
 {% endblock %}

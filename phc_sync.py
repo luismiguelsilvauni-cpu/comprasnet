@@ -55,8 +55,8 @@ SELECT DISTINCT
     ISNULL(fo.morada, '')           AS morada,
     ISNULL(fo.local, '')            AS localidade,
     ISNULL(fo.codpost, '')          AS cod_postal,
-    ISNULL(fo.tel, '')              AS telefone,
-    ISNULL(fo.email, '')            AS email,
+    ''                              AS telefone,
+    ''                              AS email,
     0                               AS inactivo,
     fo.fostamp                      AS stamp
 FROM fo

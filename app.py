@@ -1766,6 +1766,16 @@ def nova_embarcacao(cid):
             notas=request.form.get('notas','').strip()
         )
         db.session.add(e); db.session.flush()
+        # Handle foto upload
+        foto = request.files.get('foto')
+        if foto and foto.filename:
+            import uuid
+            ext = os.path.splitext(foto.filename)[1].lower()
+            fname = f'emb_{e.id}_{uuid.uuid4().hex[:8]}{ext}'
+            fdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'embarcacoes')
+            os.makedirs(fdir, exist_ok=True)
+            foto.save(os.path.join(fdir, fname))
+            e.foto_path = fname
         # Default components
         for cat in ['Motor Propulsor','Caixa Inversora/Redutora','Veio Propulsor','Hélice']:
             db.session.add(ComponenteEmbarcacao(
@@ -3205,6 +3215,14 @@ def api_users_status():
             result.append({'nome': u.nome, 'status': 'offline', 'mins': None})
     result.sort(key=lambda x: (0 if x['status']=='online' else 1 if x['status']=='recente' else 2, x['nome']))
     return jsonify(result)
+
+
+@app.route('/uploads/embarcacoes/<path:fname>')
+@login_required
+def embarcacao_foto_serve(fname):
+    import mimetypes
+    fdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'embarcacoes')
+    return send_from_directory(fdir, fname)
 
 
 # ── MÓDULO FORNECEDORES ────────────────────────────────────────────────────────
