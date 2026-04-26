@@ -363,6 +363,14 @@ document.querySelector('[name=logo]')?.addEventListener('change', function() {
 });
 
 function fazerBackup() {
+
+
+  const msg = document.getElementById('backupMsg');
+  msg.style.display='block'; msg.textContent='⏳ A fazer backup...';
+  fetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'action=backup'})
+    .then(()=>{ msg.textContent='✅ Backup concluído!'; setTimeout(()=>location.reload(),2000); })
+    .catch(()=>{ msg.textContent='❌ Erro no backup'; });
+}
   function testarPasta(tipo) {
     var inp = document.getElementById(tipo === 'local' ? 'backupLocalPath' : 'backupRedePath');
     var out = document.getElementById('teste' + (tipo === 'local' ? 'Local' : 'Rede'));
@@ -372,7 +380,7 @@ function fazerBackup() {
     fetch('/admin/testar-pasta', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({path: path, tipo: tipo})
-    }).then(r=>r.json()).then(d=>{
+    }).then(function(resp){ return resp.json(); }).then(function(d){
       if (d.ok) {
         out.innerHTML = '✅ ' + d.msg;
         out.style.color = '#22c55e';
@@ -380,14 +388,7 @@ function fazerBackup() {
         out.innerHTML = '❌ ' + d.msg;
         out.style.color = '#ef4444';
       }
-    }).catch(()=>{ out.innerHTML='❌ Erro de ligação'; out.style.color='#ef4444'; });
+    }).catch(function(){ out.innerHTML='❌ Erro de ligação'; out.style.color='#ef4444'; });
   }
-
-  const msg = document.getElementById('backupMsg');
-  msg.style.display='block'; msg.textContent='⏳ A fazer backup...';
-  fetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'action=backup'})
-    .then(()=>{ msg.textContent='✅ Backup concluído!'; setTimeout(()=>location.reload(),2000); })
-    .catch(()=>{ msg.textContent='❌ Erro no backup'; });
-}
 </script>
 {% endblock %}
