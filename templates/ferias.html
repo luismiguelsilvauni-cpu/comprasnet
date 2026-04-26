@@ -151,11 +151,27 @@ function buildCalendar() {
       var fer = isFeriado(ds);
       var isWk = dow === 0 || dow === 6;
       var cell = document.createElement('div');
-      cell.style.cssText = 'text-align:center;font-size:10px;padding:3px 0;border-radius:4px;cursor:pointer;' +
-        (fer ? 'background:'+(fer.tipo==='ponte'?'rgba(245,158,11,.25)':'rgba(239,68,68,.25)')+';color:'+(fer.tipo==='ponte'?'#f59e0b':'#ef4444')+';font-weight:700;' :
-         isWk ? 'color:var(--text-muted);background:var(--surface2);' : 'color:var(--text);');
-      cell.innerHTML = '<div style="font-size:8px">' + ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'][dow] + '</div><div style="font-weight:700">' + d + '</div>';
+      var ferBg = fer ? (fer.tipo==='ponte' ? 'rgba(245,158,11,.18)' : 'rgba(239,68,68,.18)') : '';
+      var ferBorder = fer ? (fer.tipo==='ponte' ? '2px solid rgba(245,158,11,.6)' : '2px solid rgba(239,68,68,.6)') : '';
+      var ferCol = fer ? (fer.tipo==='ponte' ? '#f59e0b' : '#ef4444') : '';
+      cell.style.cssText = 'text-align:center;font-size:10px;padding:2px 0;cursor:pointer;position:relative;' +
+        (fer ? 'background:'+ferBg+';border-left:'+ferBorder+';border-right:'+ferBorder+';' :
+         isWk ? 'background:var(--surface2);' : '');
+      // Day header content
+      var dayLabel = document.createElement('div');
+      dayLabel.style.cssText = 'font-size:8px;color:' + (fer ? ferCol : isWk ? 'var(--text-muted)' : 'var(--text-muted)');
+      dayLabel.textContent = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'][dow];
+      var dayNum = document.createElement('div');
+      dayNum.style.cssText = 'font-weight:700;color:' + (fer ? ferCol : isWk ? 'var(--text-muted)' : 'var(--text)');
+      dayNum.textContent = d;
+      cell.appendChild(dayLabel);
+      cell.appendChild(dayNum);
+      // Vertical feriado name
       if (fer) {
+        var ferName = document.createElement('div');
+        ferName.style.cssText = 'writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:8px;font-weight:700;color:' + ferCol + ';white-space:nowrap;overflow:hidden;max-height:60px;margin:2px auto 0;line-height:1.2;opacity:.85';
+        ferName.textContent = fer.nome;
+        cell.appendChild(ferName);
         cell.title = fer.nome + ' (' + fer.tipo + ')';
         cell.onclick = (function(f){ return function(){ removeFeriado(f); }; })(fer);
       } else {
@@ -184,6 +200,13 @@ function buildCalendar() {
         var periodo = PERIODOS.find(function(p){
           return p.funcionario_id === fid && p.data_inicio <= ds2 && p.data_fim >= ds2;
         });
+        // Check if feriado
+        var ferDia = isFeriado(ds2);
+        if (ferDia && !periodo) {
+          cell2.style.background = ferDia.tipo === 'ponte' ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.12)';
+          cell2.style.borderLeft = ferDia.tipo === 'ponte' ? '2px solid rgba(245,158,11,.4)' : '2px solid rgba(239,68,68,.4)';
+          cell2.style.borderRight = ferDia.tipo === 'ponte' ? '2px solid rgba(245,158,11,.4)' : '2px solid rgba(239,68,68,.4)';
+        }
         if (periodo) {
           var pCor = periodo.cor || cor;
           var isStart = periodo.data_inicio === ds2;
