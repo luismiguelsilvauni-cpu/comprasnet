@@ -4965,61 +4965,79 @@ def api_registar_commit():
 @app.route('/api/fornecedores')
 @login_required
 def api_fornecedores():
-    q = request.args.get('q','').strip()
-    # Try local FornecedorPHC table FIRST (fast - no network)
-    try:
+    q = request.args.get('q','').strip().lower()
+    
+    # 1. Use in-memory cache (populated once per server start)
+    if not hasattr(app, '_forn_cache'):
+        app._forn_cache = []
+        try:
+            rows = FornecedorPHC.query.order_by(FornecedorPHC.nome).limit(2000).all()
+            app._forn_cache = [{'id': f.no, 'no': f.no, 'nome': f.nome, 'ncont': getattr(f,'ncont','')} for f in rows]
+        except: pass
+    
+    if app._forn_cache:
         if q:
-            local = FornecedorPHC.query.filter(FornecedorPHC.nome.ilike(f'%{q}%')).limit(15).all()
+            results = [f for f in app._forn_cache if q in f['nome'].lower()][:15]
         else:
-            local = FornecedorPHC.query.order_by(FornecedorPHC.nome).limit(15).all()
-        if local:
-            return jsonify([{'id': f.no, 'no': f.no, 'nome': f.nome, 'ncont': getattr(f,'ncont','')} for f in local])
-    except Exception:
-        pass
-    # Fallback: previous fornecedores from pedido lines
+            results = app._forn_cache[:15]
+        if results:
+            return jsonify(results)
+    
+    # 2. Fallback: previous fornecedores from pedido lines (no network)
     try:
         import json as _jf
-        prev_forn = set()
+        seen = set()
         results = []
-        for l in LinhaPedido.query.filter(LinhaPedido.fornecedores_json != None).limit(200).all():
-            for f in _jf.loads(l.fornecedores_json or '[]'):
-                if f.get('nome') and (not q or q.lower() in f['nome'].lower()):
-                    key = f.get('id','') or f['nome']
-                    if key not in prev_forn:
-                        prev_forn.add(key)
-                        results.append({'id': f.get('id',''), 'no': f.get('id',''), 'nome': f['nome'], 'ncont': ''})
+        for l in LinhaPedido.query.filter(LinhaPedido.fornecedores_json.isnot(None)).limit(300).all():
+            try:
+                for f in _jf.loads(l.fornecedores_json or '[]'):
+                    if isinstance(f, dict) and f.get('nome'):
+                        nome = f['nome']
+                        if (not q or q in nome.lower()) and nome not in seen:
+                            seen.add(nome)
+                            results.append({'id': f.get('id',''), 'no': f.get('id',''), 'nome': nome, 'ncont': ''})
+            except: pass
+        # Also from fornecedor_hab field
+        for l in LinhaPedido.query.filter(LinhaPedido.fornecedor_hab.isnot(None)).filter(LinhaPedido.fornecedor_hab != '').limit(200).all():
+            nome = l.fornecedor_hab.strip()
+            if nome and (not q or q in nome.lower()) and nome not in seen:
+                seen.add(nome)
+                results.append({'id': '', 'no': '', 'nome': nome, 'ncont': ''})
         if results:
-            return jsonify(results[:15])
+            return jsonify(sorted(results, key=lambda x: x['nome'])[:15])
     except: pass
-    # Query PHC cl table directly (fornecedores sao clientes com ncont)
+    
+    # 3. Last resort: PHC direct query with short timeout
     try:
         cfg_phc = ConfigPHC.query.first()
         if cfg_phc:
             from phc_sync import get_phc_connection
             conn = get_phc_connection(cfg_phc)
             cursor = conn.cursor()
-            # Search in fo (facturas compra) for supplier names
             cursor.execute(
-                "SELECT DISTINCT fo.no, fo.nome FROM PHC_Uniao..fo WHERE fo.nome LIKE ? AND fo.nome IS NOT NULL ORDER BY fo.nome",
+                "SELECT TOP 15 no, nome FROM PHC_Uniao..fo WHERE nome LIKE ? AND nome IS NOT NULL ORDER BY nome",
                 (f'%{q}%',)
             )
-            rows = [{'no': r[0], 'nome': (r[1] or '').strip()} for r in cursor.fetchmany(10)]
+            rows = [{'id': r[0], 'no': r[0], 'nome': (r[1] or '').strip(), 'ncont': ''} for r in cursor.fetchall()]
             conn.close()
-            if rows:
-                return jsonify(rows)
-            # Fallback to cl table
-            conn = get_phc_connection(cfg_phc)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT no, nome FROM PHC_Uniao..cl WHERE nome LIKE ? AND ISNULL(inactivo,0)=0 ORDER BY nome",
-                (f'%{q}%',)
-            )
-            rows = [{'no': r[0], 'nome': (r[1] or '').strip()} for r in cursor.fetchmany(10)]
-            conn.close()
+            # Add to cache
+            if not hasattr(app, '_forn_cache'): app._forn_cache = []
+            for r in rows:
+                if r['nome'] and r not in app._forn_cache:
+                    app._forn_cache.append(r)
             return jsonify(rows)
-    except Exception as e:
-        app.logger.warning(f"api_fornecedores PHC error: {e}")
+    except: pass
+    
     return jsonify([])
+
+# Endpoint to refresh the fornecedor cache
+@app.route('/api/fornecedores/refresh', methods=['POST'])
+@login_required
+def api_fornecedores_refresh():
+    if hasattr(app, '_forn_cache'):
+        del app._forn_cache
+    return jsonify({'ok': True})
+
 
 @app.route('/admin/ia', methods=['GET', 'POST'])
 @login_required
