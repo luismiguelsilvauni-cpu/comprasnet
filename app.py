@@ -4972,7 +4972,7 @@ def api_fornecedores():
         app._forn_cache = []
         try:
             rows = FornecedorPHC.query.order_by(FornecedorPHC.nome).limit(2000).all()
-            app._forn_cache = [{'id': f.no, 'no': f.no, 'nome': f.nome, 'ncont': getattr(f,'ncont','')} for f in rows]
+            app._forn_cache = [{'id': str(f.numero), 'no': str(f.numero), 'nome': f.nome, 'ncont': f.nif or ''} for f in rows]
         except: pass
     
     if app._forn_cache:
