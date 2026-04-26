@@ -130,6 +130,21 @@ function guardarMarcas() {
   });
 }
 
+function resyncFornecedores() {
+  var btn = document.getElementById('resyncBtn');
+  btn.disabled = true; btn.textContent = '⏳ A sincronizar...';
+  fetch('/fornecedores/resync', {method:'POST'})
+    .then(r=>r.json()).then(function(d){
+      if (d.ok) {
+        btn.textContent = '✅ ' + d.inseridos + ' novos, ' + d.atualizados + ' actualizados';
+        setTimeout(function(){ location.reload(); }, 1500);
+      } else {
+        alert('Erro: ' + d.error);
+        btn.disabled = false; btn.textContent = '🔄 Sincronizar PHC';
+      }
+    });
+}
+
 document.getElementById('marcasModal').addEventListener('click', function(e){
   if (e.target === this) fecharMarcas();
 });

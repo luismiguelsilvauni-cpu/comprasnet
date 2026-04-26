@@ -55,11 +55,12 @@ SELECT DISTINCT
     ISNULL(fo.morada, '')           AS morada,
     ISNULL(fo.local, '')            AS localidade,
     ISNULL(fo.codpost, '')          AS cod_postal,
-    ''                              AS telefone,
-    ''                              AS email,
+    ISNULL(fo.tel, '')              AS telefone,
+    ISNULL(fo.email, '')            AS email,
     0                               AS inactivo,
     fo.fostamp                      AS stamp
 FROM fo
+INNER JOIN ft ON ft.no = fo.no
 WHERE fo.nome IS NOT NULL
   AND LEN(LTRIM(RTRIM(fo.nome))) > 0
 ORDER BY fo.nome

@@ -3235,6 +3235,25 @@ def fornecedores():
     return render_template('fornecedores.html', items=items, q=q,
         marca_filtro=marca, all_marcas=sorted(all_marcas))
 
+@app.route('/fornecedores/resync', methods=['POST'])
+@login_required
+def fornecedores_resync():
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    try:
+        cfg = ConfigPHC.query.first()
+        if not cfg:
+            return jsonify({'ok': False, 'error': 'PHC não configurado'})
+        from phc_sync import sync_fornecedores
+        ins, upd, errs = sync_fornecedores(cfg)
+        db.session.commit()
+        # Clear cache
+        if hasattr(app, '_forn_cache'):
+            del app._forn_cache
+        return jsonify({'ok': True, 'inseridos': ins, 'atualizados': upd, 'erros': len(errs)})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
 @app.route('/fornecedores/<int:fid>/marcas', methods=['POST'])
 @login_required
 def fornecedor_marcas(fid):
