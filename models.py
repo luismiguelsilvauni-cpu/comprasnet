@@ -61,6 +61,11 @@ class FornecedorPHC(db.Model):
     email       = db.Column(db.String(150))
     ultima_sync = db.Column(db.DateTime)
     marcas      = db.Column(db.Text, default='')  # comma-separated brands this supplier handles
+    # NAV fields (manual, never overwritten by PHC sync)
+    nav_telefone  = db.Column(db.String(50),  default='')
+    nav_email     = db.Column(db.String(150), default='')
+    nav_morada    = db.Column(db.String(300), default='')
+    nav_notas     = db.Column(db.Text,        default='')
 
 class ConfigPHC(db.Model):
     __tablename__ = 'config_phc'

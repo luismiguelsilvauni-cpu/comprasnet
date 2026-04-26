@@ -3259,10 +3259,11 @@ def fornecedores_resync():
 def fornecedor_editar(fid):
     f = FornecedorPHC.query.get_or_404(fid)
     data = request.get_json() or {}
-    if 'email'    in data: f.email    = data['email'].strip()
-    if 'telefone' in data: f.telefone = data['telefone'].strip()
-    if 'morada'   in data: f.morada   = data['morada'].strip()
-    if 'localidade' in data: f.localidade = data['localidade'].strip()
+    # Only touch NAV fields (PHC fields are read-only from sync)
+    if 'nav_telefone' in data: f.nav_telefone = data['nav_telefone'].strip()
+    if 'nav_email'    in data: f.nav_email    = data['nav_email'].strip()
+    if 'nav_morada'   in data: f.nav_morada   = data['nav_morada'].strip()
+    if 'nav_notas'    in data: f.nav_notas    = data['nav_notas'].strip()
     db.session.commit()
     if hasattr(app, '_forn_cache'):
         del app._forn_cache

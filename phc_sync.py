@@ -206,25 +206,15 @@ def sync_fornecedores(config) -> tuple[int, int, list]:
             existing = FornecedorPHC.query.filter_by(numero=no).first()
             nome = str(r.nome or '').strip()
             if existing:
-                # Always update nome from PHC (source of truth)
-                existing.nome = nome
-                # Only overwrite local fields if PHC has data AND local is empty
-                # (preserves manual edits made in the app)
-                phc_nif   = str(r.nif or '').strip()
-                phc_mor   = str(r.morada or '').strip()
-                phc_loc   = str(r.localidade or '').strip()
-                phc_cp    = str(r.cod_postal or '').strip()
-                phc_tel   = str(r.telefone or '').strip()
-                phc_email = str(r.email or '').strip()
-                if phc_nif:   existing.nif        = phc_nif
-                if phc_mor:   existing.morada      = phc_mor
-                if phc_loc:   existing.localidade  = phc_loc
-                if phc_cp:    existing.cod_postal  = phc_cp
-                # Only overwrite tel/email if local is empty
-                if phc_tel   and not (existing.telefone or '').strip():
-                    existing.telefone = phc_tel
-                if phc_email and not (existing.email or '').strip():
-                    existing.email = phc_email
+                # Update PHC fields (always from PHC — source of truth)
+                existing.nome       = nome
+                existing.nif        = str(r.nif or '').strip()
+                existing.morada     = str(r.morada or '').strip()
+                existing.localidade = str(r.localidade or '').strip()
+                existing.cod_postal = str(r.cod_postal or '').strip()
+                existing.telefone   = str(r.telefone or '').strip()
+                existing.email      = str(r.email or '').strip()
+                # nav_ fields are NEVER touched by sync
                 updated += 1
             else:
                 db.session.add(FornecedorPHC(
@@ -286,25 +276,15 @@ def sync_clientes(config) -> tuple[int, int, list]:
             nome = str(r.nome or '').strip()
             existing = Cliente.query.filter_by(phc_no=no).first()
             if existing:
-                # Always update nome from PHC (source of truth)
-                existing.nome = nome
-                # Only overwrite local fields if PHC has data AND local is empty
-                # (preserves manual edits made in the app)
-                phc_nif   = str(r.nif or '').strip()
-                phc_mor   = str(r.morada or '').strip()
-                phc_loc   = str(r.localidade or '').strip()
-                phc_cp    = str(r.cod_postal or '').strip()
-                phc_tel   = str(r.telefone or '').strip()
-                phc_email = str(r.email or '').strip()
-                if phc_nif:   existing.nif        = phc_nif
-                if phc_mor:   existing.morada      = phc_mor
-                if phc_loc:   existing.localidade  = phc_loc
-                if phc_cp:    existing.cod_postal  = phc_cp
-                # Only overwrite tel/email if local is empty
-                if phc_tel   and not (existing.telefone or '').strip():
-                    existing.telefone = phc_tel
-                if phc_email and not (existing.email or '').strip():
-                    existing.email = phc_email
+                # Update PHC fields (always from PHC — source of truth)
+                existing.nome       = nome
+                existing.nif        = str(r.nif or '').strip()
+                existing.morada     = str(r.morada or '').strip()
+                existing.localidade = str(r.localidade or '').strip()
+                existing.cod_postal = str(r.cod_postal or '').strip()
+                existing.telefone   = str(r.telefone or '').strip()
+                existing.email      = str(r.email or '').strip()
+                # nav_ fields are NEVER touched by sync
                 updated += 1
             else:
                 db.session.add(Cliente(
