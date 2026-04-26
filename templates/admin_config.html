@@ -121,22 +121,64 @@
 <!-- Backup -->
 <div class="card mb-16">
   <div class="card-title">💾 Backup Automático</div>
-  <div class="grid-2">
-    <div class="form-group"><label>Pasta local</label>
-      <input type="text" name="backup_local_path" value="{{ cfg.backup_local_path or 'backups' }}"></div>
-    <div class="form-group"><label>Pasta de rede</label>
-      <input type="text" name="backup_rede_path" value="{{ cfg.backup_rede_path or '' }}" placeholder="\\servidor\partilha"></div>
+
+  <!-- Pasta local -->
+  <div class="form-group">
+    <label>📁 Pasta Local</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="text" name="backup_local_path" id="backupLocalPath"
+        value="{{ cfg.backup_local_path or 'backups' }}"
+        placeholder="C:\Backups\ComprasNet"
+        style="flex:1;font-family:monospace;font-size:12px">
+      <button type="button" onclick="testarPasta('local')" class="btn btn-ghost btn-sm" style="white-space:nowrap">🔍 Testar</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+      Caminho absoluto (ex: <code>C:\Backups\ComprasNet</code>) ou relativo à app (ex: <code>backups</code>)
+    </div>
+    <div id="testeLocal" style="font-size:11px;margin-top:4px;display:none"></div>
   </div>
-  <div class="grid-2">
-    <div class="form-group"><label>Hora</label>
-      <input type="time" name="backup_hora" value="{{ cfg.backup_hora or '02:00' }}"></div>
-    <div class="form-group"><label>Manter (dias)</label>
-      <input type="number" name="backup_manter_dias" value="{{ cfg.backup_manter_dias or 30 }}" min="1"></div>
+
+  <!-- Pasta de rede -->
+  <div class="form-group">
+    <label>🌐 Pasta de Rede (opcional)</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="text" name="backup_rede_path" id="backupRedePath"
+        value="{{ cfg.backup_rede_path or '' }}"
+        placeholder="\\servidor\partilha\ComprasNet"
+        style="flex:1;font-family:monospace;font-size:12px">
+      <button type="button" onclick="testarPasta('rede')" class="btn btn-ghost btn-sm" style="white-space:nowrap">🔍 Testar</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+      Caminho UNC (ex: <code>\\NAS\Backups</code>) ou mapeado (ex: <code>Z:\Backups</code>)
+    </div>
+    <div id="testeRede" style="font-size:11px;margin-top:4px;display:none"></div>
   </div>
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+
+  <!-- Hora e retenção -->
+  <div class="grid-2">
+    <div class="form-group">
+      <label>⏰ Hora do Backup Diário</label>
+      <input type="time" name="backup_hora" value="{{ cfg.backup_hora or '02:00' }}" class="input">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px">O backup corre automaticamente todos os dias a esta hora</div>
+    </div>
+    <div class="form-group">
+      <label>🗓 Retenção (dias)</label>
+      <input type="number" name="backup_manter_dias" value="{{ cfg.backup_manter_dias or 30 }}" min="1" max="365" class="input">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Backups com mais de X dias são eliminados automaticamente</div>
+    </div>
+  </div>
+
+  <!-- Checkbox activo -->
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:4px">
     <input type="checkbox" name="backup_auto_ativo" {% if cfg.backup_auto_ativo %}checked{% endif %} style="width:auto">
-    Backup automático diário activo
+    <span>Backup automático diário <strong>activo</strong></span>
   </label>
+
+  <!-- Info sobre retenção -->
+  <div style="margin-top:10px;padding:8px 12px;background:rgba(59,110,240,.08);border-radius:6px;border-left:3px solid var(--accent);font-size:12px;color:var(--text-muted)">
+    ℹ️ Cada backup fica guardado <strong>{{ cfg.backup_manter_dias or 30 }} dias</strong>. Após esse período é eliminado automaticamente para poupar espaço.
+    Os backups têm o formato <code>comprasnet_backup_AAAAMMDD_HHMMSS.db</code>.
+  </div>
 </div>
 
 <!-- Chat IA -->
@@ -321,6 +363,26 @@ document.querySelector('[name=logo]')?.addEventListener('change', function() {
 });
 
 function fazerBackup() {
+  function testarPasta(tipo) {
+    var inp = document.getElementById(tipo === 'local' ? 'backupLocalPath' : 'backupRedePath');
+    var out = document.getElementById('teste' + (tipo === 'local' ? 'Local' : 'Rede'));
+    var path = inp.value.trim();
+    if (!path) { out.style.display='block'; out.innerHTML='⚠️ Indique um caminho.'; return; }
+    out.style.display='block'; out.innerHTML='⏳ A testar...'; out.style.color='var(--text-muted)';
+    fetch('/admin/testar-pasta', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({path: path, tipo: tipo})
+    }).then(r=>r.json()).then(d=>{
+      if (d.ok) {
+        out.innerHTML = '✅ ' + d.msg;
+        out.style.color = '#22c55e';
+      } else {
+        out.innerHTML = '❌ ' + d.msg;
+        out.style.color = '#ef4444';
+      }
+    }).catch(()=>{ out.innerHTML='❌ Erro de ligação'; out.style.color='#ef4444'; });
+  }
+
   const msg = document.getElementById('backupMsg');
   msg.style.display='block'; msg.textContent='⏳ A fazer backup...';
   fetch('/admin/config', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'action=backup'})
