@@ -296,6 +296,11 @@
               <span class="icon">💶</span><span>Salários</span>
             </a>
             {% endif %}
+            {% if pode_aceder('fornecedores') %}
+            <a href="{{ url_for('fornecedores') }}" class="nav-item nav-sub {% if request.endpoint in ['fornecedores','fornecedor_marcas'] %}active{% endif %}">
+              <span class="icon">🏭</span><span>Fornecedores</span>
+            </a>
+            {% endif %}
             {% if pode_aceder('ferias') %}
             <a href="{{ url_for('ferias_mapa') }}" class="nav-item nav-sub {% if 'ferias' in (request.endpoint or '') %}active{% endif %}">
               <span class="icon">🏖</span><span>Mapa de Férias</span>

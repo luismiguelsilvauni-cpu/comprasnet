@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Fornecedores · NavTech{% endblock %}
+{% block page_title %}🏭 Fornecedores{% endblock %}
+{% block content %}
+
+<!-- Search + Filters -->
+<form method="GET" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+  <input type="text" name="q" value="{{ q }}" class="input" placeholder="🔍 Nome, NIF, email, localidade, telefone..." style="flex:1;min-width:200px;max-width:360px">
+  <select name="marca" class="input" style="width:auto" onchange="this.form.submit()">
+    <option value="">Todas as marcas</option>
+    {% for m in all_marcas %}
+    <option value="{{ m }}" {% if marca_filtro==m %}selected{% endif %}>{{ m }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-ghost">Pesquisar</button>
+  {% if q or marca_filtro %}<a href="{{ url_for('fornecedores') }}" class="btn btn-ghost">✕ Limpar</a>{% endif %}
+  <span style="font-size:12px;color:var(--text-muted)">{{ items|length }} resultado(s)</span>
+</form>
+
+<div class="card" style="padding:0;overflow:hidden">
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;min-width:800px">
+  <thead>
+    <tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+      <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700">Nome</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700;width:110px">NIF</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700;width:130px">Localidade</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700;width:120px">Telefone</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700;width:180px">Email</th>
+      <th style="padding:10px 8px;text-align:left;font-size:11px;font-weight:700">Marcas</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for f in items %}
+  <tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+    <td style="padding:8px 12px;font-size:13px;font-weight:600">{{ f.nome }}</td>
+    <td style="padding:8px;font-size:12px;font-family:monospace;color:var(--text-muted)">{{ f.nif or '—' }}</td>
+    <td style="padding:8px;font-size:12px;color:var(--text-muted)">{{ f.localidade or '—' }}</td>
+    <td style="padding:8px;font-size:12px;color:var(--text-muted)">{{ f.telefone or '—' }}</td>
+    <td style="padding:8px;font-size:12px;color:var(--text-muted)">
+      {% if f.email %}<a href="mailto:{{ f.email }}" style="color:var(--accent)">{{ f.email[:28] }}</a>{% else %}—{% endif %}
+    </td>
+    <td style="padding:6px 8px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        {% if f.marcas %}
+          {% for m in f.marcas.split(',') %}
+          {% if m.strip() %}
+          <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--accent);color:white;white-space:nowrap">{{ m.strip() }}</span>
+          {% endif %}
+          {% endfor %}
+        {% endif %}
+        <button onclick="editarMarcas({{ f.id }}, '{{ (f.marcas or '')|replace("'", "\\'") }}')"
+          style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--text-muted);white-space:nowrap">
+          ✏️ {% if f.marcas %}Editar{% else %}+ Marcas{% endif %}
+        </button>
+      </div>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">
+    {% if q or marca_filtro %}Sem resultados para os filtros aplicados{% else %}Sem fornecedores{% endif %}
+  </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+</div>
+
+<!-- Edit marcas modal -->
+<div id="marcasModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:460px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1">🏷 Marcas do Fornecedor</div>
+      <button onclick="fecharMarcas()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px">
+      <input type="hidden" id="marcasFid">
+      <div class="form-group">
+        <label>Marcas (separadas por vírgula)</label>
+        <input type="text" id="marcasInput" class="input" placeholder="Ex: Volvo, Caterpillar, John Deere, Mann...">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Liste as marcas a que este fornecedor tem acesso, separadas por vírgula</div>
+      </div>
+      <!-- Tag preview -->
+      <div id="marcasPreview" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharMarcas()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarMarcas()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _marcasFid = null;
+
+function editarMarcas(fid, marcasAtual) {
+  _marcasFid = fid;
+  document.getElementById('marcasFid').value = fid;
+  document.getElementById('marcasInput').value = marcasAtual;
+  atualizarPreview(marcasAtual);
+  document.getElementById('marcasModal').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('marcasInput').focus(); }, 100);
+}
+
+function fecharMarcas() {
+  document.getElementById('marcasModal').style.display = 'none';
+}
+
+function atualizarPreview(val) {
+  var prev = document.getElementById('marcasPreview');
+  var tags = val.split(',').map(function(m){ return m.trim(); }).filter(Boolean);
+  prev.innerHTML = tags.map(function(t){
+    return '<span style="font-size:11px;padding:3px 8px;border-radius:10px;background:var(--accent);color:white">' + t + '</span>';
+  }).join('');
+}
+
+document.getElementById('marcasInput').addEventListener('input', function(){
+  atualizarPreview(this.value);
+});
+
+function guardarMarcas() {
+  var fid = _marcasFid;
+  var marcas = document.getElementById('marcasInput').value.trim();
+  fetch('/fornecedores/' + fid + '/marcas', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({marcas: marcas})
+  }).then(r=>r.json()).then(function(d){
+    if (d.ok) location.reload();
+    else alert('Erro: ' + d.error);
+  });
+}
+
+document.getElementById('marcasModal').addEventListener('click', function(e){
+  if (e.target === this) fecharMarcas();
+});
+</script>
+{% endblock %}

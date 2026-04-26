@@ -3207,6 +3207,47 @@ def api_users_status():
     return jsonify(result)
 
 
+# ── MÓDULO FORNECEDORES ────────────────────────────────────────────────────────
+
+@app.route('/fornecedores')
+@login_required
+def fornecedores():
+    q     = request.args.get('q','').strip()
+    marca = request.args.get('marca','').strip()
+    query = FornecedorPHC.query
+    if q:
+        query = query.filter(
+            FornecedorPHC.nome.ilike(f'%{q}%') |
+            FornecedorPHC.nif.ilike(f'%{q}%') |
+            FornecedorPHC.email.ilike(f'%{q}%') |
+            FornecedorPHC.localidade.ilike(f'%{q}%') |
+            FornecedorPHC.telefone.ilike(f'%{q}%')
+        )
+    if marca:
+        query = query.filter(FornecedorPHC.marcas.ilike(f'%{marca}%'))
+    items = query.order_by(FornecedorPHC.nome).limit(200).all()
+    # Get all unique marcas for filter dropdown
+    all_marcas = set()
+    for f in FornecedorPHC.query.filter(FornecedorPHC.marcas != None, FornecedorPHC.marcas != '').all():
+        for m in (f.marcas or '').split(','):
+            m = m.strip()
+            if m: all_marcas.add(m)
+    return render_template('fornecedores.html', items=items, q=q,
+        marca_filtro=marca, all_marcas=sorted(all_marcas))
+
+@app.route('/fornecedores/<int:fid>/marcas', methods=['POST'])
+@login_required
+def fornecedor_marcas(fid):
+    f = FornecedorPHC.query.get_or_404(fid)
+    data = request.get_json() or {}
+    f.marcas = data.get('marcas', '').strip()
+    db.session.commit()
+    # Refresh in-memory cache
+    if hasattr(app, '_forn_cache'):
+        del app._forn_cache
+    return jsonify({'ok': True})
+
+
 # ── MÓDULO FICHAS TÉCNICAS ────────────────────────────────────────────────────
 
 UPLOAD_FICHAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'fichas')
@@ -3402,6 +3443,7 @@ MENUS_DISPONIVEIS = [
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
     ('ferias',             '🏖 Mapa de Férias'),
+    ('fornecedores',       '🏭 Fornecedores'),
     ('fichas',             '📋 Fichas Técnicas'),
     ('assistencias',       '🔧 Assistências'),
     ('entradas',           '📥 Entradas'),

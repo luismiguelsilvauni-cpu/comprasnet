@@ -60,6 +60,7 @@ class FornecedorPHC(db.Model):
     telefone    = db.Column(db.String(50))
     email       = db.Column(db.String(150))
     ultima_sync = db.Column(db.DateTime)
+    marcas      = db.Column(db.Text, default='')  # comma-separated brands this supplier handles
 
 class ConfigPHC(db.Model):
     __tablename__ = 'config_phc'
