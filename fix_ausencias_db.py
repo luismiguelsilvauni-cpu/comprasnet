@@ -3,6 +3,7 @@ db_path = os.path.join(os.path.dirname(__file__), 'instance', 'compras.db')
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
+# Tabelas ausencias
 cur.execute("""CREATE TABLE IF NOT EXISTS ausencia_registos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     funcionario_id INTEGER NOT NULL REFERENCES funcionario(id),
@@ -45,11 +46,7 @@ cur.execute("""CREATE TABLE IF NOT EXISTS empresa_fechos (
     criado_por INTEGER,
     criado_em DATETIME)""")
 
-conn.commit()
-conn.close()
-print("OK: tabelas ausencias criadas")
-
-# Add salary period fields to config_geral
+# Período salarial em config_geral
 cfg_cols = [r[1] for r in cur.execute("PRAGMA table_info(config_geral)").fetchall()]
 for col, typ, default in [
     ('salario_dia_inicio', 'INTEGER', '1'),
@@ -62,3 +59,5 @@ for col, typ, default in [
         print(f"ok: {col} ja existe")
 
 conn.commit()
+conn.close()
+print("Concluido.")
