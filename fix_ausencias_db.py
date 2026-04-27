@@ -61,3 +61,51 @@ for col, typ, default in [
 conn.commit()
 conn.close()
 print("Concluido.")
+
+# Periodos salariais
+cur.execute("""CREATE TABLE IF NOT EXISTS periodos_salariais (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ano INTEGER NOT NULL,
+    mes INTEGER NOT NULL,
+    data_inicio DATE NOT NULL,
+    data_fim DATE NOT NULL,
+    estado VARCHAR(10) DEFAULT 'aberto',
+    notas TEXT DEFAULT '',
+    criado_por INTEGER,
+    criado_em DATETIME,
+    fechado_por INTEGER,
+    fechado_em DATETIME,
+    UNIQUE(ano, mes))""")
+
+# Horas extra
+cur.execute("""CREATE TABLE IF NOT EXISTS horas_extra (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id),
+    periodo_id INTEGER REFERENCES periodos_salariais(id),
+    data DATE NOT NULL,
+    hora_inicio VARCHAR(5) NOT NULL,
+    hora_fim VARCHAR(5) NOT NULL,
+    total_horas REAL DEFAULT 0,
+    categoria VARCHAR(20) DEFAULT 'dia_util',
+    estado VARCHAR(20) DEFAULT 'pendente',
+    observacoes TEXT DEFAULT '',
+    criado_por INTEGER,
+    criado_em DATETIME,
+    alterado_por INTEGER,
+    alterado_em DATETIME)""")
+
+# Config horario
+cur.execute("""CREATE TABLE IF NOT EXISTS config_horario (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hora_inicio VARCHAR(5) DEFAULT '08:30',
+    hora_fim VARCHAR(5) DEFAULT '17:30',
+    horas_dia REAL DEFAULT 8.0,
+    pausa_almoco REAL DEFAULT 1.0)""")
+# Insert default if empty
+if cur.execute("SELECT COUNT(*) FROM config_horario").fetchone()[0] == 0:
+    cur.execute("INSERT INTO config_horario (hora_inicio,hora_fim,horas_dia,pausa_almoco) VALUES ('08:30','17:30',8.0,1.0)")
+    print("OK: config_horario default inserido")
+
+conn.commit()
+conn.close()
+print("Concluido.")

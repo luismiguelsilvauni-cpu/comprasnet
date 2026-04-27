@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Períodos Salariais {{ ano }}{% endblock %}
+{% block page_title %}💰 Períodos Salariais {{ ano }}{% endblock %}
+{% block topbar_actions %}
+  <button onclick="anoAnterior()" class="btn btn-ghost btn-sm">◀ {{ ano-1 }}</button>
+  <strong style="padding:0 8px">{{ ano }}</strong>
+  <button onclick="anoSeguinte()" class="btn btn-ghost btn-sm">{{ ano+1 }} ▶</button>
+  <button onclick="abrirCriar()" class="btn btn-primary btn-sm">+ Novo Período</button>
+{% endblock %}
+{% block content %}
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:14px">
+{% set meses_pt = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] %}
+{% for p in periodos %}
+<div class="card" style="padding:16px;border-left:4px solid {% if p.estado=='fechado' %}#94a3b8{% else %}#22c55e{% endif %}">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div>
+      <div style="font-size:15px;font-weight:700">{{ meses_pt[p.mes] }} {{ p.ano }}</div>
+      <div style="font-size:11px;color:var(--text-muted)">{{ p.data_inicio.strftime('%d/%m/%Y') }} → {{ p.data_fim.strftime('%d/%m/%Y') }}</div>
+    </div>
+    <span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;background:{% if p.estado=='fechado' %}rgba(148,163,184,.2){% else %}rgba(34,197,94,.15){% endif %};color:{% if p.estado=='fechado' %}#94a3b8{% else %}#22c55e{% endif %}">
+      {% if p.estado=='fechado' %}🔒 Fechado{% else %}✅ Aberto{% endif %}
+    </span>
+  </div>
+  {% if p.notas %}<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">{{ p.notas }}</div>{% endif %}
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <button onclick="verResumo({{ p.id }},'{{ meses_pt[p.mes] }} {{ p.ano }}')" class="btn btn-ghost btn-sm">📊 Resumo</button>
+    <a href="{{ url_for('periodo_exportar_pdf', pid=p.id) }}" class="btn btn-ghost btn-sm">📄 PDF</a>
+    {% if p.estado=='aberto' %}
+    <button onclick="editarPeriodo({{ p.id }},'{{ p.data_inicio }}','{{ p.data_fim }}','{{ p.notas or '' }}')" class="btn btn-ghost btn-sm">✏️</button>
+    {% if current_user.is_admin %}
+    <button onclick="fecharPeriodo({{ p.id }})" class="btn btn-sm" style="background:rgba(148,163,184,.15);color:#94a3b8;border:none">🔒 Fechar</button>
+    {% endif %}
+    {% else %}
+    {% if current_user.is_admin %}
+    <button onclick="reabrirPeriodo({{ p.id }})" class="btn btn-sm" style="background:rgba(245,158,11,.15);color:#f59e0b;border:none">🔓 Reabrir</button>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% else %}
+{% for m in range(1,13) %}
+<div class="card" style="padding:14px;opacity:.5;border:1px dashed var(--border)">
+  <div style="font-size:13px;font-weight:600;color:var(--text-muted)">{{ meses_pt[m] }}</div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Sem período definido</div>
+  <button onclick="abrirCriarMes({{ m }})" class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px">+ Criar</button>
+</div>
+{% endfor %}
+{% endfor %}
+</div>
+
+<!-- Resumo modal -->
+<div id="resumoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(95vw,900px);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;position:sticky;top:0;background:var(--surface);z-index:1">
+      <div style="font-size:14px;font-weight:700;flex:1" id="resumoTitulo">📊 Resumo Salarial</div>
+      <button onclick="document.getElementById('resumoModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="resumoBody" style="padding:16px;overflow-x:auto"></div>
+  </div>
+</div>
+
+<!-- Create/Edit modal -->
+<div id="periodoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:420px;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1" id="periodoModalTitulo">+ Novo Período Salarial</div>
+      <button onclick="document.getElementById('periodoModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" id="periodoId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label>Mês de Referência</label>
+          <select id="periodoMes" class="input">
+            {% for m,n in [(1,'Janeiro'),(2,'Fevereiro'),(3,'Março'),(4,'Abril'),(5,'Maio'),(6,'Junho'),(7,'Julho'),(8,'Agosto'),(9,'Setembro'),(10,'Outubro'),(11,'Novembro'),(12,'Dezembro')] %}
+            <option value="{{ m }}">{{ n }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0"><label>Ano</label>
+          <input type="number" id="periodoAno" class="input" value="{{ ano }}" min="2020" max="2035">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label>Data Início</label><input type="date" id="periodoInicio" class="input"></div>
+        <div class="form-group" style="margin:0"><label>Data Fim</label><input type="date" id="periodoFim" class="input"></div>
+      </div>
+      <div class="form-group" style="margin:0"><label>Notas</label><input type="text" id="periodoNotas" class="input" placeholder="Opcional"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('periodoModal').style.display='none'" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarPeriodo()" class="btn btn-primary" id="periodoSaveBtn">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ANO = {{ ano }};
+function anoAnterior(){ window.location='/periodos-salariais?ano='+(ANO-1); }
+function anoSeguinte(){ window.location='/periodos-salariais?ano='+(ANO+1); }
+
+var _editPeriodoId = null;
+function abrirCriar(mes) {
+  _editPeriodoId = null;
+  document.getElementById('periodoModalTitulo').textContent = '+ Novo Período Salarial';
+  document.getElementById('periodoId').value = '';
+  document.getElementById('periodoMes').value = mes || (new Date().getMonth()+1);
+  document.getElementById('periodoAno').value = ANO;
+  document.getElementById('periodoInicio').value = '';
+  document.getElementById('periodoFim').value = '';
+  document.getElementById('periodoNotas').value = '';
+  document.getElementById('periodoModal').style.display = 'flex';
+}
+function abrirCriarMes(mes){ abrirCriar(mes); }
+function editarPeriodo(pid, ini, fim, notas) {
+  _editPeriodoId = pid;
+  document.getElementById('periodoModalTitulo').textContent = '✏️ Editar Período';
+  document.getElementById('periodoId').value = pid;
+  document.getElementById('periodoInicio').value = ini;
+  document.getElementById('periodoFim').value = fim;
+  document.getElementById('periodoNotas').value = notas;
+  document.getElementById('periodoModal').style.display = 'flex';
+}
+function guardarPeriodo() {
+  var btn = document.getElementById('periodoSaveBtn');
+  btn.disabled = true; btn.textContent = 'A guardar...';
+  var pid = document.getElementById('periodoId').value;
+  var url = pid ? '/periodos-salariais/'+pid+'/editar' : '/periodos-salariais/criar';
+  var body = {
+    mes: document.getElementById('periodoMes').value,
+    ano: document.getElementById('periodoAno').value,
+    data_inicio: document.getElementById('periodoInicio').value,
+    data_fim: document.getElementById('periodoFim').value,
+    notas: document.getElementById('periodoNotas').value,
+  };
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok) location.reload();
+      else { alert('Erro: '+d.error); btn.disabled=false; btn.textContent='💾 Guardar'; }
+    });
+}
+function fecharPeriodo(pid) {
+  if(!confirm('Fechar este período? Os registos ficarão bloqueados.')) return;
+  fetch('/periodos-salariais/'+pid+'/fechar',{method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert(d.error); });
+}
+function reabrirPeriodo(pid) {
+  if(!confirm('Reabrir este período?')) return;
+  fetch('/periodos-salariais/'+pid+'/reabrir',{method:'POST'})
+    .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert(d.error); });
+}
+function verResumo(pid, titulo) {
+  document.getElementById('resumoTitulo').textContent = '📊 ' + titulo;
+  document.getElementById('resumoBody').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">⏳ A calcular...</div>';
+  document.getElementById('resumoModal').style.display = 'flex';
+  fetch('/periodos-salariais/'+pid+'/resumo')
+    .then(r=>r.json()).then(d=>{
+      if(!d.ok){ document.getElementById('resumoBody').innerHTML='Erro'; return; }
+      var rows = d.resumo;
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+      html += '<thead><tr style="background:var(--surface2)">';
+      ['Funcionário','Dias Úteis','Trabalhados','Férias','Pontes','F.Just.','F.Injust.','Baixas','HE Útil(h)','HE FDS(h)','HE Total(h)']
+        .forEach(h=>{ html+='<th style="padding:8px;border:1px solid var(--border);text-align:center;font-size:11px">'+h+'</th>'; });
+      html += '</tr></thead><tbody>';
+      rows.forEach(function(r, i) {
+        html += '<tr style="background:'+(i%2?'var(--surface2)':'')+'"><td style="padding:6px 8px;border:1px solid var(--border);font-weight:600">'+r.nome+'</td>';
+        [r.dias_uteis,r.dias_trabalhados,r.ferias,r.pontes,r.faltas_just,r.faltas_injust,r.baixas,r.he_util,r.he_fds,r.he_total]
+          .forEach(v=>{ html+='<td style="padding:6px;border:1px solid var(--border);text-align:center">'+(v||0)+'</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      html += '<div style="margin-top:12px;text-align:right"><a href="/periodos-salariais/'+pid+'/exportar-pdf" class="btn btn-primary btn-sm">📄 Exportar PDF</a></div>';
+      document.getElementById('resumoBody').innerHTML = html;
+    });
+}
+document.getElementById('resumoModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+document.getElementById('periodoModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+</script>
+{% endblock %}

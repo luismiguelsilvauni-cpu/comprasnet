@@ -567,6 +567,56 @@ class FichaDocumento(db.Model):
     uploader      = db.relationship('User', foreign_keys=[criado_por])
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO ASSIDUIDADE & PRÉ-PROCESSAMENTO SALARIAL
+# ══════════════════════════════════════════════════════════════════════════════
+
+class PeriodoSalarial(db.Model):
+    """Período de processamento salarial por mês de referência."""
+    __tablename__ = 'periodos_salariais'
+    id            = db.Column(db.Integer, primary_key=True)
+    ano           = db.Column(db.Integer, nullable=False, index=True)
+    mes           = db.Column(db.Integer, nullable=False)          # 1-12 (mês de referência)
+    data_inicio   = db.Column(db.Date, nullable=False)
+    data_fim      = db.Column(db.Date, nullable=False)
+    estado        = db.Column(db.String(10), default='aberto')     # aberto / fechado
+    notas         = db.Column(db.Text, default='')
+    criado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
+    fechado_por   = db.Column(db.Integer, db.ForeignKey('users.id'))
+    fechado_em    = db.Column(db.DateTime)
+    __table_args__ = (db.UniqueConstraint('ano', 'mes', name='uq_periodo_ano_mes'),)
+
+class HoraExtra(db.Model):
+    """Registo de horas extra por funcionário."""
+    __tablename__ = 'horas_extra'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False, index=True)
+    periodo_id      = db.Column(db.Integer, db.ForeignKey('periodos_salariais.id'))
+    data            = db.Column(db.Date, nullable=False)
+    hora_inicio     = db.Column(db.String(5), nullable=False)   # HH:MM
+    hora_fim        = db.Column(db.String(5), nullable=False)
+    total_horas     = db.Column(db.Float, default=0)
+    categoria       = db.Column(db.String(20), default='dia_util')  # dia_util / fds / feriado
+    estado          = db.Column(db.String(20), default='pendente')  # pendente / aprovado / rejeitado
+    observacoes     = db.Column(db.Text, default='')
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    alterado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    alterado_em     = db.Column(db.DateTime)
+    funcionario     = db.relationship('Funcionario', foreign_keys=[funcionario_id])
+    periodo         = db.relationship('PeriodoSalarial', foreign_keys=[periodo_id])
+
+class ConfigHorario(db.Model):
+    """Configuração do horário laboral normal da empresa."""
+    __tablename__ = 'config_horario'
+    id          = db.Column(db.Integer, primary_key=True)
+    hora_inicio = db.Column(db.String(5), default='08:30')
+    hora_fim    = db.Column(db.String(5), default='17:30')
+    horas_dia   = db.Column(db.Float, default=8.0)
+    pausa_almoco = db.Column(db.Float, default=1.0)  # horas de pausa
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # MÓDULO FÉRIAS / FALTAS — AUSÊNCIAS
 # ══════════════════════════════════════════════════════════════════════════════
 

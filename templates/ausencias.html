@@ -7,6 +7,8 @@
   <strong style="padding:0 8px;font-size:14px">{{ ano }}</strong>
   <button onclick="anoSeguinte()" class="btn btn-ghost btn-sm">{{ ano+1 }} ▶</button>
   <button onclick="abrirNovaAusencia()" class="btn btn-primary btn-sm">+ Registar Ausência</button>
+  <button onclick="abrirHoraExtra()" class="btn btn-ghost btn-sm">⏱ Horas Extra</button>
+  <a href="/periodos-salariais?ano={{ ano }}" class="btn btn-ghost btn-sm">💰 Períodos Salariais</a>
   <button onclick="abrirFechoEmpresa()" class="btn btn-ghost btn-sm">🏢 Fecho Empresa</button>
   <button onclick="abrirAddFeriado()" class="btn btn-ghost btn-sm">📅 Feriado/Ponte</button>
   <button onclick="syncAll()" class="btn btn-ghost btn-sm" id="syncBtn">🔄 Sincronizar Fichas</button>
@@ -193,6 +195,54 @@ var DIA_FECHO_SAL  = {{ dia_fecho_sal }};
     <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
       <button onclick="fecharModal('modalSaldo')" class="btn btn-ghost">Cancelar</button>
       <button onclick="guardarSaldo()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Horas Extra Modal -->
+<div id="modalHE" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:500px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1">⏱ Registar Horas Extra</div>
+      <button onclick="fecharModal('modalHE')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label>Funcionário</label>
+          <select id="heFuncId" class="input">
+            {% for f in funcs %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0"><label>Data</label>
+          <input type="date" id="heData" class="input" onchange="updateHECategoria()">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);padding:6px 10px;background:var(--surface2);border-radius:6px">
+        🕐 Horário normal: <strong>08:30 – 17:30</strong> — Registar apenas períodos <strong>fora</strong> deste horário
+      </div>
+      <!-- Time grid visual -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Seleccionar período (blocos de 30 min):</div>
+        <div id="heGrid" style="display:flex;flex-wrap:wrap;gap:2px"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label>Hora Início</label>
+          <input type="time" id="heInicio" class="input" step="1800" onchange="calcHETotal()">
+        </div>
+        <div class="form-group" style="margin:0"><label>Hora Fim</label>
+          <input type="time" id="heFim" class="input" step="1800" onchange="calcHETotal()">
+        </div>
+      </div>
+      <div id="heTotalInfo" style="font-size:12px;color:var(--text-muted)"></div>
+      <div id="heCategoriaInfo" style="font-size:11px;padding:5px 10px;border-radius:5px;background:var(--surface2);display:none"></div>
+      <div class="form-group" style="margin:0"><label>Observações</label>
+        <input type="text" id="heObs" class="input" placeholder="Opcional">
+      </div>
+      <div id="heAviso" style="display:none;padding:8px;background:rgba(239,68,68,.1);border-radius:6px;font-size:12px;color:#ef4444"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharModal('modalHE')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarHE()" class="btn btn-primary" id="heSaveBtn">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -551,6 +601,114 @@ function guardarFecho() {
     else alert('Erro: ' + d.error);
   });
 }
+
+// ── Horas Extra ────────────────────────────────────────────────────────────
+var _heGridSelStart = null;
+var _heGridDragging = false;
+
+function abrirHoraExtra(ds) {
+  document.getElementById('heData').value = ds || '';
+  document.getElementById('heInicio').value = '18:00';
+  document.getElementById('heFim').value   = '20:00';
+  document.getElementById('heObs').value   = '';
+  document.getElementById('heAviso').style.display = 'none';
+  document.getElementById('heCategoriaInfo').style.display = 'none';
+  buildHEGrid();
+  calcHETotal();
+  if(ds) updateHECategoria();
+  document.getElementById('modalHE').style.display = 'flex';
+}
+
+function buildHEGrid() {
+  var grid = document.getElementById('heGrid');
+  grid.innerHTML = '';
+  // 00:00 to 23:30 in 30min blocks
+  for (var h = 0; h < 24; h++) {
+    for (var m = 0; m < 2; m++) {
+      var label = pad(h) + ':' + (m===0?'00':'30');
+      var isNormal = (h===8&&m===1)||(h>=9&&h<17)||(h===17&&m===0); // 08:30–17:30
+      var block = document.createElement('div');
+      block.dataset.time = label;
+      block.style.cssText = 'width:36px;height:22px;border-radius:3px;cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);' +
+        (isNormal ? 'background:var(--surface2);color:var(--text-muted);' : 'background:rgba(59,110,240,.08);color:var(--accent);font-weight:700;');
+      block.textContent = label;
+      block.onclick = (function(t, isN){ return function(){
+        if(isN) return; // skip normal hours
+        document.getElementById('heInicio').value = t;
+        // Set fim to t+2h
+        var parts = t.split(':'), totMin = parseInt(parts[0])*60+parseInt(parts[1])+120;
+        if(totMin>1440)totMin=1440;
+        document.getElementById('heFim').value = pad(Math.floor(totMin/60))+':'+pad(totMin%60);
+        calcHETotal();
+        highlightHEGrid();
+      }; })(label, isNormal);
+      grid.appendChild(block);
+    }
+  }
+}
+
+function highlightHEGrid() {
+  var ini = document.getElementById('heInicio').value;
+  var fim = document.getElementById('heFim').value;
+  document.querySelectorAll('#heGrid div').forEach(function(b){
+    var t = b.dataset.time;
+    var active = t >= ini && t < fim;
+    if (active) b.style.background = 'var(--accent)'; b.style.color = 'white';
+    else if (!b.style.color.includes('muted')) { b.style.background='rgba(59,110,240,.08)'; b.style.color='var(--accent)'; }
+  });
+}
+
+function calcHETotal() {
+  var ini = document.getElementById('heInicio').value;
+  var fim = document.getElementById('heFim').value;
+  if (!ini || !fim) return;
+  var iMin = parseInt(ini.split(':')[0])*60+parseInt(ini.split(':')[1]);
+  var fMin = parseInt(fim.split(':')[0])*60+parseInt(fim.split(':')[1]);
+  var total = (fMin-iMin)/60;
+  document.getElementById('heTotalInfo').textContent = total > 0 ? '= ' + total.toFixed(1) + ' horas extra' : '⚠️ Hora fim deve ser depois da hora início';
+  highlightHEGrid();
+}
+
+function updateHECategoria() {
+  var ds = document.getElementById('heData').value;
+  if (!ds) return;
+  var dt = new Date(ds);
+  var dow = dt.getDay();
+  var fer = FERIADOS.find(function(f){ return f.data===ds; });
+  var el = document.getElementById('heCategoriaInfo');
+  el.style.display = 'block';
+  if (fer) { el.textContent='🔴 Feriado: '+fer.nome+' — HE classificadas como feriado'; el.style.color='#ef4444'; }
+  else if (dow===0||dow===6) { el.textContent='🟡 Fim de semana — HE classificadas como FDS'; el.style.color='#f59e0b'; }
+  else { el.textContent='🔵 Dia útil — HE classificadas como dia útil'; el.style.color='var(--accent)'; }
+}
+
+function guardarHE(forcar) {
+  var btn = document.getElementById('heSaveBtn');
+  btn.disabled=true; btn.textContent='A guardar...';
+  fetch('/horas-extra/registar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      funcionario_id: document.getElementById('heFuncId').value,
+      data: document.getElementById('heData').value,
+      hora_inicio: document.getElementById('heInicio').value,
+      hora_fim:    document.getElementById('heFim').value,
+      observacoes: document.getElementById('heObs').value,
+      forcar: forcar||false
+    })
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok){ location.reload(); }
+    else if(d.conflito){
+      var av=document.getElementById('heAviso');
+      av.innerHTML='⚠️ '+d.error+' <button onclick="guardarHE(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
+      av.style.display='block'; btn.disabled=false; btn.textContent='💾 Guardar';
+    } else {
+      var av=document.getElementById('heAviso');
+      av.textContent='❌ '+d.error; av.style.display='block';
+      btn.disabled=false; btn.textContent='💾 Guardar';
+    }
+  });
+}
+document.getElementById('modalHE').addEventListener('click',function(e){if(e.target===this)fecharModal('modalHE');});
 
 // ── Sync fichas ───────────────────────────────────────────────────────────────
 function syncAll() {

@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -8381,6 +8381,294 @@ def _sync_ausencias_to_faltas(funcionario_id, ano):
             ))
     db.session.commit()
     return len(buckets)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO PERÍODOS SALARIAIS & HORAS EXTRA
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_horario():
+    """Get company work schedule or defaults."""
+    cfg = ConfigHorario.query.first()
+    if cfg: return cfg.hora_inicio, cfg.hora_fim, cfg.horas_dia
+    return '08:30', '17:30', 8.0
+
+def _horas_entre(h_ini, h_fim):
+    """Calculate hours between two HH:MM strings."""
+    def to_min(s):
+        h, m = s.split(':')
+        return int(h)*60 + int(m)
+    return round((to_min(h_fim) - to_min(h_ini)) / 60, 2)
+
+def _categoria_he(data, feriados_set):
+    """Classify hora extra: dia_util / fds / feriado."""
+    from datetime import date
+    if data in feriados_set: return 'feriado'
+    if data.weekday() >= 5: return 'fds'
+    return 'dia_util'
+
+def _get_or_create_periodo(ano, mes):
+    """Get existing period or return None."""
+    return PeriodoSalarial.query.filter_by(ano=ano, mes=mes).first()
+
+def _resumo_periodo(periodo_id):
+    """Calculate attendance summary for a salary period."""
+    p = PeriodoSalarial.query.get(periodo_id)
+    if not p: return {}
+    from datetime import timedelta
+    feriados_set = _get_feriados_set(p.ano)
+
+    # Days in period
+    dias_uteis_total = _dias_uteis_ausencia(p.data_inicio, p.data_fim, feriados_set)
+
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()         if hasattr(Funcionario,'ativo') else Funcionario.query.order_by(Funcionario.nome).all()
+
+    resumo = {}
+    for f in funcs:
+        ausencias = AusenciaRegisto.query.filter(
+            AusenciaRegisto.funcionario_id == f.id,
+            AusenciaRegisto.estado.in_(['aprovado']),
+            AusenciaRegisto.data_inicio <= p.data_fim,
+            AusenciaRegisto.data_fim   >= p.data_inicio
+        ).all()
+
+        r = {'nome': f.nome, 'id': f.id,
+             'dias_uteis': dias_uteis_total,
+             'ferias': 0.0, 'pontes': 0.0, 'faltas_just': 0.0,
+             'faltas_injust': 0.0, 'baixas': 0.0, 'outros': 0.0,
+             'he_util': 0.0, 'he_fds': 0.0, 'he_feriado': 0.0}
+
+        for a in ausencias:
+            # Clip to period
+            ini = max(a.data_inicio, p.data_inicio)
+            fim = min(a.data_fim,   p.data_fim)
+            dias = _dias_uteis_ausencia(ini, fim, feriados_set, a.formato, a.horas)
+            if a.tipo in ('ferias','fecho_empresa'): r['ferias'] += dias
+            elif a.tipo == 'ponte': r['pontes'] += dias
+            elif a.tipo == 'falta_justificada': r['faltas_just'] += dias
+            elif a.tipo == 'falta_injustificada': r['faltas_injust'] += dias
+            elif a.tipo == 'baixa_medica': r['baixas'] += dias
+            else: r['outros'] += dias
+
+        # Horas extra
+        hes = HoraExtra.query.filter(
+            HoraExtra.funcionario_id == f.id,
+            HoraExtra.data >= p.data_inicio,
+            HoraExtra.data <= p.data_fim,
+            HoraExtra.estado.in_(['aprovado','pendente'])
+        ).all()
+        for he in hes:
+            if he.categoria == 'dia_util': r['he_util'] += he.total_horas
+            elif he.categoria == 'fds': r['he_fds'] += he.total_horas
+            elif he.categoria == 'feriado': r['he_feriado'] += he.total_horas
+
+        r['dias_trabalhados'] = round(dias_uteis_total - r['ferias'] - r['pontes'] - r['faltas_just'] - r['faltas_injust'] - r['baixas'], 1)
+        r['he_total'] = round(r['he_util'] + r['he_fds'] + r['he_feriado'], 2)
+        for k in ['ferias','pontes','faltas_just','faltas_injust','baixas','outros']:
+            r[k] = round(r[k], 1)
+        resumo[f.id] = r
+
+    return resumo
+
+# ── Períodos salariais ────────────────────────────────────────────────────────
+@app.route('/periodos-salariais')
+@login_required
+def periodos_salariais():
+    from datetime import date
+    ano = int(request.args.get('ano', date.today().year))
+    periodos = PeriodoSalarial.query.filter_by(ano=ano).order_by(PeriodoSalarial.mes).all()
+    return render_template('periodos_salariais.html', periodos=periodos, ano=ano)
+
+@app.route('/periodos-salariais/criar', methods=['POST'])
+@login_required
+def periodo_criar():
+    data = request.get_json() or {}
+    try:
+        ini = datetime.strptime(data['data_inicio'], '%Y-%m-%d').date()
+        fim = datetime.strptime(data['data_fim'],    '%Y-%m-%d').date()
+    except: return jsonify({'ok': False, 'error': 'Datas inválidas'})
+    mes = int(data.get('mes', ini.month))
+    ano = int(data.get('ano', ini.year))
+    existing = PeriodoSalarial.query.filter_by(ano=ano, mes=mes).first()
+    if existing: return jsonify({'ok': False, 'error': f'Já existe período para {ano}/{mes:02d}'})
+    p = PeriodoSalarial(ano=ano, mes=mes, data_inicio=ini, data_fim=fim,
+        notas=data.get('notas',''), criado_por=current_user.id, criado_em=datetime.now())
+    db.session.add(p); db.session.commit()
+    return jsonify({'ok': True, 'id': p.id})
+
+@app.route('/periodos-salariais/<int:pid>/editar', methods=['POST'])
+@login_required
+def periodo_editar(pid):
+    p = PeriodoSalarial.query.get_or_404(pid)
+    if p.estado == 'fechado' and not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Período fechado'})
+    data = request.get_json() or {}
+    if 'data_inicio' in data: p.data_inicio = datetime.strptime(data['data_inicio'], '%Y-%m-%d').date()
+    if 'data_fim'    in data: p.data_fim    = datetime.strptime(data['data_fim'],    '%Y-%m-%d').date()
+    if 'notas'       in data: p.notas       = data['notas']
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/periodos-salariais/<int:pid>/fechar', methods=['POST'])
+@login_required
+def periodo_fechar(pid):
+    if not current_user.is_admin: return jsonify({'ok': False, 'error': 'Sem permissão'})
+    p = PeriodoSalarial.query.get_or_404(pid)
+    p.estado = 'fechado'; p.fechado_por = current_user.id; p.fechado_em = datetime.now()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/periodos-salariais/<int:pid>/reabrir', methods=['POST'])
+@login_required
+def periodo_reabrir(pid):
+    if not current_user.is_admin: return jsonify({'ok': False, 'error': 'Sem permissão'})
+    p = PeriodoSalarial.query.get_or_404(pid)
+    p.estado = 'aberto'; p.fechado_por = None; p.fechado_em = None
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/periodos-salariais/<int:pid>/resumo')
+@login_required
+def periodo_resumo(pid):
+    resumo = _resumo_periodo(pid)
+    p = PeriodoSalarial.query.get_or_404(pid)
+    return jsonify({'ok': True, 'resumo': list(resumo.values()),
+        'periodo': {'inicio': p.data_inicio.isoformat(), 'fim': p.data_fim.isoformat(),
+                    'mes': p.mes, 'ano': p.ano, 'estado': p.estado}})
+
+@app.route('/periodos-salariais/<int:pid>/exportar-pdf')
+@login_required
+def periodo_exportar_pdf(pid):
+    p = PeriodoSalarial.query.get_or_404(pid)
+    resumo = _resumo_periodo(pid)
+    cfg = ConfigGeral.query.first()
+    empresa = cfg.empresa_nome if cfg else 'UCN'
+    from flask import Response
+    import io
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
+            topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
+        styles = getSampleStyleSheet()
+        meses_pt = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+        elements = []
+        # Title
+        title_style = ParagraphStyle('title', parent=styles['Heading1'], fontSize=14, spaceAfter=4)
+        sub_style   = ParagraphStyle('sub',   parent=styles['Normal'],   fontSize=9,  textColor=colors.grey)
+        elements.append(Paragraph(f'{empresa} — Resumo Salarial', title_style))
+        elements.append(Paragraph(
+            f'{meses_pt[p.mes]} {p.ano} · Período: {p.data_inicio.strftime("%d/%m/%Y")} a {p.data_fim.strftime("%d/%m/%Y")} · Estado: {p.estado.upper()}',
+            sub_style))
+        elements.append(Spacer(1, 0.4*cm))
+        # Table
+        headers = ['Funcionário','Dias Úteis','Trabalhados','Férias','Pontes',
+                   'Faltas Just.','Faltas Injust.','Baixas','HE Útil (h)','HE FDS (h)','HE Feriado (h)','HE Total (h)']
+        data_rows = [headers]
+        for r in resumo.values():
+            data_rows.append([
+                r['nome'][:28],
+                str(r['dias_uteis']), str(r['dias_trabalhados']),
+                str(r['ferias']), str(r['pontes']),
+                str(r['faltas_just']), str(r['faltas_injust']),
+                str(r['baixas']),
+                str(r['he_util']), str(r['he_fds']), str(r['he_feriado']), str(r['he_total'])
+            ])
+        tbl = Table(data_rows, repeatRows=1)
+        tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1e3a5f')),
+            ('TEXTCOLOR',  (0,0), (-1,0), colors.white),
+            ('FONTSIZE',   (0,0), (-1,-1), 8),
+            ('GRID',       (0,0), (-1,-1), 0.5, colors.lightgrey),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f5f7fa')]),
+            ('ALIGN', (1,0), (-1,-1), 'CENTER'),
+        ]))
+        elements.append(tbl)
+        doc.build(elements)
+        buf.seek(0)
+        fname = f'resumo_salarial_{p.ano}_{p.mes:02d}.pdf'
+        return Response(buf.getvalue(), mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment;filename={fname}'})
+    except ImportError:
+        return jsonify({'ok': False, 'error': 'ReportLab não instalado. Use: pip install reportlab'})
+
+# ── Horas Extra ───────────────────────────────────────────────────────────────
+@app.route('/horas-extra/registar', methods=['POST'])
+@login_required
+def hora_extra_registar():
+    data = request.get_json() or {}
+    try:
+        dt = datetime.strptime(data['data'], '%Y-%m-%d').date()
+    except: return jsonify({'ok': False, 'error': 'Data inválida'})
+    fid    = int(data['funcionario_id'])
+    h_ini  = data.get('hora_inicio','').strip()
+    h_fim  = data.get('hora_fim','').strip()
+    if not h_ini or not h_fim: return jsonify({'ok': False, 'error': 'Horas inválidas'})
+    total  = _horas_entre(h_ini, h_fim)
+    if total <= 0: return jsonify({'ok': False, 'error': 'Hora fim antes de hora início'})
+    # Check overlap
+    overlap = HoraExtra.query.filter(
+        HoraExtra.funcionario_id == fid,
+        HoraExtra.data == dt,
+        HoraExtra.estado.in_(['aprovado','pendente'])
+    ).first()
+    if overlap:
+        return jsonify({'ok': False, 'error': f'Já existe registo de HE neste dia ({overlap.hora_inicio}–{overlap.hora_fim})'})
+    # Check conflict with falta
+    falta = AusenciaRegisto.query.filter(
+        AusenciaRegisto.funcionario_id == fid,
+        AusenciaRegisto.data_inicio <= dt,
+        AusenciaRegisto.data_fim >= dt,
+        AusenciaRegisto.tipo.in_(['falta_injustificada','falta_justificada','baixa_medica']),
+        AusenciaRegisto.estado == 'aprovado'
+    ).first()
+    if falta and not data.get('forcar'):
+        return jsonify({'ok': False, 'error': f'Conflito: funcionário tem {falta.tipo} neste dia', 'conflito': True})
+    feriados_set = _get_feriados_set(dt.year)
+    cat = _categoria_he(dt, feriados_set)
+    # Find period
+    p = PeriodoSalarial.query.filter(
+        PeriodoSalarial.data_inicio <= dt,
+        PeriodoSalarial.data_fim >= dt
+    ).first()
+    he = HoraExtra(
+        funcionario_id=fid, data=dt,
+        hora_inicio=h_ini, hora_fim=h_fim,
+        total_horas=total, categoria=cat,
+        periodo_id=p.id if p else None,
+        observacoes=data.get('observacoes','').strip(),
+        estado='aprovado',
+        criado_por=current_user.id, criado_em=datetime.now()
+    )
+    db.session.add(he); db.session.commit()
+    return jsonify({'ok': True, 'id': he.id, 'total_horas': total, 'categoria': cat})
+
+@app.route('/horas-extra/<int:hid>/eliminar', methods=['POST'])
+@login_required
+def hora_extra_eliminar(hid):
+    he = HoraExtra.query.get_or_404(hid)
+    db.session.delete(he); db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/funcionario/<int:fid>/horas-extra')
+@login_required
+def api_funcionario_horas_extra(fid):
+    ano = int(request.args.get('ano', datetime.now().year))
+    hes = HoraExtra.query.filter(
+        HoraExtra.funcionario_id == fid,
+        db.extract('year', HoraExtra.data) == ano
+    ).order_by(HoraExtra.data.desc()).all()
+    return jsonify([{
+        'id': h.id, 'data': h.data.isoformat(),
+        'hora_inicio': h.hora_inicio, 'hora_fim': h.hora_fim,
+        'total_horas': h.total_horas, 'categoria': h.categoria,
+        'estado': h.estado, 'observacoes': h.observacoes or ''
+    } for h in hes])
 
 
 @app.route('/ausencias/ping')
