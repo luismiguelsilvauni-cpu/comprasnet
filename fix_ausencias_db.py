@@ -1,12 +1,13 @@
 import sqlite3, os
+
 db_path = os.path.join(os.path.dirname(__file__), 'instance', 'compras.db')
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
-# Tabelas ausencias
+# ── Tabelas ausencias ──────────────────────────────────────────────────────────
 cur.execute("""CREATE TABLE IF NOT EXISTS ausencia_registos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id),
+    funcionario_id INTEGER NOT NULL,
     tipo VARCHAR(30) NOT NULL,
     data_inicio DATE NOT NULL,
     data_fim DATE NOT NULL,
@@ -28,7 +29,7 @@ cur.execute("CREATE INDEX IF NOT EXISTS ix_ausencias_func_ano ON ausencia_regist
 
 cur.execute("""CREATE TABLE IF NOT EXISTS ausencia_saldos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id),
+    funcionario_id INTEGER NOT NULL,
     ano INTEGER NOT NULL,
     dias_direito REAL DEFAULT 22,
     dias_ajuste REAL DEFAULT 0,
@@ -46,23 +47,7 @@ cur.execute("""CREATE TABLE IF NOT EXISTS empresa_fechos (
     criado_por INTEGER,
     criado_em DATETIME)""")
 
-# Período salarial em config_geral
-cfg_cols = [r[1] for r in cur.execute("PRAGMA table_info(config_geral)").fetchall()]
-for col, typ, default in [
-    ('salario_dia_inicio', 'INTEGER', '1'),
-    ('salario_dia_fecho',  'INTEGER', '27'),
-]:
-    if col not in cfg_cols:
-        cur.execute(f"ALTER TABLE config_geral ADD COLUMN {col} {typ} DEFAULT {default}")
-        print(f"OK: config_geral.{col}")
-    else:
-        print(f"ok: {col} ja existe")
-
-conn.commit()
-conn.close()
-print("Concluido.")
-
-# Periodos salariais
+# ── Períodos salariais ─────────────────────────────────────────────────────────
 cur.execute("""CREATE TABLE IF NOT EXISTS periodos_salariais (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ano INTEGER NOT NULL,
@@ -76,12 +61,13 @@ cur.execute("""CREATE TABLE IF NOT EXISTS periodos_salariais (
     fechado_por INTEGER,
     fechado_em DATETIME,
     UNIQUE(ano, mes))""")
+print("OK: periodos_salariais")
 
-# Horas extra
+# ── Horas extra ────────────────────────────────────────────────────────────────
 cur.execute("""CREATE TABLE IF NOT EXISTS horas_extra (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id),
-    periodo_id INTEGER REFERENCES periodos_salariais(id),
+    funcionario_id INTEGER NOT NULL,
+    periodo_id INTEGER,
     data DATE NOT NULL,
     hora_inicio VARCHAR(5) NOT NULL,
     hora_fim VARCHAR(5) NOT NULL,
@@ -93,19 +79,33 @@ cur.execute("""CREATE TABLE IF NOT EXISTS horas_extra (
     criado_em DATETIME,
     alterado_por INTEGER,
     alterado_em DATETIME)""")
+print("OK: horas_extra")
 
-# Config horario
+# ── Config horário ─────────────────────────────────────────────────────────────
 cur.execute("""CREATE TABLE IF NOT EXISTS config_horario (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     hora_inicio VARCHAR(5) DEFAULT '08:30',
     hora_fim VARCHAR(5) DEFAULT '17:30',
     horas_dia REAL DEFAULT 8.0,
     pausa_almoco REAL DEFAULT 1.0)""")
-# Insert default if empty
 if cur.execute("SELECT COUNT(*) FROM config_horario").fetchone()[0] == 0:
-    cur.execute("INSERT INTO config_horario (hora_inicio,hora_fim,horas_dia,pausa_almoco) VALUES ('08:30','17:30',8.0,1.0)")
-    print("OK: config_horario default inserido")
+    cur.execute("INSERT INTO config_horario VALUES (1,'08:30','17:30',8.0,1.0)")
+    print("OK: config_horario default")
+else:
+    print("ok: config_horario ja existe")
+
+# ── config_geral: período salarial ─────────────────────────────────────────────
+cfg_cols = [r[1] for r in cur.execute("PRAGMA table_info(config_geral)").fetchall()]
+for col, typ, default in [
+    ('salario_dia_inicio', 'INTEGER', '1'),
+    ('salario_dia_fecho',  'INTEGER', '27'),
+]:
+    if col not in cfg_cols:
+        cur.execute(f"ALTER TABLE config_geral ADD COLUMN {col} {typ} DEFAULT {default}")
+        print(f"OK: config_geral.{col}")
+    else:
+        print(f"ok: {col} ja existe")
 
 conn.commit()
 conn.close()
-print("Concluido.")
+print("\nConcluido com sucesso.")
