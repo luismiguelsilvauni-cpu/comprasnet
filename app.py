@@ -1493,6 +1493,38 @@ def inject_config():
     except Exception:
         return {'cfg_geral': None, 'cfg_ia': None, 'now': _dt.now}
 
+@app.route('/admin/testar-pasta', methods=['POST'])
+@login_required
+def admin_testar_pasta():
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'msg': 'Sem permissão'})
+    data = request.get_json() or {}
+    path = data.get('path', '').strip()
+    if not path:
+        return jsonify({'ok': False, 'msg': 'Caminho vazio'})
+    try:
+        if not os.path.isabs(path):
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+        path = os.path.normpath(path)
+        if os.path.isdir(path):
+            backups = [f for f in os.listdir(path) if f.startswith('comprasnet_backup_')]
+            try:
+                import shutil as _sh
+                free = f'{_sh.disk_usage(path).free // (1024**3):.1f} GB livres'
+            except: free = ''
+            msg = f'Pasta existe — {len(backups)} backup(s)'
+            if free: msg += f' — {free}'
+            return jsonify({'ok': True, 'msg': msg})
+        else:
+            parent = os.path.dirname(path)
+            if os.path.isdir(parent):
+                os.makedirs(path, exist_ok=True)
+                return jsonify({'ok': True, 'msg': f'Pasta criada com sucesso'})
+            return jsonify({'ok': False, 'msg': f'Caminho nao acessivel: {path}'})
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': str(e)})
+
+
 
 @app.route('/admin/config', methods=['GET', 'POST'])
 @login_required
