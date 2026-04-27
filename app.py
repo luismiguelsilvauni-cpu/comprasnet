@@ -8991,19 +8991,32 @@ def ausencias_pdf_html(ano, mes):
             elif a.tipo in('ponte','fecho_empresa'): f_pontes+=d; cls='ponte'
             elif a.tipo=='falta_justificada': f_faltas_just+=d; total_faltas+=d; cls='falta'
             elif a.tipo=='falta_injustificada': f_faltas_injust+=d; total_faltas+=d; cls='falta'
-            elif a.tipo in('baixa_medica','consulta_medica','assistencia_familia'): f_baixas+=d; cls='falta'
-            if ini2==fim2:
-                txt=f'Gozou {label.lower()} no dia {ini2.strftime("%d/%m/%Y")}'
+            elif a.tipo in('baixa_medica','consulta_medica','assistencia_familia'): f_baixas+=d; total_faltas+=d; cls='baixa'
+            else: cls='ferias'
+            # Build event text
+            if a.tipo in ('falta_justificada','falta_injustificada','baixa_medica','consulta_medica','assistencia_familia'):
+                # Individual days for absences
+                from datetime import timedelta as _td
+                cur = ini2
+                while cur <= fim2:
+                    if cur.weekday()<5 and cur not in feriados_set:
+                        obs_part = f' — motivo: {a.observacoes}' if a.observacoes else ''
+                        events.append({'txt':f'Falta em {cur.strftime("%d/%m/%Y")} ({label}){obs_part}','cls':cls,'detail':'','tipo':a.tipo})
+                    cur += _td(days=1)
             else:
-                txt=f'Gozou {label.lower()} de {ini2.strftime("%d/%m/%Y")} a {fim2.strftime("%d/%m/%Y")}'
-            detail = f'{d:.1f} dias úteis' + (f' · {a.observacoes}' if a.observacoes else '')
-            events.append({'txt':txt,'cls':cls,'detail':detail,'tipo':a.tipo})
+                if ini2==fim2:
+                    txt=f'{label} no dia {ini2.strftime("%d/%m/%Y")}'
+                else:
+                    txt=f'{label} de {ini2.strftime("%d/%m/%Y")} a {fim2.strftime("%d/%m/%Y")}'
+                detail = f'{d:.1f} dias úteis' + (f' — {a.observacoes}' if a.observacoes else '')
+                events.append({'txt':txt,'cls':cls,'detail':detail,'tipo':a.tipo})
         for he in hes:
             f_he+=he.total_horas; total_he+=he.total_horas
             if he.categoria=='fds': f_he_fds+=he.total_horas
             else: f_he_util+=he.total_horas
-            txt=f'Horas extra em {he.data.strftime("%d/%m/%Y")}, das {he.hora_inicio} às {he.hora_fim}'
-            detail=f'{he.total_horas:.1f}h · {he.categoria.replace("_"," ").title()}' + (f' · {he.observacoes}' if he.observacoes else '')
+            cat_label = {'dia_util':'dia útil','fds':'fim de semana','feriado':'feriado'}.get(he.categoria,'')
+            txt=f'Horas extra dia {he.data.strftime("%d/%m/%Y")} ({he.data.strftime("%A")}), das {he.hora_inicio} às {he.hora_fim}'
+            detail=f'{he.total_horas:.1f}h em {cat_label}' + (f' — {he.observacoes}' if he.observacoes else '')
             events.append({'txt':txt,'cls':'he','detail':detail,'tipo':'he'})
         # Sort events by date
         events.sort(key=lambda e: e.get('txt',''))
@@ -9013,7 +9026,8 @@ def ausencias_pdf_html(ano, mes):
         func_data.append({'nome':f.nome,'dept':dept_val,
             'ferias':f_ferias,'faltas_just':f_faltas_just,'faltas_injust':f_faltas_injust,
             'baixas':f_baixas,'pontes':f_pontes,'he':f_he,'he_util':f_he_util,'he_fds':f_he_fds,
-            'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis)})
+            'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis),
+            'has_events':has_events})
     return render_template('ausencias_pdf.html',
         empresa=empresa, mes=mes, ano=ano, mes_nome=MESES_PT[mes],
         data_ini=data_ini, data_fim=data_fim,
