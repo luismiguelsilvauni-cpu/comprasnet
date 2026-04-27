@@ -28,6 +28,7 @@ var TIPOS = {{ tipos | tojson }};
 var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 var DIA_INICIO_SAL = {{ dia_inicio_sal }};
 var DIA_FECHO_SAL  = {{ dia_fecho_sal }};
+var PERIODOS_SAL = {{ periodos_sal_json | safe }};
 </script>
 
 <!-- Dashboard strip -->
@@ -309,8 +310,7 @@ function buildCalendar() {
     // Month header
     var h = document.createElement('div');
     h.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);display:flex;align-items:center;gap:8px';
-    var diasMes = daysInMonth(ANO, mes);
-    var fechoLabel = DIA_FECHO_SAL <= diasMes ? 'Fecho salarial: dia ' + DIA_FECHO_SAL : '';
+    var fechoLabel = DIA_FECHO_SAL <= days ? 'Fecho salarial: dia ' + DIA_FECHO_SAL : '';
     h.innerHTML = MESES[mes-1] + ' ' + ANO +
       (fechoLabel ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:6px">· ' + fechoLabel + '</span>' : '');
     sec.appendChild(h);
@@ -343,10 +343,27 @@ function buildCalendar() {
       dayNum.textContent = d;
       cell.appendChild(dayLbl);
       cell.appendChild(dayNum);
-      // Salary closing day marker
-      if (d === DIA_FECHO_SAL && !fer) {
-        cell.style.borderRight = '2px solid var(--accent)';
-        cell.title = 'Fecho salarial';
+      // Salary period border
+      var pSal = PERIODOS_SAL.find(function(p){ return p.inicio.substring(5,7)==pad(mes) || p.fim.substring(5,7)==pad(mes); });
+      if (pSal) {
+        var dsIni = pSal.inicio.substring(8,10); // day part
+        var dsFim = pSal.fim.substring(8,10);
+        var salMes = parseInt(pSal.inicio.substring(5,7));
+        var salMesFim = parseInt(pSal.fim.substring(5,7));
+        // Draw left border on start day
+        if (salMes == mes && parseInt(dsIni) == d) {
+          cell.style.borderLeft = '3px solid var(--accent)';
+          cell.style.background = cell.style.background || 'rgba(59,110,240,.06)';
+        }
+        // Draw right border on end day
+        if (salMesFim == mes && parseInt(dsFim) == d) {
+          cell.style.borderRight = '3px solid var(--accent)';
+        }
+        // Shade inside period
+        if ((salMes < mes || (salMes == mes && parseInt(dsIni) <= d)) &&
+            (salMesFim > mes || (salMesFim == mes && parseInt(dsFim) >= d))) {
+          if (!fer && !cell.style.background) cell.style.background = 'rgba(59,110,240,.04)';
+        }
       }
       if (fer) {
         var ferTxt = document.createElement('div');

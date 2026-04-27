@@ -8844,6 +8844,16 @@ def ausencias():
     cfg = ConfigGeral.query.first()
     dia_inicio = cfg.salario_dia_inicio if cfg and hasattr(cfg,'salario_dia_inicio') else 1
     dia_fecho  = cfg.salario_dia_fecho  if cfg and hasattr(cfg,'salario_dia_fecho')  else 27
+    # Load salary periods for calendar overlay
+    import json as _json2
+    try:
+        periodos_sal = PeriodoSalarial.query.filter_by(ano=ano).all()
+        periodos_sal_json = _json2.dumps([{
+            'mes': p.mes, 'inicio': p.data_inicio.isoformat(), 'fim': p.data_fim.isoformat(),
+            'estado': p.estado
+        } for p in periodos_sal])
+    except Exception:
+        periodos_sal_json = '[]'
     return render_template('ausencias.html',
         ano=ano, funcs=funcs, saldos=saldos,
         tipos=TIPOS_AUSENCIA, view=view,
@@ -8853,7 +8863,8 @@ def ausencias():
         ausentes_hoje=ausentes_hoje,
         dept_filtro=dept_filtro, func_filtro=func_filtro,
         depts=depts, hoje=hoje,
-        dia_inicio_sal=dia_inicio, dia_fecho_sal=dia_fecho)
+        dia_inicio_sal=dia_inicio, dia_fecho_sal=dia_fecho,
+        periodos_sal_json=periodos_sal_json)
 
 @app.route('/ausencias/registar', methods=['POST'])
 @login_required
