@@ -48,3 +48,17 @@ cur.execute("""CREATE TABLE IF NOT EXISTS empresa_fechos (
 conn.commit()
 conn.close()
 print("OK: tabelas ausencias criadas")
+
+# Add salary period fields to config_geral
+cfg_cols = [r[1] for r in cur.execute("PRAGMA table_info(config_geral)").fetchall()]
+for col, typ, default in [
+    ('salario_dia_inicio', 'INTEGER', '1'),
+    ('salario_dia_fecho',  'INTEGER', '27'),
+]:
+    if col not in cfg_cols:
+        cur.execute(f"ALTER TABLE config_geral ADD COLUMN {col} {typ} DEFAULT {default}")
+        print(f"OK: config_geral.{col}")
+    else:
+        print(f"ok: {col} ja existe")
+
+conn.commit()

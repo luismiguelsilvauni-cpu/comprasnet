@@ -9,6 +9,7 @@
   <button onclick="abrirNovaAusencia()" class="btn btn-primary btn-sm">+ Registar Ausência</button>
   <button onclick="abrirFechoEmpresa()" class="btn btn-ghost btn-sm">🏢 Fecho Empresa</button>
   <button onclick="abrirAddFeriado()" class="btn btn-ghost btn-sm">📅 Feriado/Ponte</button>
+  <button onclick="syncAll()" class="btn btn-ghost btn-sm" id="syncBtn">🔄 Sincronizar Fichas</button>
   <a href="{{ url_for('ausencias_exportar', ano=ano) }}" class="btn btn-ghost btn-sm">⬇ CSV</a>
 {% endblock %}
 
@@ -23,6 +24,8 @@ var FECHOS = {{ fechos_json | safe }};
 var FERIADOS_OBJ = {{ feriados_json | safe }};
 var TIPOS = {{ tipos | tojson }};
 var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+var DIA_INICIO_SAL = {{ dia_inicio_sal }};
+var DIA_FECHO_SAL  = {{ dia_fecho_sal }};
 </script>
 
 <!-- Dashboard strip -->
@@ -256,7 +259,10 @@ function buildCalendar() {
     // Month header
     var h = document.createElement('div');
     h.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);display:flex;align-items:center;gap:8px';
-    h.textContent = MESES[mes-1] + ' ' + ANO;
+    var diasMes = daysInMonth(ANO, mes);
+    var fechoLabel = DIA_FECHO_SAL <= diasMes ? 'Fecho salarial: dia ' + DIA_FECHO_SAL : '';
+    h.innerHTML = MESES[mes-1] + ' ' + ANO +
+      (fechoLabel ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:6px">· ' + fechoLabel + '</span>' : '');
     sec.appendChild(h);
 
     var minW = Math.max(days * 34, 400);
@@ -287,6 +293,11 @@ function buildCalendar() {
       dayNum.textContent = d;
       cell.appendChild(dayLbl);
       cell.appendChild(dayNum);
+      // Salary closing day marker
+      if (d === DIA_FECHO_SAL && !fer) {
+        cell.style.borderRight = '2px solid var(--accent)';
+        cell.title = 'Fecho salarial';
+      }
       if (fer) {
         var ferTxt = document.createElement('div');
         ferTxt.style.cssText = 'writing-mode:vertical-rl;transform:rotate(180deg);font-size:8px;font-weight:700;color:'+(fer.tipo==='ponte'?'#f59e0b':'#ef4444')+';max-height:55px;overflow:hidden;margin:1px auto;line-height:1.2';
@@ -331,21 +342,26 @@ function buildCalendar() {
 
         var reg = rowRegistos.find(function(r){ return r.data_inicio<=ds2 && r.data_fim>=ds2; });
         if (reg) {
-          var cor = reg.cor || '#888';
-          var isStart = reg.data_inicio === ds2;
-          var isEnd   = reg.data_fim   === ds2;
-          cell2.style.background = cor;
-          cell2.style.opacity = reg.estado==='pendente' ? '0.5' : '1';
-          cell2.style.borderRadius = (isStart?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isStart?'4px':'0');
-          cell2.style.cursor = 'pointer';
-          if (isStart) {
-            var lbl = document.createElement('div');
-            lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none';
-            lbl.textContent = reg.icon + ' ' + nomeCurto(reg.funcionario_nome);
-            cell2.appendChild(lbl);
+          var isWkd2 = (dayOfWeek(ANO,mes,d2)===0 || dayOfWeek(ANO,mes,d2)===6);
+          var isFer2 = !!isFeriado(ds2);
+          // Only paint useful days (not weekends/holidays for non-ponte types)
+          if (!isWkd2 && !isFer2) {
+            var cor = reg.cor || '#888';
+            var isStart = reg.data_inicio === ds2;
+            var isEnd   = reg.data_fim   === ds2;
+            cell2.style.background = cor;
+            cell2.style.opacity = reg.estado==='pendente' ? '0.5' : '1';
+            cell2.style.borderRadius = (isStart?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isStart?'4px':'0');
+            cell2.style.cursor = 'pointer';
+            if (isStart) {
+              var lbl = document.createElement('div');
+              lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none';
+              lbl.textContent = reg.icon + ' ' + nomeCurto(reg.funcionario_nome);
+              cell2.appendChild(lbl);
+            }
+            cell2.title = reg.funcionario_nome + ': ' + reg.label + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
+            cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
           }
-          cell2.title = reg.funcionario_nome + ': ' + reg.label + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
-          cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
         }
         row.appendChild(cell2);
       }
@@ -534,6 +550,23 @@ function guardarFecho() {
     if (d.ok) location.reload();
     else alert('Erro: ' + d.error);
   });
+}
+
+// ── Sync fichas ───────────────────────────────────────────────────────────────
+function syncAll() {
+  var btn = document.getElementById('syncBtn');
+  btn.disabled = true; btn.textContent = '⏳ A sincronizar...';
+  fetch('/ausencias/sync-all/' + ANO, {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        btn.textContent = '✅ ' + d.funcionarios + ' fichas actualizadas';
+        setTimeout(function(){ btn.textContent='🔄 Sincronizar Fichas'; btn.disabled=false; }, 3000);
+      } else {
+        alert('Erro: ' + d.error);
+        btn.disabled=false; btn.textContent='🔄 Sincronizar Fichas';
+      }
+    });
 }
 
 // ── Feriado management (from old ferias.html) ─────────────────────────────────

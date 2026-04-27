@@ -1600,6 +1600,10 @@ def admin_config():
                     cfg.salarios_pin = ''
                 elif request.form.get('salarios_pin','').strip():
                     cfg.salarios_pin = request.form.get('salarios_pin','').strip()
+            try:
+                cfg.salario_dia_inicio = int(request.form.get('salario_dia_inicio', 1) or 1)
+                cfg.salario_dia_fecho  = int(request.form.get('salario_dia_fecho', 27) or 27)
+            except: pass
             except Exception:
                 from sqlalchemy import text
                 with db.engine.connect() as _c:
@@ -1609,6 +1613,10 @@ def admin_config():
                     cfg.salarios_pin = ''
                 elif request.form.get('salarios_pin','').strip():
                     cfg.salarios_pin = request.form.get('salarios_pin','').strip()
+            try:
+                cfg.salario_dia_inicio = int(request.form.get('salario_dia_inicio', 1) or 1)
+                cfg.salario_dia_fecho  = int(request.form.get('salario_dia_fecho', 27) or 27)
+            except: pass
             # Logo upload
             if 'logo' in request.files and request.files['logo'].filename:
                 logo = request.files['logo']
@@ -8293,6 +8301,88 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 # cache bust Tue Apr  7 15:34:00 UTC 2026
 
+def _sync_ausencias_to_faltas(funcionario_id, ano):
+    """Sync AusenciaRegisto records into FuncionarioFalta for a given year."""
+    from datetime import date
+    cfg = ConfigGeral.query.first()
+    dia_inicio = cfg.salario_dia_inicio if cfg and hasattr(cfg,'salario_dia_inicio') else 1
+    dia_fecho  = cfg.salario_dia_fecho  if cfg and hasattr(cfg,'salario_dia_fecho')  else 27
+
+    # Delete existing auto-synced faltas for this year
+    FuncionarioFalta.query.filter_by(
+        funcionario_id=funcionario_id, ano=ano
+    ).delete()
+
+    # Get approved absences for this year (+/- spillover)
+    registos = AusenciaRegisto.query.filter(
+        AusenciaRegisto.funcionario_id == funcionario_id,
+        AusenciaRegisto.estado.in_(["aprovado","pendente"]),
+        AusenciaRegisto.data_inicio >= date(ano-1,12,1),
+        AusenciaRegisto.data_fim    <= date(ano+1,1,31)
+    ).all()
+
+    # Map tipo → FuncionarioFalta.tipo
+    tipo_map = {
+        "ferias": "ferias", "ponte": "ferias", "fecho_empresa": "ferias",
+        "falta_justificada": "justificada", "falta_injustificada": "injustificada",
+        "baixa_medica": "baixa", "consulta_medica": "justificada",
+        "assistencia_familia": "justificada", "licenca_sem_venc": "justificada",
+        "formacao": "ferias", "teletrabalho": "ferias", "trabalho_externo": "ferias",
+    }
+
+    feriados_set = _get_feriados_set(ano)
+
+    # Accumulate per salary-period per tipo
+    from datetime import timedelta
+    from collections import defaultdict
+    buckets = defaultdict(float)  # (mes_salarial, tipo_falta) → dias
+
+    for r in registos:
+        cur = r.data_inicio
+        while cur <= r.data_fim:
+            # Only count weekdays non-holidays (unless it's a ponte type)
+            is_weekday = cur.weekday() < 5
+            is_feriado = cur in feriados_set
+            if r.tipo == "ponte":
+                count_day = is_weekday  # pontes are weekdays only
+            else:
+                count_day = is_weekday and not is_feriado
+
+            if count_day:
+                # Determine salary month for this day
+                if cur.day <= dia_fecho:
+                    mes_sal = cur.month
+                    ano_sal = cur.year
+                else:
+                    # After closing day → belongs to next month
+                    if cur.month == 12:
+                        mes_sal = 1; ano_sal = cur.year + 1
+                    else:
+                        mes_sal = cur.month + 1; ano_sal = cur.year
+
+                if ano_sal == ano:
+                    ft = tipo_map.get(r.tipo, "justificada")
+                    val = 0.5 if r.formato in ("manha","tarde") else 1.0
+                    if r.formato == "horas":
+                        val = round(r.horas / 8, 2)
+                    buckets[(mes_sal, ft)] += val
+
+            cur += timedelta(days=1)
+
+    # Write FuncionarioFalta records
+    for (mes, tipo_falta), dias in buckets.items():
+        if dias > 0:
+            db.session.add(FuncionarioFalta(
+                funcionario_id=funcionario_id,
+                ano=ano, mes=mes,
+                dias_falta=round(dias, 1),
+                tipo=tipo_falta,
+                notas=f"Auto-sync Mapa Férias/Faltas {ano}"
+            ))
+    db.session.commit()
+    return len(buckets)
+
+
 @app.route('/ausencias/ping')
 def ausencias_ping():
     return 'AUSENCIAS_MODULE_LOADED_OK'
@@ -8342,6 +8432,30 @@ def _recalc_saldo(funcionario_id, ano):
     saldo.dias_gozados = round(gozados, 2)
     saldo.dias_restantes = round((saldo.dias_direito + saldo.dias_ajuste) - gozados, 2)
     return saldo
+
+@app.route('/ausencias/sync-funcionario/<int:fid>/<int:ano>', methods=['POST'])
+@login_required
+def ausencias_sync_funcionario(fid, ano):
+    try:
+        n = _sync_ausencias_to_faltas(fid, ano)
+        _recalc_saldo(fid, ano)
+        db.session.commit()
+        return jsonify({'ok': True, 'registos': n})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/ausencias/sync-all/<int:ano>', methods=['POST'])
+@login_required
+def ausencias_sync_all(ano):
+    funcs = Funcionario.query.filter_by(ativo=True).all() if hasattr(Funcionario,'ativo') else Funcionario.query.all()
+    total = 0
+    for f in funcs:
+        try:
+            total += _sync_ausencias_to_faltas(f.id, ano)
+        except: pass
+    db.session.commit()
+    return jsonify({'ok': True, 'total': total, 'funcionarios': len(funcs)})
+
 
 @app.route('/ausencias')
 @login_required
@@ -8439,6 +8553,9 @@ def ausencias():
     depts = sorted(set((getattr(f,'departamento','') or 'Geral') for f in
         (Funcionario.query.all() if not dept_filtro else funcs)))
 
+    cfg = ConfigGeral.query.first()
+    dia_inicio = cfg.salario_dia_inicio if cfg and hasattr(cfg,'salario_dia_inicio') else 1
+    dia_fecho  = cfg.salario_dia_fecho  if cfg and hasattr(cfg,'salario_dia_fecho')  else 27
     return render_template('ausencias.html',
         ano=ano, funcs=funcs, saldos=saldos,
         tipos=TIPOS_AUSENCIA, view=view,
@@ -8447,7 +8564,8 @@ def ausencias():
         fechos_json=fechos_json,
         ausentes_hoje=ausentes_hoje,
         dept_filtro=dept_filtro, func_filtro=func_filtro,
-        depts=depts, hoje=hoje)
+        depts=depts, hoje=hoje,
+        dia_inicio_sal=dia_inicio, dia_fecho_sal=dia_fecho)
 
 @app.route('/ausencias/registar', methods=['POST'])
 @login_required
@@ -8501,6 +8619,8 @@ def ausencia_registar():
     db.session.flush()
     _recalc_saldo(fid, inicio.year)
     db.session.commit()
+    try: _sync_ausencias_to_faltas(fid, inicio.year)
+    except: pass
     return jsonify({'ok': True, 'id': r.id, 'dias_uteis': dias})
 
 @app.route('/ausencias/<int:rid>/editar', methods=['POST'])
@@ -8539,6 +8659,8 @@ def ausencia_eliminar(rid):
     db.session.commit()
     _recalc_saldo(fid, ano)
     db.session.commit()
+    try: _sync_ausencias_to_faltas(fid, ano)
+    except: pass
     return jsonify({'ok': True})
 
 @app.route('/ausencias/saldo/<int:fid>/<int:ano>', methods=['GET', 'POST'])

@@ -220,7 +220,7 @@
   {% set ano_atual = now().year if now else 2026 %}
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
     <select id="anoFaltas" onchange="loadFaltas()" class="input" style="width:100px">
-      {% for a in range(ano_atual, ano_atual-6, -1) %}
+      {% for a in range(ano_atual+3, ano_atual-6, -1) %}
       <option value="{{ a }}">{{ a }}</option>
       {% endfor %}
     </select>
@@ -230,6 +230,7 @@
       <option value="baixa">Baixa Médica</option>
       <option value="ferias">Férias</option>
     </select>
+    <button onclick="syncFaltas()" class="btn btn-ghost btn-sm" id="syncFaltasBtn">🔄 Sync Mapa</button>
     <span style="font-size:12px;color:var(--text-muted)">Clique numa célula para editar</span>
   </div>
   <div style="overflow-x:auto">
@@ -278,6 +279,23 @@ var FID = {{ f.id }};
 var MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
+
+function syncFaltas() {
+  var ano = document.getElementById('anoFaltas').value;
+  var btn = document.getElementById('syncFaltasBtn');
+  btn.disabled = true; btn.textContent = '⏳ A sincronizar...';
+  fetch('/ausencias/sync-funcionario/' + FID + '/' + ano, {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        btn.textContent = '✅ Sincronizado!';
+        setTimeout(function(){ btn.textContent='🔄 Sync Mapa'; btn.disabled=false; loadFaltas(); }, 1500);
+      } else {
+        alert('Erro: ' + (d.error||'desconhecido'));
+        btn.disabled=false; btn.textContent='🔄 Sync Mapa';
+      }
+    });
+}
 
 function loadFaltas() {
   var ano = document.getElementById('anoFaltas').value;
