@@ -1,76 +1,74 @@
 {% extends "base.html" %}
-{% block title %}Mapa Férias / Faltas {{ ano }} · NavTech{% endblock %}
+{% block title %}Mapa Férias / Faltas {{ ano }}{% endblock %}
 {% block page_title %}📅 Mapa Férias / Faltas {{ ano }}{% endblock %}
 
 {% block topbar_actions %}
   <button onclick="anoAnterior()" class="btn btn-ghost btn-sm">◀ {{ ano-1 }}</button>
   <strong style="padding:0 8px;font-size:14px">{{ ano }}</strong>
   <button onclick="anoSeguinte()" class="btn btn-ghost btn-sm">{{ ano+1 }} ▶</button>
-  <button onclick="abrirNovaAusencia()" class="btn btn-primary btn-sm">+ Registar Ausência</button>
+  <button onclick="abrirNovaAusencia()" class="btn btn-primary btn-sm">+ Ausência</button>
   <button onclick="abrirHoraExtra()" class="btn btn-ghost btn-sm">⏱ Horas Extra</button>
-  <a href="/periodos-salariais?ano={{ ano }}" class="btn btn-ghost btn-sm">💰 Períodos Salariais</a>
-  <button onclick="abrirFechoEmpresa()" class="btn btn-ghost btn-sm">🏢 Fecho Empresa</button>
-  <button onclick="abrirAddFeriado()" class="btn btn-ghost btn-sm">📅 Feriado/Ponte</button>
-  <button onclick="syncAll()" class="btn btn-ghost btn-sm" id="syncBtn">🔄 Sincronizar Fichas</button>
+  <button onclick="abrirFechoEmpresa()" class="btn btn-ghost btn-sm">🏢 Fecho</button>
+  <button onclick="abrirAddFeriado()" class="btn btn-ghost btn-sm">📅 Feriado</button>
+  <button onclick="syncAll()" class="btn btn-ghost btn-sm" id="syncBtn">🔄 Sync</button>
+  <a href="/periodos-salariais?ano={{ ano }}" class="btn btn-ghost btn-sm">💰 Períodos</a>
   <a href="{{ url_for('ausencias_exportar', ano=ano) }}" class="btn btn-ghost btn-sm">⬇ CSV</a>
 {% endblock %}
 
 {% block content %}
-<script>
-var ANO = {{ ano }};
-var FUNCS = {{ funcs | map(attribute='id') | list | tojson }};
-var FUNCS_NOMES = { {% for f in funcs %}"{{ f.id }}": "{{ f.nome | replace('"', '\\"') }}"{% if not loop.last %},{% endif %}{% endfor %} };
-var REGISTOS = {{ registos_json | safe }};
-var FERIADOS = {{ feriados_json | safe }};
-var FECHOS = {{ fechos_json | safe }};
-var FERIADOS_OBJ = {{ feriados_json | safe }};
-var TIPOS = {{ tipos | tojson }};
-var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-var DIA_INICIO_SAL = {{ dia_inicio_sal }};
-var DIA_FECHO_SAL  = {{ dia_fecho_sal }};
-var PERIODOS_SAL = {{ periodos_sal_json | safe }};
-</script>
+<div id="ausencias-data"
+  data-registos="{{ registos_json | e }}"
+  data-feriados="{{ feriados_json | e }}"
+  data-fechos="{{ fechos_json | e }}"
+  data-periodos="{{ periodos_sal_json | e }}"
+  data-ano="{{ ano }}"
+  data-dia-ini="{{ dia_inicio_sal }}"
+  data-dia-fecho="{{ dia_fecho_sal }}"
+></div>
 
-<!-- Dashboard strip -->
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-  <!-- Ausentes hoje -->
-  <div class="card" style="padding:10px 14px;flex:1;min-width:180px">
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Ausentes Hoje</div>
-    {% if ausentes_hoje %}
-      {% for r in ausentes_hoje %}
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px">
-        <span style="width:10px;height:10px;border-radius:50%;background:{{ tipos[r.tipo]['cor'] if r.tipo in tipos else '#888' }};flex-shrink:0"></span>
-        <span>{{ r.funcionario.nome.split()[0] if r.funcionario else '?' }}</span>
-        <span style="font-size:10px;color:var(--text-muted)">{{ tipos[r.tipo]['label'] if r.tipo in tipos else r.tipo }}</span>
-      </div>
-      {% endfor %}
-    {% else %}
-      <div style="font-size:12px;color:var(--text-muted)">✅ Ninguém ausente</div>
-    {% endif %}
-  </div>
-  <!-- Saldos -->
-  {% for f in funcs[:6] %}
-  {% set s = saldos.get(f.id) %}
-  <div class="card" style="padding:10px 14px;min-width:130px;cursor:pointer" onclick="abrirSaldo({{ f.id }}, '{{ f.nome | replace("'", "\\'") }}')">
-    <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">{{ f.nome.split()[0] }} {{ f.nome.split()[-1] }}</div>
-    {% set dias_r = s.dias_restantes if s else 22.0 %}
-    {% set cor_r = '#ef4444' if dias_r < 0 else ('#f59e0b' if dias_r < 5 else '#22c55e') %}
-    <div style="font-size:18px;font-weight:800;color:{{ cor_r }}">
-      {{ '%.1f'|format(dias_r) }}
-    </div>
-    <div style="font-size:9px;color:var(--text-muted)">dias disponíveis</div>
-  </div>
-  {% endfor %}
+<div id="funcs-data" style="display:none">
+{% for f in funcs %}
+<span data-id="{{ f.id }}" data-nome="{{ f.nome | e }}"></span>
+{% endfor %}
 </div>
 
-<!-- Legenda -->
-<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+<div id="saldos-data" style="display:none">
+{% for f in funcs %}
+{% set s = saldos.get(f.id) %}
+{% if s %}
+<span data-id="{{ f.id }}" data-direito="{{ s.dias_direito }}" data-ajuste="{{ s.dias_ajuste }}" data-gozados="{{ s.dias_gozados }}" data-restantes="{{ s.dias_restantes }}"></span>
+{% else %}
+<span data-id="{{ f.id }}" data-direito="22" data-ajuste="0" data-gozados="0" data-restantes="22"></span>
+{% endif %}
+{% endfor %}
+</div>
+
+<!-- Ausentes hoje -->
+{% if ausentes_hoje %}
+<div class="card" style="padding:10px 14px;margin-bottom:12px;border-left:4px solid #ef4444">
+  <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px">AUSENTES HOJE</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    {% for r in ausentes_hoje %}
+    {% if r.tipo in tipos %}
+    <span style="display:flex;align-items:center;gap:5px;font-size:12px">
+      <span style="width:10px;height:10px;border-radius:50%;background:{{ tipos[r.tipo]['cor'] }};flex-shrink:0"></span>
+      {{ r.funcionario.nome.split()[0] if r.funcionario else '?' }}
+      <span style="font-size:10px;color:var(--text-muted)">{{ tipos[r.tipo]['label'] }}</span>
+    </span>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Saldos cards + legenda -->
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="saldosStrip"></div>
+
+<!-- Legenda tipos -->
+<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
   <span style="font-size:11px;font-weight:700;color:var(--text-muted)">Tipos:</span>
   {% for key, t in tipos.items() %}
-  <span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:{{ t.cor }}22;border:1px solid {{ t.cor }}55;cursor:pointer"
-    onclick="filtrarTipo('{{ key }}')" id="leg-{{ key }}">
-    {{ t.icon }} {{ t.label }}
-  </span>
+  <span class="tipo-badge" data-tipo="{{ key }}" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:{{ t.cor }}22;border:1px solid {{ t.cor }}55;cursor:pointer">{{ t.icon }} {{ t.label }}</span>
   {% endfor %}
   <span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface2);cursor:pointer" onclick="filtrarTipo('')">✕ Todos</span>
 </div>
@@ -78,302 +76,327 @@ var PERIODOS_SAL = {{ periodos_sal_json | safe }};
 <!-- Calendar -->
 <div id="calendario"></div>
 
-<!-- Feriado modal -->
-<div id="modalFeriado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:360px;overflow:hidden">
-    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
-      <div style="font-size:14px;font-weight:700;flex:1">📅 Feriado / Ponte</div>
-      <button onclick="fecharModal('modalFeriado')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+<!-- Modal: Nova Ausência -->
+<div id="modalAusencia" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:480px">
+    <div class="modal-head">
+      <span id="modalAusenciaTitulo">📅 Registar Ausência</span>
+      <button onclick="fecharModal('modalAusencia')">✕</button>
     </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-      <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="ferData" class="input"></div>
-      <div class="form-group" style="margin:0"><label>Nome</label><input type="text" id="ferNome" class="input" placeholder="Ex: Feriado Municipal"></div>
-      <div class="form-group" style="margin:0"><label>Tipo</label>
-        <select id="ferTipo" class="input">
-          <option value="nacional">🇵🇹 Feriado Nacional</option>
-          <option value="local">📍 Feriado Local</option>
-          <option value="ponte">🌉 Ponte</option>
-        </select>
-      </div>
-    </div>
-    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
-      <button onclick="fecharModal('modalFeriado')" class="btn btn-ghost">Cancelar</button>
-      <button onclick="guardarFeriado()" class="btn btn-primary">💾 Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Modais ─────────────────────────────────────────────────────────────── -->
-<!-- Nova ausência -->
-<div id="modalAusencia" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:480px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
-    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
-      <div style="font-size:14px;font-weight:700;flex:1" id="modalAusenciaTitulo">📅 Registar Ausência</div>
-      <button onclick="fecharModal('modalAusencia')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
-    </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+    <div class="modal-body">
       <input type="hidden" id="ausenciaId">
-      <div class="form-group" style="margin:0">
-        <label>Funcionário</label>
+      <div class="form-group" style="margin:0"><label>Funcionário</label>
         <select id="ausenciaFunc" class="input">
           {% for f in funcs %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
         </select>
       </div>
-      <div class="form-group" style="margin:0">
-        <label>Tipo de Ausência</label>
+      <div class="form-group" style="margin:0"><label>Tipo</label>
         <select id="ausenciaTipo" class="input" onchange="atualizarTipoInfo()">
-          {% for key, t in tipos.items() %}
-          <option value="{{ key }}">{{ t.icon }} {{ t.label }}</option>
-          {% endfor %}
+          {% for key, t in tipos.items() %}<option value="{{ key }}">{{ t.icon }} {{ t.label }}</option>{% endfor %}
         </select>
       </div>
       <div id="tipoInfo" style="font-size:11px;padding:6px 10px;border-radius:6px;background:var(--surface2);display:none"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group" style="margin:0">
-          <label>Data Início</label>
-          <input type="date" id="ausenciaInicio" class="input" onchange="calcularDias()">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Data Fim</label>
-          <input type="date" id="ausenciaFim" class="input" onchange="calcularDias()">
-        </div>
+        <div class="form-group" style="margin:0"><label>Início</label><input type="date" id="ausenciaInicio" class="input" onchange="calcularDias()"></div>
+        <div class="form-group" style="margin:0"><label>Fim</label><input type="date" id="ausenciaFim" class="input" onchange="calcularDias()"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group" style="margin:0">
-          <label>Formato</label>
-          <select id="ausenciaFormato" class="input" onchange="toggleHoras()">
+        <div class="form-group" style="margin:0"><label>Formato</label>
+          <select id="ausenciaFormato" class="input" onchange="toggleHoras();calcularDias()">
             <option value="dia">📅 Dia completo</option>
-            <option value="manha">🌅 Meio dia (manhã)</option>
-            <option value="tarde">🌆 Meio dia (tarde)</option>
+            <option value="manha">🌅 Manhã</option>
+            <option value="tarde">🌆 Tarde</option>
             <option value="horas">⏱ Por horas</option>
           </select>
         </div>
-        <div class="form-group" style="margin:0" id="horasGroup" style="display:none">
-          <label>Nº de Horas</label>
-          <input type="number" id="ausenciaHoras" class="input" value="4" min="0.5" max="8" step="0.5">
+        <div class="form-group" style="margin:0" id="horasGroup">
+          <label>Horas</label><input type="number" id="ausenciaHoras" class="input" value="4" min="0.5" max="8" step="0.5" onchange="calcularDias()">
         </div>
       </div>
       <div id="diasCalculados" style="font-size:12px;color:var(--text-muted);font-style:italic"></div>
-      <div class="form-group" style="margin:0">
-        <label>Observações</label>
-        <input type="text" id="ausenciaObs" class="input" placeholder="Opcional">
-      </div>
-      <div id="ausenciaAviso" style="display:none;padding:8px 10px;background:rgba(239,68,68,.1);border-radius:6px;font-size:12px;color:#ef4444"></div>
+      <div class="form-group" style="margin:0"><label>Observações</label><input type="text" id="ausenciaObs" class="input" placeholder="Opcional"></div>
+      <div id="ausenciaAviso" style="display:none;padding:8px;background:rgba(239,68,68,.1);border-radius:6px;font-size:12px;color:#ef4444"></div>
     </div>
-    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between">
-      <button id="ausenciaEliminarBtn" onclick="eliminarAusencia()" style="display:none" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
-      <div style="display:flex;gap:8px;margin-left:auto">
+    <div class="modal-foot">
+      <button id="ausenciaEliminarBtn" onclick="eliminarAusencia()" style="display:none;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)" class="btn btn-sm">🗑</button>
+      <div style="margin-left:auto;display:flex;gap:8px">
         <button onclick="fecharModal('modalAusencia')" class="btn btn-ghost">Cancelar</button>
-        <button onclick="guardarAusencia()" class="btn btn-primary" id="ausenciaSaveBtn">💾 Guardar</button>
+        <button onclick="guardarAusencia(false)" class="btn btn-primary" id="ausenciaSaveBtn">💾 Guardar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Saldo -->
-<div id="modalSaldo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:380px;overflow:hidden">
-    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
-      <div style="font-size:14px;font-weight:700;flex:1" id="saldoTitulo">Saldo de Férias</div>
-      <button onclick="fecharModal('modalSaldo')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
-    </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+<!-- Modal: Saldo -->
+<div id="modalSaldo" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:360px">
+    <div class="modal-head"><span id="saldoTitulo">🏖 Saldo de Férias</span><button onclick="fecharModal('modalSaldo')">✕</button></div>
+    <div class="modal-body">
       <input type="hidden" id="saldoFid">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group" style="margin:0">
-          <label>Dias de Direito</label>
-          <input type="number" id="saldoDireito" class="input" step="0.5" min="0">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Ajuste Manual</label>
-          <input type="number" id="saldoAjuste" class="input" step="0.5">
-        </div>
+        <div class="form-group" style="margin:0"><label>Dias de Direito</label><input type="number" id="saldoDireito" class="input" step="0.5" min="0"></div>
+        <div class="form-group" style="margin:0"><label>Ajuste Manual</label><input type="number" id="saldoAjuste" class="input" step="0.5"></div>
       </div>
-      <div class="form-group" style="margin:0">
-        <label>Notas do Ajuste</label>
-        <input type="text" id="saldoNotas" class="input" placeholder="Ex: 3 dias transitados do ano anterior">
-      </div>
+      <div class="form-group" style="margin:0"><label>Notas</label><input type="text" id="saldoNotas" class="input" placeholder="Ex: dias transitados"></div>
       <div id="saldoResumo" style="padding:10px;background:var(--surface2);border-radius:8px;font-size:13px"></div>
     </div>
-    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+    <div class="modal-foot" style="justify-content:flex-end">
       <button onclick="fecharModal('modalSaldo')" class="btn btn-ghost">Cancelar</button>
       <button onclick="guardarSaldo()" class="btn btn-primary">💾 Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- Horas Extra Modal -->
-<div id="modalHE" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:500px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
-    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
-      <div style="font-size:14px;font-weight:700;flex:1">⏱ Registar Horas Extra</div>
-      <button onclick="fecharModal('modalHE')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
-    </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group" style="margin:0"><label>Funcionário</label>
-          <select id="heFuncId" class="input">
-            {% for f in funcs %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="form-group" style="margin:0"><label>Data</label>
-          <input type="date" id="heData" class="input" onchange="updateHECategoria()">
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);padding:6px 10px;background:var(--surface2);border-radius:6px">
-        🕐 Horário normal: <strong>08:30 – 17:30</strong> — Registar apenas períodos <strong>fora</strong> deste horário
-      </div>
-      <!-- Time grid visual -->
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Seleccionar período (blocos de 30 min):</div>
-        <div id="heGrid" style="display:flex;flex-wrap:wrap;gap:2px"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group" style="margin:0"><label>Hora Início</label>
-          <input type="time" id="heInicio" class="input" step="1800" onchange="calcHETotal()">
-        </div>
-        <div class="form-group" style="margin:0"><label>Hora Fim</label>
-          <input type="time" id="heFim" class="input" step="1800" onchange="calcHETotal()">
-        </div>
-      </div>
-      <div id="heTotalInfo" style="font-size:12px;color:var(--text-muted)"></div>
-      <div id="heCategoriaInfo" style="font-size:11px;padding:5px 10px;border-radius:5px;background:var(--surface2);display:none"></div>
-      <div class="form-group" style="margin:0"><label>Observações</label>
-        <input type="text" id="heObs" class="input" placeholder="Opcional">
-      </div>
-      <div id="heAviso" style="display:none;padding:8px;background:rgba(239,68,68,.1);border-radius:6px;font-size:12px;color:#ef4444"></div>
-    </div>
-    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
-      <button onclick="fecharModal('modalHE')" class="btn btn-ghost">Cancelar</button>
-      <button onclick="guardarHE()" class="btn btn-primary" id="heSaveBtn">💾 Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Fecho empresa -->
-<div id="modalFecho" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:380px;overflow:hidden">
-    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
-      <div style="font-size:14px;font-weight:700;flex:1">🏢 Fecho Geral da Empresa</div>
-      <button onclick="fecharModal('modalFecho')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
-    </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-      <div style="font-size:12px;color:var(--text-muted)">Define um período de fecho aplicado automaticamente a todos os funcionários como consumo de férias.</div>
+<!-- Modal: Fecho empresa -->
+<div id="modalFecho" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:360px">
+    <div class="modal-head"><span>🏢 Fecho Geral da Empresa</span><button onclick="fecharModal('modalFecho')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted)">Aplica automaticamente a todos os funcionários.</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-group" style="margin:0"><label>Início</label><input type="date" id="fechoInicio" class="input"></div>
         <div class="form-group" style="margin:0"><label>Fim</label><input type="date" id="fechoFim" class="input"></div>
       </div>
       <div class="form-group" style="margin:0"><label>Descrição</label><input type="text" id="fechoDesc" class="input" placeholder="Ex: Férias de Natal"></div>
     </div>
-    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+    <div class="modal-foot" style="justify-content:flex-end">
       <button onclick="fecharModal('modalFecho')" class="btn btn-ghost">Cancelar</button>
       <button onclick="guardarFecho()" class="btn btn-primary">✅ Aplicar a Todos</button>
     </div>
   </div>
 </div>
 
-<script>
-var _tipoFiltro = '';
-var _editMode = false;
+<!-- Modal: Feriado -->
+<div id="modalFeriado" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:340px">
+    <div class="modal-head"><span>📅 Feriado / Ponte</span><button onclick="fecharModal('modalFeriado')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="ferData" class="input"></div>
+      <div class="form-group" style="margin:0"><label>Nome</label><input type="text" id="ferNome" class="input" placeholder="Ex: Feriado Municipal"></div>
+      <div class="form-group" style="margin:0"><label>Tipo</label>
+        <select id="ferTipo" class="input">
+          <option value="nacional">🇵🇹 Nacional</option>
+          <option value="local">📍 Local</option>
+          <option value="ponte">🌉 Ponte</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button onclick="fecharModal('modalFeriado')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarFeriado()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+<!-- Modal: Horas Extra -->
+<div id="modalHE" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:500px">
+    <div class="modal-head"><span>⏱ Registar Horas Extra</span><button onclick="fecharModal('modalHE')">✕</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label>Funcionário</label>
+          <select id="heFuncId" class="input">
+            {% for f in funcs %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="heData" class="input" onchange="updateHECategoria()"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);padding:6px 10px;background:var(--surface2);border-radius:6px">
+        🕐 Horário normal: <strong>08:30–17:30</strong>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px">Período (blocos 30min):</div>
+        <div id="heGrid" style="display:flex;flex-wrap:wrap;gap:2px"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label>Hora Início</label><input type="time" id="heInicio" class="input" step="1800" onchange="calcHETotal()"></div>
+        <div class="form-group" style="margin:0"><label>Hora Fim</label><input type="time" id="heFim" class="input" step="1800" onchange="calcHETotal()"></div>
+      </div>
+      <div id="heTotalInfo" style="font-size:12px;color:var(--text-muted)"></div>
+      <div id="heCategoriaInfo" style="display:none;font-size:11px;padding:5px 10px;border-radius:5px;background:var(--surface2)"></div>
+      <div class="form-group" style="margin:0"><label>Observações</label><input type="text" id="heObs" class="input" placeholder="Opcional"></div>
+      <div id="heAviso" style="display:none;padding:8px;background:rgba(239,68,68,.1);border-radius:6px;font-size:12px;color:#ef4444"></div>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button onclick="fecharModal('modalHE')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarHE(false)" class="btn btn-primary" id="heSaveBtn">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:none;align-items:center;justify-content:center}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.modal-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700}
+.modal-head button{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)}
+.modal-body{padding:16px;display:flex;flex-direction:column;gap:10px}
+.modal-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px}
+</style>
+
+<script>
+(function() {
+'use strict';
+
+// ── Load data from DOM ────────────────────────────────────────────────────────
+var D = document.getElementById('ausencias-data').dataset;
+var ANO          = parseInt(D.ano);
+var DIA_FECHO    = parseInt(D.diaFecho);
+var REGISTOS     = JSON.parse(D.registos);
+var FERIADOS     = JSON.parse(D.feriados);
+var FECHOS       = JSON.parse(D.fechos);
+var PERIODOS_SAL = JSON.parse(D.periodos);
+
+// Load funcs and saldos from DOM spans
+var FUNCS = [], FUNCS_MAP = {}, SALDOS = {};
+document.querySelectorAll('#funcs-data span').forEach(function(el) {
+  var id = parseInt(el.dataset.id), nome = el.dataset.nome;
+  FUNCS.push({id: id, nome: nome});
+  FUNCS_MAP[id] = nome;
+});
+document.querySelectorAll('#saldos-data span').forEach(function(el) {
+  SALDOS[parseInt(el.dataset.id)] = {
+    direito: parseFloat(el.dataset.direito),
+    ajuste:  parseFloat(el.dataset.ajuste),
+    gozados: parseFloat(el.dataset.gozados),
+    restantes: parseFloat(el.dataset.restantes)
+  };
+});
+
+var TIPOS_CONFIG = {
+  ferias:{label:'Férias',cor:'#22c55e',icon:'🏖'},
+  ponte:{label:'Ponte',cor:'#3b6ef0',icon:'🌉'},
+  fecho_empresa:{label:'Fecho Empresa',cor:'#94a3b8',icon:'🏢'},
+  falta_justificada:{label:'Falta Justificada',cor:'#f59e0b',icon:'📋'},
+  falta_injustificada:{label:'Falta Injustificada',cor:'#ef4444',icon:'🚫'},
+  baixa_medica:{label:'Baixa Médica',cor:'#a855f7',icon:'🏥'},
+  consulta_medica:{label:'Consulta Médica',cor:'#f97316',icon:'🩺'},
+  assistencia_familia:{label:'Assistência Família',cor:'#06b6d4',icon:'👨‍👩‍👧'},
+  formacao:{label:'Formação',cor:'#8b5cf6',icon:'📚'},
+  teletrabalho:{label:'Teletrabalho',cor:'#0891b2',icon:'💻'},
+  licenca_sem_venc:{label:'Licença s/ Vencimento',cor:'#64748b',icon:'📄'},
+  trabalho_externo:{label:'Trabalho Externo',cor:'#10b981',icon:'🔧'}
+};
+
+var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+var _tipoFiltro = '';
+
 function pad(n){ return String(n).padStart(2,'0'); }
 function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
 function dayOfWeek(y,m,d){ return new Date(y,m-1,d).getDay(); }
 function dateStr(y,m,d){ return y+'-'+pad(m)+'-'+pad(d); }
 function isFeriado(ds){ return FERIADOS.find(function(f){ return f.data===ds; }); }
 function isFecho(ds){ return FECHOS.find(function(f){ return f.data_inicio<=ds && f.data_fim>=ds; }); }
-function nomeCurto(nome){ var p=nome.split(' '); return p.length>1 ? p[0]+' '+p[p.length-1] : p[0]; }
-
-// ── Navigation ────────────────────────────────────────────────────────────────
+function nomeCurto(nome){ var p=nome.split(' '); return p.length>1?p[0]+' '+p[p.length-1]:p[0]; }
 function anoAnterior(){ window.location='/ausencias?ano='+(ANO-1); }
 function anoSeguinte(){ window.location='/ausencias?ano='+(ANO+1); }
 
-// ── Filter ────────────────────────────────────────────────────────────────────
+// ── Saldo cards ───────────────────────────────────────────────────────────────
+function buildSaldoCards() {
+  var strip = document.getElementById('saldosStrip');
+  FUNCS.slice(0,8).forEach(function(f) {
+    var s = SALDOS[f.id] || {restantes:22, direito:22, gozados:0};
+    var r = s.restantes;
+    var cor = r < 0 ? '#ef4444' : r < 5 ? '#f59e0b' : '#22c55e';
+    var div = document.createElement('div');
+    div.className = 'card';
+    div.style.cssText = 'padding:10px 14px;min-width:120px;cursor:pointer;flex:1';
+    div.onclick = (function(fid, fnome){ return function(){ abrirSaldo(fid, fnome); }; })(f.id, f.nome);
+    div.innerHTML = '<div style="font-size:10px;color:var(--text-muted)">' + nomeCurto(f.nome) + '</div>' +
+      '<div style="font-size:20px;font-weight:800;color:'+cor+'">'+r.toFixed(1)+'</div>' +
+      '<div style="font-size:9px;color:var(--text-muted)">dias disponíveis</div>';
+    strip.appendChild(div);
+  });
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
 function filtrarTipo(tipo) {
   _tipoFiltro = tipo;
-  document.querySelectorAll('[id^="leg-"]').forEach(function(el){
-    el.style.opacity = (!tipo || el.id==='leg-'+tipo) ? '1' : '0.35';
+  document.querySelectorAll('.tipo-badge').forEach(function(el) {
+    el.style.opacity = (!tipo || el.dataset.tipo === tipo) ? '1' : '0.35';
   });
   buildCalendar();
 }
 
-// ── Calendar ──────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tipo-badge').forEach(function(el) {
+  el.onclick = function() { filtrarTipo(el.dataset.tipo); };
+});
+
 function buildCalendar() {
   var cal = document.getElementById('calendario');
   cal.innerHTML = '';
 
   for (var mes = 1; mes <= 12; mes++) {
     var days = daysInMonth(ANO, mes);
+    var minW = Math.max(days * 34, 400);
     var sec = document.createElement('div');
     sec.className = 'card';
     sec.style.cssText = 'padding:12px;overflow-x:auto;margin-bottom:12px';
 
     // Month header
     var h = document.createElement('div');
-    h.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);display:flex;align-items:center;gap:8px';
-    var fechoLabel = DIA_FECHO_SAL <= days ? 'Fecho salarial: dia ' + DIA_FECHO_SAL : '';
-    h.innerHTML = MESES[mes-1] + ' ' + ANO +
-      (fechoLabel ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:6px">· ' + fechoLabel + '</span>' : '');
+    h.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent)';
+    var pSal = PERIODOS_SAL.find(function(p) {
+      return p.inicio.substring(0,7) === ANO+'-'+pad(mes) || p.fim.substring(0,7) === ANO+'-'+pad(mes);
+    });
+    h.textContent = MESES[mes-1] + ' ' + ANO;
+    if (pSal) {
+      var sp = document.createElement('span');
+      sp.style.cssText = 'font-size:10px;color:var(--accent);font-weight:400;margin-left:8px';
+      sp.textContent = '· Período: ' + pSal.inicio.substring(8,10) + '/' + pad(mes) + ' – ' + pSal.fim.substring(8,10) + '/' + pSal.fim.substring(5,7);
+      h.appendChild(sp);
+    }
     sec.appendChild(h);
 
-    var minW = Math.max(days * 34, 400);
-
-    // Day headers grid
+    // Day header row
     var grid = document.createElement('div');
     grid.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',34px);gap:0;min-width:'+minW+'px';
 
     for (var d = 1; d <= days; d++) {
-      var dow = dayOfWeek(ANO,mes,d);
-      var ds  = dateStr(ANO,mes,d);
+      var ds = dateStr(ANO, mes, d);
+      var dow = dayOfWeek(ANO, mes, d);
       var fer = isFeriado(ds);
       var fec = isFecho(ds);
-      var isWk = (dow===0||dow===6);
+      var isWk = (dow === 0 || dow === 6);
 
       var cell = document.createElement('div');
       cell.style.cssText = 'text-align:center;font-size:10px;padding:2px 0;cursor:pointer;position:relative;min-height:36px;';
-      if (fer)       { cell.style.background = fer.tipo==='ponte' ? 'rgba(245,158,11,.18)' : 'rgba(239,68,68,.18)';
-                       cell.style.borderLeft = cell.style.borderRight = fer.tipo==='ponte' ? '2px solid rgba(245,158,11,.5)' : '2px solid rgba(239,68,68,.5)'; }
-      else if (fec)  { cell.style.background = 'rgba(148,163,184,.18)'; }
-      else if (isWk) { cell.style.background = 'var(--surface2)'; }
+
+      // Background
+      if (fer) {
+        cell.style.background = fer.tipo === 'ponte' ? 'rgba(245,158,11,.18)' : 'rgba(239,68,68,.18)';
+        cell.style.borderLeft = cell.style.borderRight = fer.tipo === 'ponte' ? '2px solid rgba(245,158,11,.6)' : '2px solid rgba(239,68,68,.6)';
+      } else if (fec) {
+        cell.style.background = 'rgba(148,163,184,.18)';
+      } else if (isWk) {
+        cell.style.background = 'var(--surface2)';
+      }
+
+      // Salary period border
+      if (pSal) {
+        var iniDay = parseInt(pSal.inicio.substring(8,10));
+        var iniMes = parseInt(pSal.inicio.substring(5,7));
+        var fimDay = parseInt(pSal.fim.substring(8,10));
+        var fimMes = parseInt(pSal.fim.substring(5,7));
+        if (iniMes === mes && iniDay === d) { cell.style.borderLeft = '3px solid var(--accent)'; }
+        if (fimMes === mes && fimDay === d) { cell.style.borderRight = '3px solid var(--accent)'; }
+      }
 
       var dayLbl = document.createElement('div');
-      dayLbl.style.cssText = 'font-size:8px;color:'+(fer?'inherit':isWk?'var(--text-muted)':'var(--text-muted)');
+      dayLbl.style.cssText = 'font-size:8px;color:var(--text-muted)';
       dayLbl.textContent = ['D','S','T','Q','Q','S','S'][dow];
       var dayNum = document.createElement('div');
-      dayNum.style.cssText = 'font-weight:700;font-size:11px;color:'+(fer?(fer.tipo==='ponte'?'#f59e0b':'#ef4444'):isWk?'var(--text-muted)':'var(--text)');
+      dayNum.style.cssText = 'font-weight:700;font-size:11px;color:' + (fer ? (fer.tipo==='ponte'?'#f59e0b':'#ef4444') : isWk ? 'var(--text-muted)' : 'var(--text)');
       dayNum.textContent = d;
       cell.appendChild(dayLbl);
       cell.appendChild(dayNum);
-      // Salary period border
-      var pSal = PERIODOS_SAL.find(function(p){ return p.inicio.substring(5,7)==pad(mes) || p.fim.substring(5,7)==pad(mes); });
-      if (pSal) {
-        var dsIni = pSal.inicio.substring(8,10); // day part
-        var dsFim = pSal.fim.substring(8,10);
-        var salMes = parseInt(pSal.inicio.substring(5,7));
-        var salMesFim = parseInt(pSal.fim.substring(5,7));
-        // Draw left border on start day
-        if (salMes == mes && parseInt(dsIni) == d) {
-          cell.style.borderLeft = '3px solid var(--accent)';
-          cell.style.background = cell.style.background || 'rgba(59,110,240,.06)';
-        }
-        // Draw right border on end day
-        if (salMesFim == mes && parseInt(dsFim) == d) {
-          cell.style.borderRight = '3px solid var(--accent)';
-        }
-        // Shade inside period
-        if ((salMes < mes || (salMes == mes && parseInt(dsIni) <= d)) &&
-            (salMesFim > mes || (salMesFim == mes && parseInt(dsFim) >= d))) {
-          if (!fer && !cell.style.background) cell.style.background = 'rgba(59,110,240,.04)';
-        }
-      }
+
       if (fer) {
         var ferTxt = document.createElement('div');
         ferTxt.style.cssText = 'writing-mode:vertical-rl;transform:rotate(180deg);font-size:8px;font-weight:700;color:'+(fer.tipo==='ponte'?'#f59e0b':'#ef4444')+';max-height:55px;overflow:hidden;margin:1px auto;line-height:1.2';
         ferTxt.textContent = fer.nome;
         cell.appendChild(ferTxt);
-        cell.onclick = (function(f){ return function(e){ if(e.ctrlKey||e.metaKey) removeFeriado(f); }; })(fer);
-        cell.title = fer.nome + ' — Ctrl+clique para remover';
+        cell.title = fer.nome + ' (Ctrl+clique para remover)';
+        cell.onclick = (function(fObj){ return function(e){ if(e.ctrlKey||e.metaKey) removeFeriado(fObj); }; })(fer);
       } else {
         cell.onclick = (function(ds2){ return function(e){ if(e.target===this||e.target.parentNode===this) abrirNovaAusenciaDia(ds2); }; })(ds);
       }
@@ -382,57 +405,49 @@ function buildCalendar() {
     sec.appendChild(grid);
 
     // Employee rows
-    FUNCS.forEach(function(fid) {
-      var rowRegistos = REGISTOS.filter(function(r){
-        if (r.funcionario_id !== fid) return false;
-        if (_tipoFiltro && r.tipo !== _tipoFiltro) return false;
-        var rStart = r.data_inicio.substring(0,7);
-        var rEnd   = r.data_fim.substring(0,7);
-        var mesStr = ANO+'-'+pad(mes);
-        return rStart <= mesStr && rEnd >= mesStr;
-      });
-
+    FUNCS.forEach(function(f) {
       var row = document.createElement('div');
-      row.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',34px);gap:0;margin-top:1px;min-width:'+minW+'px;height:22px;position:relative';
+      row.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',34px);gap:0;margin-top:1px;min-width:'+minW+'px;height:22px';
 
       for (var d2 = 1; d2 <= days; d2++) {
-        var ds2 = dateStr(ANO,mes,d2);
+        var ds2 = dateStr(ANO, mes, d2);
         var cell2 = document.createElement('div');
         cell2.style.cssText = 'height:22px;position:relative;';
 
-        // Feriado/fecho background on employee row too
         var ferD = isFeriado(ds2);
         var fecD = isFecho(ds2);
+        var isWkD = (dayOfWeek(ANO,mes,d2) === 0 || dayOfWeek(ANO,mes,d2) === 6);
+
         if (ferD) {
           cell2.style.background = ferD.tipo==='ponte' ? 'rgba(245,158,11,.08)' : 'rgba(239,68,68,.08)';
         } else if (fecD) {
           cell2.style.background = 'rgba(148,163,184,.08)';
-        } else if (dayOfWeek(ANO,mes,d2)===0||dayOfWeek(ANO,mes,d2)===6) {
+        } else if (isWkD) {
           cell2.style.background = 'var(--surface2)';
         }
 
-        var reg = rowRegistos.find(function(r){ return r.data_inicio<=ds2 && r.data_fim>=ds2; });
-        if (reg) {
-          var isWkd2 = (dayOfWeek(ANO,mes,d2)===0 || dayOfWeek(ANO,mes,d2)===6);
-          var isFer2 = !!isFeriado(ds2);
-          // Only paint useful days (not weekends/holidays for non-ponte types)
-          if (!isWkd2 && !isFer2) {
-            var cor = reg.cor || '#888';
-            var isStart = reg.data_inicio === ds2;
-            var isEnd   = reg.data_fim   === ds2;
-            cell2.style.background = cor;
-            cell2.style.opacity = reg.estado==='pendente' ? '0.5' : '1';
-            cell2.style.borderRadius = (isStart?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isStart?'4px':'0');
-            cell2.style.cursor = 'pointer';
-            if (isStart) {
-              var lbl = document.createElement('div');
-              lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none';
-              lbl.textContent = reg.icon + ' ' + nomeCurto(reg.funcionario_nome);
-              cell2.appendChild(lbl);
-            }
-            cell2.title = reg.funcionario_nome + ': ' + reg.label + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
-            cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
+        var reg = REGISTOS.find(function(r) {
+          if (r.funcionario_id !== f.id) { return false; }
+          if (_tipoFiltro && r.tipo !== _tipoFiltro) { return false; }
+          return r.data_inicio <= ds2 && r.data_fim >= ds2;
+        });
+
+        if (reg && !isWkD && !ferD) {
+          var cor = reg.cor || (TIPOS_CONFIG[reg.tipo] ? TIPOS_CONFIG[reg.tipo].cor : '#888');
+          var isStart = reg.data_inicio === ds2;
+          var isEnd   = reg.data_fim   === ds2;
+          cell2.style.background = cor;
+          cell2.style.opacity = reg.estado === 'pendente' ? '0.5' : '1';
+          cell2.style.borderRadius = (isStart?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isStart?'4px':'0');
+          cell2.style.cursor = 'pointer';
+          if (isStart) {
+            var lbl = document.createElement('div');
+            lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none';
+            lbl.textContent = nomeCurto(f.nome);
+            cell2.appendChild(lbl);
           }
+          cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
+          cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
         }
         row.appendChild(cell2);
       }
@@ -444,21 +459,25 @@ function buildCalendar() {
 }
 
 // ── Modal helpers ─────────────────────────────────────────────────────────────
-function fecharModal(id) { document.getElementById(id).style.display='none'; }
-[document.getElementById('modalAusencia'),
- document.getElementById('modalSaldo'),
- document.getElementById('modalFecho')].forEach(function(m){
-  if(m) m.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
+function fecharModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+['modalAusencia','modalSaldo','modalFecho','modalFeriado','modalHE'].forEach(function(id) {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) { this.style.display = 'none'; }
+  });
 });
+function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
 
-// ── Nova ausência ─────────────────────────────────────────────────────────────
+// ── Nova Ausência ─────────────────────────────────────────────────────────────
+var _editMode = false;
 function abrirNovaAusencia() {
   _editMode = false;
   document.getElementById('ausenciaId').value = '';
   document.getElementById('ausenciaEliminarBtn').style.display = 'none';
   document.getElementById('modalAusenciaTitulo').textContent = '📅 Registar Ausência';
-  document.getElementById('ausenciaSaveBtn').textContent = '💾 Guardar';
-  var hoje = new Date(); var hs = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
+  var hoje = new Date();
+  var hs = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
   document.getElementById('ausenciaInicio').value = hs;
   document.getElementById('ausenciaFim').value = hs;
   document.getElementById('ausenciaTipo').value = 'ferias';
@@ -466,17 +485,14 @@ function abrirNovaAusencia() {
   document.getElementById('ausenciaObs').value = '';
   document.getElementById('ausenciaAviso').style.display = 'none';
   toggleHoras(); atualizarTipoInfo(); calcularDias();
-  document.getElementById('modalAusencia').style.display = 'flex';
-  setTimeout(function(){ document.getElementById('ausenciaFunc').focus(); },100);
+  abrirModal('modalAusencia');
 }
-
 function abrirNovaAusenciaDia(ds) {
   abrirNovaAusencia();
   document.getElementById('ausenciaInicio').value = ds;
   document.getElementById('ausenciaFim').value = ds;
   calcularDias();
 }
-
 function abrirEditarAusencia(r) {
   _editMode = true;
   document.getElementById('ausenciaId').value = r.id;
@@ -491,307 +507,243 @@ function abrirEditarAusencia(r) {
   document.getElementById('ausenciaObs').value = r.observacoes || '';
   document.getElementById('ausenciaAviso').style.display = 'none';
   toggleHoras(); atualizarTipoInfo(); calcularDias();
-  document.getElementById('modalAusencia').style.display = 'flex';
+  abrirModal('modalAusencia');
 }
-
 function atualizarTipoInfo() {
   var tipo = document.getElementById('ausenciaTipo').value;
-  var info = TIPOS[tipo] || {};
-  var el = document.getElementById('tipoInfo');
-  var parts = [];
-  if (info.conta_ferias) parts.push('🏖 Conta como férias');
-  if (info.conta_falta)  parts.push('📋 Conta como falta');
-  if (info.desconta_salario) parts.push('💰 Desconta no salário');
-  if (parts.length) {
-    el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
-    el.style.display='block';
-  } else {
-    el.style.display = 'none';
-  }
+  var t = TIPOS_CONFIG[tipo];
+  document.getElementById('tipoInfo').style.display = t ? 'block' : 'none';
+  if (t) { document.getElementById('tipoInfo').textContent = t.icon + ' ' + t.label; }
 }
-
 function toggleHoras() {
   var fmt = document.getElementById('ausenciaFormato').value;
-  document.getElementById('horasGroup').style.display = fmt==='horas' ? 'block' : 'none';
+  document.getElementById('horasGroup').style.display = fmt === 'horas' ? 'block' : 'none';
 }
-
 function calcularDias() {
-  var inicio = document.getElementById('ausenciaInicio').value;
-  var fim    = document.getElementById('ausenciaFim').value;
-  var fmt    = document.getElementById('ausenciaFormato').value;
-  var horas  = parseFloat(document.getElementById('ausenciaHoras').value)||4;
-  if (!inicio || !fim) return;
+  var ini = document.getElementById('ausenciaInicio').value;
+  var fim = document.getElementById('ausenciaFim').value;
+  var fmt = document.getElementById('ausenciaFormato').value;
+  var horas = parseFloat(document.getElementById('ausenciaHoras').value) || 4;
   var el = document.getElementById('diasCalculados');
+  if (!ini || !fim) { el.textContent = ''; return; }
   if (fmt === 'horas') { el.textContent = '≈ ' + (horas/8).toFixed(2) + ' dias úteis'; return; }
   if (fmt === 'manha' || fmt === 'tarde') { el.textContent = '= 0.5 dias úteis'; return; }
-  // Count weekdays
-  var s = new Date(inicio), e = new Date(fim), count = 0;
-  var cur = new Date(s);
-  while (cur <= e) {
-    var dw = cur.getDay();
-    if (dw !== 0 && dw !== 6) count++;
-    cur.setDate(cur.getDate()+1);
-  }
+  var s = new Date(ini), e = new Date(fim), count = 0, cur = new Date(s);
+  while (cur <= e) { if (cur.getDay()!==0 && cur.getDay()!==6) { count++; } cur.setDate(cur.getDate()+1); }
   el.textContent = '= ' + count + ' dia(s) útil(s)';
 }
-
 function guardarAusencia(forcar) {
   var btn = document.getElementById('ausenciaSaveBtn');
   btn.disabled = true; btn.textContent = 'A guardar...';
-  var aviso = document.getElementById('ausenciaAviso');
   var payload = {
     funcionario_id: document.getElementById('ausenciaFunc').value,
-    tipo:    document.getElementById('ausenciaTipo').value,
+    tipo: document.getElementById('ausenciaTipo').value,
     data_inicio: document.getElementById('ausenciaInicio').value,
-    data_fim:    document.getElementById('ausenciaFim').value,
+    data_fim: document.getElementById('ausenciaFim').value,
     formato: document.getElementById('ausenciaFormato').value,
-    horas:   document.getElementById('ausenciaHoras').value,
+    horas: document.getElementById('ausenciaHoras').value,
     observacoes: document.getElementById('ausenciaObs').value,
-    forcar: forcar || false,
+    forcar: forcar
   };
   var url = _editMode ? '/ausencias/' + document.getElementById('ausenciaId').value + '/editar' : '/ausencias/registar';
-  fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
     .then(function(r){ return r.json(); })
-    .then(function(d){
+    .then(function(d) {
       if (d.ok) {
         location.reload();
       } else if (d.saldo_insuficiente) {
-        aviso.textContent = '⚠️ ' + d.error + ' — Confirmar mesmo assim?';
-        aviso.style.display = 'block';
-        aviso.innerHTML += ' <button onclick="guardarAusencia(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
+        var av = document.getElementById('ausenciaAviso');
+        av.innerHTML = '⚠️ ' + d.error + ' <button onclick="guardarAusencia(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
+        av.style.display = 'block';
         btn.disabled = false; btn.textContent = '💾 Guardar';
       } else {
-        aviso.textContent = '❌ ' + d.error;
-        aviso.style.display = 'block';
+        document.getElementById('ausenciaAviso').textContent = '❌ ' + d.error;
+        document.getElementById('ausenciaAviso').style.display = 'block';
         btn.disabled = false; btn.textContent = '💾 Guardar';
       }
     });
 }
-
 function eliminarAusencia() {
-  if (!confirm('Eliminar este registo?')) return;
-  var id = document.getElementById('ausenciaId').value;
-  fetch('/ausencias/' + id + '/eliminar', {method:'POST'})
+  if (!confirm('Eliminar este registo?')) { return; }
+  fetch('/ausencias/' + document.getElementById('ausenciaId').value + '/eliminar', {method:'POST'})
     .then(function(r){ return r.json(); })
-    .then(function(d){ if(d.ok) location.reload(); });
+    .then(function(d){ if (d.ok) { location.reload(); } });
 }
 
 // ── Saldo ─────────────────────────────────────────────────────────────────────
 function abrirSaldo(fid, nome) {
   document.getElementById('saldoFid').value = fid;
-  document.getElementById('saldoTitulo').textContent = '🏖 Saldo de Férias — ' + nome;
-  fetch('/ausencias/saldo/' + fid + '/{{ ano }}')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      document.getElementById('saldoDireito').value = d.ok ? d.direito : 22;
-      document.getElementById('saldoAjuste').value  = d.ok ? d.ajuste  : 0;
-      document.getElementById('saldoNotas').value   = '';
-      if (d.ok) {
-        document.getElementById('saldoResumo').innerHTML =
-          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">' +
-          '<div><div style="font-size:20px;font-weight:800;color:var(--accent)">' + d.direito + '</div><div style="font-size:10px;color:var(--text-muted)">Direito</div></div>' +
-          '<div><div style="font-size:20px;font-weight:800;color:#ef4444">' + d.gozados + '</div><div style="font-size:10px;color:var(--text-muted)">Gozados</div></div>' +
-          '<div><div style="font-size:20px;font-weight:800;color:#22c55e">' + d.restantes + '</div><div style="font-size:10px;color:var(--text-muted)">Restantes</div></div>' +
-          '</div>';
-      }
-    });
-  document.getElementById('modalSaldo').style.display = 'flex';
+  document.getElementById('saldoTitulo').textContent = '🏖 Saldo — ' + nome;
+  var s = SALDOS[fid] || {direito:22, ajuste:0, gozados:0, restantes:22};
+  document.getElementById('saldoDireito').value = s.direito;
+  document.getElementById('saldoAjuste').value = s.ajuste;
+  document.getElementById('saldoNotas').value = '';
+  document.getElementById('saldoResumo').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">' +
+    '<div><div style="font-size:20px;font-weight:800;color:var(--accent)">' + s.direito + '</div><div style="font-size:10px;color:var(--text-muted)">Direito</div></div>' +
+    '<div><div style="font-size:20px;font-weight:800;color:#ef4444">' + s.gozados + '</div><div style="font-size:10px;color:var(--text-muted)">Gozados</div></div>' +
+    '<div><div style="font-size:20px;font-weight:800;color:#22c55e">' + s.restantes + '</div><div style="font-size:10px;color:var(--text-muted)">Restantes</div></div>' +
+    '</div>';
+  abrirModal('modalSaldo');
 }
-
 function guardarSaldo() {
-  fetch('/ausencias/saldo/' + document.getElementById('saldoFid').value + '/{{ ano }}', {
+  fetch('/ausencias/saldo/' + document.getElementById('saldoFid').value + '/' + ANO, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       dias_direito: document.getElementById('saldoDireito').value,
-      dias_ajuste:  document.getElementById('saldoAjuste').value,
-      notas_ajuste: document.getElementById('saldoNotas').value,
+      dias_ajuste: document.getElementById('saldoAjuste').value,
+      notas_ajuste: document.getElementById('saldoNotas').value
     })
-  }).then(function(r){ return r.json(); }).then(function(d){ if(d.ok) location.reload(); });
+  }).then(function(r){ return r.json(); }).then(function(d){ if (d.ok) { location.reload(); } });
 }
 
 // ── Fecho empresa ─────────────────────────────────────────────────────────────
-function abrirFechoEmpresa() {
-  document.getElementById('fechoDesc').value = '';
-  document.getElementById('modalFecho').style.display = 'flex';
-}
+function abrirFechoEmpresa() { document.getElementById('fechoDesc').value = ''; abrirModal('modalFecho'); }
 function guardarFecho() {
   fetch('/ausencias/fecho', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       data_inicio: document.getElementById('fechoInicio').value,
-      data_fim:    document.getElementById('fechoFim').value,
-      descricao:   document.getElementById('fechoDesc').value,
+      data_fim: document.getElementById('fechoFim').value,
+      descricao: document.getElementById('fechoDesc').value
     })
-  }).then(function(r){ return r.json(); }).then(function(d){
-    if (d.ok) { location.reload(); }
-    else { alert('Erro: ' + d.error); }
-  });
+  }).then(function(r){ return r.json(); }).then(function(d){ if (d.ok) { location.reload(); } else { alert('Erro: ' + d.error); } });
 }
 
-// ── Horas Extra ────────────────────────────────────────────────────────────
-var _heGridSelStart = null;
-var _heGridDragging = false;
+// ── Feriado ───────────────────────────────────────────────────────────────────
+function abrirAddFeriado() {
+  var hoje = new Date();
+  document.getElementById('ferData').value = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
+  document.getElementById('ferNome').value = '';
+  document.getElementById('ferTipo').value = 'nacional';
+  abrirModal('modalFeriado');
+}
+function abrirAddFeriadoData(ds) {
+  document.getElementById('ferData').value = ds;
+  document.getElementById('ferNome').value = '';
+  abrirModal('modalFeriado');
+}
+function guardarFeriado() {
+  fetch('/ferias/feriado/adicionar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({data: document.getElementById('ferData').value, nome: document.getElementById('ferNome').value || 'Feriado', tipo: document.getElementById('ferTipo').value})
+  }).then(function(r){ return r.json(); }).then(function(d){ if (d.ok) { location.reload(); } else { alert('Erro: ' + d.error); } });
+}
+function removeFeriado(fer) {
+  if (!confirm('Remover "' + fer.nome + '"?')) { return; }
+  fetch('/ferias/feriado/' + fer.id + '/eliminar', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (d.ok) { location.reload(); } });
+}
 
+// ── Horas Extra ────────────────────────────────────────────────────────────────
 function abrirHoraExtra(ds) {
   document.getElementById('heData').value = ds || '';
   document.getElementById('heInicio').value = '18:00';
-  document.getElementById('heFim').value   = '20:00';
-  document.getElementById('heObs').value   = '';
+  document.getElementById('heFim').value = '20:00';
+  document.getElementById('heObs').value = '';
   document.getElementById('heAviso').style.display = 'none';
   document.getElementById('heCategoriaInfo').style.display = 'none';
   buildHEGrid();
   calcHETotal();
-  if(ds) updateHECategoria();
-  document.getElementById('modalHE').style.display = 'flex';
+  if (ds) { updateHECategoria(); }
+  abrirModal('modalHE');
 }
-
 function buildHEGrid() {
   var grid = document.getElementById('heGrid');
   grid.innerHTML = '';
-  // 00:00 to 23:30 in 30min blocks
   for (var h = 0; h < 24; h++) {
     for (var m = 0; m < 2; m++) {
       var label = pad(h) + ':' + (m===0?'00':'30');
-      var isNormal = (h===8&&m===1)||(h>=9&&h<17)||(h===17&&m===0); // 08:30–17:30
+      var isNormal = (h===8&&m===1)||(h>=9&&h<=16)||(h===17&&m===0);
       var block = document.createElement('div');
       block.dataset.time = label;
-      block.style.cssText = 'width:36px;height:22px;border-radius:3px;cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);' +
-        (isNormal ? 'background:var(--surface2);color:var(--text-muted);' : 'background:rgba(59,110,240,.08);color:var(--accent);font-weight:700;');
+      block.style.cssText = 'width:34px;height:20px;border-radius:3px;cursor:pointer;font-size:8px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);' + (isNormal ? 'background:var(--surface2);color:var(--text-muted);' : 'background:rgba(59,110,240,.1);color:var(--accent);font-weight:700;');
       block.textContent = label;
-      block.onclick = (function(t, isN){ return function(){
-        if(isN) return; // skip normal hours
-        document.getElementById('heInicio').value = t;
-        // Set fim to t+2h
-        var parts = t.split(':'), totMin = parseInt(parts[0])*60+parseInt(parts[1])+120;
-        if(totMin>1440)totMin=1440;
-        document.getElementById('heFim').value = pad(Math.floor(totMin/60))+':'+pad(totMin%60);
-        calcHETotal();
-        highlightHEGrid();
-      }; })(label, isNormal);
+      if (!isNormal) {
+        block.onclick = (function(t){ return function() {
+          document.getElementById('heInicio').value = t;
+          var parts = t.split(':'), totMin = parseInt(parts[0])*60 + parseInt(parts[1]) + 120;
+          if (totMin > 1440) { totMin = 1440; }
+          document.getElementById('heFim').value = pad(Math.floor(totMin/60)) + ':' + pad(totMin%60);
+          calcHETotal();
+        }; })(label);
+      }
       grid.appendChild(block);
     }
   }
 }
-
-function highlightHEGrid() {
-  var ini = document.getElementById('heInicio').value;
-  var fim = document.getElementById('heFim').value;
-  document.querySelectorAll('#heGrid div').forEach(function(b){
-    var t = b.dataset.time;
-    var active = t >= ini && t < fim;
-    if (active) { b.style.background = 'var(--accent)'; b.style.color = 'white'; }
-    else if (!b.style.color.includes('muted')) { b.style.background='rgba(59,110,240,.08)'; b.style.color='var(--accent)'; }
-  });
-}
-
 function calcHETotal() {
   var ini = document.getElementById('heInicio').value;
   var fim = document.getElementById('heFim').value;
-  if (!ini || !fim) return;
-  var iMin = parseInt(ini.split(':')[0])*60+parseInt(ini.split(':')[1]);
-  var fMin = parseInt(fim.split(':')[0])*60+parseInt(fim.split(':')[1]);
-  var total = (fMin-iMin)/60;
-  document.getElementById('heTotalInfo').textContent = total > 0 ? '= ' + total.toFixed(1) + ' horas extra' : '⚠️ Hora fim deve ser depois da hora início';
-  highlightHEGrid();
+  if (!ini || !fim) { return; }
+  var iMin = parseInt(ini.split(':')[0])*60 + parseInt(ini.split(':')[1]);
+  var fMin = parseInt(fim.split(':')[0])*60 + parseInt(fim.split(':')[1]);
+  var total = (fMin - iMin) / 60;
+  document.getElementById('heTotalInfo').textContent = total > 0 ? '= ' + total.toFixed(1) + ' horas extra' : '⚠️ Hora fim deve ser depois do início';
 }
-
 function updateHECategoria() {
   var ds = document.getElementById('heData').value;
-  if (!ds) return;
-  var dt = new Date(ds);
+  if (!ds) { return; }
+  var dt = new Date(ds + 'T12:00:00');
   var dow = dt.getDay();
-  var fer = FERIADOS.find(function(f){ return f.data===ds; });
+  var fer = FERIADOS.find(function(f){ return f.data === ds; });
   var el = document.getElementById('heCategoriaInfo');
   el.style.display = 'block';
-  if (fer) {
-    el.textContent='🔴 Feriado: '+fer.nome+' — HE classificadas como feriado';
-    el.style.color='#ef4444';
-  } else if (dow===0||dow===6) {
-    el.textContent='🟡 Fim de semana — HE classificadas como FDS';
-    el.style.color='#f59e0b';
-  } else {
-    el.textContent='🔵 Dia útil — HE classificadas como dia útil';
-    el.style.color='var(--accent)';
-  }
+  if (fer) { el.textContent = '🔴 Feriado: ' + fer.nome; el.style.color = '#ef4444'; }
+  else if (dow===0||dow===6) { el.textContent = '🟡 Fim de semana'; el.style.color = '#f59e0b'; }
+  else { el.textContent = '🔵 Dia útil'; el.style.color = 'var(--accent)'; }
 }
-
 function guardarHE(forcar) {
   var btn = document.getElementById('heSaveBtn');
-  btn.disabled=true; btn.textContent='A guardar...';
+  btn.disabled = true; btn.textContent = 'A guardar...';
   fetch('/horas-extra/registar', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       funcionario_id: document.getElementById('heFuncId').value,
       data: document.getElementById('heData').value,
       hora_inicio: document.getElementById('heInicio').value,
-      hora_fim:    document.getElementById('heFim').value,
+      hora_fim: document.getElementById('heFim').value,
       observacoes: document.getElementById('heObs').value,
-      forcar: forcar||false
+      forcar: forcar
     })
-  }).then(r=>r.json()).then(d=>{
+  }).then(function(r){ return r.json(); }).then(function(d) {
     if (d.ok) {
       location.reload();
     } else if (d.conflito) {
-      var av=document.getElementById('heAviso');
-      av.innerHTML='⚠️ '+d.error+' <button onclick="guardarHE(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
-      av.style.display='block'; btn.disabled=false; btn.textContent='💾 Guardar';
+      var av = document.getElementById('heAviso');
+      av.innerHTML = '⚠️ ' + d.error + ' <button onclick="guardarHE(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
+      av.style.display = 'block';
+      btn.disabled = false; btn.textContent = '💾 Guardar';
     } else {
-      var av=document.getElementById('heAviso');
-      av.textContent='❌ '+d.error; av.style.display='block';
-      btn.disabled=false; btn.textContent='💾 Guardar';
+      document.getElementById('heAviso').textContent = '❌ ' + d.error;
+      document.getElementById('heAviso').style.display = 'block';
+      btn.disabled = false; btn.textContent = '💾 Guardar';
     }
   });
 }
-document.getElementById('modalHE').addEventListener('click',function(e){if(e.target===this)fecharModal('modalHE');});
 
-// ── Sync fichas ───────────────────────────────────────────────────────────────
+// ── Sync ──────────────────────────────────────────────────────────────────────
 function syncAll() {
   var btn = document.getElementById('syncBtn');
-  btn.disabled = true; btn.textContent = '⏳ A sincronizar...';
+  btn.disabled = true; btn.textContent = '⏳ Sync...';
   fetch('/ausencias/sync-all/' + ANO, {method:'POST'})
     .then(function(r){ return r.json(); })
-    .then(function(d){
+    .then(function(d) {
       if (d.ok) {
-        btn.textContent = '✅ ' + d.funcionarios + ' fichas actualizadas';
-        setTimeout(function(){ btn.textContent='🔄 Sincronizar Fichas'; btn.disabled=false; }, 3000);
+        btn.textContent = '✅ ' + d.funcionarios + ' fichas';
+        setTimeout(function(){ btn.textContent='🔄 Sync'; btn.disabled=false; }, 3000);
       } else {
         alert('Erro: ' + d.error);
-        btn.disabled=false; btn.textContent='🔄 Sincronizar Fichas';
+        btn.disabled = false; btn.textContent = '🔄 Sync';
       }
     });
 }
 
-// ── Feriado management (from old ferias.html) ─────────────────────────────────
-function abrirAddFeriado() {
-  var hoje = new Date();
-  document.getElementById('ferData').value = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
-  document.getElementById('ferNome').value = '';
-  document.getElementById('ferTipo').value = 'nacional';
-  document.getElementById('modalFeriado').style.display = 'flex';
-}
-function abrirAddFeriadoData(ds) {
-  document.getElementById('ferData').value = ds;
-  document.getElementById('ferNome').value = '';
-  document.getElementById('ferTipo').value = 'nacional';
-  document.getElementById('modalFeriado').style.display = 'flex';
-  setTimeout(function(){ document.getElementById('ferNome').focus(); },100);
-}
-function guardarFeriado() {
-  fetch('/ferias/feriado/adicionar', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      data: document.getElementById('ferData').value,
-      nome: document.getElementById('ferNome').value.trim() || 'Feriado',
-      tipo: document.getElementById('ferTipo').value
-    })
-  }).then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); else alert('Erro: '+d.error); });
-}
-function removeFeriado(fer) {
-  if (!confirm('Remover "'+fer.nome+'"?')) return;
-  fetch('/ferias/feriado/'+fer.id+'/eliminar',{method:'POST'})
-    .then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); });
-}
-
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildSaldoCards();
 buildCalendar();
+
+})(); // end IIFE
 </script>
 {% endblock %}
