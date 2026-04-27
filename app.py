@@ -3101,8 +3101,8 @@ PT_FERIADOS = [
 @app.route('/ferias')
 @login_required
 def ferias_mapa():
-    # Serve the new unified ausencias view directly
-    return ausencias()
+    # Redirect to the new unified ausencias view
+    return redirect(url_for('ausencias'))
 
 @app.route('/ferias_legacy')
 @login_required
@@ -8354,20 +8354,50 @@ def ausencias():
         funcs = [f for f in funcs if (getattr(f,'departamento','') or '') == dept_filtro]
 
     # Registos do ano
-    query = AusenciaRegisto.query.filter_by(ano=ano)
-    if func_filtro:
-        query = query.filter_by(funcionario_id=func_filtro)
-    registos = query.all()
+    try:
+        query = AusenciaRegisto.query.filter_by(ano=ano)
+        if func_filtro:
+            query = query.filter_by(funcionario_id=func_filtro)
+        registos = query.all()
+    except Exception:
+        registos = []
 
-    # Feriados
-    feriados = FeriasFeriado.query.filter_by(ano=ano).all()
-    fechos = EmpresaFecho.query.filter_by(ano=ano).all()
+    # Feriados — seed defaults if none exist
+    try:
+        feriados = FeriasFeriado.query.filter_by(ano=ano).all()
+        if not feriados:
+            from datetime import date as _d
+            PT_FERIADOS_BASE = [
+                (1,1,'Ano Novo'),(4,25,'25 de Abril'),(5,1,'Dia do Trabalhador'),
+                (6,10,'Dia de Portugal'),(8,15,'Assunção de Nossa Senhora'),
+                (10,5,'Implantação da República'),(11,1,'Dia de Todos os Santos'),
+                (12,1,'Restauração da Independência'),(12,8,'Imaculada Conceição'),
+                (12,25,'Natal'),
+            ]
+            for mes, dia, nome in PT_FERIADOS_BASE:
+                try:
+                    db.session.add(FeriasFeriado(ano=ano, data=_d(ano,mes,dia), nome=nome, tipo='nacional'))
+                except: pass
+            try: db.session.commit()
+            except: db.session.rollback()
+            feriados = FeriasFeriado.query.filter_by(ano=ano).all()
+    except Exception:
+        feriados = []
+
+    # Fecho empresa
+    try:
+        fechos = EmpresaFecho.query.filter_by(ano=ano).all()
+    except Exception:
+        fechos = []
 
     # Saldos
     saldos = {}
     for f in funcs:
-        s = AusenciaSaldoAnual.query.filter_by(funcionario_id=f.id, ano=ano).first()
-        saldos[f.id] = s
+        try:
+            s = AusenciaSaldoAnual.query.filter_by(funcionario_id=f.id, ano=ano).first()
+            saldos[f.id] = s
+        except Exception:
+            saldos[f.id] = None
 
     import json
     hoje = date.today()
