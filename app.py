@@ -9219,6 +9219,26 @@ def ausencias():
         } for p in periodos_sal])
     except Exception:
         periodos_sal_json = '[]'
+    try:
+        from datetime import date as _dt3
+        horas_extra_ano = HoraExtra.query.filter(
+            db.extract('year', HoraExtra.data) == ano,
+            HoraExtra.estado.in_(['aprovado','pendente'])
+        ).all()
+        horas_extra_json = _json2.dumps([{
+            'id': h.id,
+            'funcionario_id': h.funcionario_id,
+            'funcionario_nome': h.funcionario.nome if h.funcionario else '?',
+            'data': h.data.isoformat(),
+            'hora_inicio': h.hora_inicio,
+            'hora_fim': h.hora_fim,
+            'total_horas': h.total_horas,
+            'categoria': h.categoria,
+            'estado': h.estado,
+            'observacoes': h.observacoes or '',
+        } for h in horas_extra_ano])
+    except Exception:
+        horas_extra_json = '[]'
     return render_template('ausencias.html',
         ano=ano, funcs=funcs, saldos=saldos,
         tipos=TIPOS_AUSENCIA, view=view,
@@ -9229,7 +9249,8 @@ def ausencias():
         dept_filtro=dept_filtro, func_filtro=func_filtro,
         depts=depts, hoje=hoje,
         dia_inicio_sal=dia_inicio, dia_fecho_sal=dia_fecho,
-        periodos_sal_json=periodos_sal_json)
+        periodos_sal_json=periodos_sal_json,
+        horas_extra_json=horas_extra_json)
 
 @app.route('/ausencias/registar', methods=['POST'])
 @login_required

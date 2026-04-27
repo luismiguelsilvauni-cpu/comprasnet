@@ -229,6 +229,7 @@ function gerarPDF() {
 <script type="application/json" id="j-feriados">{{ feriados_json | safe }}</script>
 <script type="application/json" id="j-fechos">{{ fechos_json | safe }}</script>
 <script type="application/json" id="j-periodos">{{ periodos_sal_json | safe }}</script>
+<script type="application/json" id="j-he">{{ horas_extra_json | safe }}</script>
 
 <div id="funcs-data" style="display:none">
 {% for f in funcs %}
@@ -422,8 +423,11 @@ function gerarPDF() {
       <div id="heAviso" style="display:none;padding:8px;background:rgba(239,68,68,.1);border-radius:6px;font-size:12px;color:#ef4444"></div>
     </div>
     <div class="modal-foot" style="justify-content:flex-end">
+      <button id="heDeleteBtn" style="display:none;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)" class="btn btn-sm">🗑 Eliminar</button>
+      <div style="margin-left:auto;display:flex;gap:8px">
       <button onclick="fecharModal('modalHE')" class="btn btn-ghost">Cancelar</button>
       <button onclick="guardarHE(false)" class="btn btn-primary" id="heSaveBtn">💾 Guardar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -445,6 +449,7 @@ var REGISTOS     = JSON.parse(document.getElementById('j-registos').textContent)
 var FERIADOS     = JSON.parse(document.getElementById('j-feriados').textContent);
 var FECHOS       = JSON.parse(document.getElementById('j-fechos').textContent);
 var PERIODOS_SAL = JSON.parse(document.getElementById('j-periodos').textContent);
+var HORAS_EXTRA   = JSON.parse(document.getElementById('j-he').textContent);
 
 // Load funcs and saldos from DOM spans
 var FUNCS = [], FUNCS_MAP = {}, SALDOS = {};
@@ -649,6 +654,14 @@ function buildCalendar() {
           cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
           cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
         }
+        // HE indicator (orange triangle in corner)
+        if (he) {
+          var heTri = document.createElement('div');
+          heTri.style.cssText = 'position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 8px 8px 0;border-color:transparent #f59e0b transparent transparent;cursor:pointer;z-index:2';
+          heTri.title = f.nome+': HE '+he.hora_inicio+'–'+he.hora_fim+' ('+he.total_horas+'h)';
+          heTri.onclick = (function(heObj){ return function(e){ e.stopPropagation(); abrirEditarHE(heObj); }; })(he);
+          cell2.appendChild(heTri);
+        }
         row.appendChild(cell2);
       }
       sec.appendChild(row);
@@ -837,6 +850,29 @@ function removeFeriado(fer) {
 }
 
 // ── Horas Extra ────────────────────────────────────────────────────────────────
+function abrirEditarHE(he) {
+  document.getElementById('heFuncId').value = he.funcionario_id;
+  document.getElementById('heData').value    = he.data;
+  document.getElementById('heInicio').value  = he.hora_inicio;
+  document.getElementById('heFim').value     = he.hora_fim;
+  document.getElementById('heObs').value     = he.observacoes || '';
+  document.getElementById('heAviso').style.display = 'none';
+  // Store id for possible delete
+  document.getElementById('modalHE').dataset.editId = he.id;
+  buildHEGrid(); calcHETotal(); updateHECategoria();
+  // Show delete button
+  var delBtn = document.getElementById('heDeleteBtn');
+  if (delBtn) { delBtn.style.display='inline-flex'; delBtn.onclick = function(){ eliminarHE(he.id); }; }
+  abrirModal('modalHE');
+}
+
+function eliminarHE(hid) {
+  if (!confirm('Eliminar este registo de horas extra?')) { return; }
+  fetch('/horas-extra/'+hid+'/eliminar', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(d.ok) { location.reload(); } });
+}
+
 function abrirHoraExtra(ds) {
   document.getElementById('heData').value = ds || '';
   document.getElementById('heInicio').value = '18:00';
@@ -844,6 +880,9 @@ function abrirHoraExtra(ds) {
   document.getElementById('heObs').value = '';
   document.getElementById('heAviso').style.display = 'none';
   document.getElementById('heCategoriaInfo').style.display = 'none';
+  document.getElementById('modalHE').dataset.editId = '';
+  var delBtn = document.getElementById('heDeleteBtn');
+  if (delBtn) delBtn.style.display='none';
   buildHEGrid();
   calcHETotal();
   if (ds) { updateHECategoria(); }
