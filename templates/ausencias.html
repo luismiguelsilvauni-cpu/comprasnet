@@ -19,7 +19,7 @@
 <script>
 var ANO = {{ ano }};
 var FUNCS = {{ funcs | map(attribute='id') | list | tojson }};
-var FUNCS_NOMES = { {% for f in funcs %}"{{ f.id }}": "{{ f.nome }}"{% if not loop.last %},{% endif %}{% endfor %} };
+var FUNCS_NOMES = { {% for f in funcs %}"{{ f.id }}": "{{ f.nome | replace('"', '\\"') }}"{% if not loop.last %},{% endif %}{% endfor %} };
 var REGISTOS = {{ registos_json | safe }};
 var FERIADOS = {{ feriados_json | safe }};
 var FECHOS = {{ fechos_json | safe }};
@@ -51,10 +51,12 @@ var PERIODOS_SAL = {{ periodos_sal_json | safe }};
   <!-- Saldos -->
   {% for f in funcs[:6] %}
   {% set s = saldos.get(f.id) %}
-  <div class="card" style="padding:10px 14px;min-width:130px;cursor:pointer" onclick="abrirSaldo({{ f.id }}, '{{ f.nome }}')">
+  <div class="card" style="padding:10px 14px;min-width:130px;cursor:pointer" onclick="abrirSaldo({{ f.id }}, '{{ f.nome | replace("'", "\\'") }}')">
     <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">{{ f.nome.split()[0] }} {{ f.nome.split()[-1] }}</div>
-    <div style="font-size:18px;font-weight:800;color:{% if s and s.dias_restantes < 0 %}#ef4444{% elif s and s.dias_restantes < 5 %}#f59e0b{% else %}#22c55e{% endif %}">
-      {{ '%.1f'|format(s.dias_restantes) if s else '22.0' }}
+    {% set dias_r = s.dias_restantes if s else 22.0 %}
+    {% set cor_r = '#ef4444' if dias_r < 0 else ('#f59e0b' if dias_r < 5 else '#22c55e') %}
+    <div style="font-size:18px;font-weight:800;color:{{ cor_r }}">
+      {{ '%.1f'|format(dias_r) }}
     </div>
     <div style="font-size:9px;color:var(--text-muted)">dias disponíveis</div>
   </div>
