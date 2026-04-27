@@ -8948,7 +8948,12 @@ def ausencias_pdf_html(ano, mes):
     dias_uteis = _dias_uteis_ausencia(data_ini, data_fim, feriados_set)
     cfg = ConfigGeral.query.first()
     empresa = cfg.empresa_nome if cfg else 'UCN'
-    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()         if hasattr(Funcionario,'ativo') else Funcionario.query.order_by(Funcionario.nome).all()
+    try:
+        funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+        if not funcs:  # if ativo filter returns nothing, get all
+            funcs = Funcionario.query.order_by(Funcionario.nome).all()
+    except Exception:
+        funcs = Funcionario.query.order_by(Funcionario.nome).all()
     TIPOS_LABELS = {
         'ferias':'Férias','ponte':'Ponte','fecho_empresa':'Fecho Empresa',
         'falta_justificada':'Falta Justificada','falta_injustificada':'Falta Injustificada',
@@ -8966,12 +8971,14 @@ def ausencias_pdf_html(ano, mes):
             AusenciaRegisto.data_inicio<=data_fim,
             AusenciaRegisto.data_fim>=data_ini
         ).order_by(AusenciaRegisto.data_inicio).all()
-        hes = HoraExtra.query.filter(
-            HoraExtra.funcionario_id==f.id,
-            HoraExtra.data>=data_ini, HoraExtra.data<=data_fim,
-            HoraExtra.estado.in_(['aprovado','pendente'])
-        ).order_by(HoraExtra.data).all()
-        if not aus and not hes: continue
+        try:
+            hes = HoraExtra.query.filter(
+                HoraExtra.funcionario_id==f.id,
+                HoraExtra.data>=data_ini, HoraExtra.data<=data_fim,
+                HoraExtra.estado.in_(['aprovado','pendente'])
+            ).order_by(HoraExtra.data).all()
+        except Exception:
+            hes = []
         f_ferias=0; f_faltas_just=0; f_faltas_injust=0; f_baixas=0; f_pontes=0
         f_he=0; f_he_util=0; f_he_fds=0
         events = []
