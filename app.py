@@ -9027,7 +9027,7 @@ def ausencias_pdf_html(ano, mes):
             'ferias':f_ferias,'faltas_just':f_faltas_just,'faltas_injust':f_faltas_injust,
             'baixas':f_baixas,'pontes':f_pontes,'he':f_he,'he_util':f_he_util,'he_fds':f_he_fds,
             'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis),
-            'has_events':has_events})
+            'has_events':bool(aus or hes)})
     return render_template('ausencias_pdf.html',
         empresa=empresa, mes=mes, ano=ano, mes_nome=MESES_PT[mes],
         data_ini=data_ini, data_fim=data_fim,
