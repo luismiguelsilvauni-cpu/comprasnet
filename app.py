@@ -3101,6 +3101,13 @@ PT_FERIADOS = [
 @app.route('/ferias')
 @login_required
 def ferias_mapa():
+    # Redirect to new unified ausencias view
+    from flask import redirect
+    return redirect('/ausencias?from=ferias')
+
+@app.route('/ferias_legacy')
+@login_required
+def ferias_mapa_legacy():
     from datetime import date
     ano = int(request.args.get('ano', date.today().year))
     # Get all employees
@@ -3527,8 +3534,7 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
-    ('ausencias',          '📅 Mapa Férias / Faltas'),
-    ('ferias',             '🏖 Mapa de Férias (legado)'),
+    ('ferias',             '📅 Mapa Férias / Faltas'),
     ('fornecedores',       '🏭 Fornecedores'),
     ('fichas',             '📋 Fichas Técnicas'),
     ('assistencias',       '🔧 Assistências'),

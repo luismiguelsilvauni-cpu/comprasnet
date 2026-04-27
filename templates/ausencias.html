@@ -8,6 +8,7 @@
   <button onclick="anoSeguinte()" class="btn btn-ghost btn-sm">{{ ano+1 }} ▶</button>
   <button onclick="abrirNovaAusencia()" class="btn btn-primary btn-sm">+ Registar Ausência</button>
   <button onclick="abrirFechoEmpresa()" class="btn btn-ghost btn-sm">🏢 Fecho Empresa</button>
+  <button onclick="abrirAddFeriado()" class="btn btn-ghost btn-sm">📅 Feriado/Ponte</button>
   <a href="{{ url_for('ausencias_exportar', ano=ano) }}" class="btn btn-ghost btn-sm">⬇ CSV</a>
 {% endblock %}
 
@@ -19,6 +20,7 @@ var FUNCS_NOMES = { {% for f in funcs %}"{{ f.id }}": "{{ f.nome }}"{% if not lo
 var REGISTOS = {{ registos_json | safe }};
 var FERIADOS = {{ feriados_json | safe }};
 var FECHOS = {{ fechos_json | safe }};
+var FERIADOS_OBJ = {{ feriados_json | safe }};
 var TIPOS = {{ tipos | tojson }};
 var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 </script>
@@ -67,6 +69,31 @@ var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agos
 
 <!-- Calendar -->
 <div id="calendario"></div>
+
+<!-- Feriado modal -->
+<div id="modalFeriado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:360px;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1">📅 Feriado / Ponte</div>
+      <button onclick="fecharModal('modalFeriado')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="ferData" class="input"></div>
+      <div class="form-group" style="margin:0"><label>Nome</label><input type="text" id="ferNome" class="input" placeholder="Ex: Feriado Municipal"></div>
+      <div class="form-group" style="margin:0"><label>Tipo</label>
+        <select id="ferTipo" class="input">
+          <option value="nacional">🇵🇹 Feriado Nacional</option>
+          <option value="local">📍 Feriado Local</option>
+          <option value="ponte">🌉 Ponte</option>
+        </select>
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharModal('modalFeriado')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarFeriado()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Modais ─────────────────────────────────────────────────────────────── -->
 <!-- Nova ausência -->
@@ -266,7 +293,12 @@ function buildCalendar() {
         ferTxt.textContent = fer.nome;
         cell.appendChild(ferTxt);
       }
-      if (!fer) cell.onclick = (function(ds2){ return function(e){ if(e.target===this||e.target.parentNode===this) abrirNovaAusenciaDia(ds2); }; })(ds);
+      if (fer) {
+        cell.onclick = (function(f){ return function(e){ if(e.ctrlKey||e.metaKey) removeFeriado(f); }; })(fer);
+        cell.title = fer.nome + ' — Ctrl+clique para remover';
+      } else {
+        cell.onclick = (function(ds2){ return function(e){ if(e.target===this||e.target.parentNode===this) abrirNovaAusenciaDia(ds2); }; })(ds);
+      }
       grid.appendChild(cell);
     }
     sec.appendChild(grid);
@@ -502,6 +534,37 @@ function guardarFecho() {
     if (d.ok) location.reload();
     else alert('Erro: ' + d.error);
   });
+}
+
+// ── Feriado management (from old ferias.html) ─────────────────────────────────
+function abrirAddFeriado() {
+  var hoje = new Date();
+  document.getElementById('ferData').value = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
+  document.getElementById('ferNome').value = '';
+  document.getElementById('ferTipo').value = 'nacional';
+  document.getElementById('modalFeriado').style.display = 'flex';
+}
+function abrirAddFeriadoData(ds) {
+  document.getElementById('ferData').value = ds;
+  document.getElementById('ferNome').value = '';
+  document.getElementById('ferTipo').value = 'nacional';
+  document.getElementById('modalFeriado').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('ferNome').focus(); },100);
+}
+function guardarFeriado() {
+  fetch('/ferias/feriado/adicionar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      data: document.getElementById('ferData').value,
+      nome: document.getElementById('ferNome').value.trim() || 'Feriado',
+      tipo: document.getElementById('ferTipo').value
+    })
+  }).then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); else alert('Erro: '+d.error); });
+}
+function removeFeriado(fer) {
+  if (!confirm('Remover "'+fer.nome+'"?')) return;
+  fetch('/ferias/feriado/'+fer.id+'/eliminar',{method:'POST'})
+    .then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); });
 }
 
 buildCalendar();
