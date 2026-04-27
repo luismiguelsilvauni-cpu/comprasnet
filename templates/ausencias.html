@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block title %}Mapa Férias / Faltas {{ ano }} · NavTech{% endblock %}
+{% block page_title %}📅 Mapa Férias / Faltas {{ ano }}{% endblock %}
+
+{% block topbar_actions %}
+  <button onclick="anoAnterior()" class="btn btn-ghost btn-sm">◀ {{ ano-1 }}</button>
+  <strong style="padding:0 8px;font-size:14px">{{ ano }}</strong>
+  <button onclick="anoSeguinte()" class="btn btn-ghost btn-sm">{{ ano+1 }} ▶</button>
+  <button onclick="abrirNovaAusencia()" class="btn btn-primary btn-sm">+ Registar Ausência</button>
+  <button onclick="abrirFechoEmpresa()" class="btn btn-ghost btn-sm">🏢 Fecho Empresa</button>
+  <a href="{{ url_for('ausencias_exportar', ano=ano) }}" class="btn btn-ghost btn-sm">⬇ CSV</a>
+{% endblock %}
+
+{% block content %}
+<script>
+var ANO = {{ ano }};
+var FUNCS = {{ funcs | map(attribute='id') | list | tojson }};
+var FUNCS_NOMES = { {% for f in funcs %}"{{ f.id }}": "{{ f.nome }}"{% if not loop.last %},{% endif %}{% endfor %} };
+var REGISTOS = {{ registos_json | safe }};
+var FERIADOS = {{ feriados_json | safe }};
+var FECHOS = {{ fechos_json | safe }};
+var TIPOS = {{ tipos | tojson }};
+var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+</script>
+
+<!-- Dashboard strip -->
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+  <!-- Ausentes hoje -->
+  <div class="card" style="padding:10px 14px;flex:1;min-width:180px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Ausentes Hoje</div>
+    {% if ausentes_hoje %}
+      {% for r in ausentes_hoje %}
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px">
+        <span style="width:10px;height:10px;border-radius:50%;background:{{ tipos[r.tipo]['cor'] if r.tipo in tipos else '#888' }};flex-shrink:0"></span>
+        <span>{{ r.funcionario.nome.split()[0] if r.funcionario else '?' }}</span>
+        <span style="font-size:10px;color:var(--text-muted)">{{ tipos[r.tipo]['label'] if r.tipo in tipos else r.tipo }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="font-size:12px;color:var(--text-muted)">✅ Ninguém ausente</div>
+    {% endif %}
+  </div>
+  <!-- Saldos -->
+  {% for f in funcs[:6] %}
+  {% set s = saldos.get(f.id) %}
+  <div class="card" style="padding:10px 14px;min-width:130px;cursor:pointer" onclick="abrirSaldo({{ f.id }}, '{{ f.nome }}')">
+    <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">{{ f.nome.split()[0] }} {{ f.nome.split()[-1] }}</div>
+    <div style="font-size:18px;font-weight:800;color:{% if s and s.dias_restantes < 0 %}#ef4444{% elif s and s.dias_restantes < 5 %}#f59e0b{% else %}#22c55e{% endif %}">
+      {{ '%.1f'|format(s.dias_restantes) if s else '22.0' }}
+    </div>
+    <div style="font-size:9px;color:var(--text-muted)">dias disponíveis</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Legenda -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+  <span style="font-size:11px;font-weight:700;color:var(--text-muted)">Tipos:</span>
+  {% for key, t in tipos.items() %}
+  <span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:{{ t.cor }}22;border:1px solid {{ t.cor }}55;cursor:pointer"
+    onclick="filtrarTipo('{{ key }}')" id="leg-{{ key }}">
+    {{ t.icon }} {{ t.label }}
+  </span>
+  {% endfor %}
+  <span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface2);cursor:pointer" onclick="filtrarTipo('')">✕ Todos</span>
+</div>
+
+<!-- Calendar -->
+<div id="calendario"></div>
+
+<!-- ── Modais ─────────────────────────────────────────────────────────────── -->
+<!-- Nova ausência -->
+<div id="modalAusencia" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:480px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1" id="modalAusenciaTitulo">📅 Registar Ausência</div>
+      <button onclick="fecharModal('modalAusencia')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" id="ausenciaId">
+      <div class="form-group" style="margin:0">
+        <label>Funcionário</label>
+        <select id="ausenciaFunc" class="input">
+          {% for f in funcs %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Tipo de Ausência</label>
+        <select id="ausenciaTipo" class="input" onchange="atualizarTipoInfo()">
+          {% for key, t in tipos.items() %}
+          <option value="{{ key }}">{{ t.icon }} {{ t.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="tipoInfo" style="font-size:11px;padding:6px 10px;border-radius:6px;background:var(--surface2);display:none"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0">
+          <label>Data Início</label>
+          <input type="date" id="ausenciaInicio" class="input" onchange="calcularDias()">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Data Fim</label>
+          <input type="date" id="ausenciaFim" class="input" onchange="calcularDias()">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0">
+          <label>Formato</label>
+          <select id="ausenciaFormato" class="input" onchange="toggleHoras()">
+            <option value="dia">📅 Dia completo</option>
+            <option value="manha">🌅 Meio dia (manhã)</option>
+            <option value="tarde">🌆 Meio dia (tarde)</option>
+            <option value="horas">⏱ Por horas</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0" id="horasGroup" style="display:none">
+          <label>Nº de Horas</label>
+          <input type="number" id="ausenciaHoras" class="input" value="4" min="0.5" max="8" step="0.5">
+        </div>
+      </div>
+      <div id="diasCalculados" style="font-size:12px;color:var(--text-muted);font-style:italic"></div>
+      <div class="form-group" style="margin:0">
+        <label>Observações</label>
+        <input type="text" id="ausenciaObs" class="input" placeholder="Opcional">
+      </div>
+      <div id="ausenciaAviso" style="display:none;padding:8px 10px;background:rgba(239,68,68,.1);border-radius:6px;font-size:12px;color:#ef4444"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between">
+      <button id="ausenciaEliminarBtn" onclick="eliminarAusencia()" style="display:none" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">🗑 Eliminar</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button onclick="fecharModal('modalAusencia')" class="btn btn-ghost">Cancelar</button>
+        <button onclick="guardarAusencia()" class="btn btn-primary" id="ausenciaSaveBtn">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Saldo -->
+<div id="modalSaldo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:380px;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1" id="saldoTitulo">Saldo de Férias</div>
+      <button onclick="fecharModal('modalSaldo')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" id="saldoFid">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0">
+          <label>Dias de Direito</label>
+          <input type="number" id="saldoDireito" class="input" step="0.5" min="0">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Ajuste Manual</label>
+          <input type="number" id="saldoAjuste" class="input" step="0.5">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Notas do Ajuste</label>
+        <input type="text" id="saldoNotas" class="input" placeholder="Ex: 3 dias transitados do ano anterior">
+      </div>
+      <div id="saldoResumo" style="padding:10px;background:var(--surface2);border-radius:8px;font-size:13px"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharModal('modalSaldo')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarSaldo()" class="btn btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fecho empresa -->
+<div id="modalFecho" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:380px;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center">
+      <div style="font-size:14px;font-weight:700;flex:1">🏢 Fecho Geral da Empresa</div>
+      <button onclick="fecharModal('modalFecho')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;color:var(--text-muted)">Define um período de fecho aplicado automaticamente a todos os funcionários como consumo de férias.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label>Início</label><input type="date" id="fechoInicio" class="input"></div>
+        <div class="form-group" style="margin:0"><label>Fim</label><input type="date" id="fechoFim" class="input"></div>
+      </div>
+      <div class="form-group" style="margin:0"><label>Descrição</label><input type="text" id="fechoDesc" class="input" placeholder="Ex: Férias de Natal"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharModal('modalFecho')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="guardarFecho()" class="btn btn-primary">✅ Aplicar a Todos</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _tipoFiltro = '';
+var _editMode = false;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function pad(n){ return String(n).padStart(2,'0'); }
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function dayOfWeek(y,m,d){ return new Date(y,m-1,d).getDay(); }
+function dateStr(y,m,d){ return y+'-'+pad(m)+'-'+pad(d); }
+function isFeriado(ds){ return FERIADOS.find(function(f){ return f.data===ds; }); }
+function isFecho(ds){ return FECHOS.find(function(f){ return f.data_inicio<=ds && f.data_fim>=ds; }); }
+function nomeCurto(nome){ var p=nome.split(' '); return p.length>1 ? p[0]+' '+p[p.length-1] : p[0]; }
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function anoAnterior(){ window.location='/ausencias?ano='+(ANO-1); }
+function anoSeguinte(){ window.location='/ausencias?ano='+(ANO+1); }
+
+// ── Filter ────────────────────────────────────────────────────────────────────
+function filtrarTipo(tipo) {
+  _tipoFiltro = tipo;
+  document.querySelectorAll('[id^="leg-"]').forEach(function(el){
+    el.style.opacity = (!tipo || el.id==='leg-'+tipo) ? '1' : '0.35';
+  });
+  buildCalendar();
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function buildCalendar() {
+  var cal = document.getElementById('calendario');
+  cal.innerHTML = '';
+
+  for (var mes = 1; mes <= 12; mes++) {
+    var days = daysInMonth(ANO, mes);
+    var sec = document.createElement('div');
+    sec.className = 'card';
+    sec.style.cssText = 'padding:12px;overflow-x:auto;margin-bottom:12px';
+
+    // Month header
+    var h = document.createElement('div');
+    h.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);display:flex;align-items:center;gap:8px';
+    h.textContent = MESES[mes-1] + ' ' + ANO;
+    sec.appendChild(h);
+
+    var minW = Math.max(days * 34, 400);
+
+    // Day headers grid
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',34px);gap:0;min-width:'+minW+'px';
+
+    for (var d = 1; d <= days; d++) {
+      var dow = dayOfWeek(ANO,mes,d);
+      var ds  = dateStr(ANO,mes,d);
+      var fer = isFeriado(ds);
+      var fec = isFecho(ds);
+      var isWk = (dow===0||dow===6);
+
+      var cell = document.createElement('div');
+      cell.style.cssText = 'text-align:center;font-size:10px;padding:2px 0;cursor:pointer;position:relative;min-height:36px;';
+      if (fer)       { cell.style.background = fer.tipo==='ponte' ? 'rgba(245,158,11,.18)' : 'rgba(239,68,68,.18)';
+                       cell.style.borderLeft = cell.style.borderRight = fer.tipo==='ponte' ? '2px solid rgba(245,158,11,.5)' : '2px solid rgba(239,68,68,.5)'; }
+      else if (fec)  { cell.style.background = 'rgba(148,163,184,.18)'; }
+      else if (isWk) { cell.style.background = 'var(--surface2)'; }
+
+      var dayLbl = document.createElement('div');
+      dayLbl.style.cssText = 'font-size:8px;color:'+(fer?'inherit':isWk?'var(--text-muted)':'var(--text-muted)');
+      dayLbl.textContent = ['D','S','T','Q','Q','S','S'][dow];
+      var dayNum = document.createElement('div');
+      dayNum.style.cssText = 'font-weight:700;font-size:11px;color:'+(fer?(fer.tipo==='ponte'?'#f59e0b':'#ef4444'):isWk?'var(--text-muted)':'var(--text)');
+      dayNum.textContent = d;
+      cell.appendChild(dayLbl);
+      cell.appendChild(dayNum);
+      if (fer) {
+        var ferTxt = document.createElement('div');
+        ferTxt.style.cssText = 'writing-mode:vertical-rl;transform:rotate(180deg);font-size:8px;font-weight:700;color:'+(fer.tipo==='ponte'?'#f59e0b':'#ef4444')+';max-height:55px;overflow:hidden;margin:1px auto;line-height:1.2';
+        ferTxt.textContent = fer.nome;
+        cell.appendChild(ferTxt);
+      }
+      if (!fer) cell.onclick = (function(ds2){ return function(e){ if(e.target===this||e.target.parentNode===this) abrirNovaAusenciaDia(ds2); }; })(ds);
+      grid.appendChild(cell);
+    }
+    sec.appendChild(grid);
+
+    // Employee rows
+    FUNCS.forEach(function(fid) {
+      var rowRegistos = REGISTOS.filter(function(r){
+        if (r.funcionario_id !== fid) return false;
+        if (_tipoFiltro && r.tipo !== _tipoFiltro) return false;
+        var rStart = r.data_inicio.substring(0,7);
+        var rEnd   = r.data_fim.substring(0,7);
+        var mesStr = ANO+'-'+pad(mes);
+        return rStart <= mesStr && rEnd >= mesStr;
+      });
+
+      var row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',34px);gap:0;margin-top:1px;min-width:'+minW+'px;height:22px;position:relative';
+
+      for (var d2 = 1; d2 <= days; d2++) {
+        var ds2 = dateStr(ANO,mes,d2);
+        var cell2 = document.createElement('div');
+        cell2.style.cssText = 'height:22px;position:relative;';
+
+        // Feriado/fecho background on employee row too
+        var ferD = isFeriado(ds2);
+        var fecD = isFecho(ds2);
+        if (ferD) cell2.style.background = ferD.tipo==='ponte' ? 'rgba(245,158,11,.08)' : 'rgba(239,68,68,.08)';
+        else if (fecD) cell2.style.background = 'rgba(148,163,184,.08)';
+        else if (dayOfWeek(ANO,mes,d2)===0||dayOfWeek(ANO,mes,d2)===6) cell2.style.background = 'var(--surface2)';
+
+        var reg = rowRegistos.find(function(r){ return r.data_inicio<=ds2 && r.data_fim>=ds2; });
+        if (reg) {
+          var cor = reg.cor || '#888';
+          var isStart = reg.data_inicio === ds2;
+          var isEnd   = reg.data_fim   === ds2;
+          cell2.style.background = cor;
+          cell2.style.opacity = reg.estado==='pendente' ? '0.5' : '1';
+          cell2.style.borderRadius = (isStart?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isStart?'4px':'0');
+          cell2.style.cursor = 'pointer';
+          if (isStart) {
+            var lbl = document.createElement('div');
+            lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none';
+            lbl.textContent = reg.icon + ' ' + nomeCurto(reg.funcionario_nome);
+            cell2.appendChild(lbl);
+          }
+          cell2.title = reg.funcionario_nome + ': ' + reg.label + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
+          cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
+        }
+        row.appendChild(cell2);
+      }
+      sec.appendChild(row);
+    });
+
+    cal.appendChild(sec);
+  }
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function fecharModal(id) { document.getElementById(id).style.display='none'; }
+[document.getElementById('modalAusencia'),
+ document.getElementById('modalSaldo'),
+ document.getElementById('modalFecho')].forEach(function(m){
+  if(m) m.addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
+});
+
+// ── Nova ausência ─────────────────────────────────────────────────────────────
+function abrirNovaAusencia() {
+  _editMode = false;
+  document.getElementById('ausenciaId').value = '';
+  document.getElementById('ausenciaEliminarBtn').style.display = 'none';
+  document.getElementById('modalAusenciaTitulo').textContent = '📅 Registar Ausência';
+  document.getElementById('ausenciaSaveBtn').textContent = '💾 Guardar';
+  var hoje = new Date(); var hs = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1)+'-'+pad(hoje.getDate());
+  document.getElementById('ausenciaInicio').value = hs;
+  document.getElementById('ausenciaFim').value = hs;
+  document.getElementById('ausenciaTipo').value = 'ferias';
+  document.getElementById('ausenciaFormato').value = 'dia';
+  document.getElementById('ausenciaObs').value = '';
+  document.getElementById('ausenciaAviso').style.display = 'none';
+  toggleHoras(); atualizarTipoInfo(); calcularDias();
+  document.getElementById('modalAusencia').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('ausenciaFunc').focus(); },100);
+}
+
+function abrirNovaAusenciaDia(ds) {
+  abrirNovaAusencia();
+  document.getElementById('ausenciaInicio').value = ds;
+  document.getElementById('ausenciaFim').value = ds;
+  calcularDias();
+}
+
+function abrirEditarAusencia(r) {
+  _editMode = true;
+  document.getElementById('ausenciaId').value = r.id;
+  document.getElementById('ausenciaEliminarBtn').style.display = 'inline-flex';
+  document.getElementById('modalAusenciaTitulo').textContent = '✏️ Editar Ausência';
+  document.getElementById('ausenciaFunc').value = r.funcionario_id;
+  document.getElementById('ausenciaTipo').value = r.tipo;
+  document.getElementById('ausenciaInicio').value = r.data_inicio;
+  document.getElementById('ausenciaFim').value = r.data_fim;
+  document.getElementById('ausenciaFormato').value = r.formato || 'dia';
+  document.getElementById('ausenciaHoras').value = r.horas || 4;
+  document.getElementById('ausenciaObs').value = r.observacoes || '';
+  document.getElementById('ausenciaAviso').style.display = 'none';
+  toggleHoras(); atualizarTipoInfo(); calcularDias();
+  document.getElementById('modalAusencia').style.display = 'flex';
+}
+
+function atualizarTipoInfo() {
+  var tipo = document.getElementById('ausenciaTipo').value;
+  var info = TIPOS[tipo] || {};
+  var el = document.getElementById('tipoInfo');
+  var parts = [];
+  if (info.conta_ferias) parts.push('🏖 Conta como férias');
+  if (info.conta_falta)  parts.push('📋 Conta como falta');
+  if (info.desconta_salario) parts.push('💰 Desconta no salário');
+  if (parts.length) { el.innerHTML = parts.join(' &nbsp;·&nbsp; '); el.style.display='block'; }
+  else el.style.display = 'none';
+}
+
+function toggleHoras() {
+  var fmt = document.getElementById('ausenciaFormato').value;
+  document.getElementById('horasGroup').style.display = fmt==='horas' ? 'block' : 'none';
+}
+
+function calcularDias() {
+  var inicio = document.getElementById('ausenciaInicio').value;
+  var fim    = document.getElementById('ausenciaFim').value;
+  var fmt    = document.getElementById('ausenciaFormato').value;
+  var horas  = parseFloat(document.getElementById('ausenciaHoras').value)||4;
+  if (!inicio || !fim) return;
+  var el = document.getElementById('diasCalculados');
+  if (fmt === 'horas') { el.textContent = '≈ ' + (horas/8).toFixed(2) + ' dias úteis'; return; }
+  if (fmt === 'manha' || fmt === 'tarde') { el.textContent = '= 0.5 dias úteis'; return; }
+  // Count weekdays
+  var s = new Date(inicio), e = new Date(fim), count = 0;
+  var cur = new Date(s);
+  while (cur <= e) {
+    var dw = cur.getDay();
+    if (dw !== 0 && dw !== 6) count++;
+    cur.setDate(cur.getDate()+1);
+  }
+  el.textContent = '= ' + count + ' dia(s) útil(s)';
+}
+
+function guardarAusencia(forcar) {
+  var btn = document.getElementById('ausenciaSaveBtn');
+  btn.disabled = true; btn.textContent = 'A guardar...';
+  var aviso = document.getElementById('ausenciaAviso');
+  var payload = {
+    funcionario_id: document.getElementById('ausenciaFunc').value,
+    tipo:    document.getElementById('ausenciaTipo').value,
+    data_inicio: document.getElementById('ausenciaInicio').value,
+    data_fim:    document.getElementById('ausenciaFim').value,
+    formato: document.getElementById('ausenciaFormato').value,
+    horas:   document.getElementById('ausenciaHoras').value,
+    observacoes: document.getElementById('ausenciaObs').value,
+    forcar: forcar || false,
+  };
+  var url = _editMode ? '/ausencias/' + document.getElementById('ausenciaId').value + '/editar' : '/ausencias/registar';
+  fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) { location.reload(); }
+      else if (d.saldo_insuficiente) {
+        aviso.textContent = '⚠️ ' + d.error + ' — Confirmar mesmo assim?';
+        aviso.style.display = 'block';
+        aviso.innerHTML += ' <button onclick="guardarAusencia(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
+        btn.disabled = false; btn.textContent = '💾 Guardar';
+      } else {
+        aviso.textContent = '❌ ' + d.error;
+        aviso.style.display = 'block';
+        btn.disabled = false; btn.textContent = '💾 Guardar';
+      }
+    });
+}
+
+function eliminarAusencia() {
+  if (!confirm('Eliminar este registo?')) return;
+  var id = document.getElementById('ausenciaId').value;
+  fetch('/ausencias/' + id + '/eliminar', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(d.ok) location.reload(); });
+}
+
+// ── Saldo ─────────────────────────────────────────────────────────────────────
+function abrirSaldo(fid, nome) {
+  document.getElementById('saldoFid').value = fid;
+  document.getElementById('saldoTitulo').textContent = '🏖 Saldo de Férias — ' + nome;
+  fetch('/ausencias/saldo/' + fid + '/{{ ano }}')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.getElementById('saldoDireito').value = d.ok ? d.direito : 22;
+      document.getElementById('saldoAjuste').value  = d.ok ? d.ajuste  : 0;
+      document.getElementById('saldoNotas').value   = '';
+      if (d.ok) {
+        document.getElementById('saldoResumo').innerHTML =
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">' +
+          '<div><div style="font-size:20px;font-weight:800;color:var(--accent)">' + d.direito + '</div><div style="font-size:10px;color:var(--text-muted)">Direito</div></div>' +
+          '<div><div style="font-size:20px;font-weight:800;color:#ef4444">' + d.gozados + '</div><div style="font-size:10px;color:var(--text-muted)">Gozados</div></div>' +
+          '<div><div style="font-size:20px;font-weight:800;color:#22c55e">' + d.restantes + '</div><div style="font-size:10px;color:var(--text-muted)">Restantes</div></div>' +
+          '</div>';
+      }
+    });
+  document.getElementById('modalSaldo').style.display = 'flex';
+}
+
+function guardarSaldo() {
+  fetch('/ausencias/saldo/' + document.getElementById('saldoFid').value + '/{{ ano }}', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      dias_direito: document.getElementById('saldoDireito').value,
+      dias_ajuste:  document.getElementById('saldoAjuste').value,
+      notas_ajuste: document.getElementById('saldoNotas').value,
+    })
+  }).then(function(r){ return r.json(); }).then(function(d){ if(d.ok) location.reload(); });
+}
+
+// ── Fecho empresa ─────────────────────────────────────────────────────────────
+function abrirFechoEmpresa() {
+  document.getElementById('fechoDesc').value = '';
+  document.getElementById('modalFecho').style.display = 'flex';
+}
+function guardarFecho() {
+  fetch('/ausencias/fecho', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      data_inicio: document.getElementById('fechoInicio').value,
+      data_fim:    document.getElementById('fechoFim').value,
+      descricao:   document.getElementById('fechoDesc').value,
+    })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) location.reload();
+    else alert('Erro: ' + d.error);
+  });
+}
+
+buildCalendar();
+</script>
+{% endblock %}

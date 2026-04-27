@@ -566,6 +566,84 @@ class FichaDocumento(db.Model):
     criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
     uploader      = db.relationship('User', foreign_keys=[criado_por])
 
+# ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO FÉRIAS / FALTAS — AUSÊNCIAS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Tipos de ausência com cor e impacto
+TIPOS_AUSENCIA = {
+    'ferias':           {'label': 'Férias',                   'cor': '#22c55e',  'icon': '🏖',  'conta_ferias': True,  'conta_falta': False, 'desconta_salario': False},
+    'ponte':            {'label': 'Ponte',                    'cor': '#3b6ef0',  'icon': '🌉',  'conta_ferias': True,  'conta_falta': False, 'desconta_salario': False},
+    'fecho_empresa':    {'label': 'Fecho Empresa',            'cor': '#94a3b8',  'icon': '🏢',  'conta_ferias': True,  'conta_falta': False, 'desconta_salario': False},
+    'falta_justificada':{'label': 'Falta Justificada',        'cor': '#f59e0b',  'icon': '📋',  'conta_ferias': False, 'conta_falta': True,  'desconta_salario': False},
+    'falta_injustificada':{'label':'Falta Injustificada',     'cor': '#ef4444',  'icon': '🚫',  'conta_ferias': False, 'conta_falta': True,  'desconta_salario': True},
+    'baixa_medica':     {'label': 'Baixa Médica',             'cor': '#a855f7',  'icon': '🏥',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
+    'consulta_medica':  {'label': 'Consulta Médica',          'cor': '#f97316',  'icon': '🩺',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
+    'assistencia_familia':{'label':'Assistência Família/Filho','cor': '#06b6d4', 'icon': '👨‍👩‍👧',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
+    'formacao':         {'label': 'Formação',                 'cor': '#8b5cf6',  'icon': '📚',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
+    'teletrabalho':     {'label': 'Teletrabalho',             'cor': '#0891b2',  'icon': '💻',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
+    'licenca_sem_venc': {'label': 'Licença sem Vencimento',   'cor': '#64748b',  'icon': '📄',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': True},
+    'trabalho_externo': {'label': 'Trabalho Externo/Serviço', 'cor': '#10b981',  'icon': '🔧',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
+}
+
+class AusenciaRegisto(db.Model):
+    """Registo individual de ausência de um funcionário."""
+    __tablename__ = 'ausencia_registos'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False, index=True)
+    tipo            = db.Column(db.String(30), nullable=False)  # key of TIPOS_AUSENCIA
+    data_inicio     = db.Column(db.Date, nullable=False)
+    data_fim        = db.Column(db.Date, nullable=False)
+    ano             = db.Column(db.Integer, nullable=False, index=True)
+    # Formato: 'dia', 'manha', 'tarde', 'horas'
+    formato         = db.Column(db.String(10), default='dia')
+    horas           = db.Column(db.Float, default=0)  # only for formato='horas'
+    # Dias úteis calculados
+    dias_uteis      = db.Column(db.Float, default=0)
+    # Aprovação
+    estado          = db.Column(db.String(20), default='aprovado')  # pendente/aprovado/rejeitado/cancelado
+    aprovado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    aprovado_em     = db.Column(db.DateTime)
+    # Info
+    observacoes     = db.Column(db.Text, default='')
+    tem_documento   = db.Column(db.Boolean, default=False)
+    documento_path  = db.Column(db.String(300))
+    # Auditoria
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    alterado_por    = db.Column(db.Integer, db.ForeignKey('users.id'))
+    alterado_em     = db.Column(db.DateTime)
+    # Relationships
+    funcionario     = db.relationship('Funcionario', foreign_keys=[funcionario_id])
+    aprovador       = db.relationship('User', foreign_keys=[aprovado_por])
+    criador         = db.relationship('User', foreign_keys=[criado_por])
+
+class AusenciaSaldoAnual(db.Model):
+    """Saldo anual de férias por funcionário."""
+    __tablename__ = 'ausencia_saldos'
+    id              = db.Column(db.Integer, primary_key=True)
+    funcionario_id  = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    ano             = db.Column(db.Integer, nullable=False)
+    dias_direito    = db.Column(db.Float, default=22)   # dias de férias a que tem direito
+    dias_ajuste     = db.Column(db.Float, default=0)    # ajuste manual (transitados, acerto)
+    notas_ajuste    = db.Column(db.String(300), default='')
+    # calculados
+    dias_gozados    = db.Column(db.Float, default=0)
+    dias_restantes  = db.Column(db.Float, default=0)
+    __table_args__  = (db.UniqueConstraint('funcionario_id', 'ano'),)
+    funcionario     = db.relationship('Funcionario', foreign_keys=[funcionario_id])
+
+class EmpresaFecho(db.Model):
+    """Períodos de fecho geral da empresa (contam como férias para todos)."""
+    __tablename__ = 'empresa_fechos'
+    id          = db.Column(db.Integer, primary_key=True)
+    ano         = db.Column(db.Integer, nullable=False)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim    = db.Column(db.Date, nullable=False)
+    descricao   = db.Column(db.String(200), default='')
+    criado_por  = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+
 # ── MAPA DE FÉRIAS ─────────────────────────────────────────────────────────────
 
 class FeriasPeriodo(db.Model):

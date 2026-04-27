@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 app = Flask(__name__)
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
@@ -3527,7 +3527,8 @@ MENUS_DISPONIVEIS = [
     ('biblioteca_modelos', '📚 Biblioteca PDF'),
     ('funcionarios',       '👤 Funcionários'),
     ('salarios',           '💶 Salários'),
-    ('ferias',             '🏖 Mapa de Férias'),
+    ('ausencias',          '📅 Mapa Férias / Faltas'),
+    ('ferias',             '🏖 Mapa de Férias (legado)'),
     ('fornecedores',       '🏭 Fornecedores'),
     ('fichas',             '📋 Fichas Técnicas'),
     ('assistencias',       '🔧 Assistências'),
@@ -8286,3 +8287,314 @@ if __name__ == '__main__':
     init_db()
     app.run(host='0.0.0.0', port=5000, debug=False)
 # cache bust Tue Apr  7 15:34:00 UTC 2026
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO AUSÊNCIAS — FÉRIAS / FALTAS
+# ══════════════════════════════════════════════════════════════════════════════
+
+UPLOAD_AUSENCIAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'ausencias')
+os.makedirs(UPLOAD_AUSENCIAS, exist_ok=True)
+
+def _dias_uteis_ausencia(data_inicio, data_fim, feriados_set=None, formato='dia', horas=0):
+    """Count useful days between dates, excluding weekends and holidays."""
+    from datetime import timedelta
+    if formato == 'horas':
+        return round(horas / 8, 2)
+    if formato in ('manha', 'tarde'):
+        # Check if that single day is a weekday
+        if data_inicio.weekday() < 5 and (feriados_set is None or data_inicio not in feriados_set):
+            return 0.5
+        return 0
+    count = 0
+    cur = data_inicio
+    while cur <= data_fim:
+        if cur.weekday() < 5 and (feriados_set is None or cur not in feriados_set):
+            count += 1
+        cur += timedelta(days=1)
+    return count
+
+def _get_feriados_set(ano):
+    from datetime import date
+    feriados = FeriasFeriado.query.filter_by(ano=ano).all()
+    return {f.data for f in feriados}
+
+def _recalc_saldo(funcionario_id, ano):
+    """Recalculate annual leave balance for a given year."""
+    saldo = AusenciaSaldoAnual.query.filter_by(funcionario_id=funcionario_id, ano=ano).first()
+    if not saldo:
+        saldo = AusenciaSaldoAnual(funcionario_id=funcionario_id, ano=ano, dias_direito=22)
+        db.session.add(saldo)
+    gozados = db.session.query(db.func.sum(AusenciaRegisto.dias_uteis)).filter(
+        AusenciaRegisto.funcionario_id == funcionario_id,
+        AusenciaRegisto.ano == ano,
+        AusenciaRegisto.estado.in_(['aprovado','pendente']),
+        AusenciaRegisto.tipo.in_(['ferias','ponte','fecho_empresa'])
+    ).scalar() or 0
+    saldo.dias_gozados = round(gozados, 2)
+    saldo.dias_restantes = round((saldo.dias_direito + saldo.dias_ajuste) - gozados, 2)
+    return saldo
+
+@app.route('/ausencias')
+@login_required
+def ausencias():
+    from datetime import date
+    ano = int(request.args.get('ano', date.today().year))
+    dept_filtro = request.args.get('dept', '')
+    func_filtro = request.args.get('func', 0, type=int)
+    view = request.args.get('view', 'calendario')  # calendario / lista / dashboard
+
+    funcs = Funcionario.query.filter(Funcionario.ativo == True).order_by(Funcionario.nome).all() \
+        if hasattr(Funcionario, 'ativo') else Funcionario.query.order_by(Funcionario.nome).all()
+    if dept_filtro:
+        funcs = [f for f in funcs if (getattr(f,'departamento','') or '') == dept_filtro]
+
+    # Registos do ano
+    query = AusenciaRegisto.query.filter_by(ano=ano)
+    if func_filtro:
+        query = query.filter_by(funcionario_id=func_filtro)
+    registos = query.all()
+
+    # Feriados
+    feriados = FeriasFeriado.query.filter_by(ano=ano).all()
+    fechos = EmpresaFecho.query.filter_by(ano=ano).all()
+
+    # Saldos
+    saldos = {}
+    for f in funcs:
+        s = AusenciaSaldoAnual.query.filter_by(funcionario_id=f.id, ano=ano).first()
+        saldos[f.id] = s
+
+    import json
+    hoje = date.today()
+
+    registos_json = json.dumps([{
+        'id': r.id,
+        'funcionario_id': r.funcionario_id,
+        'funcionario_nome': r.funcionario.nome if r.funcionario else '?',
+        'tipo': r.tipo,
+        'label': TIPOS_AUSENCIA.get(r.tipo, {}).get('label', r.tipo),
+        'cor': TIPOS_AUSENCIA.get(r.tipo, {}).get('cor', '#888'),
+        'icon': TIPOS_AUSENCIA.get(r.tipo, {}).get('icon', '📅'),
+        'data_inicio': r.data_inicio.isoformat(),
+        'data_fim': r.data_fim.isoformat(),
+        'formato': r.formato,
+        'horas': r.horas,
+        'dias_uteis': r.dias_uteis,
+        'estado': r.estado,
+        'observacoes': r.observacoes or '',
+    } for r in registos])
+
+    feriados_json = json.dumps([{
+        'id': f.id, 'data': f.data.isoformat(), 'nome': f.nome, 'tipo': f.tipo
+    } for f in feriados])
+
+    fechos_json = json.dumps([{
+        'id': f.id, 'data_inicio': f.data_inicio.isoformat(),
+        'data_fim': f.data_fim.isoformat(), 'descricao': f.descricao
+    } for f in fechos])
+
+    # Dashboard stats
+    ausentes_hoje = [r for r in registos
+        if r.data_inicio <= hoje <= r.data_fim and r.estado == 'aprovado']
+
+    depts = sorted(set((getattr(f,'departamento','') or 'Geral') for f in
+        (Funcionario.query.all() if not dept_filtro else funcs)))
+
+    return render_template('ausencias.html',
+        ano=ano, funcs=funcs, saldos=saldos,
+        tipos=TIPOS_AUSENCIA, view=view,
+        registos_json=registos_json,
+        feriados_json=feriados_json,
+        fechos_json=fechos_json,
+        ausentes_hoje=ausentes_hoje,
+        dept_filtro=dept_filtro, func_filtro=func_filtro,
+        depts=depts, hoje=hoje)
+
+@app.route('/ausencias/registar', methods=['POST'])
+@login_required
+def ausencia_registar():
+    from datetime import date
+    data = request.get_json() or {}
+    try:
+        inicio = datetime.strptime(data['data_inicio'], '%Y-%m-%d').date()
+        fim    = datetime.strptime(data['data_fim'],    '%Y-%m-%d').date()
+    except:
+        return jsonify({'ok': False, 'error': 'Datas inválidas'})
+    if fim < inicio:
+        return jsonify({'ok': False, 'error': 'Data fim anterior ao início'})
+
+    fid  = int(data['funcionario_id'])
+    tipo = data.get('tipo', 'ferias')
+    fmt  = data.get('formato', 'dia')
+    horas= float(data.get('horas', 0))
+
+    # Check overlap
+    overlap = AusenciaRegisto.query.filter(
+        AusenciaRegisto.funcionario_id == fid,
+        AusenciaRegisto.estado.in_(['aprovado','pendente']),
+        AusenciaRegisto.data_inicio <= fim,
+        AusenciaRegisto.data_fim >= inicio
+    ).first()
+    if overlap:
+        return jsonify({'ok': False, 'error': f'Sobreposição com registo existente ({overlap.tipo} {overlap.data_inicio}–{overlap.data_fim})'})
+
+    feriados_set = _get_feriados_set(inicio.year)
+    dias = _dias_uteis_ausencia(inicio, fim, feriados_set, fmt, horas)
+
+    # Check saldo for férias
+    tipo_info = TIPOS_AUSENCIA.get(tipo, {})
+    if tipo_info.get('conta_ferias'):
+        saldo = AusenciaSaldoAnual.query.filter_by(funcionario_id=fid, ano=inicio.year).first()
+        if saldo and saldo.dias_restantes < dias:
+            if not data.get('forcar'):
+                return jsonify({'ok': False, 'error': f'Saldo insuficiente ({saldo.dias_restantes:.1f} dias disponíveis, a marcar {dias:.1f})', 'saldo_insuficiente': True})
+
+    auto_aprovar = True  # can be changed to pending based on config
+    r = AusenciaRegisto(
+        funcionario_id=fid, tipo=tipo, formato=fmt, horas=horas,
+        data_inicio=inicio, data_fim=fim, ano=inicio.year,
+        dias_uteis=dias,
+        estado='aprovado' if auto_aprovar else 'pendente',
+        observacoes=data.get('observacoes','').strip(),
+        criado_por=current_user.id, criado_em=datetime.now()
+    )
+    db.session.add(r)
+    db.session.flush()
+    _recalc_saldo(fid, inicio.year)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': r.id, 'dias_uteis': dias})
+
+@app.route('/ausencias/<int:rid>/editar', methods=['POST'])
+@login_required
+def ausencia_editar(rid):
+    r = AusenciaRegisto.query.get_or_404(rid)
+    data = request.get_json() or {}
+    old_ano = r.ano
+    if 'data_inicio' in data:
+        r.data_inicio = datetime.strptime(data['data_inicio'], '%Y-%m-%d').date()
+    if 'data_fim' in data:
+        r.data_fim = datetime.strptime(data['data_fim'], '%Y-%m-%d').date()
+    if 'tipo' in data: r.tipo = data['tipo']
+    if 'formato' in data: r.formato = data['formato']
+    if 'horas' in data: r.horas = float(data['horas'])
+    if 'estado' in data: r.estado = data['estado']
+    if 'observacoes' in data: r.observacoes = data['observacoes']
+    r.ano = r.data_inicio.year
+    feriados_set = _get_feriados_set(r.ano)
+    r.dias_uteis = _dias_uteis_ausencia(r.data_inicio, r.data_fim, feriados_set, r.formato, r.horas)
+    r.alterado_por = current_user.id
+    r.alterado_em  = datetime.now()
+    db.session.commit()
+    _recalc_saldo(r.funcionario_id, r.ano)
+    if old_ano != r.ano:
+        _recalc_saldo(r.funcionario_id, old_ano)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/ausencias/<int:rid>/eliminar', methods=['POST'])
+@login_required
+def ausencia_eliminar(rid):
+    r = AusenciaRegisto.query.get_or_404(rid)
+    fid, ano = r.funcionario_id, r.ano
+    db.session.delete(r)
+    db.session.commit()
+    _recalc_saldo(fid, ano)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/ausencias/saldo/<int:fid>/<int:ano>', methods=['GET', 'POST'])
+@login_required
+def ausencia_saldo(fid, ano):
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        saldo = AusenciaSaldoAnual.query.filter_by(funcionario_id=fid, ano=ano).first()
+        if not saldo:
+            saldo = AusenciaSaldoAnual(funcionario_id=fid, ano=ano)
+            db.session.add(saldo)
+        if 'dias_direito' in data: saldo.dias_direito = float(data['dias_direito'])
+        if 'dias_ajuste'  in data: saldo.dias_ajuste  = float(data['dias_ajuste'])
+        if 'notas_ajuste' in data: saldo.notas_ajuste = data['notas_ajuste'].strip()
+        db.session.flush()
+        _recalc_saldo(fid, ano)
+        db.session.commit()
+        return jsonify({'ok': True, 'restantes': saldo.dias_restantes})
+    saldo = AusenciaSaldoAnual.query.filter_by(funcionario_id=fid, ano=ano).first()
+    if not saldo: return jsonify({'ok': False})
+    return jsonify({'ok': True, 'direito': saldo.dias_direito,
+        'ajuste': saldo.dias_ajuste, 'gozados': saldo.dias_gozados, 'restantes': saldo.dias_restantes})
+
+@app.route('/ausencias/fecho', methods=['POST'])
+@login_required
+def ausencia_fecho():
+    data = request.get_json() or {}
+    try:
+        inicio = datetime.strptime(data['data_inicio'], '%Y-%m-%d').date()
+        fim    = datetime.strptime(data['data_fim'],    '%Y-%m-%d').date()
+    except:
+        return jsonify({'ok': False, 'error': 'Datas inválidas'})
+    f = EmpresaFecho(
+        ano=inicio.year, data_inicio=inicio, data_fim=fim,
+        descricao=data.get('descricao','').strip(),
+        criado_por=current_user.id, criado_em=datetime.now()
+    )
+    db.session.add(f)
+    # Auto-apply fecho to all active employees
+    funcs = Funcionario.query.filter(Funcionario.ativo == True).all() \
+        if hasattr(Funcionario, 'ativo') else Funcionario.query.all()
+    feriados_set = _get_feriados_set(inicio.year)
+    dias = _dias_uteis_ausencia(inicio, fim, feriados_set)
+    for func in funcs:
+        # Skip if overlap
+        exists = AusenciaRegisto.query.filter(
+            AusenciaRegisto.funcionario_id == func.id,
+            AusenciaRegisto.data_inicio <= fim,
+            AusenciaRegisto.data_fim >= inicio,
+            AusenciaRegisto.estado.in_(['aprovado','pendente'])
+        ).first()
+        if not exists:
+            reg = AusenciaRegisto(
+                funcionario_id=func.id, tipo='fecho_empresa',
+                data_inicio=inicio, data_fim=fim, ano=inicio.year,
+                dias_uteis=dias, estado='aprovado',
+                observacoes=data.get('descricao',''),
+                criado_por=current_user.id, criado_em=datetime.now()
+            )
+            db.session.add(reg)
+    db.session.commit()
+    for func in funcs:
+        _recalc_saldo(func.id, inicio.year)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/ausencias/exportar')
+@login_required
+def ausencias_exportar():
+    import csv, io
+    ano = int(request.args.get('ano', datetime.now().year))
+    fmt = request.args.get('fmt', 'csv')
+    fid = request.args.get('func', 0, type=int)
+    query = AusenciaRegisto.query.filter_by(ano=ano)
+    if fid: query = query.filter_by(funcionario_id=fid)
+    registos = query.order_by(AusenciaRegisto.funcionario_id, AusenciaRegisto.data_inicio).all()
+    output = io.StringIO()
+    w = csv.writer(output, delimiter=';')
+    w.writerow(['Funcionário','Tipo','Início','Fim','Dias Úteis','Formato','Estado','Observações'])
+    for r in registos:
+        w.writerow([
+            r.funcionario.nome if r.funcionario else '',
+            TIPOS_AUSENCIA.get(r.tipo, {}).get('label', r.tipo),
+            r.data_inicio.strftime('%d/%m/%Y'),
+            r.data_fim.strftime('%d/%m/%Y'),
+            r.dias_uteis,
+            r.formato,
+            r.estado,
+            r.observacoes or ''
+        ])
+    output.seek(0)
+    from flask import Response
+    return Response(
+        '\ufeff' + output.getvalue(),  # BOM for Excel UTF-8
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment;filename=ausencias_{ano}.csv'}
+    )
+
