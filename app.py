@@ -8965,25 +8965,41 @@ def ausencias_pdf_html(ano, mes):
             HoraExtra.estado.in_(['aprovado','pendente'])
         ).order_by(HoraExtra.data).all()
         if not aus and not hes: continue
-        f_ferias=0; f_faltas=0; f_pontes=0; f_he=0
+        f_ferias=0; f_faltas_just=0; f_faltas_injust=0; f_baixas=0; f_pontes=0
+        f_he=0; f_he_util=0; f_he_fds=0
         events = []
         for a in aus:
             ini2=max(a.data_inicio,data_ini); fim2=min(a.data_fim,data_fim)
             d=_dias_uteis_ausencia(ini2,fim2,feriados_set,a.formato,a.horas)
             label=TIPOS_LABELS.get(a.tipo,a.tipo)
-            if a.tipo=='ferias': f_ferias+=d; total_ferias+=d
-            elif a.tipo in('ponte','fecho_empresa'): f_pontes+=d
-            elif a.tipo in('falta_justificada','falta_injustificada','baixa_medica','consulta_medica','assistencia_familia'):
-                f_faltas+=d; total_faltas+=d
-            if ini2==fim2: events.append({'txt':f'Gozou {label.lower()} no dia {ini2.strftime("%d/%m/%Y")}','tipo':a.tipo})
-            else: events.append({'txt':f'Gozou {label.lower()} de {ini2.strftime("%d/%m/%Y")} a {fim2.strftime("%d/%m/%Y")}','tipo':a.tipo})
+            cls='ferias'
+            if a.tipo=='ferias': f_ferias+=d; total_ferias+=d; cls='ferias'
+            elif a.tipo in('ponte','fecho_empresa'): f_pontes+=d; cls='ponte'
+            elif a.tipo=='falta_justificada': f_faltas_just+=d; total_faltas+=d; cls='falta'
+            elif a.tipo=='falta_injustificada': f_faltas_injust+=d; total_faltas+=d; cls='falta'
+            elif a.tipo in('baixa_medica','consulta_medica','assistencia_familia'): f_baixas+=d; cls='falta'
+            if ini2==fim2:
+                txt=f'Gozou {label.lower()} no dia {ini2.strftime("%d/%m/%Y")}'
+            else:
+                txt=f'Gozou {label.lower()} de {ini2.strftime("%d/%m/%Y")} a {fim2.strftime("%d/%m/%Y")}'
+            detail = f'{d:.1f} dias úteis' + (f' · {a.observacoes}' if a.observacoes else '')
+            events.append({'txt':txt,'cls':cls,'detail':detail,'tipo':a.tipo})
         for he in hes:
             f_he+=he.total_horas; total_he+=he.total_horas
-            events.append({'txt':f'Horas extra em {he.data.strftime("%d/%m/%Y")}, das {he.hora_inicio} às {he.hora_fim} ({he.total_horas:.1f}h)','tipo':'he'})
+            if he.categoria=='fds': f_he_fds+=he.total_horas
+            else: f_he_util+=he.total_horas
+            txt=f'Horas extra em {he.data.strftime("%d/%m/%Y")}, das {he.hora_inicio} às {he.hora_fim}'
+            detail=f'{he.total_horas:.1f}h · {he.categoria.replace("_"," ").title()}' + (f' · {he.observacoes}' if he.observacoes else '')
+            events.append({'txt':txt,'cls':'he','detail':detail,'tipo':'he'})
+        # Sort events by date
+        events.sort(key=lambda e: e.get('txt',''))
+        f_faltas = f_faltas_just+f_faltas_injust+f_baixas
+        f_trabalhados = round(dias_uteis - f_ferias - f_pontes - f_faltas, 1)
         dept_val = getattr(f,'departamento','') or getattr(f,'cargo','') or ''
         func_data.append({'nome':f.nome,'dept':dept_val,
-            'ferias':f_ferias,'faltas':f_faltas,'pontes':f_pontes,'he':f_he,'events':events,
-            'dias_uteis':int(dias_uteis)})
+            'ferias':f_ferias,'faltas_just':f_faltas_just,'faltas_injust':f_faltas_injust,
+            'baixas':f_baixas,'pontes':f_pontes,'he':f_he,'he_util':f_he_util,'he_fds':f_he_fds,
+            'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis)})
     return render_template('ausencias_pdf.html',
         empresa=empresa, mes=mes, ano=ano, mes_nome=MESES_PT[mes],
         data_ini=data_ini, data_fim=data_fim,

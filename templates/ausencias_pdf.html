@@ -4,80 +4,201 @@
 <meta charset="UTF-8">
 <title>Resumo Assiduidade – {{ mes_nome }} {{ ano }}</title>
 <style>
-  @page { size: A4; margin: 2cm; }
-  @media print { .no-print { display:none; } body { -webkit-print-color-adjust: exact; } }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; line-height: 1.4; }
-  .header { border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 16px; }
-  .header h1 { font-size: 22px; color: #1e3a5f; margin: 0 0 2px 0; }
-  .header h2 { font-size: 14px; color: #334155; margin: 0 0 2px 0; font-weight: 500; }
-  .header .periodo { font-size: 11px; color: #64748b; font-style: italic; }
-  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
-  .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; text-align: center; }
-  .kpi .val { font-size: 20px; font-weight: 700; color: #1e3a5f; display: block; }
-  .kpi .lbl { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
-  .sec-title { font-size: 13px; font-weight: 700; color: #1e3a5f; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin: 16px 0 10px; }
-  .func-block { margin-bottom: 16px; page-break-inside: avoid; }
-  .func-name { font-size: 13px; font-weight: 700; color: #1e3a5f; margin-bottom: 1px; }
-  .func-dept { font-size: 10px; color: #64748b; margin-bottom: 6px; }
-  .func-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
-  .func-stat { background: #eef2ff; border-radius: 4px; padding: 5px 8px; text-align: center; }
-  .func-stat .v { font-size: 14px; font-weight: 700; color: #3b6ef0; }
-  .func-stat .l { font-size: 9px; color: #64748b; }
-  .events { padding-left: 0; }
-  .event { font-size: 10px; color: #334155; padding: 3px 0 3px 14px; border-left: 3px solid #e2e8f0; margin-bottom: 2px; position: relative; }
-  .event::before { content: '·'; position: absolute; left: 4px; color: #94a3b8; }
-  .event.ferias { border-left-color: #22c55e; }
-  .event.falta { border-left-color: #ef4444; }
-  .event.he { border-left-color: #3b6ef0; }
-  .event.ponte { border-left-color: #3b6ef0; }
-  .func-divider { border: none; border-top: 1px solid #f1f5f9; margin: 12px 0; }
-  .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 9px; color: #94a3b8; display: flex; justify-content: space-between; }
-  .print-btn { position: fixed; top: 20px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+@page { size: A4; margin: 1.8cm 1.5cm; }
+@media print { .no-print{display:none} body{-webkit-print-color-adjust:exact;print-color-adjust:exact} .page-break{page-break-before:always} }
+* { box-sizing: border-box; margin:0; padding:0; }
+body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; color: #1e293b; background: white; }
+
+/* ── Header ── */
+.header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #1e3a5f; padding-bottom:10px; margin-bottom:14px; }
+.header-left h1 { font-size:20px; font-weight:800; color:#1e3a5f; letter-spacing:-0.5px; }
+.header-left h2 { font-size:13px; font-weight:600; color:#334155; margin-top:2px; }
+.header-left .periodo { font-size:10px; color:#64748b; font-style:italic; margin-top:2px; }
+.header-right { text-align:right; font-size:9px; color:#64748b; }
+.header-right strong { display:block; font-size:11px; color:#1e3a5f; }
+
+/* ── KPI band ── */
+.kpi-band { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-bottom:14px; }
+.kpi { background:#f0f4ff; border:1px solid #c7d7fd; border-radius:6px; padding:8px 6px; text-align:center; }
+.kpi .val { font-size:18px; font-weight:800; color:#1e3a5f; display:block; line-height:1; }
+.kpi .lbl { font-size:8px; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-top:3px; display:block; }
+
+/* ── Summary table (all employees) ── */
+.section-title { font-size:12px; font-weight:700; color:#1e3a5f; border-bottom:2px solid #e2e8f0; padding-bottom:4px; margin:14px 0 8px; letter-spacing:.02em; }
+table { width:100%; border-collapse:collapse; font-size:9.5px; }
+thead tr { background:#1e3a5f; color:white; }
+thead th { padding:6px 8px; text-align:left; font-weight:600; font-size:9px; letter-spacing:.04em; }
+thead th.center { text-align:center; }
+tbody tr:nth-child(even) { background:#f8fafc; }
+tbody tr:hover { background:#eef2ff; }
+tbody td { padding:5px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+tbody td.center { text-align:center; font-family:monospace; }
+tbody td.name { font-weight:600; color:#1e3a5f; }
+tbody td.good { color:#16a34a; font-weight:700; }
+tbody td.warn { color:#d97706; font-weight:700; }
+tbody td.bad  { color:#dc2626; font-weight:700; }
+tfoot tr { background:#e0e7ff; font-weight:700; }
+tfoot td { padding:5px 8px; border-top:2px solid #c7d7fd; }
+
+/* ── Employee detail sections ── */
+.emp-section { margin-bottom:16px; page-break-inside:avoid; }
+.emp-header { display:flex; justify-content:space-between; align-items:center; background:#1e3a5f; color:white; padding:7px 10px; border-radius:5px 5px 0 0; }
+.emp-header .emp-name { font-size:12px; font-weight:700; }
+.emp-header .emp-dept { font-size:9px; opacity:.75; margin-top:1px; }
+.emp-header .emp-totals { font-size:9px; text-align:right; opacity:.9; }
+.emp-stats { display:grid; grid-template-columns:repeat(5,1fr); background:#eef2ff; border:1px solid #c7d7fd; border-top:none; }
+.emp-stat { padding:6px 8px; text-align:center; border-right:1px solid #c7d7fd; }
+.emp-stat:last-child { border-right:none; }
+.emp-stat .sv { font-size:15px; font-weight:800; color:#1e3a5f; display:block; }
+.emp-stat .sl { font-size:8px; color:#64748b; text-transform:uppercase; }
+.emp-events { border:1px solid #e2e8f0; border-top:none; border-radius:0 0 5px 5px; padding:8px 10px; }
+.emp-events-title { font-size:9px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:5px; }
+.event { display:flex; align-items:flex-start; gap:8px; padding:3px 0; border-bottom:1px solid #f8fafc; font-size:9.5px; }
+.event:last-child { border-bottom:none; }
+.event-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:2px; }
+.event-dot.ferias   { background:#22c55e; }
+.event-dot.ponte    { background:#3b6ef0; }
+.event-dot.fecho    { background:#94a3b8; }
+.event-dot.falta    { background:#ef4444; }
+.event-dot.he       { background:#f59e0b; }
+.event-txt { color:#334155; flex:1; }
+.event-detail { color:#94a3b8; font-size:8.5px; }
+
+/* ── Footer ── */
+.footer { margin-top:20px; padding-top:8px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:8.5px; color:#94a3b8; }
+
+/* ── Print button ── */
+.print-btn { position:fixed; top:20px; right:20px; z-index:999; background:#1e3a5f; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+.print-btn:hover { background:#2d5499; }
 </style>
 </head>
 <body>
 
-<button class="print-btn no-print" onclick="window.print()">🖨 Imprimir / PDF</button>
+<button class="print-btn no-print" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
 
+<!-- ── HEADER ── -->
 <div class="header">
-  <h1>{{ empresa }}</h1>
-  <h2>Resumo de Assiduidade – {{ mes_nome }} {{ ano }}</h2>
-  <div class="periodo">Período Salarial: {{ data_ini.strftime('%d/%m/%Y') }} a {{ data_fim.strftime('%d/%m/%Y') }}</div>
+  <div class="header-left">
+    <h1>{{ empresa }}</h1>
+    <h2>Resumo de Assiduidade &mdash; {{ mes_nome }} {{ ano }}</h2>
+    <div class="periodo">Período Salarial: {{ data_ini.strftime('%d/%m/%Y') }} &rarr; {{ data_fim.strftime('%d/%m/%Y') }}</div>
+  </div>
+  <div class="header-right">
+    <strong>Documento Interno</strong>
+    Emitido em {{ hoje.strftime('%d/%m/%Y') }}<br>
+    Uso exclusivo RH / Contabilidade
+  </div>
 </div>
 
-<div class="kpis">
+<!-- ── KPIs ── -->
+<div class="kpi-band">
   <div class="kpi"><span class="val">{{ dias_uteis }}</span><span class="lbl">Dias Úteis</span></div>
-  <div class="kpi"><span class="val">{{ total_ferias }}</span><span class="lbl">Dias Férias</span></div>
-  <div class="kpi"><span class="val">{{ total_faltas }}</span><span class="lbl">Dias Faltas</span></div>
-  <div class="kpi"><span class="val">{{ total_he }}</span><span class="lbl">Horas Extra</span></div>
-  <div class="kpi"><span class="val">{{ func_data | length }}</span><span class="lbl">Colaboradores</span></div>
+  <div class="kpi"><span class="val">{{ total_ferias }}</span><span class="lbl">Total Férias</span></div>
+  <div class="kpi"><span class="val">{{ total_faltas }}</span><span class="lbl">Total Faltas</span></div>
+  <div class="kpi"><span class="val">{{ total_he }}h</span><span class="lbl">Horas Extra</span></div>
+  <div class="kpi"><span class="val">{{ func_data|length }}</span><span class="lbl">Colaboradores</span></div>
+  <div class="kpi"><span class="val">{{ (dias_uteis * func_data|length - total_ferias - total_faltas)|round(0)|int }}</span><span class="lbl">Dias Trabalhados</span></div>
 </div>
 
-<div class="sec-title">Detalhe por Colaborador</div>
+<!-- ── SUMMARY TABLE ── -->
+<div class="section-title">Resumo por Colaborador</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:28%">Colaborador</th>
+      <th class="center">Dias Úteis</th>
+      <th class="center">Trabalhados</th>
+      <th class="center">Férias</th>
+      <th class="center">Pontes</th>
+      <th class="center">Faltas Just.</th>
+      <th class="center">Faltas Injust.</th>
+      <th class="center">Baixas</th>
+      <th class="center">HE Útil (h)</th>
+      <th class="center">HE FDS (h)</th>
+      <th class="center">HE Total (h)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for f in func_data %}
+    <tr>
+      <td class="name">{{ f.nome }}</td>
+      <td class="center">{{ f.dias_uteis }}</td>
+      <td class="center {% if f.trabalhados >= f.dias_uteis * 0.8 %}good{% elif f.trabalhados >= f.dias_uteis * 0.6 %}warn{% else %}bad{% endif %}">{{ '%.1f'|format(f.trabalhados) }}</td>
+      <td class="center">{{ '%.1f'|format(f.ferias) }}</td>
+      <td class="center">{{ '%.1f'|format(f.pontes) }}</td>
+      <td class="center {% if f.faltas_just > 0 %}warn{% endif %}">{{ '%.1f'|format(f.faltas_just) }}</td>
+      <td class="center {% if f.faltas_injust > 0 %}bad{% endif %}">{{ '%.1f'|format(f.faltas_injust) }}</td>
+      <td class="center">{{ '%.1f'|format(f.baixas) }}</td>
+      <td class="center">{{ '%.1f'|format(f.he_util) }}</td>
+      <td class="center">{{ '%.1f'|format(f.he_fds) }}</td>
+      <td class="center {% if f.he > 0 %}good{% endif %}">{{ '%.1f'|format(f.he) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td><strong>TOTAL</strong></td>
+      <td class="center">—</td>
+      <td class="center">{{ func_data|sum(attribute='trabalhados')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='ferias')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='pontes')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='faltas_just')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='faltas_injust')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='baixas')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='he_util')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='he_fds')|round(1) }}</td>
+      <td class="center">{{ func_data|sum(attribute='he')|round(1) }}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- ── DETAIL PER EMPLOYEE ── -->
+<div class="section-title" style="margin-top:20px">Detalhe por Colaborador</div>
 
 {% for f in func_data %}
-<div class="func-block">
-  <div class="func-name">{{ f.nome }}</div>
-  {% if f.dept %}<div class="func-dept">{{ f.dept }}</div>{% endif %}
-  <div class="func-stats">
-    <div class="func-stat"><div class="v">{{ f.dias_uteis }}</div><div class="l">Dias Úteis</div></div>
-    <div class="func-stat"><div class="v">{{ '%.1f'|format(f.ferias) }}</div><div class="l">Férias</div></div>
-    <div class="func-stat"><div class="v">{{ '%.1f'|format(f.faltas) }}</div><div class="l">Faltas</div></div>
-    <div class="func-stat"><div class="v">{{ '%.1f'|format(f.pontes) }}</div><div class="l">Pontes</div></div>
-    <div class="func-stat"><div class="v">{{ '%.1f'|format(f.he) }}h</div><div class="l">Horas Extra</div></div>
+<div class="emp-section {% if not loop.first and loop.index0 % 3 == 0 %}page-break{% endif %}">
+  <div class="emp-header">
+    <div>
+      <div class="emp-name">{{ f.nome }}</div>
+      {% if f.dept %}<div class="emp-dept">{{ f.dept }}</div>{% endif %}
+    </div>
+    <div class="emp-totals">
+      {{ f.dias_uteis }} dias úteis &nbsp;·&nbsp;
+      {{ '%.1f'|format(f.trabalhados) }} trabalhados &nbsp;·&nbsp;
+      {% if f.he > 0 %}{{ '%.1f'|format(f.he) }}h extra{% endif %}
+    </div>
   </div>
-  <div class="events">
+  <div class="emp-stats">
+    <div class="emp-stat"><span class="sv">{{ '%.1f'|format(f.trabalhados) }}</span><span class="sl">Trabalhados</span></div>
+    <div class="emp-stat"><span class="sv" style="color:#22c55e">{{ '%.1f'|format(f.ferias) }}</span><span class="sl">Férias</span></div>
+    <div class="emp-stat"><span class="sv" style="color:#3b6ef0">{{ '%.1f'|format(f.pontes) }}</span><span class="sl">Pontes</span></div>
+    <div class="emp-stat"><span class="sv" style="color:#ef4444">{{ '%.1f'|format(f.faltas_just + f.faltas_injust + f.baixas) }}</span><span class="sl">Faltas/Baixas</span></div>
+    <div class="emp-stat"><span class="sv" style="color:#f59e0b">{{ '%.1f'|format(f.he) }}h</span><span class="sl">Horas Extra</span></div>
+  </div>
+  {% if f.events %}
+  <div class="emp-events">
+    <div class="emp-events-title">Eventos do Período</div>
     {% for e in f.events %}
-    <div class="event {% if 'ferias' in e.tipo or 'fecho' in e.tipo %}ferias{% elif 'falta' in e.tipo or 'baixa' in e.tipo or 'consulta' in e.tipo or 'assistencia' in e.tipo %}falta{% elif e.tipo=='he' %}he{% else %}ponte{% endif %}">{{ e.txt }}</div>
+    <div class="event">
+      <div class="event-dot {{ e.cls }}"></div>
+      <div>
+        <div class="event-txt">{{ e.txt }}</div>
+        {% if e.detail %}<div class="event-detail">{{ e.detail }}</div>{% endif %}
+      </div>
+    </div>
     {% endfor %}
   </div>
-  {% if not loop.last %}<hr class="func-divider">{% endif %}
+  {% else %}
+  <div class="emp-events" style="color:#94a3b8;font-size:9px;font-style:italic">Sem eventos registados neste período.</div>
+  {% endif %}
 </div>
 {% endfor %}
 
+<!-- ── FOOTER ── -->
 <div class="footer">
-  <span>{{ empresa }} · Uso Interno</span>
-  <span>Emitido em {{ hoje.strftime('%d/%m/%Y') }}</span>
+  <span>{{ empresa }} &nbsp;·&nbsp; Documento de Uso Interno &nbsp;·&nbsp; RH / Contabilidade</span>
+  <span>Emitido em {{ hoje.strftime('%d/%m/%Y às %H:%M') }}</span>
 </div>
+
 </body>
 </html>
