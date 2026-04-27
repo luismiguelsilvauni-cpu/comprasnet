@@ -401,9 +401,13 @@ function buildCalendar() {
         // Feriado/fecho background on employee row too
         var ferD = isFeriado(ds2);
         var fecD = isFecho(ds2);
-        if (ferD) cell2.style.background = ferD.tipo==='ponte' ? 'rgba(245,158,11,.08)' : 'rgba(239,68,68,.08)';
-        else if (fecD) cell2.style.background = 'rgba(148,163,184,.08)';
-        else if (dayOfWeek(ANO,mes,d2)===0||dayOfWeek(ANO,mes,d2)===6) cell2.style.background = 'var(--surface2)';
+        if (ferD) {
+          cell2.style.background = ferD.tipo==='ponte' ? 'rgba(245,158,11,.08)' : 'rgba(239,68,68,.08)';
+        } else if (fecD) {
+          cell2.style.background = 'rgba(148,163,184,.08)';
+        } else if (dayOfWeek(ANO,mes,d2)===0||dayOfWeek(ANO,mes,d2)===6) {
+          cell2.style.background = 'var(--surface2)';
+        }
 
         var reg = rowRegistos.find(function(r){ return r.data_inicio<=ds2 && r.data_fim>=ds2; });
         if (reg) {
@@ -668,7 +672,7 @@ function highlightHEGrid() {
   document.querySelectorAll('#heGrid div').forEach(function(b){
     var t = b.dataset.time;
     var active = t >= ini && t < fim;
-    if (active) b.style.background = 'var(--accent)'; b.style.color = 'white';
+    if (active) { b.style.background = 'var(--accent)'; b.style.color = 'white'; }
     else if (!b.style.color.includes('muted')) { b.style.background='rgba(59,110,240,.08)'; b.style.color='var(--accent)'; }
   });
 }
@@ -692,9 +696,16 @@ function updateHECategoria() {
   var fer = FERIADOS.find(function(f){ return f.data===ds; });
   var el = document.getElementById('heCategoriaInfo');
   el.style.display = 'block';
-  if (fer) { el.textContent='🔴 Feriado: '+fer.nome+' — HE classificadas como feriado'; el.style.color='#ef4444'; }
-  else if (dow===0||dow===6) { el.textContent='🟡 Fim de semana — HE classificadas como FDS'; el.style.color='#f59e0b'; }
-  else { el.textContent='🔵 Dia útil — HE classificadas como dia útil'; el.style.color='var(--accent)'; }
+  if (fer) {
+    el.textContent='🔴 Feriado: '+fer.nome+' — HE classificadas como feriado';
+    el.style.color='#ef4444';
+  } else if (dow===0||dow===6) {
+    el.textContent='🟡 Fim de semana — HE classificadas como FDS';
+    el.style.color='#f59e0b';
+  } else {
+    el.textContent='🔵 Dia útil — HE classificadas como dia útil';
+    el.style.color='var(--accent)';
+  }
 }
 
 function guardarHE(forcar) {
