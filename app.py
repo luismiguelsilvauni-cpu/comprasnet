@@ -5580,6 +5580,7 @@ def tecnico_editar(eid):
     if request.method == 'POST':
         e.cliente_nome      = request.form.get('cliente_nome','').strip()
         e.embarcacao        = request.form.get('embarcacao','').strip()
+        e.motor_marca       = request.form.get('motor_marca','').strip()
         e.motor_modelo      = request.form.get('motor_modelo','').strip()
         e.motor_potencia    = request.form.get('motor_potencia','').strip()
         e.serial_number     = request.form.get('serial_number','').strip()
@@ -8328,6 +8329,7 @@ def _sync_ausencias_to_faltas(funcionario_id, ano):
         "baixa_medica": "baixa", "consulta_medica": "justificada",
         "assistencia_familia": "justificada", "licenca_sem_venc": "justificada",
         "formacao": "ferias", "teletrabalho": "ferias", "trabalho_externo": "ferias",
+        "trabalho_ponte": None,  # worked on bridge day - no deduction
     }
 
     feriados_set = _get_feriados_set(ano)

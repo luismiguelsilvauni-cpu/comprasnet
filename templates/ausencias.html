@@ -479,7 +479,8 @@ var TIPOS_CONFIG = {
   formacao:{label:'Formação',cor:'#8b5cf6',icon:'📚'},
   teletrabalho:{label:'Teletrabalho',cor:'#0891b2',icon:'💻'},
   licenca_sem_venc:{label:'Licença s/ Vencimento',cor:'#64748b',icon:'📄'},
-  trabalho_externo:{label:'Trabalho Externo',cor:'#10b981',icon:'🔧'}
+  trabalho_externo:{label:'Trabalho Externo',cor:'#10b981',icon:'🔧'},
+  trabalho_ponte:{label:'Trabalhou na Ponte',cor:'#06b6d4',icon:'💼'}
 };
 
 var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -654,6 +655,28 @@ function buildCalendar() {
           }
           cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
           cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
+        }
+        // Ponte auto-indicator: show ponte feriado as consumed férias if no override
+        var ferD2 = isFeriado(ds2);
+        var hasOverride = reg && reg.tipo === 'trabalho_ponte';
+        if (ferD2 && ferD2.tipo === 'ponte' && !reg && !hasOverride) {
+          // Auto-consumed ponte - show as blue overlay
+          cell2.style.background = 'rgba(59,110,240,.25)';
+          cell2.style.borderRadius = '3px';
+          cell2.title = 'Ponte (conta como férias) — clique para registar trabalho';
+          cell2.style.cursor = 'pointer';
+          cell2.onclick = (function(ds3, fid2){ return function(){
+            abrirNovaAusenciaDia(ds3);
+            setTimeout(function(){
+              document.getElementById('ausenciaTipo').value='trabalho_ponte';
+              document.getElementById('ausenciaFunc').value = fid2;
+              atualizarTipoInfo();
+            },100);
+          }; })(ds2, f.id);
+          var lbl2 = document.createElement('div');
+          lbl2.style.cssText = 'position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:8px;font-weight:700;color:#3b6ef0;pointer-events:none';
+          lbl2.textContent = '🌉';
+          cell2.appendChild(lbl2);
         }
         // HE indicator (orange triangle in corner)
         if (he) {

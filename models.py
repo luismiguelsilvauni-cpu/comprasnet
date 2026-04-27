@@ -634,6 +634,7 @@ TIPOS_AUSENCIA = {
     'teletrabalho':     {'label': 'Teletrabalho',             'cor': '#0891b2',  'icon': '💻',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
     'licenca_sem_venc': {'label': 'Licença sem Vencimento',   'cor': '#64748b',  'icon': '📄',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': True},
     'trabalho_externo': {'label': 'Trabalho Externo/Serviço', 'cor': '#10b981',  'icon': '🔧',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},
+    'trabalho_ponte':   {'label': 'Trabalhou na Ponte',         'cor': '#06b6d4',  'icon': '💼',  'conta_ferias': False, 'conta_falta': False, 'desconta_salario': False},  # override bridge day
 }
 
 class AusenciaRegisto(db.Model):
