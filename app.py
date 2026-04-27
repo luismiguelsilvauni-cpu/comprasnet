@@ -3101,9 +3101,8 @@ PT_FERIADOS = [
 @app.route('/ferias')
 @login_required
 def ferias_mapa():
-    # Redirect to new unified ausencias view
-    from flask import redirect
-    return redirect('/ausencias?from=ferias')
+    # Serve the new unified ausencias view directly
+    return ausencias()
 
 @app.route('/ferias_legacy')
 @login_required
