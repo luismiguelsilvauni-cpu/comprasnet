@@ -234,9 +234,6 @@
 </style>
 
 <script>
-(function() {
-'use strict';
-
 // ── Load data from DOM ────────────────────────────────────────────────────────
 var D = document.getElementById('ausencias-data').dataset;
 var ANO          = parseInt(D.ano);
@@ -744,6 +741,5 @@ function syncAll() {
 buildSaldoCards();
 buildCalendar();
 
-})(); // end IIFE
 </script>
 {% endblock %}
