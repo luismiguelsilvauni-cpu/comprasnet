@@ -1,6 +1,140 @@
 {% extends "base.html" %}
-{% block title %}Mapa Férias / Faltas {{ ano }}{% endblock %}
-{% block page_title %}📅 Mapa Férias / Faltas {{ ano }}{% endblock %}
+{% block title %}Mapa Férias / Faltas {{ ano }}
+<!-- Modal: Exportar PDF -->
+<div id="modalPDF" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:400px">
+    <div class="modal-head"><span>📄 Exportar PDF Salarial</span><button onclick="fecharModal('modalPDF')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+        O PDF é gerado com base no período salarial configurado para o mês seleccionado.
+      </div>
+      <div class="form-group" style="margin:0"><label>Mês de Referência</label>
+        <select id="pdfMes" class="input" onchange="updatePDFPeriodo()">
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div id="pdfPeriodoInfo" style="font-size:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;margin-top:4px"></div>
+      <div id="pdfAviso" style="display:none;font-size:12px;color:#f59e0b;padding:6px 10px;background:rgba(245,158,11,.1);border-radius:6px">
+        ⚠️ Sem período salarial configurado para este mês. Será usado o mês civil.
+      </div>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button onclick="fecharModal('modalPDF')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="gerarPDF()" class="btn btn-primary" id="pdfBtn">📄 Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('modalPDF').addEventListener('click',function(e){if(e.target===this)fecharModal('modalPDF');});
+
+function abrirExportarPDF() {
+  var hoje = new Date();
+  document.getElementById('pdfMes').value = hoje.getMonth() + 1;
+  updatePDFPeriodo();
+  abrirModal('modalPDF');
+}
+
+function updatePDFPeriodo() {
+  var mes = parseInt(document.getElementById('pdfMes').value);
+  var p = PERIODOS_SAL.find(function(ps){ return ps.mes === mes; });
+  var info = document.getElementById('pdfPeriodoInfo');
+  var aviso = document.getElementById('pdfAviso');
+  if (p) {
+    var ini = p.inicio.split('-').reverse().join('/');
+    var fim = p.fim.split('-').reverse().join('/');
+    info.innerHTML = '<strong>Período:</strong> ' + ini + ' a ' + fim + (p.estado==='fechado' ? ' <span style="color:#94a3b8">· 🔒 Fechado</span>' : ' <span style="color:#22c55e">· ✅ Aberto</span>');
+    info.style.display = 'block';
+    aviso.style.display = 'none';
+  } else {
+    info.style.display = 'none';
+    aviso.style.display = 'block';
+  }
+}
+
+function gerarPDF() {
+  var mes = document.getElementById('pdfMes').value;
+  var btn = document.getElementById('pdfBtn');
+  btn.disabled = true; btn.textContent = '⏳ A gerar...';
+  window.location = '/ausencias/pdf/' + ANO + '/' + mes;
+  setTimeout(function(){ btn.disabled=false; btn.textContent='📄 Gerar PDF'; fecharModal('modalPDF'); }, 2000);
+}
+</script>
+
+{% endblock %}
+{% block page_title %}📅 Mapa Férias / Faltas {{ ano }}
+<!-- Modal: Exportar PDF -->
+<div id="modalPDF" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:400px">
+    <div class="modal-head"><span>📄 Exportar PDF Salarial</span><button onclick="fecharModal('modalPDF')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+        O PDF é gerado com base no período salarial configurado para o mês seleccionado.
+      </div>
+      <div class="form-group" style="margin:0"><label>Mês de Referência</label>
+        <select id="pdfMes" class="input" onchange="updatePDFPeriodo()">
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div id="pdfPeriodoInfo" style="font-size:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;margin-top:4px"></div>
+      <div id="pdfAviso" style="display:none;font-size:12px;color:#f59e0b;padding:6px 10px;background:rgba(245,158,11,.1);border-radius:6px">
+        ⚠️ Sem período salarial configurado para este mês. Será usado o mês civil.
+      </div>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button onclick="fecharModal('modalPDF')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="gerarPDF()" class="btn btn-primary" id="pdfBtn">📄 Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('modalPDF').addEventListener('click',function(e){if(e.target===this)fecharModal('modalPDF');});
+
+function abrirExportarPDF() {
+  var hoje = new Date();
+  document.getElementById('pdfMes').value = hoje.getMonth() + 1;
+  updatePDFPeriodo();
+  abrirModal('modalPDF');
+}
+
+function updatePDFPeriodo() {
+  var mes = parseInt(document.getElementById('pdfMes').value);
+  var p = PERIODOS_SAL.find(function(ps){ return ps.mes === mes; });
+  var info = document.getElementById('pdfPeriodoInfo');
+  var aviso = document.getElementById('pdfAviso');
+  if (p) {
+    var ini = p.inicio.split('-').reverse().join('/');
+    var fim = p.fim.split('-').reverse().join('/');
+    info.innerHTML = '<strong>Período:</strong> ' + ini + ' a ' + fim + (p.estado==='fechado' ? ' <span style="color:#94a3b8">· 🔒 Fechado</span>' : ' <span style="color:#22c55e">· ✅ Aberto</span>');
+    info.style.display = 'block';
+    aviso.style.display = 'none';
+  } else {
+    info.style.display = 'none';
+    aviso.style.display = 'block';
+  }
+}
+
+function gerarPDF() {
+  var mes = document.getElementById('pdfMes').value;
+  var btn = document.getElementById('pdfBtn');
+  btn.disabled = true; btn.textContent = '⏳ A gerar...';
+  window.location = '/ausencias/pdf/' + ANO + '/' + mes;
+  setTimeout(function(){ btn.disabled=false; btn.textContent='📄 Gerar PDF'; fecharModal('modalPDF'); }, 2000);
+}
+</script>
+
+{% endblock %}
 
 {% block topbar_actions %}
   <button onclick="anoAnterior()" class="btn btn-ghost btn-sm">◀ {{ ano-1 }}</button>
@@ -12,10 +146,84 @@
   <button onclick="abrirAddFeriado()" class="btn btn-ghost btn-sm">📅 Feriado</button>
   <button onclick="syncAll()" class="btn btn-ghost btn-sm" id="syncBtn">🔄 Sync</button>
   <a href="/periodos-salariais?ano={{ ano }}" class="btn btn-ghost btn-sm">💰 Períodos</a>
+  <button onclick="abrirExportarPDF()" class="btn btn-primary btn-sm">📄 PDF Salarial</button>
   <a href="{{ url_for('ausencias_exportar', ano=ano) }}" class="btn btn-ghost btn-sm">⬇ CSV</a>
+
+<!-- Modal: Exportar PDF -->
+<div id="modalPDF" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:400px">
+    <div class="modal-head"><span>📄 Exportar PDF Salarial</span><button onclick="fecharModal('modalPDF')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+        O PDF é gerado com base no período salarial configurado para o mês seleccionado.
+      </div>
+      <div class="form-group" style="margin:0"><label>Mês de Referência</label>
+        <select id="pdfMes" class="input" onchange="updatePDFPeriodo()">
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div id="pdfPeriodoInfo" style="font-size:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;margin-top:4px"></div>
+      <div id="pdfAviso" style="display:none;font-size:12px;color:#f59e0b;padding:6px 10px;background:rgba(245,158,11,.1);border-radius:6px">
+        ⚠️ Sem período salarial configurado para este mês. Será usado o mês civil.
+      </div>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button onclick="fecharModal('modalPDF')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="gerarPDF()" class="btn btn-primary" id="pdfBtn">📄 Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('modalPDF').addEventListener('click',function(e){if(e.target===this)fecharModal('modalPDF');});
+
+function abrirExportarPDF() {
+  var hoje = new Date();
+  document.getElementById('pdfMes').value = hoje.getMonth() + 1;
+  updatePDFPeriodo();
+  abrirModal('modalPDF');
+}
+
+function updatePDFPeriodo() {
+  var mes = parseInt(document.getElementById('pdfMes').value);
+  var p = PERIODOS_SAL.find(function(ps){ return ps.mes === mes; });
+  var info = document.getElementById('pdfPeriodoInfo');
+  var aviso = document.getElementById('pdfAviso');
+  if (p) {
+    var ini = p.inicio.split('-').reverse().join('/');
+    var fim = p.fim.split('-').reverse().join('/');
+    info.innerHTML = '<strong>Período:</strong> ' + ini + ' a ' + fim + (p.estado==='fechado' ? ' <span style="color:#94a3b8">· 🔒 Fechado</span>' : ' <span style="color:#22c55e">· ✅ Aberto</span>');
+    info.style.display = 'block';
+    aviso.style.display = 'none';
+  } else {
+    info.style.display = 'none';
+    aviso.style.display = 'block';
+  }
+}
+
+function gerarPDF() {
+  var mes = document.getElementById('pdfMes').value;
+  var btn = document.getElementById('pdfBtn');
+  btn.disabled = true; btn.textContent = '⏳ A gerar...';
+  window.location = '/ausencias/pdf/' + ANO + '/' + mes;
+  setTimeout(function(){ btn.disabled=false; btn.textContent='📄 Gerar PDF'; fecharModal('modalPDF'); }, 2000);
+}
+</script>
+
 {% endblock %}
 
 {% block content %}
+<style>
+/* Wide calendar layout */
+.content { padding: 16px 20px !important; }
+#calendario .card { padding: 10px 12px; }
+#calendario { width: 100%; }
+</style>
 <div id="ausencias-data" style="display:none"></div>
 <script type="application/json" id="j-registos">{{ registos_json | safe }}</script>
 <script type="application/json" id="j-feriados">{{ feriados_json | safe }}</script>
@@ -319,7 +527,7 @@ function buildCalendar() {
 
   for (var mes = 1; mes <= 12; mes++) {
     var days = daysInMonth(ANO, mes);
-    var minW = Math.max(days * 34, 400);
+    var minW = Math.max(days * 38, 500);
     var sec = document.createElement('div');
     sec.className = 'card';
     sec.style.cssText = 'padding:12px;overflow-x:auto;margin-bottom:12px';
@@ -341,7 +549,7 @@ function buildCalendar() {
 
     // Day header row
     var grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',34px);gap:0;min-width:'+minW+'px';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',minmax(34px,1fr));gap:0;width:100%;min-width:'+minW+'px';
 
     for (var d = 1; d <= days; d++) {
       var ds = dateStr(ANO, mes, d);
@@ -399,7 +607,7 @@ function buildCalendar() {
     // Employee rows
     FUNCS.forEach(function(f) {
       var row = document.createElement('div');
-      row.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',34px);gap:0;margin-top:1px;min-width:'+minW+'px;height:22px';
+      row.style.cssText = 'display:grid;grid-template-columns:repeat('+days+',minmax(34px,1fr));gap:0;margin-top:1px;width:100%;min-width:'+minW+'px;height:22px';
 
       for (var d2 = 1; d2 <= days; d2++) {
         var ds2 = dateStr(ANO, mes, d2);
@@ -737,4 +945,71 @@ buildSaldoCards();
 buildCalendar();
 
 </script>
+
+<!-- Modal: Exportar PDF -->
+<div id="modalPDF" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:400px">
+    <div class="modal-head"><span>📄 Exportar PDF Salarial</span><button onclick="fecharModal('modalPDF')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+        O PDF é gerado com base no período salarial configurado para o mês seleccionado.
+      </div>
+      <div class="form-group" style="margin:0"><label>Mês de Referência</label>
+        <select id="pdfMes" class="input" onchange="updatePDFPeriodo()">
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div id="pdfPeriodoInfo" style="font-size:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;margin-top:4px"></div>
+      <div id="pdfAviso" style="display:none;font-size:12px;color:#f59e0b;padding:6px 10px;background:rgba(245,158,11,.1);border-radius:6px">
+        ⚠️ Sem período salarial configurado para este mês. Será usado o mês civil.
+      </div>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button onclick="fecharModal('modalPDF')" class="btn btn-ghost">Cancelar</button>
+      <button onclick="gerarPDF()" class="btn btn-primary" id="pdfBtn">📄 Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('modalPDF').addEventListener('click',function(e){if(e.target===this)fecharModal('modalPDF');});
+
+function abrirExportarPDF() {
+  var hoje = new Date();
+  document.getElementById('pdfMes').value = hoje.getMonth() + 1;
+  updatePDFPeriodo();
+  abrirModal('modalPDF');
+}
+
+function updatePDFPeriodo() {
+  var mes = parseInt(document.getElementById('pdfMes').value);
+  var p = PERIODOS_SAL.find(function(ps){ return ps.mes === mes; });
+  var info = document.getElementById('pdfPeriodoInfo');
+  var aviso = document.getElementById('pdfAviso');
+  if (p) {
+    var ini = p.inicio.split('-').reverse().join('/');
+    var fim = p.fim.split('-').reverse().join('/');
+    info.innerHTML = '<strong>Período:</strong> ' + ini + ' a ' + fim + (p.estado==='fechado' ? ' <span style="color:#94a3b8">· 🔒 Fechado</span>' : ' <span style="color:#22c55e">· ✅ Aberto</span>');
+    info.style.display = 'block';
+    aviso.style.display = 'none';
+  } else {
+    info.style.display = 'none';
+    aviso.style.display = 'block';
+  }
+}
+
+function gerarPDF() {
+  var mes = document.getElementById('pdfMes').value;
+  var btn = document.getElementById('pdfBtn');
+  btn.disabled = true; btn.textContent = '⏳ A gerar...';
+  window.location = '/ausencias/pdf/' + ANO + '/' + mes;
+  setTimeout(function(){ btn.disabled=false; btn.textContent='📄 Gerar PDF'; fecharModal('modalPDF'); }, 2000);
+}
+</script>
+
 {% endblock %}

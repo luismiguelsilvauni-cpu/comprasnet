@@ -8671,6 +8671,255 @@ def api_funcionario_horas_extra(fid):
     } for h in hes])
 
 
+@app.route('/ausencias/pdf/<int:ano>/<int:mes>')
+@login_required
+def ausencias_pdf(ano, mes):
+    from datetime import date, timedelta
+    import io
+    MESES_PT = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+    # Get salary period
+    periodo = PeriodoSalarial.query.filter_by(ano=ano, mes=mes).first()
+    if periodo:
+        data_ini = periodo.data_inicio
+        data_fim = periodo.data_fim
+    else:
+        # Fallback: civil month
+        data_ini = date(ano, mes, 1)
+        import calendar
+        data_fim = date(ano, mes, calendar.monthrange(ano, mes)[1])
+
+    feriados_set = _get_feriados_set(ano)
+
+    # Calculate period stats
+    dias_total = (data_fim - data_ini).days + 1
+    dias_uteis = _dias_uteis_ausencia(data_ini, data_fim, feriados_set)
+    feriados_no_periodo = [f for f in FeriasFeriado.query.filter_by(ano=ano).all()
+                           if data_ini <= f.data <= data_fim]
+    pontes_no_periodo = [f for f in feriados_no_periodo if f.tipo == 'ponte']
+
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()         if hasattr(Funcionario,'ativo') else Funcionario.query.order_by(Funcionario.nome).all()
+
+    cfg = ConfigGeral.query.first()
+    empresa = cfg.empresa_nome if cfg else 'UCN'
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+            Paragraph, Spacer, HRFlowable, PageBreak)
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+            topMargin=2*cm, bottomMargin=2*cm,
+            leftMargin=2*cm, rightMargin=2*cm,
+            title=f'Resumo Assiduidade {MESES_PT[mes]} {ano}')
+
+        # Styles
+        styles = getSampleStyleSheet()
+        navy   = colors.HexColor('#1e3a5f')
+        gold   = colors.HexColor('#e8b84b')
+        light  = colors.HexColor('#f5f7fa')
+        mid    = colors.HexColor('#e2e8f0')
+        dark   = colors.HexColor('#334155')
+
+        s_title  = ParagraphStyle('T', fontName='Helvetica-Bold', fontSize=18, textColor=navy, spaceAfter=4)
+        s_sub    = ParagraphStyle('S', fontName='Helvetica', fontSize=10, textColor=dark, spaceAfter=2)
+        s_period = ParagraphStyle('P', fontName='Helvetica-Oblique', fontSize=9, textColor=colors.grey, spaceAfter=12)
+        s_sec    = ParagraphStyle('SEC', fontName='Helvetica-Bold', fontSize=12, textColor=navy, spaceBefore=14, spaceAfter=6)
+        s_name   = ParagraphStyle('N', fontName='Helvetica-Bold', fontSize=11, textColor=navy, spaceBefore=10, spaceAfter=2)
+        s_body   = ParagraphStyle('B', fontName='Helvetica', fontSize=9, textColor=dark, spaceAfter=2)
+        s_event  = ParagraphStyle('E', fontName='Helvetica', fontSize=8.5, textColor=dark, leftIndent=12, spaceAfter=1)
+        s_footer = ParagraphStyle('F', fontName='Helvetica', fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
+
+        elements = []
+
+        # ── Header ────────────────────────────────────────────────────────────
+        elements.append(Paragraph(empresa, s_title))
+        elements.append(Paragraph(f'Resumo de Assiduidade – {MESES_PT[mes]} {ano}', s_sub))
+        periodo_label = f'Período Salarial: {data_ini.strftime("%d/%m/%Y")} a {data_fim.strftime("%d/%m/%Y")}'
+        if not periodo:
+            periodo_label += '  (mês civil — sem período salarial configurado)'
+        elements.append(Paragraph(periodo_label, s_period))
+        elements.append(HRFlowable(width='100%', thickness=2, color=navy, spaceAfter=10))
+
+        # ── Summary KPIs ──────────────────────────────────────────────────────
+        # Aggregate totals
+        total_faltas = 0; total_ferias = 0; total_he = 0
+        for f in funcs:
+            aus = AusenciaRegisto.query.filter(
+                AusenciaRegisto.funcionario_id == f.id,
+                AusenciaRegisto.estado == 'aprovado',
+                AusenciaRegisto.data_inicio <= data_fim,
+                AusenciaRegisto.data_fim >= data_ini
+            ).all()
+            for a in aus:
+                ini2 = max(a.data_inicio, data_ini)
+                fim2 = min(a.data_fim, data_fim)
+                d = _dias_uteis_ausencia(ini2, fim2, feriados_set, a.formato, a.horas)
+                if a.tipo in ('falta_justificada','falta_injustificada','baixa_medica','consulta_medica','assistencia_familia'):
+                    total_faltas += d
+                elif a.tipo in ('ferias','fecho_empresa','ponte'):
+                    total_ferias += d
+            hes = HoraExtra.query.filter(
+                HoraExtra.funcionario_id == f.id,
+                HoraExtra.data >= data_ini, HoraExtra.data <= data_fim,
+                HoraExtra.estado.in_(['aprovado','pendente'])
+            ).all()
+            total_he += sum(h.total_horas for h in hes)
+
+        kpi_data = [
+            ['Mês de Referência', MESES_PT[mes] + ' ' + str(ano),
+             'Dias do Período', str(dias_total)],
+            ['Dias Úteis', str(int(dias_uteis)),
+             'Feriados', str(len(feriados_no_periodo))],
+            ['Total Faltas', f'{total_faltas:.1f} dias',
+             'Total Férias', f'{total_ferias:.1f} dias'],
+            ['Horas Extra', f'{total_he:.1f} h',
+             'Data de Emissão', date.today().strftime('%d/%m/%Y')],
+        ]
+        kpi_table = Table(kpi_data, colWidths=[4*cm, 4.5*cm, 4*cm, 4.5*cm])
+        kpi_table.setStyle(TableStyle([
+            ('BACKGROUND',  (0,0), (-1,-1), light),
+            ('BACKGROUND',  (0,0), (0,-1), mid),
+            ('BACKGROUND',  (2,0), (2,-1), mid),
+            ('FONTNAME',    (0,0), (-1,-1), 'Helvetica'),
+            ('FONTNAME',    (0,0), (0,-1), 'Helvetica-Bold'),
+            ('FONTNAME',    (2,0), (2,-1), 'Helvetica-Bold'),
+            ('FONTSIZE',    (0,0), (-1,-1), 9),
+            ('PADDING',     (0,0), (-1,-1), 6),
+            ('GRID',        (0,0), (-1,-1), 0.5, colors.white),
+            ('ROUNDEDCORNERS', [4]),
+        ]))
+        elements.append(kpi_table)
+        elements.append(Spacer(1, 0.5*cm))
+
+        # ── Per-employee sections ──────────────────────────────────────────────
+        elements.append(Paragraph('Detalhe por Colaborador', s_sec))
+        elements.append(HRFlowable(width='100%', thickness=1, color=mid, spaceAfter=8))
+
+        TIPOS_LABELS = {
+            'ferias':'Férias','ponte':'Ponte','fecho_empresa':'Fecho Empresa',
+            'falta_justificada':'Falta Justificada','falta_injustificada':'Falta Injustificada',
+            'baixa_medica':'Baixa Médica','consulta_medica':'Consulta Médica',
+            'assistencia_familia':'Assistência Família','formacao':'Formação',
+            'teletrabalho':'Teletrabalho','licenca_sem_venc':'Licença s/ Vencimento',
+            'trabalho_externo':'Trabalho Externo',
+        }
+
+        for f in funcs:
+            aus = AusenciaRegisto.query.filter(
+                AusenciaRegisto.funcionario_id == f.id,
+                AusenciaRegisto.estado == 'aprovado',
+                AusenciaRegisto.data_inicio <= data_fim,
+                AusenciaRegisto.data_fim >= data_ini
+            ).order_by(AusenciaRegisto.data_inicio).all()
+
+            hes = HoraExtra.query.filter(
+                HoraExtra.funcionario_id == f.id,
+                HoraExtra.data >= data_ini, HoraExtra.data <= data_fim,
+                HoraExtra.estado.in_(['aprovado','pendente'])
+            ).order_by(HoraExtra.data).all()
+
+            if not aus and not hes:
+                continue
+
+            # Employee header
+            elements.append(Paragraph(f.nome, s_name))
+            dept = getattr(f, 'departamento', '') or getattr(f, 'cargo', '') or '—'
+            elements.append(Paragraph(dept, s_body))
+
+            # Employee summary table
+            f_ferias=0; f_faltas=0; f_pontes=0; f_outros=0; f_he=0
+            for a in aus:
+                ini2 = max(a.data_inicio, data_ini)
+                fim2 = min(a.data_fim, data_fim)
+                d = _dias_uteis_ausencia(ini2, fim2, feriados_set, a.formato, a.horas)
+                if a.tipo == 'ferias': f_ferias += d
+                elif a.tipo in ('ponte','fecho_empresa'): f_pontes += d
+                elif a.tipo in ('falta_justificada','falta_injustificada','baixa_medica',
+                                'consulta_medica','assistencia_familia'): f_faltas += d
+                else: f_outros += d
+            for h in hes:
+                f_he += h.total_horas
+
+            emp_data = [[
+                f'Dias Úteis: {int(dias_uteis)}',
+                f'Férias: {f_ferias:.1f}d',
+                f'Faltas: {f_faltas:.1f}d',
+                f'Pontes: {f_pontes:.1f}d',
+                f'HE: {f_he:.1f}h'
+            ]]
+            emp_table = Table(emp_data, colWidths=[3.3*cm]*5)
+            emp_table.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,-1), colors.HexColor('#eef2ff')),
+                ('FONTNAME',(0,0),(-1,-1),'Helvetica'),
+                ('FONTSIZE',(0,0),(-1,-1),8),
+                ('ALIGN',(0,0),(-1,-1),'CENTER'),
+                ('PADDING',(0,0),(-1,-1),4),
+                ('GRID',(0,0),(-1,-1),0.5,colors.white),
+            ]))
+            elements.append(emp_table)
+            elements.append(Spacer(1, 0.2*cm))
+
+            # Events — consolidate consecutive férias
+            # Group consecutive férias/pontes/fecho
+            event_lines = []
+            i = 0
+            while i < len(aus):
+                a = aus[i]
+                ini2 = max(a.data_inicio, data_ini)
+                fim2 = min(a.data_fim, data_fim)
+                label = TIPOS_LABELS.get(a.tipo, a.tipo)
+                if a.tipo in ('ferias','fecho_empresa','ponte'):
+                    if ini2 == fim2:
+                        event_lines.append(f'Gozou {label.lower()} no dia {ini2.strftime("%d/%m/%Y")}')
+                    else:
+                        event_lines.append(f'Gozou {label.lower()} de {ini2.strftime("%d/%m/%Y")} a {fim2.strftime("%d/%m/%Y")}')
+                else:
+                    # Faltas, baixas, etc — individual days
+                    cur = ini2
+                    from datetime import timedelta
+                    while cur <= fim2:
+                        if cur.weekday() < 5 and cur not in feriados_set:
+                            event_lines.append(f'Ausente no dia {cur.strftime("%d/%m/%Y")} — {label}')
+                        cur += timedelta(days=1)
+                if a.observacoes:
+                    event_lines[-1] += f' (obs: {a.observacoes})'
+                i += 1
+
+            for he in hes:
+                event_lines.append(f'Horas extra no dia {he.data.strftime("%d/%m/%Y")}, das {he.hora_inicio} às {he.hora_fim} ({he.total_horas:.1f}h)')
+
+            for line in event_lines:
+                elements.append(Paragraph('• ' + line, s_event))
+
+            elements.append(HRFlowable(width='100%', thickness=0.5, color=mid, spaceAfter=4))
+
+        # ── Footer ────────────────────────────────────────────────────────────
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph(
+            f'Documento gerado em {date.today().strftime("%d/%m/%Y")} · {empresa} · Uso Interno',
+            s_footer))
+
+        doc.build(elements)
+        buf.seek(0)
+        fname = f'assiduidade_{MESES_PT[mes]}_{ano}.pdf'
+        from flask import Response
+        return Response(buf.getvalue(), mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment;filename={fname}'})
+
+    except ImportError:
+        return jsonify({'error': 'pip install reportlab --break-system-packages'}), 500
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
 @app.route('/ausencias/ping')
 def ausencias_ping():
     return 'AUSENCIAS_MODULE_LOADED_OK'
