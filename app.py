@@ -1600,10 +1600,6 @@ def admin_config():
                     cfg.salarios_pin = ''
                 elif request.form.get('salarios_pin','').strip():
                     cfg.salarios_pin = request.form.get('salarios_pin','').strip()
-            try:
-                cfg.salario_dia_inicio = int(request.form.get('salario_dia_inicio', 1) or 1)
-                cfg.salario_dia_fecho  = int(request.form.get('salario_dia_fecho', 27) or 27)
-            except: pass
             except Exception:
                 from sqlalchemy import text
                 with db.engine.connect() as _c:
@@ -1613,6 +1609,10 @@ def admin_config():
                     cfg.salarios_pin = ''
                 elif request.form.get('salarios_pin','').strip():
                     cfg.salarios_pin = request.form.get('salarios_pin','').strip()
+            try:
+                cfg.salario_dia_inicio = int(request.form.get('salario_dia_inicio', 1) or 1)
+                cfg.salario_dia_fecho  = int(request.form.get('salario_dia_fecho', 27) or 27)
+            except: pass
             try:
                 cfg.salario_dia_inicio = int(request.form.get('salario_dia_inicio', 1) or 1)
                 cfg.salario_dia_fecho  = int(request.form.get('salario_dia_fecho', 27) or 27)
