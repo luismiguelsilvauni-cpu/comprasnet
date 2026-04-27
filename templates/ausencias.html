@@ -500,8 +500,12 @@ function atualizarTipoInfo() {
   if (info.conta_ferias) parts.push('🏖 Conta como férias');
   if (info.conta_falta)  parts.push('📋 Conta como falta');
   if (info.desconta_salario) parts.push('💰 Desconta no salário');
-  if (parts.length) { el.innerHTML = parts.join(' &nbsp;·&nbsp; '); el.style.display='block'; }
-  else el.style.display = 'none';
+  if (parts.length) {
+    el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+    el.style.display='block';
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 function toggleHoras() {
@@ -547,8 +551,9 @@ function guardarAusencia(forcar) {
   fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if (d.ok) { location.reload(); }
-      else if (d.saldo_insuficiente) {
+      if (d.ok) {
+        location.reload();
+      } else if (d.saldo_insuficiente) {
         aviso.textContent = '⚠️ ' + d.error + ' — Confirmar mesmo assim?';
         aviso.style.display = 'block';
         aviso.innerHTML += ' <button onclick="guardarAusencia(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
@@ -616,8 +621,8 @@ function guardarFecho() {
       descricao:   document.getElementById('fechoDesc').value,
     })
   }).then(function(r){ return r.json(); }).then(function(d){
-    if (d.ok) location.reload();
-    else alert('Erro: ' + d.error);
+    if (d.ok) { location.reload(); }
+    else { alert('Erro: ' + d.error); }
   });
 }
 
@@ -722,8 +727,9 @@ function guardarHE(forcar) {
       forcar: forcar||false
     })
   }).then(r=>r.json()).then(d=>{
-    if(d.ok){ location.reload(); }
-    else if(d.conflito){
+    if (d.ok) {
+      location.reload();
+    } else if (d.conflito) {
       var av=document.getElementById('heAviso');
       av.innerHTML='⚠️ '+d.error+' <button onclick="guardarHE(true)" style="margin-left:8px;background:var(--accent);color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer">Forçar</button>';
       av.style.display='block'; btn.disabled=false; btn.textContent='💾 Guardar';
