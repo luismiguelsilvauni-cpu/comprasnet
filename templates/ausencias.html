@@ -370,8 +370,6 @@ function buildCalendar() {
         ferTxt.style.cssText = 'writing-mode:vertical-rl;transform:rotate(180deg);font-size:8px;font-weight:700;color:'+(fer.tipo==='ponte'?'#f59e0b':'#ef4444')+';max-height:55px;overflow:hidden;margin:1px auto;line-height:1.2';
         ferTxt.textContent = fer.nome;
         cell.appendChild(ferTxt);
-      }
-      if (fer) {
         cell.onclick = (function(f){ return function(e){ if(e.ctrlKey||e.metaKey) removeFeriado(f); }; })(fer);
         cell.title = fer.nome + ' — Ctrl+clique para remover';
       } else {
