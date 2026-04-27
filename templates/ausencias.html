@@ -618,6 +618,7 @@ function buildCalendar() {
         var ds2 = dateStr(ANO, mes, d2);
         var cell2 = document.createElement('div');
         cell2.style.cssText = 'height:22px;position:relative;';
+        var he = HORAS_EXTRA.find(function(h){ return h.funcionario_id===f.id && h.data===ds2; });
 
         var ferD = isFeriado(ds2);
         var fecD = isFecho(ds2);
