@@ -8674,6 +8674,13 @@ def api_funcionario_horas_extra(fid):
 @app.route('/ausencias/pdf/<int:ano>/<int:mes>')
 @login_required
 def ausencias_pdf(ano, mes):
+    """Main PDF route - always uses the professional HTML version."""
+    return redirect(url_for('ausencias_pdf_html', ano=ano, mes=mes))
+
+
+@app.route('/ausencias/pdf-reportlab/<int:ano>/<int:mes>')
+@login_required
+def ausencias_pdf_reportlab(ano, mes):
     from datetime import date, timedelta
     import io
     MESES_PT = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
