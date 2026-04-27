@@ -8293,6 +8293,10 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 # cache bust Tue Apr  7 15:34:00 UTC 2026
 
+@app.route('/ausencias/ping')
+def ausencias_ping():
+    return 'AUSENCIAS_MODULE_LOADED_OK'
+
 # ══════════════════════════════════════════════════════════════════════════════
 # MÓDULO AUSÊNCIAS — FÉRIAS / FALTAS
 # ══════════════════════════════════════════════════════════════════════════════
