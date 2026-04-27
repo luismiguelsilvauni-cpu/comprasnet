@@ -8914,10 +8914,82 @@ def ausencias_pdf(ano, mes):
             headers={'Content-Disposition': f'attachment;filename={fname}'})
 
     except ImportError:
-        return jsonify({'error': 'pip install reportlab --break-system-packages'}), 500
+        # Fallback: generate printable HTML
+        from flask import redirect
+        return redirect(url_for('ausencias_pdf_html', ano=ano, mes=mes))
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/ausencias/pdf-html/<int:ano>/<int:mes>')
+@login_required
+def ausencias_pdf_html(ano, mes):
+    """HTML printable version as fallback when reportlab not installed."""
+    from datetime import date, timedelta
+    import calendar as cal_mod
+    MESES_PT = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+    periodo = PeriodoSalarial.query.filter_by(ano=ano, mes=mes).first()
+    if periodo:
+        data_ini = periodo.data_inicio
+        data_fim = periodo.data_fim
+    else:
+        data_ini = date(ano, mes, 1)
+        data_fim = date(ano, mes, cal_mod.monthrange(ano, mes)[1])
+    feriados_set = _get_feriados_set(ano)
+    dias_uteis = _dias_uteis_ausencia(data_ini, data_fim, feriados_set)
+    cfg = ConfigGeral.query.first()
+    empresa = cfg.empresa_nome if cfg else 'UCN'
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()         if hasattr(Funcionario,'ativo') else Funcionario.query.order_by(Funcionario.nome).all()
+    TIPOS_LABELS = {
+        'ferias':'Férias','ponte':'Ponte','fecho_empresa':'Fecho Empresa',
+        'falta_justificada':'Falta Justificada','falta_injustificada':'Falta Injustificada',
+        'baixa_medica':'Baixa Médica','consulta_medica':'Consulta Médica',
+        'assistencia_familia':'Assistência Família/Filho','formacao':'Formação',
+        'teletrabalho':'Teletrabalho','licenca_sem_venc':'Licença s/ Vencimento',
+        'trabalho_externo':'Trabalho Externo',
+    }
+    func_data = []
+    total_faltas=0; total_ferias=0; total_he=0
+    for f in funcs:
+        aus = AusenciaRegisto.query.filter(
+            AusenciaRegisto.funcionario_id==f.id,
+            AusenciaRegisto.estado=='aprovado',
+            AusenciaRegisto.data_inicio<=data_fim,
+            AusenciaRegisto.data_fim>=data_ini
+        ).order_by(AusenciaRegisto.data_inicio).all()
+        hes = HoraExtra.query.filter(
+            HoraExtra.funcionario_id==f.id,
+            HoraExtra.data>=data_ini, HoraExtra.data<=data_fim,
+            HoraExtra.estado.in_(['aprovado','pendente'])
+        ).order_by(HoraExtra.data).all()
+        if not aus and not hes: continue
+        f_ferias=0; f_faltas=0; f_pontes=0; f_he=0
+        events = []
+        for a in aus:
+            ini2=max(a.data_inicio,data_ini); fim2=min(a.data_fim,data_fim)
+            d=_dias_uteis_ausencia(ini2,fim2,feriados_set,a.formato,a.horas)
+            label=TIPOS_LABELS.get(a.tipo,a.tipo)
+            if a.tipo=='ferias': f_ferias+=d; total_ferias+=d
+            elif a.tipo in('ponte','fecho_empresa'): f_pontes+=d
+            elif a.tipo in('falta_justificada','falta_injustificada','baixa_medica','consulta_medica','assistencia_familia'):
+                f_faltas+=d; total_faltas+=d
+            if ini2==fim2: events.append({'txt':f'Gozou {label.lower()} no dia {ini2.strftime("%d/%m/%Y")}','tipo':a.tipo})
+            else: events.append({'txt':f'Gozou {label.lower()} de {ini2.strftime("%d/%m/%Y")} a {fim2.strftime("%d/%m/%Y")}','tipo':a.tipo})
+        for he in hes:
+            f_he+=he.total_horas; total_he+=he.total_horas
+            events.append({'txt':f'Horas extra em {he.data.strftime("%d/%m/%Y")}, das {he.hora_inicio} às {he.hora_fim} ({he.total_horas:.1f}h)','tipo':'he'})
+        dept_val = getattr(f,'departamento','') or getattr(f,'cargo','') or ''
+        func_data.append({'nome':f.nome,'dept':dept_val,
+            'ferias':f_ferias,'faltas':f_faltas,'pontes':f_pontes,'he':f_he,'events':events,
+            'dias_uteis':int(dias_uteis)})
+    return render_template('ausencias_pdf.html',
+        empresa=empresa, mes=mes, ano=ano, mes_nome=MESES_PT[mes],
+        data_ini=data_ini, data_fim=data_fim,
+        dias_uteis=int(dias_uteis), total_faltas=round(total_faltas,1),
+        total_ferias=round(total_ferias,1), total_he=round(total_he,1),
+        func_data=func_data, hoje=date.today())
 
 
 @app.route('/ausencias/ping')
