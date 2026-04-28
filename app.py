@@ -108,13 +108,107 @@ def analyze_pdf_with_claude(pdf_text, filename):
 
 @app.route('/favicon.ico')
 def favicon():
+    """Serve favicon - use company logo if available, else default."""
+    cfg = ConfigGeral.query.first()
+    if cfg and cfg.empresa_logo_path:
+        logo_path = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
+        if os.path.exists(logo_path):
+            try:
+                from PIL import Image
+                import io
+                img = Image.open(logo_path).convert('RGBA')
+                # Create padded square with navy background
+                size = max(img.size)
+                bg = Image.new('RGBA', (size, size), '#1e3a5f')
+                offset = ((size - img.width)//2, (size - img.height)//2)
+                bg.paste(img, offset, img if img.mode == 'RGBA' else None)
+                # Resize to 32x32 for favicon
+                ico = bg.resize((32, 32), Image.LANCZOS)
+                buf = io.BytesIO()
+                ico.save(buf, format='ICO', sizes=[(16,16),(32,32)])
+                buf.seek(0)
+                from flask import Response
+                return Response(buf.getvalue(), mimetype='image/vnd.microsoft.icon',
+                    headers={'Cache-Control': 'public, max-age=3600'})
+            except Exception:
+                pass
     return send_from_directory(os.path.join(app.root_path, 'static'),
         'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/icon-<int:size>.png')
+def pwa_icon(size):
+    """Dynamic PWA icon from company logo at any size."""
+    if size not in [72, 96, 128, 144, 152, 192, 384, 512]:
+        size = 192
+    cfg = ConfigGeral.query.first()
+    if cfg and cfg.empresa_logo_path:
+        logo_path = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
+        if os.path.exists(logo_path):
+            try:
+                from PIL import Image, ImageDraw
+                import io
+                img = Image.open(logo_path).convert('RGBA')
+                # Navy square background
+                canvas = Image.new('RGBA', (size, size), '#1e3a5f')
+                # Padding: logo occupies 70% of canvas
+                max_logo = int(size * 0.70)
+                img.thumbnail((max_logo, max_logo), Image.LANCZOS)
+                offset = ((size - img.width)//2, (size - img.height)//2)
+                canvas.paste(img, offset, img if img.mode == 'RGBA' else canvas)
+                buf = io.BytesIO()
+                canvas.save(buf, format='PNG')
+                buf.seek(0)
+                from flask import Response
+                return Response(buf.getvalue(), mimetype='image/png',
+                    headers={'Cache-Control': 'public, max-age=3600'})
+            except Exception:
+                pass
+    # Fallback to static
+    fname = f'icon-{size}.png'
+    static_icon = os.path.join(app.root_path, 'static', fname)
+    if not os.path.exists(static_icon):
+        fname = 'icon-192.png'
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+        fname, mimetype='image/png')
+
+@app.route('/apple-touch-icon.png')
+@app.route('/apple-touch-icon-precomposed.png')
+def apple_touch_icon():
+    return pwa_icon(180)
+
 @app.route('/manifest.json')
 def pwa_manifest():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
-        'manifest.json', mimetype='application/manifest+json')
+    """Dynamic manifest using company name and logo."""
+    cfg = ConfigGeral.query.first()
+    nome = (cfg.empresa_nome if cfg and cfg.empresa_nome else 'ComprasNet').strip()
+    short = nome[:12] if len(nome) > 12 else nome
+    import json
+    manifest = {
+        "name": nome + " — NavTech",
+        "short_name": short,
+        "description": "Plataforma de gestão interna — pedidos, stock, técnico, RH",
+        "start_url": "/dashboard",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#1e3a5f",
+        "orientation": "any",
+        "categories": ["business", "productivity"],
+        "icons": [
+            {"src": "/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "maskable any"},
+            {"src": "/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "maskable any"},
+            {"src": "/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "maskable any"},
+            {"src": "/icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "maskable any"},
+            {"src": "/icon-152.png", "sizes": "152x152", "type": "image/png", "purpose": "maskable any"},
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable any"},
+            {"src": "/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "maskable any"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any"},
+        ]
+    }
+    from flask import Response
+    return Response(json.dumps(manifest, ensure_ascii=False, indent=2),
+        mimetype='application/manifest+json',
+        headers={'Cache-Control': 'no-cache'})
 
 @app.route('/login', methods=['GET','POST'])
 def login():

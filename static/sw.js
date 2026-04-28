@@ -1,29 +1,21 @@
-const CACHE_NAME = 'comprasnet-v202604171551';
-const OFFLINE_URLS = [
-  '/mobile',
-  '/static/manifest.json',
-];
+const CACHE = 'comprasnet-v1';
+const OFFLINE_URL = '/dashboard';
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(OFFLINE_URLS))
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(['/static/favicon-32.png']))
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+self.addEventListener('activate', e => {
+  e.waitUntil(clients.claim());
 });
 
-self.addEventListener('fetch', event => {
-  // Network first, fallback to cache
-  event.respondWith(
-    fetch(event.request)
-      .catch(() => caches.match(event.request))
-  );
+self.addEventListener('fetch', e => {
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match(OFFLINE_URL))
+    );
+  }
 });
