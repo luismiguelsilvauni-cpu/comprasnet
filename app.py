@@ -141,7 +141,7 @@ def dashboard():
         .filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente']))
         .order_by(
             case(
-                (LinhaPedido.status == 'recebido', 2),
+                (LinhaPedido.status.in_(['recebido','por_faturar','faturado','cancelado']), 2),
                 (LinhaPedido.status == 'cancelado', 3),
                 else_=0
             ),
@@ -243,10 +243,13 @@ def api_dashboard_artigos_pedidos():
         ).all()
     )
     STATUS_INFO = {
-        "nao_encomendado": ("🔴 Não Enc.",  "#ef4444", "rgba(239,68,68,.15)"),
-        "pendente":         ("⏳ Pendente",  "#f59e0b", "rgba(245,158,11,.15)"),
-        "recebido":         ("✅ Recebido",  "#22c55e", "rgba(34,197,94,.15)"),
-        "cancelado":        ("❌ Cancelado", "#a855f7", "rgba(168,85,247,.15)"),
+        "nao_encomendado": ("🔴 Não Enc.",    "#ef4444", "rgba(239,68,68,.15)"),
+        "pendente":         ("⏳ Pendente",    "#f59e0b", "rgba(245,158,11,.15)"),
+        "encomendado":      ("📦 Encomendado", "#3b6ef0", "rgba(59,110,240,.15)"),
+        "recebido":         ("✅ Recebido",    "#22c55e", "rgba(34,197,94,.15)"),
+        "por_faturar":      ("🧾 Por Faturar", "#f97316", "rgba(249,115,22,.15)"),
+        "faturado":         ("💶 Faturado",    "#6366f1", "rgba(99,102,241,.15)"),
+        "cancelado":        ("❌ Cancelado",   "#a855f7", "rgba(168,85,247,.15)"),
     }
     rows = []
     for linha, pedido, user in artigos:
@@ -295,7 +298,7 @@ def api_dashboard_artigos_pedidos():
             "status_label": lbl,
             "status_color": col,
             "status_bg": bg,
-            "dim": s in ["recebido","cancelado"],
+            "dim": s in ["recebido","faturado","cancelado"],
             "data_status": hist.data.strftime("%d/%m/%Y %H:%M") if hist else "—",
             "alterado_por": hist.user_nome[:20] if hist else "—",
         })
