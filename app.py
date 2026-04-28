@@ -167,9 +167,10 @@ def pwa_icon(size):
     static_path = os.path.join(app.root_path, 'static', fname)
     if not os.path.exists(static_path):
         fname = 'icon-192.png'
-    return send_from_directory(os.path.join(app.root_path, 'static'),
-        fname, mimetype='image/png',
-        headers={'Cache-Control': 'public, max-age=300'})
+    resp = send_from_directory(os.path.join(app.root_path, 'static'),
+        fname, mimetype='image/png')
+    resp.headers['Cache-Control'] = 'public, max-age=300'
+    return resp
 
 
 @app.route('/apple-touch-icon.png')
