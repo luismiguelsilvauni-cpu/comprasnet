@@ -2521,6 +2521,10 @@ def manifest_static():
     return send_from_directory('static', 'manifest.json',
                                mimetype='application/manifest+json')
 
+@app.route('/versao')
+def versao():
+    return '2026-04-28-v2'
+
 @app.route('/pwa-test')
 def pwa_test():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'pwa-test.html')
