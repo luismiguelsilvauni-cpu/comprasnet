@@ -315,9 +315,6 @@
             <a href="{{ url_for('ausencias') }}" class="nav-item nav-sub {% if request.endpoint and ('ausencia' in request.endpoint or 'ferias' in request.endpoint) %}active{% endif %}">
               <span class="icon">📅</span><span>Mapa Férias / Faltas</span>
             </a>
-            <a href="{{ url_for('periodos_salariais') }}" class="nav-item nav-sub {% if request.endpoint and 'periodo' in request.endpoint %}active{% endif %}">
-              <span class="icon">💰</span><span>Períodos Salariais</span>
-            </a>
             {% endif %}
             {% if pode_aceder('partilha') %}
             <a href="{{ url_for('partilha') }}" class="nav-item nav-sub {% if request.endpoint == 'partilha' %}active{% endif %}">
