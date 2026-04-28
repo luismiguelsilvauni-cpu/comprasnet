@@ -105,81 +105,55 @@ table.summary tfoot td.name { text-align:left; }
 
 <!-- KPIs -->
 <div class="kpi-band">
-  <div class="kpi"><span class="val">{{ dias_uteis }}</span><span class="lbl">Dias Úteis</span></div>
+  <div class="kpi"><span class="val">{{ dias_uteis }}</span><span class="lbl">Dias Úteis Período</span></div>
+  <div class="kpi"><span class="val">{{ dias_uteis_civil }}</span><span class="lbl">Dias Úteis Mês Civil</span></div>
   <div class="kpi"><span class="val">{{ total_ferias }}</span><span class="lbl">Férias (dias)</span></div>
   <div class="kpi"><span class="val">{{ total_faltas }}</span><span class="lbl">Faltas (dias)</span></div>
   <div class="kpi"><span class="val">{{ total_he }}h</span><span class="lbl">Horas Extra</span></div>
   <div class="kpi"><span class="val">{{ func_data|length }}</span><span class="lbl">Colaboradores</span></div>
-  <div class="kpi"><span class="val">{{ func_data|sum(attribute='trabalhados')|round(1) }}</span><span class="lbl">Total Trabalhados</span></div>
 </div>
 
 
-<!-- Mini Calendar -->
-{% set first_day = data_ini %}
-{% set last_day = data_fim %}
-{% set cal_year = data_ini.year %}
-{% set cal_month_ini = data_ini.month %}
-{% set cal_month_fim = data_fim.month %}
-
+<!-- Mini Calendar (pre-computed) -->
 <div style="margin-bottom:14px">
   <div class="section-title" style="margin-top:0">Calendário do Período Salarial</div>
   <div style="display:flex;gap:16px;flex-wrap:wrap">
-  {% for cal_m in range(cal_month_ini, cal_month_fim+1) %}
-  {% set ns = namespace(first_wd=0) %}
-  <div class="mini-cal">
-    <div style="font-size:9px;font-weight:700;color:#1e3a5f;margin-bottom:4px;text-align:center">
-      {{ ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][cal_m] }} {{ cal_year }}
-    </div>
-    <table>
-      <thead><tr>
-        {% for d in ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] %}
-        <th>{{ d }}</th>{% endfor %}
-      </tr></thead>
-      <tbody>
-      {% set days_in_month = [0,31,28,31,30,31,30,31,31,30,31,30,31] %}
-      {% set nd = days_in_month[cal_m] %}
-      {% set nd = 29 if cal_m==2 and cal_year%4==0 else nd %}
-      {% set first_dow = namespace(v=0) %}
-      {% for d in range(1, nd+1) %}
-        {% set dow = (date(cal_year, cal_m, d).weekday()) %}
-        {% if loop.first %}{% set first_dow.v = dow %}{% endif %}
-      {% endfor %}
-      {% set blank = first_dow.v %}
-      {% set day_count = namespace(n=0) %}
-      {% for week in range(6) %}
-      <tr>
-        {% for wd in range(7) %}
-          {% set cell_n = week*7 + wd - blank + 1 %}
-          {% if cell_n < 1 or cell_n > nd %}
-          <td></td>
-          {% else %}
-            {% set cell_date = date(cal_year, cal_m, cell_n) %}
-            {% set is_wk = wd >= 5 %}
-            {% set fer_obj = feriados_no_periodo | selectattr('data','eq',cell_date) | first | default(none) %}
-            {% set in_sal = cell_date >= data_ini and cell_date <= data_fim %}
-            {% if fer_obj %}
-              <td class="{{ 'ponte' if fer_obj.tipo=='ponte' else 'feriado' }}" title="{{ fer_obj.nome }}">{{ cell_n }}</td>
-            {% elif is_wk %}
-              <td class="wk">{{ cell_n }}</td>
-            {% elif in_sal %}
-              <td class="periodo">{{ cell_n }}</td>
+    {% for cal in cal_months %}
+    <div class="mini-cal">
+      <div style="font-size:9px;font-weight:700;color:#1e3a5f;margin-bottom:4px;text-align:center">
+        {{ cal.nome }} {{ cal.ano }}
+      </div>
+      <table>
+        <thead><tr>
+          <th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th style="color:#94a3b8">Sáb</th><th style="color:#94a3b8">Dom</th>
+        </tr></thead>
+        <tbody>
+          {% for week in cal.weeks %}
+          <tr>
+            {% for cell in week %}
+            {% if cell.day == 0 %}
+            <td></td>
+            {% elif cell.feriado %}
+            <td class="{{ cell.feriado_tipo }}" title="{{ cell.feriado_nome }}"><strong>{{ cell.day }}</strong></td>
+            {% elif cell.weekend %}
+            <td class="wk">{{ cell.day }}</td>
+            {% elif cell.in_period %}
+            <td class="periodo">{{ cell.day }}</td>
             {% else %}
-              <td>{{ cell_n }}</td>
+            <td>{{ cell.day }}</td>
             {% endif %}
-          {% endif %}
-        {% endfor %}
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <div class="mini-cal-legend">
-      <span><div class="mini-cal-dot" style="background:rgba(30,58,95,.2)"></div> Período</span>
-      <span><div class="mini-cal-dot" style="background:rgba(239,68,68,.3)"></div> Feriado</span>
-      <span><div class="mini-cal-dot" style="background:rgba(59,110,240,.3)"></div> Ponte</span>
-      <span><div class="mini-cal-dot" style="background:#f8fafc;border:1px solid #e2e8f0"></div> FDS</span>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="mini-cal-legend">
+        <span><div class="mini-cal-dot" style="background:rgba(30,58,95,.15);border:1px solid rgba(30,58,95,.3)"></div> Período</span>
+        <span><div class="mini-cal-dot" style="background:rgba(239,68,68,.3)"></div> Feriado</span>
+        <span><div class="mini-cal-dot" style="background:rgba(59,110,240,.3)"></div> Ponte</span>
+      </div>
     </div>
-  </div>
-  {% endfor %}
+    {% endfor %}
   </div>
 </div>
 

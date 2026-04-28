@@ -8887,8 +8887,14 @@ def ausencias_pdf_reportlab(ano, mes):
     feriados_set = _get_feriados_set(ano)
 
     # Calculate period stats
+    from datetime import date as _dt_pdf
+    import calendar as _cal_mod
     dias_total = (data_fim - data_ini).days + 1
     dias_uteis = _dias_uteis_ausencia(data_ini, data_fim, feriados_set)
+    # Also calculate full civil month working days for reference
+    mes_ini_civil = _dt_pdf(ano, mes, 1)
+    mes_fim_civil = _dt_pdf(ano, mes, _cal_mod.monthrange(ano, mes)[1])
+    dias_uteis_mes_civil = _dias_uteis_ausencia(mes_ini_civil, mes_fim_civil, feriados_set)
     feriados_no_periodo = [f for f in FeriasFeriado.query.filter_by(ano=ano).all()
                            if data_ini <= f.data <= data_fim]
     pontes_no_periodo = [f for f in feriados_no_periodo if f.tipo == 'ponte']
@@ -9218,15 +9224,54 @@ def ausencias_pdf_html(ano, mes):
             'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis),
             'has_events':bool(aus or hes)})
     from datetime import date as _dt_cls
+
+    # Build mini-calendar data
+    import calendar as _cal
+    MESES_NOMES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+    feriados_dict = {f.data: f for f in feriados_no_periodo}
+    cal_months = []
+    cur_m = data_ini.month; cur_y = data_ini.year
+    while (cur_y, cur_m) <= (data_fim.year, data_fim.month):
+        from datetime import date as _dtc
+        nd = _cal.monthrange(cur_y, cur_m)[1]
+        first_dow = _dtc(cur_y, cur_m, 1).weekday()  # 0=Mon
+        weeks = []
+        week = [{'day':0}] * first_dow
+        for d in range(1, nd+1):
+            dt = _dtc(cur_y, cur_m, d)
+            dow = dt.weekday()
+            fer = feriados_dict.get(dt)
+            cell = {
+                'day': d,
+                'weekend': dow >= 5,
+                'in_period': data_ini <= dt <= data_fim,
+                'feriado': bool(fer),
+                'feriado_tipo': ('ponte' if fer and fer.tipo=='ponte' else 'feriado') if fer else '',
+                'feriado_nome': fer.nome if fer else '',
+            }
+            week.append(cell)
+            if len(week) == 7:
+                weeks.append(week); week = []
+        if week:
+            week += [{'day':0}] * (7 - len(week))
+            weeks.append(week)
+        cal_months.append({'nome': MESES_NOMES[cur_m], 'ano': cur_y, 'weeks': weeks})
+        if cur_m == 12: cur_y += 1; cur_m = 1
+        else: cur_m += 1
+
+    from datetime import date as _dt_cls
     return render_template('ausencias_pdf.html',
         empresa=empresa, mes=mes, ano=ano, mes_nome=MESES_PT[mes],
         data_ini=data_ini, data_fim=data_fim,
-        dias_uteis=int(dias_uteis), total_faltas=round(total_faltas,1),
+        dias_uteis=int(dias_uteis),
+        dias_uteis_civil=int(dias_uteis_mes_civil),
+        total_faltas=round(total_faltas,1),
         total_ferias=round(total_ferias,1), total_he=round(total_he,1),
         func_data=func_data, hoje=date.today(),
         feriados_no_periodo=feriados_no_periodo,
         n_feriados=n_feriados, n_pontes=n_pontes,
-        date=_dt_cls)
+        cal_months=cal_months, date=_dt_cls)
 
 
 @app.route('/ausencias/ping')
