@@ -173,6 +173,73 @@ def pwa_icon(size):
     return resp
 
 
+@app.route('/admin/regenerar-icons', methods=['POST'])
+@login_required
+def admin_regenerar_icons():
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    ok = _regenerar_pwa_icons()
+    if ok:
+        return jsonify({'ok': True, 'msg': 'Ícones PWA regenerados com o logotipo actual'})
+    return jsonify({'ok': False, 'error': 'Sem logotipo definido ou erro ao processar'})
+
+
+@app.route('/icon-debug')
+def icon_debug():
+    """Debug: check what icon would be served."""
+    cfg = ConfigGeral.query.first()
+    info = {
+        'empresa_logo_path': cfg.empresa_logo_path if cfg else None,
+        'upload_folder': app.config['UPLOAD_FOLDER'],
+    }
+    if cfg and cfg.empresa_logo_path:
+        logo_path = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
+        info['logo_full_path'] = logo_path
+        info['logo_exists'] = os.path.exists(logo_path)
+    else:
+        info['logo_full_path'] = None
+        info['logo_exists'] = False
+    
+    # List uploads folder
+    try:
+        info['uploads_contents'] = os.listdir(app.config['UPLOAD_FOLDER'])
+    except Exception as e:
+        info['uploads_contents'] = str(e)
+    
+    return jsonify(info)
+
+def _regenerar_pwa_icons():
+    """Pre-generate all PWA icon sizes from the company logo."""
+    cfg = ConfigGeral.query.first()
+    if not cfg or not cfg.empresa_logo_path:
+        return False
+    logo_path = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
+    if not os.path.exists(logo_path):
+        return False
+    try:
+        from PIL import Image
+        logo = Image.open(logo_path).convert('RGBA')
+        static_dir = os.path.join(app.root_path, 'static')
+        for size in [72, 96, 128, 144, 152, 180, 192, 384, 512]:
+            canvas = Image.new('RGBA', (size, size), '#1e3a5f')
+            thumb = logo.copy()
+            max_dim = int(size * 0.75)
+            thumb.thumbnail((max_dim, max_dim), Image.LANCZOS)
+            ox = (size - thumb.width) // 2
+            oy = (size - thumb.height) // 2
+            canvas.paste(thumb, (ox, oy), thumb)
+            canvas.save(os.path.join(static_dir, f'icon-{size}.png'), 'PNG')
+        # favicon
+        i32 = Image.new('RGBA', (32, 32), '#1e3a5f')
+        thumb = logo.copy(); thumb.thumbnail((24,24), Image.LANCZOS)
+        i32.paste(thumb, ((32-thumb.width)//2,(32-thumb.height)//2), thumb)
+        i32.save(os.path.join(static_dir, 'favicon.ico'), format='ICO', sizes=[(16,16),(32,32)])
+        return True
+    except Exception as e:
+        print(f"Icon regen error: {e}")
+        return False
+
+
 @app.route('/apple-touch-icon.png')
 @app.route('/apple-touch-icon-precomposed.png')
 def apple_touch_icon():
@@ -1757,6 +1824,7 @@ def admin_config():
                 logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logo_empresa.png')
                 logo.save(logo_path)
                 cfg.empresa_logo_path = 'logo_empresa.png'
+                _regenerar_pwa_icons()
             try:
                 db.session.commit()
                 flash('Configurações guardadas com sucesso! ✅', 'success')
