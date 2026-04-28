@@ -158,8 +158,11 @@ def pwa_icon(size):
                 buf = _io.BytesIO()
                 canvas.save(buf, 'PNG')
                 buf.seek(0)
-                return Response(buf.getvalue(), mimetype='image/png',
-                    headers={'Cache-Control': 'public, max-age=300'})
+                resp = Response(buf.getvalue(), mimetype='image/png')
+                resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+                resp.headers['Pragma'] = 'no-cache'
+                resp.headers['Expires'] = '0'
+                return resp
             except Exception:
                 pass
     # Static fallback (always works)
@@ -167,9 +170,9 @@ def pwa_icon(size):
     static_path = os.path.join(app.root_path, 'static', fname)
     if not os.path.exists(static_path):
         fname = 'icon-192.png'
-    resp = send_from_directory(os.path.join(app.root_path, 'static'),
-        fname, mimetype='image/png')
-    resp.headers['Cache-Control'] = 'public, max-age=300'
+    resp = send_from_directory(os.path.join(app.root_path, 'static'), fname, mimetype='image/png')
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
     return resp
 
 
@@ -255,6 +258,13 @@ def pwa_manifest():
     # Build absolute base URL
     from flask import request as freq
     base = freq.host_url.rstrip('/')  # e.g. http://192.168.1.10:5000
+    # Version based on logo file mtime for cache busting
+    import time
+    v = str(int(time.time()))
+    if cfg and cfg.empresa_logo_path:
+        lp = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
+        if os.path.exists(lp):
+            v = str(int(os.path.getmtime(lp)))
     
     import json
     manifest = {
@@ -269,13 +279,13 @@ def pwa_manifest():
         "orientation": "any",
         "lang": "pt",
         "icons": [
-            {"src": base + "/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-72.png?v=" + v,  "sizes": "72x72",   "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-96.png?v=" + v,  "sizes": "96x96",   "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-128.png?v=" + v, "sizes": "128x128", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-144.png?v=" + v, "sizes": "144x144", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-192.png?v=" + v, "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-384.png?v=" + v, "sizes": "384x384", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
         ]
     }
     from flask import Response

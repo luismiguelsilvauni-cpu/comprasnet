@@ -152,10 +152,22 @@ function regenerarIcons() {
       if (d.ok) {
         msg.textContent = '✅ ' + d.msg;
         msg.style.color = '#22c55e';
-        // Refresh icon previews
-        document.querySelectorAll('img[src*="icon-"]').forEach(function(img){
-          img.src = img.src.split('?')[0] + '?t=' + Date.now();
-        });
+        // Clear service worker cache and refresh icons
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({action: 'clearCache'});
+        }
+        // Clear cache API
+        if ('caches' in window) {
+          caches.keys().then(function(keys) {
+            keys.forEach(function(key) { caches.delete(key); });
+          });
+        }
+        // Refresh icon previews with cache bust
+        setTimeout(function() {
+          document.querySelectorAll('img[src*="icon-"]').forEach(function(img){
+            img.src = img.src.split('?')[0] + '?t=' + Date.now();
+          });
+        }, 500);
       } else {
         msg.textContent = '❌ ' + d.error;
         msg.style.color = '#ef4444';
