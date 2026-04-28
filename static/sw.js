@@ -1,45 +1,54 @@
-const CACHE = 'comprasnet-v2';
-const ICONS = [
-  '/icon-192.png', '/icon-512.png', '/favicon.ico',
-  '/static/icon-192.png', '/static/icon-512.png'
+const CACHE = 'comprasnet-v3';
+const PRECACHE = [
+  '/icon-192.png',
+  '/icon-512.png', 
+  '/icon-maskable-192.png',
+  '/icon-maskable-512.png',
+  '/favicon.ico',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => {
-      return Promise.allSettled(ICONS.map(url => 
-        c.add(url).catch(() => null)
-      ));
-    })
+    caches.open(CACHE).then(c =>
+      Promise.allSettled(PRECACHE.map(url => c.add(url).catch(()=>null)))
+    ).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys => 
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => clients.claim())
   );
+});
+
+self.addEventListener('message', e => {
+  if (e.data && e.data.action === 'clearCache') {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  }
 });
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // Cache-first for icons
-  if (url.pathname.match(/\.(png|ico|svg)$/)) {
+  // Serve icons from cache
+  if (url.pathname.match(/\.(png|ico)$/)) {
     e.respondWith(
-      caches.match(e.request).then(cached => 
+      caches.match(e.request).then(cached =>
         cached || fetch(e.request).then(resp => {
-          const clone = resp.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          if (resp.ok) {
+            caches.open(CACHE).then(c => c.put(e.request, resp.clone()));
+          }
           return resp;
         })
       )
     );
     return;
   }
-  // Network-first for pages
+  // For navigation: network first
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).catch(() => caches.match('/dashboard')));
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match('/dashboard'))
+    );
   }
 });

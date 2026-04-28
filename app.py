@@ -235,17 +235,24 @@ def pwa_manifest():
     base = _req.host_url.rstrip('/')
     import json, time
     v = str(int(time.time()))
+    start_path = (cfg.pwa_start_url.lstrip('/') if cfg and getattr(cfg,'pwa_start_url',None) else "dashboard")
     manifest = {
         "name": nome,
         "short_name": short,
-        "start_url": base + "/dashboard",
+        "description": "Plataforma de gestao interna",
+        "start_url": base + "/" + start_path,
         "scope": base + "/",
         "display": "standalone",
+        "display_override": ["standalone", "minimal-ui"],
         "background_color": "#1e3a5f",
         "theme_color": "#1e3a5f",
+        "orientation": "portrait-primary",
+        "lang": "pt-PT",
+        "dir": "ltr",
+        "prefer_related_applications": False,
         "icons": [
-            {"src": base + "/icon-192.png?v=" + v, "sizes": "192x192", "type": "image/png", "purpose": "any"},
-            {"src": base + "/icon-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": base + "/icon-192.png?v=" + v,          "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": base + "/icon-512.png?v=" + v,          "sizes": "512x512", "type": "image/png", "purpose": "any"},
             {"src": base + "/icon-maskable-192.png?v=" + v, "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
             {"src": base + "/icon-maskable-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ]
