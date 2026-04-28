@@ -137,42 +137,12 @@ def favicon():
 
 @app.route('/icon-<int:size>.png')
 def pwa_icon(size):
-    """Dynamic PWA icon - overlay company logo on navy background."""
-    valid = [72, 96, 128, 144, 152, 180, 192, 384, 512]
+    valid = [72, 96, 128, 144, 152, 192, 384, 512]
     if size not in valid:
         size = 192
-    cfg = ConfigGeral.query.first()
-    if cfg and cfg.empresa_logo_path:
-        logo_path = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
-        if os.path.exists(logo_path):
-            try:
-                from PIL import Image
-                import io as _io
-                logo = Image.open(logo_path).convert('RGBA')
-                canvas = Image.new('RGBA', (size, size), '#1e3a5f')
-                max_dim = int(size * 0.72)
-                logo.thumbnail((max_dim, max_dim), Image.LANCZOS)
-                ox = (size - logo.width) // 2
-                oy = (size - logo.height) // 2
-                canvas.paste(logo, (ox, oy), logo)
-                buf = _io.BytesIO()
-                canvas.save(buf, 'PNG')
-                buf.seek(0)
-                resp = Response(buf.getvalue(), mimetype='image/png')
-                resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-                resp.headers['Pragma'] = 'no-cache'
-                resp.headers['Expires'] = '0'
-                return resp
-            except Exception:
-                pass
-    # Static fallback (always works)
     fname = f'icon-{size}.png'
-    static_path = os.path.join(app.root_path, 'static', fname)
-    if not os.path.exists(static_path):
-        fname = 'icon-192.png'
-    resp = send_from_directory(os.path.join(app.root_path, 'static'), fname, mimetype='image/png')
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
+    resp = send_from_directory(os.path.join(app.root_path, 'static'), fname)
+    resp.headers['Cache-Control'] = 'no-cache'
     return resp
 
 
@@ -243,6 +213,14 @@ def _regenerar_pwa_icons():
         return False
 
 
+@app.route('/icon-maskable-<int:size>.png')
+def pwa_icon_maskable(size):
+    if size not in [192, 512]:
+        size = 192
+    resp = send_from_directory(os.path.join(app.root_path, 'static'), f'icon-maskable-{size}.png')
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
 @app.route('/apple-touch-icon.png')
 @app.route('/apple-touch-icon-precomposed.png')
 def apple_touch_icon():
@@ -250,53 +228,31 @@ def apple_touch_icon():
 
 @app.route('/manifest.json')
 def pwa_manifest():
-    """Dynamic manifest using company name and logo - absolute URLs for Android."""
     cfg = ConfigGeral.query.first()
     nome = (cfg.empresa_nome if cfg and cfg.empresa_nome else 'ComprasNet').strip()
     short = nome[:12] if len(nome) > 12 else nome
-    
-    # Build absolute base URL
-    from flask import request as freq
-    base = freq.host_url.rstrip('/')  # e.g. http://192.168.1.10:5000
-    # Version based on logo file mtime for cache busting
-    import time
+    from flask import request as _req
+    base = _req.host_url.rstrip('/')
+    import json, time
     v = str(int(time.time()))
-    if cfg and cfg.empresa_logo_path:
-        lp = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
-        if os.path.exists(lp):
-            v = str(int(os.path.getmtime(lp)))
-    
-    import json
     manifest = {
         "name": nome,
         "short_name": short,
-        "description": "Plataforma de gestao interna - pedidos, stock, tecnico, RH",
         "start_url": base + "/dashboard",
         "scope": base + "/",
         "display": "standalone",
         "background_color": "#1e3a5f",
         "theme_color": "#1e3a5f",
-        "orientation": "any",
-        "lang": "pt",
         "icons": [
-            {"src": base + "/icon-72.png?v=" + v,  "sizes": "72x72",   "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-96.png?v=" + v,  "sizes": "96x96",   "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-128.png?v=" + v, "sizes": "128x128", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-144.png?v=" + v, "sizes": "144x144", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-192.png?v=" + v, "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-384.png?v=" + v, "sizes": "384x384", "type": "image/png", "purpose": "any maskable"},
-            {"src": base + "/icon-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-192.png?v=" + v, "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": base + "/icon-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": base + "/icon-maskable-192.png?v=" + v, "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+            {"src": base + "/icon-maskable-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ]
     }
-    from flask import Response
-    resp = Response(
-        json.dumps(manifest, ensure_ascii=False),
-        mimetype='application/manifest+json'
-    )
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp = Response(json.dumps(manifest), mimetype='application/manifest+json')
+    resp.headers['Cache-Control'] = 'no-cache'
     return resp
-
 
 
 @app.route('/login', methods=['GET','POST'])
