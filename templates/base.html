@@ -265,6 +265,39 @@
     <div class="sidebar-logo">
         {% if cfg_geral and cfg_geral.empresa_logo_path %}
 {% endif %}
+      </div>
+        <!-- GESTÃO dropdown -->
+        {% set gestao_active = request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe','funcionarios','funcionario_novo','funcionario_ficha','funcionario_editar','salarios','salarios_pin','salarios_documentos','partilha'] %}
+        <div class="nav-dropdown {% if gestao_active %}active{% endif %}" id="dd-gestao">
+          <button class="nav-item nav-dd-btn {% if gestao_active %}active{% endif %}" onclick="toggleDD('gestao')">
+            <span class="icon">👥</span><span>Gestão</span><span class="dd-arrow">▸</span>
+          </button>
+          <div class="nav-dd-items" id="ddi-gestao">
+            {% if pode_aceder('clientes') %}
+            <a href="{{ url_for('clientes') }}" class="nav-item nav-sub {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
+              <span class="icon">👥</span><span>Clientes</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('funcionarios') %}
+            <a href="{{ url_for('funcionarios') }}" class="nav-item nav-sub {% if 'funcionario' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">🪪</span><span>Funcionários</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('salarios') %}
+            <a href="{{ url_for('salarios') }}" class="nav-item nav-sub {% if 'salario' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">💶</span><span>Salários</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('fornecedores') %}
+            <a href="{{ url_for('fornecedores') }}" class="nav-item nav-sub {% if request.endpoint in ['fornecedores','fornecedor_marcas'] %}active{% endif %}">
+              <span class="icon">🏭</span><span>Fornecedores</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('ferias') %}
+            <a href="{{ url_for('ausencias') }}" class="nav-item nav-sub {% if request.endpoint and ('ausencia' in request.endpoint or 'ferias' in request.endpoint) %}active{% endif %}">
+              <span class="icon">📅</span><span>Mapa Férias / Faltas</span>
+            </a>
+            {% endif %}
             {% if pode_aceder('partilha') %}
             <a href="{{ url_for('partilha') }}" class="nav-item nav-sub {% if request.endpoint == 'partilha' %}active{% endif %}">
               <span class="icon">📁</span><span>Partilha</span>
@@ -272,6 +305,8 @@
             {% endif %}
           </div>
         </div>
+
+
 
         <!-- LOGÍSTICA dropdown -->
         {% set log_active = request.endpoint in ['pedidos','novo_pedido','pedido_detalhe','stock','stock_artigo','entradas','entrada_nova','entrada_detalhe','entrada_editar','inventario','reposicao','analisar_artigo','pendentes'] %}
