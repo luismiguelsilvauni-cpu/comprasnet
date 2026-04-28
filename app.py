@@ -137,39 +137,40 @@ def favicon():
 
 @app.route('/icon-<int:size>.png')
 def pwa_icon(size):
-    """Dynamic PWA icon from company logo at any size."""
-    if size not in [72, 96, 128, 144, 152, 192, 384, 512]:
+    """Dynamic PWA icon - overlay company logo on navy background."""
+    valid = [72, 96, 128, 144, 152, 180, 192, 384, 512]
+    if size not in valid:
         size = 192
     cfg = ConfigGeral.query.first()
     if cfg and cfg.empresa_logo_path:
         logo_path = os.path.join(app.config['UPLOAD_FOLDER'], cfg.empresa_logo_path)
         if os.path.exists(logo_path):
             try:
-                from PIL import Image, ImageDraw
-                import io
-                img = Image.open(logo_path).convert('RGBA')
-                # Navy square background
+                from PIL import Image
+                import io as _io
+                logo = Image.open(logo_path).convert('RGBA')
                 canvas = Image.new('RGBA', (size, size), '#1e3a5f')
-                # Padding: logo occupies 70% of canvas
-                max_logo = int(size * 0.70)
-                img.thumbnail((max_logo, max_logo), Image.LANCZOS)
-                offset = ((size - img.width)//2, (size - img.height)//2)
-                canvas.paste(img, offset, img if img.mode == 'RGBA' else canvas)
-                buf = io.BytesIO()
-                canvas.save(buf, format='PNG')
+                max_dim = int(size * 0.72)
+                logo.thumbnail((max_dim, max_dim), Image.LANCZOS)
+                ox = (size - logo.width) // 2
+                oy = (size - logo.height) // 2
+                canvas.paste(logo, (ox, oy), logo)
+                buf = _io.BytesIO()
+                canvas.save(buf, 'PNG')
                 buf.seek(0)
-                from flask import Response
                 return Response(buf.getvalue(), mimetype='image/png',
-                    headers={'Cache-Control': 'public, max-age=3600'})
+                    headers={'Cache-Control': 'public, max-age=300'})
             except Exception:
                 pass
-    # Fallback to static
+    # Static fallback (always works)
     fname = f'icon-{size}.png'
-    static_icon = os.path.join(app.root_path, 'static', fname)
-    if not os.path.exists(static_icon):
+    static_path = os.path.join(app.root_path, 'static', fname)
+    if not os.path.exists(static_path):
         fname = 'icon-192.png'
     return send_from_directory(os.path.join(app.root_path, 'static'),
-        fname, mimetype='image/png')
+        fname, mimetype='image/png',
+        headers={'Cache-Control': 'public, max-age=300'})
+
 
 @app.route('/apple-touch-icon.png')
 @app.route('/apple-touch-icon-precomposed.png')
@@ -187,22 +188,22 @@ def pwa_manifest():
         "name": nome + " — NavTech",
         "short_name": short,
         "description": "Plataforma de gestão interna — pedidos, stock, técnico, RH",
-        "start_url": "/dashboard",
-        "scope": "/",
+        "start_url": "./dashboard",
+        "scope": "./",
         "display": "standalone",
         "background_color": "#0f172a",
         "theme_color": "#1e3a5f",
         "orientation": "any",
         "categories": ["business", "productivity"],
         "icons": [
-            {"src": "/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "maskable any"},
-            {"src": "/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "maskable any"},
-            {"src": "/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "maskable any"},
-            {"src": "/icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "maskable any"},
-            {"src": "/icon-152.png", "sizes": "152x152", "type": "image/png", "purpose": "maskable any"},
-            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable any"},
-            {"src": "/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "maskable any"},
-            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-152.png", "sizes": "152x152", "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "maskable any"},
+            {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any"},
         ]
     }
     from flask import Response
