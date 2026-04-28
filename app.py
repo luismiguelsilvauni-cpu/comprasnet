@@ -2465,8 +2465,8 @@ def api_gemini_models():
 
 # ── PWA + MOBILE ──────────────────────────────────────────────────────────────
 
-@app.route('/manifest.json')
-def manifest():
+@app.route('/manifest-static.json')
+def manifest_static():
     return send_from_directory('static', 'manifest.json',
                                mimetype='application/manifest+json')
 
