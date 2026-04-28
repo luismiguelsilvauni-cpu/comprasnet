@@ -180,37 +180,47 @@ def apple_touch_icon():
 
 @app.route('/manifest.json')
 def pwa_manifest():
-    """Dynamic manifest using company name and logo."""
+    """Dynamic manifest using company name and logo - absolute URLs for Android."""
     cfg = ConfigGeral.query.first()
     nome = (cfg.empresa_nome if cfg and cfg.empresa_nome else 'ComprasNet').strip()
     short = nome[:12] if len(nome) > 12 else nome
+    
+    # Build absolute base URL
+    from flask import request as freq
+    base = freq.host_url.rstrip('/')  # e.g. http://192.168.1.10:5000
+    
     import json
     manifest = {
-        "name": nome + " — NavTech",
+        "name": nome,
         "short_name": short,
-        "description": "Plataforma de gestão interna — pedidos, stock, técnico, RH",
-        "start_url": "./dashboard",
-        "scope": "./",
+        "description": "Plataforma de gestao interna - pedidos, stock, tecnico, RH",
+        "start_url": base + "/dashboard",
+        "scope": base + "/",
         "display": "standalone",
-        "background_color": "#0f172a",
+        "background_color": "#1e3a5f",
         "theme_color": "#1e3a5f",
         "orientation": "any",
-        "categories": ["business", "productivity"],
+        "lang": "pt",
         "icons": [
-            {"src": "./icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "maskable any"},
-            {"src": "./icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "maskable any"},
-            {"src": "./icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "maskable any"},
-            {"src": "./icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "maskable any"},
-            {"src": "./icon-152.png", "sizes": "152x152", "type": "image/png", "purpose": "maskable any"},
-            {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable any"},
-            {"src": "./icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "maskable any"},
-            {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any"},
+            {"src": base + "/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any maskable"},
+            {"src": base + "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
         ]
     }
     from flask import Response
-    return Response(json.dumps(manifest, ensure_ascii=False, indent=2),
-        mimetype='application/manifest+json',
-        headers={'Cache-Control': 'no-cache'})
+    resp = Response(
+        json.dumps(manifest, ensure_ascii=False),
+        mimetype='application/manifest+json'
+    )
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
 
 @app.route('/login', methods=['GET','POST'])
 def login():
