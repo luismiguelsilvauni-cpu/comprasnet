@@ -8659,7 +8659,7 @@ def _resumo_periodo(periodo_id):
 # ── Períodos salariais ────────────────────────────────────────────────────────
 @app.route('/periodos-salariais')
 @login_required
-def periodos_salariais():
+def periodos_fecho():
     from datetime import date
     ano = int(request.args.get('ano', date.today().year))
     periodos = PeriodoSalarial.query.filter_by(ano=ano).order_by(PeriodoSalarial.mes).all()
@@ -8793,15 +8793,16 @@ def hora_extra_registar():
     except: return jsonify({'ok': False, 'error': 'Data inválida'})
     fid    = int(data['funcionario_id'])
     horas_manual = data.get('horas_manual')
-    h_ini  = data.get('hora_inicio','').strip() or '00:00'
-    h_fim  = data.get('hora_fim','').strip() or '00:00'
-    if horas_manual:
+    h_ini = (data.get('hora_inicio') or '').strip() or '00:00'
+    h_fim = (data.get('hora_fim') or '').strip() or '00:00'
+    if horas_manual and float(horas_manual) > 0:
         total = float(horas_manual)
-        h_ini = '00:00'; h_fim = '00:00'
-    else:
-        if not h_ini or not h_fim: return jsonify({'ok': False, 'error': 'Horas inválidas'})
+        h_ini = '--'; h_fim = '--'
+    elif h_ini != '00:00' and h_fim != '00:00':
         total = _horas_entre(h_ini, h_fim)
-        if total <= 0: return jsonify({'ok': False, 'error': 'Hora fim antes de hora início'})
+        if total <= 0: return jsonify({'ok': False, 'error': 'Hora fim deve ser depois do início'})
+    else:
+        return jsonify({'ok': False, 'error': 'Indique o período horário ou o total de horas'})
     # Check overlap
     overlap = HoraExtra.query.filter(
         HoraExtra.funcionario_id == fid,
@@ -8899,6 +8900,7 @@ def ausencias_pdf_reportlab(ano, mes):
     mes_ini_civil = _dt_pdf(ano, mes, 1)
     mes_fim_civil = _dt_pdf(ano, mes, _cal_mod.monthrange(ano, mes)[1])
     dias_uteis_mes_civil = _dias_uteis_ausencia(mes_ini_civil, mes_fim_civil, feriados_set)
+    dias_uteis_periodo = dias_uteis  # period-based
     feriados_no_periodo = [f for f in FeriasFeriado.query.filter_by(ano=ano).all()
                            if data_ini <= f.data <= data_fim]
     pontes_no_periodo = [f for f in feriados_no_periodo if f.tipo == 'ponte']
@@ -9225,8 +9227,8 @@ def ausencias_pdf_html(ano, mes):
         func_data.append({'nome':f.nome,'dept':dept_val,
             'ferias':f_ferias,'faltas_just':f_faltas_just,'faltas_injust':f_faltas_injust,
             'baixas':f_baixas,'pontes':f_pontes,'he':f_he,'he_util':f_he_util,'he_fds':f_he_fds,
-            'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis),
-            'has_events':bool(aus or hes)})
+            'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis_mes_civil),
+            'has_events':bool(events)})
     from datetime import date as _dt_cls
 
     # Build mini-calendar data
@@ -9234,6 +9236,22 @@ def ausencias_pdf_html(ano, mes):
     MESES_NOMES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
     feriados_dict = {f.data: f for f in feriados_no_periodo}
+    # Also get fecho empresa days for calendar
+    try:
+        fechos_empresa = AusenciaRegisto.query.filter(
+            AusenciaRegisto.tipo == 'fecho_empresa',
+            AusenciaRegisto.data_inicio <= data_fim,
+            AusenciaRegisto.data_fim >= data_ini
+        ).all()
+        fechos_dias = set()
+        from datetime import timedelta as _td2
+        for fe in fechos_empresa:
+            cur = fe.data_inicio
+            while cur <= fe.data_fim:
+                fechos_dias.add(cur)
+                cur += _td2(days=1)
+    except:
+        fechos_dias = set()
     cal_months = []
     cur_m = data_ini.month; cur_y = data_ini.year
     while (cur_y, cur_m) <= (data_fim.year, data_fim.month):
@@ -9253,6 +9271,7 @@ def ausencias_pdf_html(ano, mes):
                 'feriado': bool(fer),
                 'feriado_tipo': ('ponte' if fer and fer.tipo=='ponte' else 'feriado') if fer else '',
                 'feriado_nome': fer.nome if fer else '',
+                'is_fecho': dt in fechos_dias,
             }
             week.append(cell)
             if len(week) == 7:
@@ -9275,7 +9294,9 @@ def ausencias_pdf_html(ano, mes):
         func_data=func_data, hoje=date.today(),
         feriados_no_periodo=feriados_no_periodo,
         n_feriados=n_feriados, n_pontes=n_pontes,
-        cal_months=cal_months, date=_dt_cls)
+        cal_months=cal_months, date=_dt_cls,
+        periodo_fecho=periodo,
+        mes_ini_civil=mes_ini_civil, mes_fim_civil=mes_fim_civil)
 
 
 @app.route('/ausencias/ping')
