@@ -105,6 +105,17 @@ def analyze_pdf_with_claude(pdf_text, filename):
 
 # ── AUTH ───────────────────────────────────────────────────────────────────────
 
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+        'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+@app.route('/manifest.json')
+def pwa_manifest():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+        'manifest.json', mimetype='application/manifest+json')
+
 @app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
