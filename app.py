@@ -8788,11 +8788,16 @@ def hora_extra_registar():
         dt = datetime.strptime(data['data'], '%Y-%m-%d').date()
     except: return jsonify({'ok': False, 'error': 'Data inválida'})
     fid    = int(data['funcionario_id'])
-    h_ini  = data.get('hora_inicio','').strip()
-    h_fim  = data.get('hora_fim','').strip()
-    if not h_ini or not h_fim: return jsonify({'ok': False, 'error': 'Horas inválidas'})
-    total  = _horas_entre(h_ini, h_fim)
-    if total <= 0: return jsonify({'ok': False, 'error': 'Hora fim antes de hora início'})
+    horas_manual = data.get('horas_manual')
+    h_ini  = data.get('hora_inicio','').strip() or '00:00'
+    h_fim  = data.get('hora_fim','').strip() or '00:00'
+    if horas_manual:
+        total = float(horas_manual)
+        h_ini = '00:00'; h_fim = '00:00'
+    else:
+        if not h_ini or not h_fim: return jsonify({'ok': False, 'error': 'Horas inválidas'})
+        total = _horas_entre(h_ini, h_fim)
+        if total <= 0: return jsonify({'ok': False, 'error': 'Hora fim antes de hora início'})
     # Check overlap
     overlap = HoraExtra.query.filter(
         HoraExtra.funcionario_id == fid,
@@ -8887,6 +8892,8 @@ def ausencias_pdf_reportlab(ano, mes):
     feriados_no_periodo = [f for f in FeriasFeriado.query.filter_by(ano=ano).all()
                            if data_ini <= f.data <= data_fim]
     pontes_no_periodo = [f for f in feriados_no_periodo if f.tipo == 'ponte']
+    n_feriados = len([f for f in feriados_no_periodo if f.tipo != 'ponte'])
+    n_pontes   = len(pontes_no_periodo)
 
     funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()         if hasattr(Funcionario,'ativo') else Funcionario.query.order_by(Funcionario.nome).all()
 
@@ -9210,12 +9217,16 @@ def ausencias_pdf_html(ano, mes):
             'baixas':f_baixas,'pontes':f_pontes,'he':f_he,'he_util':f_he_util,'he_fds':f_he_fds,
             'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis),
             'has_events':bool(aus or hes)})
+    from datetime import date as _dt_cls
     return render_template('ausencias_pdf.html',
         empresa=empresa, mes=mes, ano=ano, mes_nome=MESES_PT[mes],
         data_ini=data_ini, data_fim=data_fim,
         dias_uteis=int(dias_uteis), total_faltas=round(total_faltas,1),
         total_ferias=round(total_ferias,1), total_he=round(total_he,1),
-        func_data=func_data, hoje=date.today())
+        func_data=func_data, hoje=date.today(),
+        feriados_no_periodo=feriados_no_periodo,
+        n_feriados=n_feriados, n_pontes=n_pontes,
+        date=_dt_cls)
 
 
 @app.route('/ausencias/ping')
@@ -9251,6 +9262,70 @@ def _get_feriados_set(ano):
     from datetime import date
     feriados = FeriasFeriado.query.filter_by(ano=ano).all()
     return {f.data for f in feriados}
+
+def _calcular_direito_ferias(funcionario, ano):
+    """Calculate vacation days entitlement based on admission date."""
+    from datetime import date
+    admissao = funcionario.data_admissao
+    if not admissao:
+        return 22  # default
+
+    # First year: 2 days per full month, max 20
+    if admissao.year == ano:
+        meses_completos = 0
+        for m in range(admissao.month, 13):
+            # Count months after admission in the same year
+            if m > admissao.month or admissao.day == 1:
+                meses_completos += 1
+        # More precise: months from admission to end of year
+        from dateutil.relativedelta import relativedelta
+        end_of_year = date(ano, 12, 31)
+        delta = relativedelta(end_of_year, admissao)
+        meses_completos = delta.months + (delta.years * 12)
+        if delta.days > 0:
+            meses_completos += 1
+        dias = min(meses_completos * 2, 20)
+        return max(0, dias)
+    
+    # Year of admission + 1: proportional or full 22 days
+    if admissao.year == ano - 1:
+        return 22
+    
+    # Subsequent years: 22 days
+    return 22
+
+def _recalc_saldo_com_admissao(funcionario_id, ano):
+    """Recalculate saldo considering admission date and company bridges."""
+    from datetime import date, timedelta
+    func = Funcionario.query.get(funcionario_id)
+    if not func:
+        return None
+    
+    saldo = AusenciaSaldoAnual.query.filter_by(funcionario_id=funcionario_id, ano=ano).first()
+    if not saldo:
+        saldo = AusenciaSaldoAnual(funcionario_id=funcionario_id, ano=ano)
+        db.session.add(saldo)
+    
+    # Only set dias_direito if not manually overridden (dias_ajuste == 0 and dias_direito == 22)
+    if saldo.dias_direito == 22 and saldo.dias_ajuste == 0:
+        saldo.dias_direito = _calcular_direito_ferias(func, ano)
+    
+    # Calculate consumed: ferias + pontes + fecho_empresa
+    # But only pontes/fechos AFTER admission date
+    admissao = func.data_admissao or date(ano, 1, 1)
+    
+    consumed = db.session.query(db.func.sum(AusenciaRegisto.dias_uteis)).filter(
+        AusenciaRegisto.funcionario_id == funcionario_id,
+        AusenciaRegisto.ano == ano,
+        AusenciaRegisto.estado.in_(['aprovado', 'pendente']),
+        AusenciaRegisto.tipo.in_(['ferias', 'ponte', 'fecho_empresa']),
+        AusenciaRegisto.data_inicio >= admissao  # Only after admission
+    ).scalar() or 0
+    
+    saldo.dias_gozados = round(consumed, 2)
+    saldo.dias_restantes = round((saldo.dias_direito + saldo.dias_ajuste) - consumed, 2)
+    return saldo
+
 
 def _recalc_saldo(funcionario_id, ano):
     """Recalculate annual leave balance for a given year."""
@@ -9343,11 +9418,22 @@ def ausencias():
     except Exception:
         fechos = []
 
-    # Saldos
+    # Saldos - recalculate with admission date rules
     saldos = {}
     for f in funcs:
         try:
             s = AusenciaSaldoAnual.query.filter_by(funcionario_id=f.id, ano=ano).first()
+            if not s:
+                # Auto-create with correct entitlement
+                try:
+                    s = AusenciaSaldoAnual(
+                        funcionario_id=f.id, ano=ano,
+                        dias_direito=_calcular_direito_ferias(f, ano)
+                    )
+                    db.session.add(s)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
             saldos[f.id] = s
         except Exception:
             saldos[f.id] = None

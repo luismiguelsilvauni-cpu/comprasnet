@@ -267,7 +267,7 @@ function gerarPDF() {
 {% endif %}
 
 <!-- Saldos cards + legenda -->
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="saldosStrip"></div>
+<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px" id="saldosStrip"></div>
 
 <!-- Legenda tipos -->
 <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
@@ -407,15 +407,29 @@ function gerarPDF() {
         <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="heData" class="input" onchange="updateHECategoria()"></div>
       </div>
       <div style="font-size:11px;color:var(--text-muted);padding:6px 10px;background:var(--surface2);border-radius:6px">
-        🕐 Horário normal: <strong>08:30–17:30</strong>
+        🕐 Horário normal: <strong>08:30–17:30</strong> — preencha o horário OU as horas directamente
       </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px">Período (blocos 30min):</div>
-        <div id="heGrid" style="display:flex;flex-wrap:wrap;gap:2px"></div>
+      <!-- Toggle: horário vs horas manuais -->
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <button type="button" onclick="heSetMode('horario')" id="heModeHorario" class="btn btn-sm btn-primary" style="font-size:11px">🕐 Horário</button>
+        <button type="button" onclick="heSetMode('manual')" id="heModeManual" class="btn btn-sm btn-ghost" style="font-size:11px">✏️ Horas Manual</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group" style="margin:0"><label>Hora Início</label><input type="time" id="heInicio" class="input" step="1800" onchange="calcHETotal()"></div>
-        <div class="form-group" style="margin:0"><label>Hora Fim</label><input type="time" id="heFim" class="input" step="1800" onchange="calcHETotal()"></div>
+      <div id="heHorarioSection">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px">Período (blocos 30min):</div>
+          <div id="heGrid" style="display:flex;flex-wrap:wrap;gap:2px"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+          <div class="form-group" style="margin:0"><label>Hora Início</label><input type="time" id="heInicio" class="input" step="1800" onchange="calcHETotal()"></div>
+          <div class="form-group" style="margin:0"><label>Hora Fim</label><input type="time" id="heFim" class="input" step="1800" onchange="calcHETotal()"></div>
+        </div>
+      </div>
+      <div id="heManualSection" style="display:none">
+        <div class="form-group" style="margin:0">
+          <label>Total de Horas Extra</label>
+          <input type="number" id="heHorasManual" class="input" min="0.5" max="24" step="0.5" value="2" placeholder="Ex: 2.5" onchange="calcHETotal()">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Introduza directamente o número de horas</div>
+        </div>
       </div>
       <div id="heTotalInfo" style="font-size:12px;color:var(--text-muted)"></div>
       <div id="heCategoriaInfo" style="display:none;font-size:11px;padding:5px 10px;border-radius:5px;background:var(--surface2)"></div>
@@ -499,13 +513,13 @@ function anoSeguinte(){ window.location='/ausencias?ano='+(ANO+1); }
 // ── Saldo cards ───────────────────────────────────────────────────────────────
 function buildSaldoCards() {
   var strip = document.getElementById('saldosStrip');
-  FUNCS.slice(0,8).forEach(function(f) {
+  FUNCS.forEach(function(f) {
     var s = SALDOS[f.id] || {restantes:22, direito:22, gozados:0};
     var r = s.restantes;
     var cor = r < 0 ? '#ef4444' : r < 5 ? '#f59e0b' : '#22c55e';
     var div = document.createElement('div');
     div.className = 'card';
-    div.style.cssText = 'padding:10px 14px;min-width:120px;cursor:pointer;flex:1';
+    div.style.cssText = 'padding:6px 10px;min-width:90px;cursor:pointer;';
     div.onclick = (function(fid, fnome){ return function(){ abrirSaldo(fid, fnome); }; })(f.id, f.nome);
     div.innerHTML = '<div style="font-size:10px;color:var(--text-muted)">' + nomeCurto(f.nome) + '</div>' +
       '<div style="font-size:20px;font-weight:800;color:'+cor+'">'+r.toFixed(1)+'</div>' +
@@ -574,7 +588,8 @@ function buildCalendar() {
       } else if (fec) {
         cell.style.background = 'rgba(148,163,184,.18)';
       } else if (isWk) {
-        cell.style.background = 'var(--surface2)';
+        cell.style.background = 'rgba(0,0,0,0.06)';
+        cell.style.borderLeft = cell.style.borderRight = '1px solid rgba(0,0,0,0.08)';
       }
 
       // Salary period border
@@ -630,7 +645,8 @@ function buildCalendar() {
         } else if (fecD) {
           cell2.style.background = 'rgba(148,163,184,.08)';
         } else if (isWkD) {
-          cell2.style.background = 'var(--surface2)';
+          cell2.style.background = 'rgba(0,0,0,0.06)';
+          cell2.style.borderLeft = cell2.style.borderRight = '1px solid rgba(0,0,0,0.06)';
         }
 
         var reg = REGISTOS.find(function(r) {
@@ -650,7 +666,8 @@ function buildCalendar() {
           if (isStart) {
             var lbl = document.createElement('div');
             lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none';
-            lbl.textContent = nomeCurto(f.nome);
+            var parts = f.nome.split(' ');
+            lbl.textContent = parts.length > 1 ? parts[0]+' '+parts[parts.length-1] : parts[0];
             cell2.appendChild(lbl);
           }
           cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
@@ -897,6 +914,18 @@ function eliminarHE(hid) {
     .then(function(d){ if(d.ok) { location.reload(); } });
 }
 
+var _heMode = 'horario';
+function heSetMode(mode) {
+  _heMode = mode;
+  document.getElementById('heHorarioSection').style.display = mode==='horario' ? 'block' : 'none';
+  document.getElementById('heManualSection').style.display  = mode==='manual'  ? 'block' : 'none';
+  document.getElementById('heModeHorario').className = 'btn btn-sm ' + (mode==='horario' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('heModeManual').className  = 'btn btn-sm ' + (mode==='manual'  ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('heModeHorario').style.fontSize = '11px';
+  document.getElementById('heModeManual').style.fontSize  = '11px';
+  calcHETotal();
+}
+
 function abrirHoraExtra(ds) {
   document.getElementById('heData').value = ds || '';
   document.getElementById('heInicio').value = '18:00';
@@ -907,6 +936,7 @@ function abrirHoraExtra(ds) {
   document.getElementById('modalHE').dataset.editId = '';
   var delBtn = document.getElementById('heDeleteBtn');
   if (delBtn) delBtn.style.display='none';
+  heSetMode('horario');
   buildHEGrid();
   calcHETotal();
   if (ds) { updateHECategoria(); }
@@ -937,13 +967,19 @@ function buildHEGrid() {
   }
 }
 function calcHETotal() {
+  var el = document.getElementById('heTotalInfo');
+  if (_heMode === 'manual') {
+    var h = parseFloat(document.getElementById('heHorasManual').value) || 0;
+    el.textContent = h > 0 ? '= ' + h.toFixed(1) + ' horas extra' : '';
+    return;
+  }
   var ini = document.getElementById('heInicio').value;
   var fim = document.getElementById('heFim').value;
   if (!ini || !fim) { return; }
   var iMin = parseInt(ini.split(':')[0])*60 + parseInt(ini.split(':')[1]);
   var fMin = parseInt(fim.split(':')[0])*60 + parseInt(fim.split(':')[1]);
   var total = (fMin - iMin) / 60;
-  document.getElementById('heTotalInfo').textContent = total > 0 ? '= ' + total.toFixed(1) + ' horas extra' : '⚠️ Hora fim deve ser depois do início';
+  el.textContent = total > 0 ? '= ' + total.toFixed(1) + ' horas extra' : '⚠️ Hora fim deve ser depois do início';
 }
 function updateHECategoria() {
   var ds = document.getElementById('heData').value;
