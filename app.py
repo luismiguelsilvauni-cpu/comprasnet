@@ -138,12 +138,23 @@ def dashboard():
     artigos_pedidos = (db.session.query(LinhaPedido, PedidoCompra, User)
         .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
         .join(User, PedidoCompra.criado_por == User.id, isouter=True)
-        .filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente']))
+        .filter(
+            db.or_(
+                PedidoCompra.estado.in_(['aberto','aprovado','pendente']),
+                # Always show por_faturar and faturado even if pedido is closed
+                LinhaPedido.status.in_(['por_faturar','faturado'])
+            )
+        )
+        .filter(LinhaPedido.status != 'cancelado')
         .order_by(
             case(
-                (LinhaPedido.status.in_(['recebido','por_faturar','faturado','cancelado']), 2),
-                (LinhaPedido.status == 'cancelado', 3),
-                else_=0
+                (LinhaPedido.status == 'nao_encomendado', 0),
+                (LinhaPedido.status == 'pendente', 1),
+                (LinhaPedido.status == 'encomendado', 2),
+                (LinhaPedido.status == 'por_faturar', 3),
+                (LinhaPedido.status == 'recebido', 4),
+                (LinhaPedido.status == 'faturado', 5),
+                else_=6
             ),
             PedidoCompra.data_criacao.desc()
         )
@@ -299,6 +310,8 @@ def api_dashboard_artigos_pedidos():
             "status_color": col,
             "status_bg": bg,
             "dim": s in ["recebido","faturado","cancelado"],
+            "alerta_faturar": bool(s == "por_faturar" and hist and (datetime.now() - hist.data).days >= 10),
+            "dias_por_faturar": int((datetime.now() - hist.data).days) if s == "por_faturar" and hist else 0,
             "data_status": hist.data.strftime("%d/%m/%Y %H:%M") if hist else "—",
             "alterado_por": hist.user_nome[:20] if hist else "—",
         })
