@@ -9160,17 +9160,21 @@ def ausencias_pdf_html(ano, mes):
             funcs = Funcionario.query.order_by(Funcionario.nome).all()
     except Exception:
         funcs = Funcionario.query.order_by(Funcionario.nome).all()
-    # Civil month calculation
+    # Civil month calculation (base for working days)
     import calendar as _cal_m
     from datetime import date as _dm
     mes_ini_civil = _dm(ano, mes, 1)
     mes_fim_civil = _dm(ano, mes, _cal_m.monthrange(ano, mes)[1])
-    dias_uteis_mes_civil = _dias_uteis_ausencia(mes_ini_civil, mes_fim_civil, feriados_set)
-    n_feriados = len([f for f in FeriasFeriado.query.filter_by(ano=ano).all()
-                      if mes_ini_civil <= f.data <= mes_fim_civil and f.tipo != 'ponte'])
-    n_pontes   = len([f for f in FeriasFeriado.query.filter_by(ano=ano).all()
-                      if mes_ini_civil <= f.data <= mes_fim_civil and f.tipo == 'ponte'])
-    feriados_no_periodo = FeriasFeriado.query.filter_by(ano=ano).all()
+    dias_uteis_mes_civil = _dias_uteis_ausencia(mes_ini_civil, mes_fim_civil, set())  # excl weekends only
+    feriados_mes = [f for f in FeriasFeriado.query.filter_by(ano=ano).all()
+                    if mes_ini_civil <= f.data <= mes_fim_civil]
+    n_feriados = len([f for f in feriados_mes if f.tipo != 'ponte'])
+    n_pontes   = len([f for f in feriados_mes if f.tipo == 'ponte'])
+    # dias_uteis_trabalho = civil month weekdays minus feriados and pontes
+    dias_uteis_trabalho = _dias_uteis_ausencia(mes_ini_civil, mes_fim_civil, {f.data for f in feriados_mes})
+    feriados_no_periodo = feriados_mes
+    # dias_ferias_pontes = feriados + pontes that fall on weekdays
+    dias_ferias_pontes = n_feriados + n_pontes
     TIPOS_LABELS = {
         'ferias':'Férias','ponte':'Ponte','fecho_empresa':'Fecho Empresa',
         'falta_justificada':'Falta Justificada','falta_injustificada':'Falta Injustificada',
@@ -9238,12 +9242,12 @@ def ausencias_pdf_html(ano, mes):
         # Sort events by date
         events.sort(key=lambda e: e.get('txt',''))
         f_faltas = f_faltas_just+f_faltas_injust+f_baixas
-        f_trabalhados = round(dias_uteis - f_ferias - f_pontes - f_faltas, 1)
+        f_trabalhados = round(dias_uteis_trabalho - f_ferias - f_pontes - f_faltas, 1)
         dept_val = getattr(f,'departamento','') or getattr(f,'cargo','') or ''
         func_data.append({'nome':f.nome,'dept':dept_val,
             'ferias':f_ferias,'faltas_just':f_faltas_just,'faltas_injust':f_faltas_injust,
             'baixas':f_baixas,'pontes':f_pontes,'he':f_he,'he_util':f_he_util,'he_fds':f_he_fds,
-            'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis),
+            'trabalhados':max(0,f_trabalhados),'events':events,'dias_uteis':int(dias_uteis_trabalho),
             'has_events':bool(events)})
     from datetime import date as _dt_cls
 
@@ -9308,8 +9312,9 @@ def ausencias_pdf_html(ano, mes):
     return render_template('ausencias_pdf.html',
         empresa=empresa, mes=mes, ano=ano, mes_nome=MESES_PT[mes],
         data_ini=data_ini, data_fim=data_fim,
-        dias_uteis=int(dias_uteis),
-        dias_uteis_civil=int(dias_uteis_mes_civil),
+        dias_uteis=int(dias_uteis),  # salary period days
+        dias_uteis_civil=int(dias_uteis_trabalho),  # civil month working days
+        dias_ferias_pontes=dias_ferias_pontes,
         total_faltas=round(total_faltas,1),
         total_ferias=round(total_ferias,1), total_he=round(total_he,1),
         func_data=func_data, hoje=date.today(),
