@@ -152,6 +152,7 @@ function dashAbrirStatus(linhaId, pedidoId, designacao, statusAtual) {
   _dsmLinhaId = linhaId;
   _dsmPedidoId = pedidoId;
   var LABELS = {nao_encomendado:'🔴 Não Encomendado', pendente:'⏳ Pendente Chegada', encomendado:'📦 Encomendado', recebido:'✅ Recebido', por_faturar:'🧾 Por Faturar', faturado:'💶 Faturado', cancelado:'❌ Cancelado'};
+  var _dsmIsStock = false;
   document.getElementById('dsmDesig').textContent = designacao;
   document.getElementById('dsmAtual').textContent = 'Estado actual: ' + (LABELS[statusAtual] || statusAtual);
   document.getElementById('dsmNotas').value = '';
@@ -533,7 +534,7 @@ function carregarArtigosPedidos() {
         var span = document.createElement('span');
         span.textContent = r.status_label;
         span.style.cssText = 'cursor:pointer;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:' + r.status_bg + ';color:' + r.status_color + ';border:1px solid ' + r.status_color + '40';
-        span.onclick = (function(lid, pid, des, st){ return function(){ dashAbrirStatus(lid, pid, des, st); }; })(r.linha_id, r.pedido_id, r.designacao, r.status);
+        span.onclick = (function(lid, pid, des, st, stk){ return function(){ dashAbrirStatus(lid, pid, des, st, stk); }; })(r.linha_id, r.pedido_id, r.designacao, r.status, r.is_stock);
         tdStatus.appendChild(span);
         tr.appendChild(tdStatus);
         // Artigo cell
@@ -967,6 +968,7 @@ function dashAbrirStatus(linhaId, pedidoId, designacao, statusAtual) {
   _dsmLinhaId = linhaId;
   _dsmPedidoId = pedidoId;
   var LABELS = {nao_encomendado:'🔴 Não Encomendado', pendente:'⏳ Pendente Chegada', encomendado:'📦 Encomendado', recebido:'✅ Recebido', por_faturar:'🧾 Por Faturar', faturado:'💶 Faturado', cancelado:'❌ Cancelado'};
+  var _dsmIsStock = false;
   document.getElementById('dsmDesig').textContent = designacao;
   document.getElementById('dsmAtual').textContent = 'Estado actual: ' + (LABELS[statusAtual] || statusAtual);
   document.getElementById('dsmNotas').value = '';
