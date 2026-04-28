@@ -2521,6 +2521,11 @@ def manifest_static():
     return send_from_directory('static', 'manifest.json',
                                mimetype='application/manifest+json')
 
+@app.route('/pwa-test')
+def pwa_test():
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'pwa-test.html')
+
+
 @app.route('/sw.js')
 def service_worker():
     return send_from_directory('static', 'sw.js',

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#1e3a5f">
+<meta name="mobile-web-app-capable" content="yes">
+<title>PWA Test</title>
+</head>
+<body style="background:#1e3a5f;color:white;font-family:sans-serif;padding:20px;text-align:center">
+<img src="/static/icon-192.png" style="width:96px;height:96px;border-radius:16px;margin:20px">
+<h2>ComprasNet</h2>
+<p>Se vê o ícone acima, os ícones estão acessíveis.</p>
+<div id="manifest-status" style="margin-top:20px;padding:10px;background:rgba(255,255,255,.1);border-radius:8px">
+  A verificar manifesto...
+</div>
+<script>
+fetch('/static/manifest.json')
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById('manifest-status').innerHTML = 
+      '✅ Manifesto OK<br>Nome: ' + d.name + '<br>Ícones: ' + d.icons.length + '<br>' +
+      d.icons.map(i => '<img src="' + i.src + '" style="width:32px;height:32px;margin:4px;border-radius:4px">').join('');
+  })
+  .catch(e => {
+    document.getElementById('manifest-status').innerHTML = '❌ Erro: ' + e.message;
+  });
+</script>
+</body>
+</html>
