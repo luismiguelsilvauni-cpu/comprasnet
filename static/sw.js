@@ -1,4 +1,4 @@
-const CACHE = 'comprasnet-v3';
+const CACHE = 'comprasnet-v4';
 const PRECACHE = [
   '/icon-192.png',
   '/icon-512.png', 

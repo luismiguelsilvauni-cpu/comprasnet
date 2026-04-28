@@ -280,6 +280,7 @@ def logout():
 
 # ── DASHBOARD ─────────────────────────────────────────────────────────────────
 
+@app.route('/dashboard')
 @app.route('/')
 @login_required
 def dashboard():
