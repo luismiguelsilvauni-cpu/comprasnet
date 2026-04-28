@@ -264,61 +264,7 @@
 <nav class="sidebar">
     <div class="sidebar-logo">
         {% if cfg_geral and cfg_geral.empresa_logo_path %}
-            <a href="{{ url_for('admin_config') }}" title="Editar logotipo" style="display:block">
-            <img src="/uploads/{{ cfg_geral.empresa_logo_path }}" alt="Logo"
-                 style="height:{{ cfg_geral.logo_altura or 48 }}px;max-width:{{ cfg_geral.logo_largura or 180 }}px;object-fit:contain;filter:{{ cfg_geral.logo_filtro or 'none' }};display:block">
-            </a>
-        {% else %}
-            <div class="logo-icon">📦</div>
-            <div class="app-name">{{ cfg_geral.empresa_nome if cfg_geral else "ComprasNet" }}</div>
-        {% endif %}
-    </div>
-
-    <!-- TOP NAV with dropdowns -->
-    <div style="padding:8px 6px 0">
-
-        <!-- Dashboard -->
-        {% if pode_aceder('dashboard') %}
-        <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-            <span class="icon">⊞</span><span>Dashboard</span>
-        </a>
-        {% endif %}
-
-        <!-- GESTÃO dropdown -->
-        {% set gestao_active = request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe','funcionarios','funcionario_novo','funcionario_ficha','funcionario_editar','salarios','salarios_pin','salarios_documentos','partilha'] %}
-        <div class="nav-dropdown {% if gestao_active %}active{% endif %}" id="dd-gestao">
-          <button class="nav-item nav-dd-btn {% if gestao_active %}active{% endif %}" onclick="toggleDD('gestao')">
-            <span class="icon">👥</span><span>Gestão</span><span class="dd-arrow">▸</span>
-          </button>
-          <div class="nav-dd-items" id="ddi-gestao">
-            {% if pode_aceder('clientes') %}
-            <a href="{{ url_for('clientes') }}" class="nav-item nav-sub {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
-              <span class="icon">👥</span><span>Clientes</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('funcionarios') %}
-            <a href="{{ url_for('funcionarios') }}" class="nav-item nav-sub {% if 'funcionario' in (request.endpoint or '') %}active{% endif %}">
-              <span class="icon">🪪</span><span>Funcionários</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('salarios') %}
-            <a href="{{ url_for('salarios') }}" class="nav-item nav-sub {% if 'salario' in (request.endpoint or '') %}active{% endif %}">
-              <span class="icon">💶</span><span>Salários</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('fornecedores') %}
-            <a href="{{ url_for('fornecedores') }}" class="nav-item nav-sub {% if request.endpoint in ['fornecedores','fornecedor_marcas'] %}active{% endif %}">
-              <span class="icon">🏭</span><span>Fornecedores</span>
-            </a>
-            {% endif %}
-            {% if pode_aceder('ferias') %}
-            <a href="{{ url_for('ausencias') }}" class="nav-item nav-sub {% if request.endpoint and ('ausencia' in request.endpoint or 'ferias' in request.endpoint) %}active{% endif %}">
-              <span class="icon">📅</span><span>Mapa Férias / Faltas</span>
-            </a>
-            <a href="{{ url_for('periodos_fecho') }}" class="nav-item nav-sub {% if request.endpoint and 'periodo' in request.endpoint or 'fecho' in request.endpoint %}active{% endif %}">
-              <span class="icon">💰</span><span>Períodos de Fecho</span>
-            </a>
-            {% endif %}
+{% endif %}
             {% if pode_aceder('partilha') %}
             <a href="{{ url_for('partilha') }}" class="nav-item nav-sub {% if request.endpoint == 'partilha' %}active{% endif %}">
               <span class="icon">📁</span><span>Partilha</span>

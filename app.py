@@ -2523,7 +2523,7 @@ def manifest_static():
 
 @app.route('/versao')
 def versao():
-    return '2026-04-28-v2'
+    return 'VERSAO-f3effc2-OK-PERIODOS-FECHO'
 
 @app.route('/pwa-test')
 def pwa_test():
