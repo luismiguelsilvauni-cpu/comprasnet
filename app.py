@@ -235,12 +235,11 @@ def pwa_manifest():
     base = _req.host_url.rstrip('/')
     import json, time
     v = str(int(time.time()))
-    start_path = (cfg.pwa_start_url.lstrip('/') if cfg and getattr(cfg,'pwa_start_url',None) else "dashboard")
     manifest = {
         "name": nome,
         "short_name": short,
         "description": "Plataforma de gestao interna",
-        "start_url": base + "/" + start_path,
+        "start_url": base + "/",  # dashboard is at root
         "scope": base + "/",
         "display": "standalone",
         "display_override": ["standalone", "minimal-ui"],
