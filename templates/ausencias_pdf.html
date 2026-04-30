@@ -51,9 +51,10 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;colo
 .mini-cal td.fecho-emp{background:#fef3c7;color:#92400e;font-weight:800;border:2px solid #f59e0b}
 .mini-cal td.in-period{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
 .mini-cal td.in-period.util{background:#dcfce7;border:2px solid #86efac;color:#166534;font-weight:800}
-.mini-cal td.border-start{border-left:4px solid #f59e0b !important}
-.mini-cal td.border-end{border-right:4px solid #f59e0b !important}
-.mini-cal td.in-fecho:not(.feriado):not(.ponte):not(.fecho-emp):not(.wk){background:#eff6ff}
+.mini-cal td.border-start{border-left:5px solid #f59e0b !important;position:relative}
+.mini-cal td.border-end{border-right:5px solid #f59e0b !important;position:relative}
+.mini-cal td.border-start::before{content:'▶';position:absolute;top:-14px;left:-4px;color:#f59e0b;font-size:8px}
+.mini-cal td.border-end::after{content:'◀';position:absolute;top:-14px;right:-4px;color:#f59e0b;font-size:8px}
 .mini-cal td.empty{border:none;background:transparent}
 .cal-legend{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #e2e8f0}
 .cal-legend span{display:flex;align-items:center;gap:4px;font-size:8.5px;color:#475569;font-weight:600}
@@ -162,7 +163,7 @@ table.summary tfoot td.name{text-align:left}
           <tr>
             {% for cell in week %}
             {% if cell.day == 0 %}
-              <td class="empty"></td>
+              <td class="empty{% if cell.border_start %} border-start{% endif %}{% if cell.border_end %} border-end{% endif %}"></td>
             {% elif cell.feriado %}
               <td class="{{ cell.feriado_tipo }}" title="{{ cell.feriado_nome }}">{{ cell.day }}</td>
             {% elif cell.is_fecho %}
