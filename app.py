@@ -406,8 +406,8 @@ def artigos_pedidos_pdf():
     from sqlalchemy import case
     query = (db.session.query(LinhaPedido, PedidoCompra)
         .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
-        .filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente']))
-        .filter(LinhaPedido.status != 'cancelado'))
+        .filter(LinhaPedido.status.notin_(['cancelado','faturado']))
+        .filter(LinhaPedido.status != None))
 
     artigos = query.order_by(
         case(
@@ -440,12 +440,14 @@ def artigos_pedidos_pdf():
                 if row: cliente_nome = row[0]
         except: cliente_nome = "Stock"
 
-        # Fornecedor
+        # Fornecedor - try multiple sources
         forn_nome = ""
         try:
             if linha.fornecedor_id:
                 frow = db.session.execute(db.text('SELECT nome FROM fornecedores_phc WHERE id=:id'),{'id':linha.fornecedor_id}).fetchone()
                 if frow: forn_nome = frow[0]
+            if not forn_nome and hasattr(linha, 'fornecedor_nome') and linha.fornecedor_nome:
+                forn_nome = linha.fornecedor_nome
         except: pass
 
         # Apply filters
@@ -471,7 +473,7 @@ def artigos_pedidos_pdf():
             'fornecedor': forn_nome or '—',
             'status': lbl,
             'status_col': col,
-            'pedido_ref': pedido.referencia or f'#{pedido.id}',
+            'pedido_ref': (pedido.titulo or '')[:30] or f'#{pedido.id}',
             'data': pedido.data_criacao.strftime('%d/%m/%Y') if pedido.data_criacao else '',
             'preco': ultimo_preco,
             'obs': linha.observacoes or '',
