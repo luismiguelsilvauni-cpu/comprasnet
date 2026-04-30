@@ -486,6 +486,7 @@ def artigos_pedidos_pdf():
         f'Estado: {status_filtro}' if status_filtro else '',
     ])) or 'Todos os artigos'
 
+    total_q = len(artigos)
     html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>Artigos Pedidos — {empresa}</title>
 <style>
@@ -511,7 +512,7 @@ tr:nth-child(even){{background:#f8fafc}}
 <div class="header">
   <div>
     <h1>{empresa} &mdash; Lista de Artigos Pedidos</h1>
-    <h2>Filtros: {filtros_str} &nbsp;·&nbsp; {len(rows)} artigo(s) &nbsp;·&nbsp; Emitido em {_dt.now().strftime('%d/%m/%Y %H:%M')}</h2>
+    <h2>Filtros: {filtros_str} &nbsp;·&nbsp; {len(rows)} de {total_q} artigo(s) &nbsp;·&nbsp; Emitido em {_dt.now().strftime('%d/%m/%Y %H:%M')}</h2>
   </div>
 </div>
 <table>
