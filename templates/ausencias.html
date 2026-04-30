@@ -281,6 +281,25 @@ function gerarPDF() {
 <!-- Calendar -->
 <div id="calendario"></div>
 
+<!-- Modal: Opções Ponte -->
+<div id="modalOpcoesPonte" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="width:360px">
+    <div class="modal-head"><span id="opcoesPonteTitulo">🌉 Ponte</span><button onclick="fecharModal('modalOpcoesPonte')">✕</button></div>
+    <div class="modal-body" style="gap:8px">
+      <div style="font-size:12px;color:var(--text-muted)" id="opcoesPonteInfo"></div>
+      <button onclick="opcaoPonteTrabalhei()" class="btn btn-primary" style="width:100%;justify-content:center">
+        💼 Registar que trabalhei nesta ponte
+      </button>
+      <button onclick="opcaoPonteEliminar()" class="btn btn-sm" style="width:100%;justify-content:center;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)">
+        🗑 Eliminar esta ponte do calendário
+      </button>
+    </div>
+    <div class="modal-foot" style="justify-content:flex-end">
+      <button onclick="fecharModal('modalOpcoesPonte')" class="btn btn-ghost">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Nova Ausência -->
 <div id="modalAusencia" class="modal-overlay" style="display:none">
   <div class="modal-box" style="width:480px">
@@ -688,7 +707,7 @@ function buildCalendar() {
           cell2.style.cursor = 'pointer';
           if (isFirstVisible) {
             var lbl = document.createElement('div');
-            lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none;z-index:1';
+            lbl.style.cssText = 'position:absolute;left:2px;top:0;bottom:0;display:flex;align-items:center;font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;pointer-events:none;z-index:1;text-shadow:0 1px 2px rgba(0,0,0,.4)';
             var parts = f.nome.split(' ');
             lbl.textContent = parts.length > 1 ? parts[0]+' '+parts[parts.length-1] : parts[0];
             cell2.appendChild(lbl);
@@ -703,16 +722,12 @@ function buildCalendar() {
           // Auto-consumed ponte - show as blue overlay
           cell2.style.background = 'rgba(59,110,240,.25)';
           cell2.style.borderRadius = '3px';
-          cell2.title = 'Ponte (conta como férias) — clique para registar trabalho';
+          cell2.title = 'Ponte — clique para opções (registar trabalho ou eliminar ponte)';
           cell2.style.cursor = 'pointer';
-          cell2.onclick = (function(ds3, fid2){ return function(){
-            abrirNovaAusenciaDia(ds3);
-            setTimeout(function(){
-              document.getElementById('ausenciaTipo').value='trabalho_ponte';
-              document.getElementById('ausenciaFunc').value = fid2;
-              atualizarTipoInfo();
-            },100);
-          }; })(ds2, f.id);
+          cell2.onclick = (function(ds3, fid2, ferObj){ return function(e){
+            e.stopPropagation();
+            abrirOpcoesPonte(ds3, fid2, ferObj);
+          }; })(ds2, f.id, ferD2);
           var lbl2 = document.createElement('div');
           lbl2.style.cssText = 'position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:8px;font-weight:700;color:#3b6ef0;pointer-events:none';
           lbl2.textContent = '🌉';
