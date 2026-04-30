@@ -455,16 +455,26 @@ def artigos_pedidos_pdf():
         if status_filtro and linha.status != status_filtro: continue
 
         lbl, col = STATUS_INFO_LOCAL.get(linha.status or 'nao_encomendado', ("?","#888"))
+        # Get last cost price
+        ultimo_preco = ''
+        try:
+            artigo = ArtigoPHC.query.filter_by(referencia=linha.artigo_ref).first() if linha.artigo_ref else None
+            if artigo and artigo.preco_custo:
+                ultimo_preco = f'{artigo.preco_custo:.2f} €'
+        except: pass
+
         rows.append({
             'ref': linha.artigo_ref or '',
             'designacao': linha.designacao or '',
-            'qty': linha.quantidade or 0,
+            'qty': f"{linha.quantidade or 0} {linha.unidade or ''}".strip(),
             'cliente': cliente_nome,
-            'fornecedor': forn_nome,
+            'fornecedor': forn_nome or '—',
             'status': lbl,
             'status_col': col,
             'pedido_ref': pedido.referencia or f'#{pedido.id}',
             'data': pedido.data_criacao.strftime('%d/%m/%Y') if pedido.data_criacao else '',
+            'preco': ultimo_preco,
+            'obs': linha.observacoes or '',
         })
 
     cfg = ConfigGeral.query.first()
@@ -477,44 +487,63 @@ def artigos_pedidos_pdf():
     ])) or 'Todos os artigos'
 
     html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Artigos Pedidos</title>
+<title>Artigos Pedidos — {empresa}</title>
 <style>
-@page{{size:A4;margin:1.5cm}}
-@media print{{.no-print{{display:none}}body{{-webkit-print-color-adjust:exact}}}}
-body{{font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#1e293b}}
-.header{{border-bottom:3px solid #1e3a5f;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between}}
-h1{{font-size:16px;font-weight:800;color:#1e3a5f;margin:0}}
-h2{{font-size:10px;color:#64748b;margin:2px 0 0}}
+@page{{size:A4 landscape;margin:1.2cm}}
+@media print{{.no-print{{display:none}}body{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}}}
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#1e293b;background:white}}
+.header{{border-bottom:3px solid #1e3a5f;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-end}}
+h1{{font-size:16px;font-weight:800;color:#1e3a5f}}
+h2{{font-size:9px;color:#64748b;margin-top:2px}}
 table{{width:100%;border-collapse:collapse;font-size:8.5px}}
 thead tr{{background:#1e3a5f;color:white}}
-th{{padding:5px 6px;text-align:left;font-size:8px}}
-td{{padding:4px 6px;border-bottom:1px solid #f1f5f9}}
+th{{padding:5px 8px;text-align:left;font-size:8px;font-weight:700}}
+td{{padding:4px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}}
 tr:nth-child(even){{background:#f8fafc}}
-.badge{{display:inline-block;padding:1px 6px;border-radius:3px;font-weight:700;font-size:8px}}
-.footer{{margin-top:12px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between}}
-.print-btn{{position:fixed;top:16px;right:16px;background:#1e3a5f;color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700}}
+.badge{{display:inline-block;padding:2px 7px;border-radius:4px;font-weight:700;font-size:8px;white-space:nowrap}}
+.footer{{margin-top:12px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:6px}}
+.btn-print{{position:fixed;top:16px;right:16px;background:#1e3a5f;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2)}}
+.ref{{font-family:monospace;color:#3b6ef0;font-size:8px}}
+.price{{font-family:monospace;color:#16a34a;font-weight:700}}
 </style></head><body>
-<button class="no-print print-btn" onclick="window.print()">🖨 Imprimir</button>
+<button class="btn-print no-print" onclick="window.print()">🖨 Imprimir / PDF</button>
 <div class="header">
-  <div><h1>{empresa} — Artigos Pedidos</h1><h2>{filtros_str}</h2></div>
-  <div style="text-align:right;font-size:8px;color:#64748b">Emitido em {_dt.now().strftime('%d/%m/%Y %H:%M')}<br>{len(rows)} artigo(s)</div>
+  <div>
+    <h1>{empresa} &mdash; Lista de Artigos Pedidos</h1>
+    <h2>Filtros: {filtros_str} &nbsp;·&nbsp; {len(rows)} artigo(s) &nbsp;·&nbsp; Emitido em {_dt.now().strftime('%d/%m/%Y %H:%M')}</h2>
+  </div>
 </div>
 <table>
-<thead><tr><th>Ref.</th><th>Designação</th><th>Qtd</th><th>Cliente</th><th>Fornecedor</th><th>Pedido</th><th>Data</th><th>Estado</th></tr></thead>
+<thead><tr>
+  <th style="width:8%">Estado</th>
+  <th style="width:7%">Ref.</th>
+  <th style="width:24%">Designação</th>
+  <th style="width:6%;text-align:center">Qtd</th>
+  <th style="width:16%">Fornecedor</th>
+  <th style="width:12%">Cliente</th>
+  <th style="width:8%;text-align:right">Últ. Custo</th>
+  <th style="width:10%">Pedido</th>
+  <th style="width:9%">Data</th>
+</tr></thead>
 <tbody>"""
     for r in rows:
         html += f"""<tr>
-<td><b>{r['ref']}</b></td>
-<td>{r['designacao']}</td>
-<td style="text-align:center">{r['qty']}</td>
-<td>{r['cliente']}</td>
-<td>{r['fornecedor']}</td>
-<td>{r['pedido_ref']}</td>
-<td>{r['data']}</td>
 <td><span class="badge" style="background:{r['status_col']}22;color:{r['status_col']};border:1px solid {r['status_col']}55">{r['status']}</span></td>
+<td class="ref">{r['ref']}</td>
+<td><strong>{r['designacao']}</strong>{('<br><span style="font-size:7.5px;color:#94a3b8">' + r['obs'] + '</span>') if r['obs'] else ''}</td>
+<td style="text-align:center;font-weight:700">{r['qty']}</td>
+<td>{r['fornecedor']}</td>
+<td>{r['cliente']}</td>
+<td style="text-align:right" class="price">{r['preco']}</td>
+<td style="color:#3b6ef0">{r['pedido_ref']}</td>
+<td style="color:#94a3b8">{r['data']}</td>
 </tr>"""
     html += f"""</tbody></table>
-<div class="footer"><span>{empresa} · Uso Interno</span><span>Total: {len(rows)} artigos</span></div>
+<div class="footer">
+  <span>{empresa} &nbsp;·&nbsp; Uso Interno &nbsp;·&nbsp; Lista de Artigos Pedidos</span>
+  <span>Total: {len(rows)} artigos</span>
+</div>
 </body></html>"""
 
     from flask import Response

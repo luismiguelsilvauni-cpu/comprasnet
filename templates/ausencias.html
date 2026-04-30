@@ -514,16 +514,34 @@ function anoSeguinte(){ window.location='/ausencias?ano='+(ANO+1); }
 function buildSaldoCards() {
   var strip = document.getElementById('saldosStrip');
   FUNCS.forEach(function(f) {
-    var s = SALDOS[f.id] || {restantes:22, direito:22, gozados:0};
-    var r = s.restantes;
-    var cor = r < 0 ? '#ef4444' : r < 5 ? '#f59e0b' : '#22c55e';
+    var s = SALDOS[f.id] || {restantes:22, direito:22, gozados:0, ajuste:0};
+    var d  = parseFloat(s.direito)   || 22;
+    var g  = parseFloat(s.gozados)   || 0;
+    var aj = parseFloat(s.ajuste)    || 0;
+    // Count future pontes not yet manually registered
+    var pontesAuto = FERIADOS.filter(function(fer) {
+      if (fer.tipo !== 'ponte') return false;
+      var dw = new Date(fer.data + 'T12:00:00').getDay();
+      if (dw === 0 || dw === 6) return false;
+      var jaReg = REGISTOS.find(function(reg) {
+        return reg.funcionario_id === f.id && reg.data_inicio <= fer.data && reg.data_fim >= fer.data;
+      });
+      return !jaReg;
+    }).length;
+    var restantes = d + aj - g - pontesAuto;
+    var cor = restantes < 0 ? '#ef4444' : restantes < 5 ? '#f59e0b' : '#22c55e';
     var div = document.createElement('div');
     div.className = 'card';
-    div.style.cssText = 'padding:6px 10px;min-width:90px;cursor:pointer;';
+    div.style.cssText = 'padding:6px 10px;min-width:120px;cursor:pointer;';
     div.onclick = (function(fid, fnome){ return function(){ abrirSaldo(fid, fnome); }; })(f.id, f.nome);
-    div.innerHTML = '<div style="font-size:10px;color:var(--text-muted)">' + nomeCurto(f.nome) + '</div>' +
-      '<div style="font-size:20px;font-weight:800;color:'+cor+'">'+r.toFixed(1)+'</div>' +
-      '<div style="font-size:9px;color:var(--text-muted)">dias disponíveis</div>';
+    div.innerHTML =
+      '<div style="font-size:9px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:116px;margin-bottom:4px">' + nomeCurto(f.nome) + '</div>' +
+      '<div style="display:grid;grid-template-columns:auto 1fr;gap:1px 8px;font-size:8px;line-height:1.6">' +
+        '<span style="color:var(--text-muted)">Direito:</span><span style="font-weight:700">' + d.toFixed(1) + '</span>' +
+        '<span style="color:var(--text-muted)">Marcadas:</span><span style="font-weight:700;color:#f59e0b">' + g.toFixed(1) + '</span>' +
+        '<span style="color:var(--text-muted)">Pontes:</span><span style="font-weight:700;color:#3b6ef0">' + pontesAuto + '</span>' +
+        '<span style="color:var(--text-muted)">Restantes:</span><span style="font-weight:800;color:' + cor + '">' + restantes.toFixed(1) + '</span>' +
+      '</div>';
     strip.appendChild(div);
   });
 }
@@ -616,8 +634,11 @@ function buildCalendar() {
         ferTxt.style.cssText = 'writing-mode:vertical-rl;transform:rotate(180deg);font-size:8px;font-weight:700;color:'+(fer.tipo==='ponte'?'#f59e0b':'#ef4444')+';max-height:55px;overflow:hidden;margin:1px auto;line-height:1.2';
         ferTxt.textContent = fer.nome;
         cell.appendChild(ferTxt);
-        cell.title = fer.nome + ' (Ctrl+clique para remover)';
-        cell.onclick = (function(fObj){ return function(e){ if(e.ctrlKey||e.metaKey) removeFeriado(fObj); }; })(fer);
+        cell.title = fer.nome + ' — Clique para eliminar';
+        cell.style.cursor = 'pointer';
+        cell.onclick = (function(fObj){ return function(e){
+          if (confirm('Eliminar "' + fObj.nome + '" do calendário?')) removeFeriado(fObj);
+        }; })(fer);
       } else {
         cell.onclick = (function(ds2){ return function(e){ if(e.target===this||e.target.parentNode===this) abrirNovaAusenciaDia(ds2); }; })(ds);
       }
@@ -672,7 +693,7 @@ function buildCalendar() {
             lbl.textContent = parts.length > 1 ? parts[0]+' '+parts[parts.length-1] : parts[0];
             cell2.appendChild(lbl);
           }
-          cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ') — Clique para editar/eliminar';
+          cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ') — Clique para EDITAR ou ELIMINAR';
           cell2.onclick = (function(r){ return function(e){ e.stopPropagation(); abrirEditarAusencia(r); }; })(reg);
         }
         // Ponte auto-indicator: show ponte feriado as consumed férias if no override
