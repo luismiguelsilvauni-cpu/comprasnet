@@ -203,17 +203,14 @@ table.summary tfoot td.name{text-align:left}
 <table class="summary">
   <thead>
     <tr>
-      <th class="left" style="width:26%">Colaborador</th>
+      <th class="left" style="width:28%">Colaborador</th>
       <th>Dias Úteis</th>
       <th>Trabalhados</th>
-      <th>Férias</th>
-      <th>Pontes</th>
+      <th>Férias (+ Pontes)</th>
       <th>F.Just.</th>
       <th>F.Injust.</th>
       <th>Baixas</th>
-      <th>HE Útil(h)</th>
-      <th>HE FDS(h)</th>
-      <th>HE Total(h)</th>
+      <th>HE (h)</th>
     </tr>
   </thead>
   <tbody>
@@ -221,14 +218,11 @@ table.summary tfoot td.name{text-align:left}
     <tr>
       <td class="name">{{ f.nome }}</td>
       <td>{{ f.dias_uteis }}</td>
-      <td class="{% if f.trabalhados >= f.dias_uteis * 0.9 %}c-good{% elif f.trabalhados >= f.dias_uteis * 0.7 %}c-warn{% else %}c-bad{% endif %}">{{ '%.1f'|format(f.trabalhados) }}</td>
-      <td>{{ '%.1f'|format(f.ferias) }}</td>
-      <td>{{ '%.1f'|format(f.pontes) }}</td>
-      <td class="{% if f.faltas_just > 0 %}c-warn{% endif %}">{{ '%.1f'|format(f.faltas_just) }}</td>
-      <td class="{% if f.faltas_injust > 0 %}c-bad{% endif %}">{{ '%.1f'|format(f.faltas_injust) }}</td>
-      <td class="{% if f.baixas > 0 %}c-warn{% endif %}">{{ '%.1f'|format(f.baixas) }}</td>
-      <td class="{% if f.he_util > 0 %}c-he{% endif %}">{{ '%.1f'|format(f.he_util) }}</td>
-      <td class="{% if f.he_fds > 0 %}c-he{% endif %}">{{ '%.1f'|format(f.he_fds) }}</td>
+      <td class="{% if f.trabalhados >= f.dias_uteis * 0.9 %}c-good{% elif f.trabalhados >= f.dias_uteis * 0.7 %}c-warn{% else %}c-bad{% endif %}">{{ '%.2f'|format(f.trabalhados) }}</td>
+      <td>{{ '%.1f'|format(f.ferias + f.pontes) }}</td>
+      <td class="{% if f.faltas_just > 0 %}c-warn{% endif %}">{{ '%.2f'|format(f.faltas_just) }}</td>
+      <td class="{% if f.faltas_injust > 0 %}c-bad{% endif %}">{{ '%.2f'|format(f.faltas_injust) }}</td>
+      <td class="{% if f.baixas > 0 %}c-warn{% endif %}">{{ '%.2f'|format(f.baixas) }}</td>
       <td class="{% if f.he > 0 %}c-he{% endif %}">{{ '%.1f'|format(f.he) }}</td>
     </tr>
     {% endfor %}
@@ -237,14 +231,11 @@ table.summary tfoot td.name{text-align:left}
     <tr>
       <td class="name">TOTAL</td>
       <td>—</td>
-      <td>{{ func_data|sum(attribute='trabalhados')|round(1) }}</td>
-      <td>{{ func_data|sum(attribute='ferias')|round(1) }}</td>
-      <td>{{ func_data|sum(attribute='pontes')|round(1) }}</td>
-      <td>{{ func_data|sum(attribute='faltas_just')|round(1) }}</td>
-      <td>{{ func_data|sum(attribute='faltas_injust')|round(1) }}</td>
-      <td>{{ func_data|sum(attribute='baixas')|round(1) }}</td>
-      <td>{{ func_data|sum(attribute='he_util')|round(1) }}</td>
-      <td>{{ func_data|sum(attribute='he_fds')|round(1) }}</td>
+      <td>{{ func_data|sum(attribute='trabalhados')|round(2) }}</td>
+      <td>{{ (func_data|sum(attribute='ferias') + func_data|sum(attribute='pontes'))|round(1) }}</td>
+      <td>{{ func_data|sum(attribute='faltas_just')|round(2) }}</td>
+      <td>{{ func_data|sum(attribute='faltas_injust')|round(2) }}</td>
+      <td>{{ func_data|sum(attribute='baixas')|round(2) }}</td>
       <td>{{ func_data|sum(attribute='he')|round(1) }}</td>
     </tr>
   </tfoot>
@@ -270,10 +261,9 @@ table.summary tfoot td.name{text-align:left}
     </div>
   </div>
   <div class="emp-stats-row">
-    <div class="emp-stat"><span class="sv">{{ '%.1f'|format(f.trabalhados) }}</span><span class="sl">Trabalhados</span></div>
-    <div class="emp-stat"><span class="sv" style="color:#22c55e">{{ '%.1f'|format(f.ferias) }}</span><span class="sl">Férias</span></div>
-    <div class="emp-stat"><span class="sv" style="color:#ef4444">{{ '%.1f'|format(f.faltas_just + f.faltas_injust + f.baixas) }}</span><span class="sl">Faltas/Baixas</span></div>
-    <div class="emp-stat"><span class="sv" style="color:#3b6ef0">{{ '%.1f'|format(f.pontes) }}</span><span class="sl">Pontes</span></div>
+    <div class="emp-stat"><span class="sv">{{ '%.2f'|format(f.trabalhados) }}</span><span class="sl">Trabalhados</span></div>
+    <div class="emp-stat"><span class="sv" style="color:#22c55e">{{ '%.1f'|format(f.ferias + f.pontes) }}</span><span class="sl">Férias + Pontes</span></div>
+    <div class="emp-stat"><span class="sv" style="color:#ef4444">{{ '%.2f'|format(f.faltas_just + f.faltas_injust + f.baixas) }}</span><span class="sl">Faltas/Baixas</span></div>
     <div class="emp-stat"><span class="sv" style="color:#f59e0b">{{ '%.1f'|format(f.he) }}h</span><span class="sl">Horas Extra</span></div>
   </div>
   <div class="emp-events">
@@ -281,8 +271,17 @@ table.summary tfoot td.name{text-align:left}
     <div class="event">
       <div class="dot {{ e.cls }}"></div>
       <div>
-        <span class="event-main">{{ e.txt }}</span>
-        {% if e.detail %}<span class="event-detail">— {{ e.detail }}</span>{% endif %}
+        {% if e.cls == 'he' %}
+          <span class="event-main">{{ e.txt }}</span>
+          {% if e.detail %}
+            {% set parts = e.detail.split(' — ') %}
+            <span style="color:#f59e0b;font-weight:700;margin-left:4px">{{ parts[0] }}</span>
+            {% if parts|length > 1 %}<span class="event-detail"> — {{ parts[1:] | join(' — ') }}</span>{% endif %}
+          {% endif %}
+        {% else %}
+          <span class="event-main">{{ e.txt }}</span>
+          {% if e.detail %}<span class="event-detail">— {{ e.detail }}</span>{% endif %}
+        {% endif %}
       </div>
     </div>
     {% endfor %}

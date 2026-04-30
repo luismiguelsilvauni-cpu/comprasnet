@@ -9616,21 +9616,6 @@ def _recalc_saldo(funcionario_id, ano):
         AusenciaRegisto.estado.in_(['aprovado','pendente']),
         AusenciaRegisto.tipo.in_(['ferias','ponte','fecho_empresa'])
     ).scalar() or 0
-    # Also add bridges from FeriasFeriado (auto-consumed pontes not manually registered)
-    from datetime import date as _dtrs
-    feriados_ponte = FeriasFeriado.query.filter_by(ano=ano, tipo='ponte').all()
-    feriados_set_rs = {f.data for f in FeriasFeriado.query.filter_by(ano=ano).all()}
-    for fp in feriados_ponte:
-        if fp.data.weekday() < 5:  # weekday ponte
-            # Check if already has manual registro
-            has_reg = AusenciaRegisto.query.filter(
-                AusenciaRegisto.funcionario_id == funcionario_id,
-                AusenciaRegisto.data_inicio <= fp.data,
-                AusenciaRegisto.data_fim >= fp.data,
-                AusenciaRegisto.ano == ano
-            ).first()
-            if not has_reg:
-                gozados += 1  # auto-consumed ponte
     saldo.dias_gozados = round(gozados, 2)
     saldo.dias_restantes = round((saldo.dias_direito + saldo.dias_ajuste) - gozados, 2)
     return saldo
