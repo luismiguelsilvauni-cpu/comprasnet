@@ -9455,14 +9455,18 @@ def ausencias_pdf_html(ano, mes):
             dt = _dtc(cur_y, cur_m, d)
             dow = dt.weekday()
             fer = feriados_dict.get(dt)
+            is_civil_weekday = dow < 5 and not fer
             cell = {
                 'day': d,
                 'weekend': dow >= 5,
-                'in_period': data_ini <= dt <= data_fim,
+                'in_period': is_civil_weekday,  # green = civil month working days
                 'feriado': bool(fer),
                 'feriado_tipo': ('ponte' if fer and fer.tipo=='ponte' else 'feriado') if fer else '',
                 'feriado_nome': fer.nome if fer else '',
                 'is_fecho': dt in fechos_dias,
+                'border_start': dt == data_ini,   # vertical line: start of fecho period
+                'border_end': dt == data_fim,     # vertical line: end of fecho period
+                'in_fecho': data_ini <= dt <= data_fim,  # within fecho period
             }
             week.append(cell)
             if len(week) == 7:

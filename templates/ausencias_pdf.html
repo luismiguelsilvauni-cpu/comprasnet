@@ -51,6 +51,9 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;colo
 .mini-cal td.fecho-emp{background:#fef3c7;color:#92400e;font-weight:800;border:2px solid #f59e0b}
 .mini-cal td.in-period{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
 .mini-cal td.in-period.util{background:#dcfce7;border:2px solid #86efac;color:#166534;font-weight:800}
+.mini-cal td.border-start{border-left:4px solid #f59e0b !important}
+.mini-cal td.border-end{border-right:4px solid #f59e0b !important}
+.mini-cal td.in-fecho:not(.feriado):not(.ponte):not(.fecho-emp):not(.wk){background:#eff6ff}
 .mini-cal td.empty{border:none;background:transparent}
 .cal-legend{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #e2e8f0}
 .cal-legend span{display:flex;align-items:center;gap:4px;font-size:8.5px;color:#475569;font-weight:600}
@@ -177,11 +180,12 @@ table.summary tfoot td.name{text-align:left}
         </tbody>
       </table>
       <div class="cal-legend">
-        <span><div class="cal-dot" style="background:#dcfce7;border-color:#86efac"></div>Dia útil no período</span>
+        <span><div class="cal-dot" style="background:#dcfce7;border-color:#86efac"></div>Dia útil (mês)</span>
         <span><div class="cal-dot" style="background:#fee2e2;border-color:#ef4444"></div>Feriado</span>
         <span><div class="cal-dot" style="background:#dbeafe;border-color:#3b82f6"></div>Ponte</span>
         <span><div class="cal-dot" style="background:#fef3c7;border-color:#f59e0b"></div>Fecho Empresa</span>
         <span><div class="cal-dot" style="background:#f8fafc;border-color:#e2e8f0"></div>Fim de Semana</span>
+        <span><div style="width:12px;height:12px;border-left:4px solid #f59e0b;flex-shrink:0"></div>Abertura/Fecho período</span>
       </div>
     </div>
     {% endfor %}
