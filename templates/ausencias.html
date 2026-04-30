@@ -699,8 +699,20 @@ function buildCalendar() {
           var cor = reg.cor || (TIPOS_CONFIG[reg.tipo] ? TIPOS_CONFIG[reg.tipo].cor : '#888');
           var isStart = reg.data_inicio === ds2;
           var isEnd   = reg.data_fim   === ds2;
-          // First visible day in this month (for label)
-          var isFirstVisible = isStart || d2 === 1;
+          // First painted day in this month segment (skip weekends/holidays)
+          var isFirstVisible = false;
+          if (!isWkD && !ferD) {
+            // Check if all previous days in this month for this reg were weekend/holiday
+            var prevPainted = false;
+            for (var pd = (isStart ? d2 : 1); pd < d2; pd++) {
+              var pds = dateStr(ANO, mes, pd);
+              var pdow = dayOfWeek(ANO, mes, pd);
+              if (pdow < 5 && !isFeriado(pds) && reg.data_inicio <= pds && reg.data_fim >= pds) {
+                prevPainted = true; break;
+              }
+            }
+            isFirstVisible = !prevPainted;
+          }
           cell2.style.background = cor;
           cell2.style.opacity = reg.estado === 'pendente' ? '0.5' : '1';
           cell2.style.borderRadius = (isStart?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isStart?'4px':'0');
