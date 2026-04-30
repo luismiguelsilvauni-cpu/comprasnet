@@ -5,6 +5,7 @@
 <title>Resumo Assiduidade – {{ mes_nome }} {{ ano }}</title>
 <style>
 @page { size: A4; margin: 1.5cm; }
+@page :first { size: A4; }
 @media print { .no-print{display:none!important} body{-webkit-print-color-adjust:exact;print-color-adjust:exact} }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;color:#1e293b;background:white}
@@ -35,21 +36,25 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;colo
 .kpi .lbl{font-size:7.5px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:2px;display:block}
 
 /* Mini calendar */
-.mini-cal-wrap{margin-bottom:14px}
-.mini-cal-grid{display:flex;gap:14px;flex-wrap:wrap}
-.mini-cal{border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#fafbff}
-.mini-cal-title{font-size:9px;font-weight:700;color:#1e3a5f;text-align:center;margin-bottom:5px}
-.mini-cal table{border-collapse:collapse;font-size:8px;width:100%}
-.mini-cal th{background:#1e3a5f;color:white;padding:3px 4px;text-align:center;font-size:7.5px}
-.mini-cal td{padding:3px 4px;text-align:center;width:22px;border:1px solid #f1f5f9;color:#334155}
-.mini-cal td.wk{background:#f1f5f9;color:#94a3b8}
-.mini-cal td.feriado{background:rgba(239,68,68,.2);color:#dc2626;font-weight:700}
-.mini-cal td.ponte{background:rgba(59,110,240,.2);color:#3b6ef0;font-weight:700}
-.mini-cal td.fecho{background:rgba(245,158,11,.15);color:#d97706;font-weight:700}
-.mini-cal td.in-period{background:rgba(30,58,95,.07)}
+.mini-cal-wrap{margin-bottom:18px}
+.mini-cal-grid{display:flex;gap:20px;flex-wrap:wrap;justify-content:flex-start}
+.mini-cal{border:2px solid #1e3a5f;border-radius:10px;padding:14px;background:#ffffff;box-shadow:0 2px 8px rgba(30,58,95,.12);min-width:260px}
+.mini-cal-title{font-size:13px;font-weight:800;color:#1e3a5f;text-align:center;margin-bottom:10px;letter-spacing:.03em;border-bottom:2px solid #e2e8f0;padding-bottom:6px}
+.mini-cal table{border-collapse:separate;border-spacing:3px;font-size:11px;width:100%}
+.mini-cal th{background:#1e3a5f;color:white;padding:6px 4px;text-align:center;font-size:10px;font-weight:700;border-radius:4px}
+.mini-cal th.fds{background:#475569}
+.mini-cal td{padding:7px 4px;text-align:center;width:32px;height:32px;border:1px solid #e2e8f0;color:#334155;font-size:11px;border-radius:4px;font-weight:500}
+.mini-cal td.wk{background:#f8fafc;color:#94a3b8;font-weight:400}
+.mini-cal td.util{background:#f0fdf4;color:#166534;font-weight:700;border:1px solid #86efac}
+.mini-cal td.feriado{background:#fee2e2;color:#dc2626;font-weight:800;border:2px solid #ef4444;position:relative}
+.mini-cal td.ponte{background:#dbeafe;color:#1d4ed8;font-weight:800;border:2px solid #3b82f6}
+.mini-cal td.fecho-emp{background:#fef3c7;color:#92400e;font-weight:800;border:2px solid #f59e0b}
+.mini-cal td.in-period{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.mini-cal td.in-period.util{background:#dcfce7;border:2px solid #86efac;color:#166534;font-weight:800}
 .mini-cal td.empty{border:none;background:transparent}
-.cal-legend{display:flex;gap:8px;margin-top:5px;flex-wrap:wrap}
-.cal-legend span{display:flex;align-items:center;gap:3px;font-size:7.5px;color:#64748b}
+.cal-legend{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #e2e8f0}
+.cal-legend span{display:flex;align-items:center;gap:4px;font-size:8.5px;color:#475569;font-weight:600}
+.cal-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;border:1px solid rgba(0,0,0,.15)}
 .cal-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 
 /* Summary table */
@@ -146,8 +151,8 @@ table.summary tfoot td.name{text-align:left}
       <div class="mini-cal-title">{{ cal.nome }} {{ cal.ano }}</div>
       <table>
         <thead><tr>
-          <th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th>
-          <th style="color:#94a3b8">Sáb</th><th style="color:#94a3b8">Dom</th>
+          <th>Segunda</th><th>Terça</th><th>Quarta</th><th>Quinta</th><th>Sexta</th>
+          <th class="wk-h">Sábado</th><th class="wk-h">Domingo</th>
         </tr></thead>
         <tbody>
           {% for week in cal.weeks %}
@@ -162,7 +167,7 @@ table.summary tfoot td.name{text-align:left}
             {% elif cell.weekend %}
               <td class="wk">{{ cell.day }}</td>
             {% elif cell.in_period %}
-              <td class="in-period">{{ cell.day }}</td>
+              <td class="util" title="Dia útil">{{ cell.day }}</td>
             {% else %}
               <td>{{ cell.day }}</td>
             {% endif %}
@@ -172,11 +177,11 @@ table.summary tfoot td.name{text-align:left}
         </tbody>
       </table>
       <div class="cal-legend">
-        <span><div class="cal-dot" style="background:rgba(30,58,95,.15);border:1px solid #c7d7fd"></div>Período Fecho</span>
-        <span><div class="cal-dot" style="background:rgba(239,68,68,.25)"></div>Feriado</span>
-        <span><div class="cal-dot" style="background:rgba(59,110,240,.25)"></div>Ponte</span>
-        <span><div class="cal-dot" style="background:rgba(245,158,11,.2)"></div>Fecho Emp.</span>
-        <span><div class="cal-dot" style="background:#f1f5f9"></div>FDS</span>
+        <span><div class="cal-dot" style="background:#dcfce7;border-color:#86efac"></div>Dia útil no período</span>
+        <span><div class="cal-dot" style="background:#fee2e2;border-color:#ef4444"></div>Feriado</span>
+        <span><div class="cal-dot" style="background:#dbeafe;border-color:#3b82f6"></div>Ponte</span>
+        <span><div class="cal-dot" style="background:#fef3c7;border-color:#f59e0b"></div>Fecho Empresa</span>
+        <span><div class="cal-dot" style="background:#f8fafc;border-color:#e2e8f0"></div>Fim de Semana</span>
       </div>
     </div>
     {% endfor %}
