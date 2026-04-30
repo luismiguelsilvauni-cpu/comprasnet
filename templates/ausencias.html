@@ -888,14 +888,33 @@ function abrirSaldo(fid, nome) {
   abrirModal('modalSaldo');
 }
 function guardarSaldo() {
-  fetch('/ausencias/saldo/' + document.getElementById('saldoFid').value + '/' + ANO, {
+  var fid = parseInt(document.getElementById('saldoFid').value);
+  fetch('/ausencias/saldo/' + fid + '/' + ANO, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       dias_direito: document.getElementById('saldoDireito').value,
       dias_ajuste: document.getElementById('saldoAjuste').value,
       notas_ajuste: document.getElementById('saldoNotas').value
     })
-  }).then(function(r){ return r.json(); }).then(function(d){ if (d.ok) { location.reload(); } });
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) {
+      // Update SALDOS in memory immediately
+      fetch('/ausencias/saldo/' + fid + '/' + ANO)
+        .then(function(r2){ return r2.json(); })
+        .then(function(s){
+          if (s.ok) {
+            SALDOS[fid] = {
+              direito: s.direito, ajuste: s.ajuste,
+              gozados: s.gozados, restantes: s.restantes
+            };
+            // Rebuild badge strip
+            document.getElementById('saldosStrip').innerHTML = '';
+            buildSaldoCards();
+          }
+          fecharModal('modalSaldo');
+        });
+    }
+  });
 }
 
 // ── Fecho empresa ─────────────────────────────────────────────────────────────

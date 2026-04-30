@@ -30,7 +30,7 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;colo
 .period-box .ps{font-size:9px;color:#64748b;margin-top:2px}
 
 /* KPIs */
-.kpi-band{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}
+.kpi-band{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:12px}
 .kpi{background:#f0f4ff;border:1px solid #c7d7fd;border-radius:5px;padding:6px;text-align:center}
 .kpi .val{font-size:16px;font-weight:800;color:#1e3a5f;display:block;line-height:1}
 .kpi .lbl{font-size:7.5px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:2px;display:block}
@@ -139,7 +139,8 @@ table.summary tfoot td.name{text-align:left}
 
 <!-- KPIs -->
 <div class="kpi-band">
-  <div class="kpi"><span class="val">{{ dias_uteis_civil }}</span><span class="lbl">Dias Úteis (Mês)</span></div>
+  <div class="kpi"><span class="val">{{ dias_uteis_total }}</span><span class="lbl">Dias Úteis + Pontes</span></div>
+  <div class="kpi"><span class="val">{{ dias_uteis_civil }}</span><span class="lbl">Dias Úteis (s/ Pontes)</span></div>
   <div class="kpi"><span class="val">{{ dias_ferias_pontes }}</span><span class="lbl">Feriados + Pontes</span></div>
   <div class="kpi"><span class="val">{{ total_faltas }}</span><span class="lbl">Total Faltas</span></div>
   <div class="kpi"><span class="val">{{ total_he }}h</span><span class="lbl">Horas Extra</span></div>
