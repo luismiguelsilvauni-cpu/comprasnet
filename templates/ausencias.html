@@ -659,13 +659,15 @@ function buildCalendar() {
           var cor = reg.cor || (TIPOS_CONFIG[reg.tipo] ? TIPOS_CONFIG[reg.tipo].cor : '#888');
           var isStart = reg.data_inicio === ds2;
           var isEnd   = reg.data_fim   === ds2;
+          // First visible day in this month (for label)
+          var isFirstVisible = isStart || d2 === 1;
           cell2.style.background = cor;
           cell2.style.opacity = reg.estado === 'pendente' ? '0.5' : '1';
           cell2.style.borderRadius = (isStart?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isEnd?'4px':'0')+' '+(isStart?'4px':'0');
           cell2.style.cursor = 'pointer';
-          if (isStart) {
+          if (isFirstVisible) {
             var lbl = document.createElement('div');
-            lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none';
+            lbl.style.cssText = 'position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;pointer-events:none;z-index:1';
             var parts = f.nome.split(' ');
             lbl.textContent = parts.length > 1 ? parts[0]+' '+parts[parts.length-1] : parts[0];
             cell2.appendChild(lbl);

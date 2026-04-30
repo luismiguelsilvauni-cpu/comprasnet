@@ -393,6 +393,134 @@ def dashboard():
     )
 
 
+@app.route('/api/artigos-pedidos/pdf')
+@login_required
+def artigos_pedidos_pdf():
+    """Generate PDF of pending items, filtered and sorted by priority."""
+    from datetime import datetime as _dt
+    forn_filtro   = request.args.get('fornecedor','').strip()
+    cliente_filtro = request.args.get('cliente','').strip()
+    item_filtro   = request.args.get('item','').strip()
+    status_filtro = request.args.get('status','').strip()
+
+    from sqlalchemy import case
+    query = (db.session.query(LinhaPedido, PedidoCompra)
+        .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
+        .filter(PedidoCompra.estado.in_(['aberto','aprovado','pendente']))
+        .filter(LinhaPedido.status != 'cancelado'))
+
+    artigos = query.order_by(
+        case(
+            (LinhaPedido.status == 'nao_encomendado', 0),
+            (LinhaPedido.status == 'consultado', 1),
+            (LinhaPedido.status == 'pendente', 2),
+            (LinhaPedido.status == 'encomendado', 3),
+            else_=4
+        ), PedidoCompra.data_criacao.desc()
+    ).all()
+
+    STATUS_INFO_LOCAL = {
+        "nao_encomendado": ("🔴 Não Enc.",    "#ef4444"),
+        "consultado":       ("🔍 Consultado",  "#0891b2"),
+        "pendente":         ("⏳ Pendente",    "#f59e0b"),
+        "encomendado":      ("📦 Encomendado", "#3b6ef0"),
+        "recebido":         ("✅ Recebido",    "#22c55e"),
+        "por_faturar":      ("🧾 Por Faturar", "#f97316"),
+        "faturado":         ("💶 Faturado",    "#6366f1"),
+        "cancelado":        ("❌ Cancelado",   "#a855f7"),
+    }
+
+    rows = []
+    for linha, pedido in artigos:
+        try:
+            cid = linha.cliente_id or pedido.cliente_id
+            cliente_nome = "Stock"
+            if cid:
+                row = db.session.execute(db.text('SELECT nome FROM clientes WHERE id=:id'),{'id':cid}).fetchone()
+                if row: cliente_nome = row[0]
+        except: cliente_nome = "Stock"
+
+        # Fornecedor
+        forn_nome = ""
+        try:
+            if linha.fornecedor_id:
+                frow = db.session.execute(db.text('SELECT nome FROM fornecedores_phc WHERE id=:id'),{'id':linha.fornecedor_id}).fetchone()
+                if frow: forn_nome = frow[0]
+        except: pass
+
+        # Apply filters
+        if forn_filtro and forn_filtro.lower() not in (forn_nome or '').lower(): continue
+        if cliente_filtro and cliente_filtro.lower() not in cliente_nome.lower(): continue
+        if item_filtro and item_filtro.lower() not in (linha.designacao or '').lower(): continue
+        if status_filtro and linha.status != status_filtro: continue
+
+        lbl, col = STATUS_INFO_LOCAL.get(linha.status or 'nao_encomendado', ("?","#888"))
+        rows.append({
+            'ref': linha.artigo_ref or '',
+            'designacao': linha.designacao or '',
+            'qty': linha.quantidade or 0,
+            'cliente': cliente_nome,
+            'fornecedor': forn_nome,
+            'status': lbl,
+            'status_col': col,
+            'pedido_ref': pedido.referencia or f'#{pedido.id}',
+            'data': pedido.data_criacao.strftime('%d/%m/%Y') if pedido.data_criacao else '',
+        })
+
+    cfg = ConfigGeral.query.first()
+    empresa = cfg.empresa_nome if cfg else 'UCN'
+    filtros_str = ' | '.join(filter(None,[
+        f'Fornecedor: {forn_filtro}' if forn_filtro else '',
+        f'Cliente: {cliente_filtro}' if cliente_filtro else '',
+        f'Item: {item_filtro}' if item_filtro else '',
+        f'Estado: {status_filtro}' if status_filtro else '',
+    ])) or 'Todos os artigos'
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Artigos Pedidos</title>
+<style>
+@page{{size:A4;margin:1.5cm}}
+@media print{{.no-print{{display:none}}body{{-webkit-print-color-adjust:exact}}}}
+body{{font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#1e293b}}
+.header{{border-bottom:3px solid #1e3a5f;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between}}
+h1{{font-size:16px;font-weight:800;color:#1e3a5f;margin:0}}
+h2{{font-size:10px;color:#64748b;margin:2px 0 0}}
+table{{width:100%;border-collapse:collapse;font-size:8.5px}}
+thead tr{{background:#1e3a5f;color:white}}
+th{{padding:5px 6px;text-align:left;font-size:8px}}
+td{{padding:4px 6px;border-bottom:1px solid #f1f5f9}}
+tr:nth-child(even){{background:#f8fafc}}
+.badge{{display:inline-block;padding:1px 6px;border-radius:3px;font-weight:700;font-size:8px}}
+.footer{{margin-top:12px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between}}
+.print-btn{{position:fixed;top:16px;right:16px;background:#1e3a5f;color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700}}
+</style></head><body>
+<button class="no-print print-btn" onclick="window.print()">🖨 Imprimir</button>
+<div class="header">
+  <div><h1>{empresa} — Artigos Pedidos</h1><h2>{filtros_str}</h2></div>
+  <div style="text-align:right;font-size:8px;color:#64748b">Emitido em {_dt.now().strftime('%d/%m/%Y %H:%M')}<br>{len(rows)} artigo(s)</div>
+</div>
+<table>
+<thead><tr><th>Ref.</th><th>Designação</th><th>Qtd</th><th>Cliente</th><th>Fornecedor</th><th>Pedido</th><th>Data</th><th>Estado</th></tr></thead>
+<tbody>"""
+    for r in rows:
+        html += f"""<tr>
+<td><b>{r['ref']}</b></td>
+<td>{r['designacao']}</td>
+<td style="text-align:center">{r['qty']}</td>
+<td>{r['cliente']}</td>
+<td>{r['fornecedor']}</td>
+<td>{r['pedido_ref']}</td>
+<td>{r['data']}</td>
+<td><span class="badge" style="background:{r['status_col']}22;color:{r['status_col']};border:1px solid {r['status_col']}55">{r['status']}</span></td>
+</tr>"""
+    html += f"""</tbody></table>
+<div class="footer"><span>{empresa} · Uso Interno</span><span>Total: {len(rows)} artigos</span></div>
+</body></html>"""
+
+    from flask import Response
+    return Response(html, mimetype='text/html')
+
+
 @app.route('/api/dashboard/artigos-pedidos')
 @login_required
 def api_dashboard_artigos_pedidos():
@@ -417,6 +545,7 @@ def api_dashboard_artigos_pedidos():
         "recebido":         ("✅ Recebido",    "#22c55e", "rgba(34,197,94,.15)"),
         "por_faturar":      ("🧾 Por Faturar", "#f97316", "rgba(249,115,22,.15)"),
         "faturado":         ("💶 Faturado",    "#6366f1", "rgba(99,102,241,.15)"),
+        "consultado":       ("🔍 Consultado",  "#0891b2", "rgba(8,145,178,.15)"),
         "cancelado":        ("❌ Cancelado",   "#a855f7", "rgba(168,85,247,.15)"),
     }
     rows = []
@@ -9429,12 +9558,28 @@ def _recalc_saldo(funcionario_id, ano):
     if not saldo:
         saldo = AusenciaSaldoAnual(funcionario_id=funcionario_id, ano=ano, dias_direito=22)
         db.session.add(saldo)
+    # Sum ferias + pontes + fecho_empresa (all consume vacation balance)
     gozados = db.session.query(db.func.sum(AusenciaRegisto.dias_uteis)).filter(
         AusenciaRegisto.funcionario_id == funcionario_id,
         AusenciaRegisto.ano == ano,
         AusenciaRegisto.estado.in_(['aprovado','pendente']),
         AusenciaRegisto.tipo.in_(['ferias','ponte','fecho_empresa'])
     ).scalar() or 0
+    # Also add bridges from FeriasFeriado (auto-consumed pontes not manually registered)
+    from datetime import date as _dtrs
+    feriados_ponte = FeriasFeriado.query.filter_by(ano=ano, tipo='ponte').all()
+    feriados_set_rs = {f.data for f in FeriasFeriado.query.filter_by(ano=ano).all()}
+    for fp in feriados_ponte:
+        if fp.data.weekday() < 5:  # weekday ponte
+            # Check if already has manual registro
+            has_reg = AusenciaRegisto.query.filter(
+                AusenciaRegisto.funcionario_id == funcionario_id,
+                AusenciaRegisto.data_inicio <= fp.data,
+                AusenciaRegisto.data_fim >= fp.data,
+                AusenciaRegisto.ano == ano
+            ).first()
+            if not has_reg:
+                gozados += 1  # auto-consumed ponte
     saldo.dias_gozados = round(gozados, 2)
     saldo.dias_restantes = round((saldo.dias_direito + saldo.dias_ajuste) - gozados, 2)
     return saldo
