@@ -9711,6 +9711,30 @@ def ausencias():
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
+            # Calculate breakdown by type for display
+            try:
+                ferias_dias = db.session.query(db.func.sum(AusenciaRegisto.dias_uteis)).filter(
+                    AusenciaRegisto.funcionario_id==f.id, AusenciaRegisto.ano==ano,
+                    AusenciaRegisto.estado.in_(['aprovado','pendente']),
+                    AusenciaRegisto.tipo=='ferias'
+                ).scalar() or 0
+                pontes_dias = db.session.query(db.func.sum(AusenciaRegisto.dias_uteis)).filter(
+                    AusenciaRegisto.funcionario_id==f.id, AusenciaRegisto.ano==ano,
+                    AusenciaRegisto.estado.in_(['aprovado','pendente']),
+                    AusenciaRegisto.tipo=='ponte'
+                ).scalar() or 0
+                fecho_dias = db.session.query(db.func.sum(AusenciaRegisto.dias_uteis)).filter(
+                    AusenciaRegisto.funcionario_id==f.id, AusenciaRegisto.ano==ano,
+                    AusenciaRegisto.estado.in_(['aprovado','pendente']),
+                    AusenciaRegisto.tipo=='fecho_empresa'
+                ).scalar() or 0
+                if s:
+                    s._ferias = round(ferias_dias, 1)
+                    s._pontes = round(pontes_dias, 1)
+                    s._fecho  = round(fecho_dias, 1)
+            except:
+                if s:
+                    s._ferias = 0; s._pontes = 0; s._fecho = 0
             saldos[f.id] = s
         except Exception:
             saldos[f.id] = None
