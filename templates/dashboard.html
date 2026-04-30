@@ -587,6 +587,9 @@ function carregarArtigosPedidos() {
     })
     .catch(function(e){ console.error('artigos pedidos:', e); });
 
+}
+
+
 function filtrarArtigosPedidos() {
   var q     = ((document.getElementById('apSearch')||{}).value||'').toLowerCase();
   var qForn = ((document.getElementById('apSearchForn')||{}).value||'').toLowerCase();
@@ -609,8 +612,6 @@ function gerarPDFArtigos() {
   var qCli  = ((document.getElementById('apSearchCli')||{}).value||'');
   window.open('/api/artigos-pedidos/pdf?item='+encodeURIComponent(q)+'&fornecedor='+encodeURIComponent(qForn)+'&cliente='+encodeURIComponent(qCli),'_blank');
 }
-}
-
 function carregarCalendario() {
   const grid = document.getElementById('calGrid');
   const titulo = document.getElementById('calTitulo');
