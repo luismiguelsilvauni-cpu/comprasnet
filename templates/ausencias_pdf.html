@@ -164,16 +164,20 @@ table.summary tfoot td.name{text-align:left}
             {% for cell in week %}
             {% if cell.day == 0 %}
               <td class="empty{% if cell.border_start %} border-start{% endif %}{% if cell.border_end %} border-end{% endif %}"></td>
-            {% elif cell.feriado %}
-              <td class="{{ cell.feriado_tipo }}" title="{{ cell.feriado_nome }}">{{ cell.day }}</td>
-            {% elif cell.is_fecho %}
-              <td class="fecho" title="Fecho empresa">{{ cell.day }}</td>
-            {% elif cell.weekend %}
-              <td class="wk">{{ cell.day }}</td>
-            {% elif cell.in_period %}
-              <td class="util" title="Dia útil">{{ cell.day }}</td>
             {% else %}
-              <td>{{ cell.day }}</td>
+              {% set bs = ' border-start' if cell.border_start else '' %}
+              {% set be = ' border-end' if cell.border_end else '' %}
+              {% if cell.feriado %}
+                <td class="{{ cell.feriado_tipo }}{{ bs }}{{ be }}" title="{{ cell.feriado_nome }}">{{ cell.day }}</td>
+              {% elif cell.is_fecho %}
+                <td class="fecho-emp{{ bs }}{{ be }}" title="Fecho empresa">{{ cell.day }}</td>
+              {% elif cell.weekend %}
+                <td class="wk{{ bs }}{{ be }}">{{ cell.day }}</td>
+              {% elif cell.in_period %}
+                <td class="util{{ bs }}{{ be }}" title="Dia útil">{{ cell.day }}</td>
+              {% else %}
+                <td class="{{ bs|trim }}{{ be|trim }}">{{ cell.day }}</td>
+              {% endif %}
             {% endif %}
             {% endfor %}
           </tr>
