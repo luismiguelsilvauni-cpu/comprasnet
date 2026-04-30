@@ -404,10 +404,14 @@ def artigos_pedidos_pdf():
     status_filtro = request.args.get('status','').strip()
 
     from sqlalchemy import case
+    STATUS_VISIVEIS = ['nao_encomendado', 'consultado', 'pendente', 'encomendado', 'por_faturar']
     query = (db.session.query(LinhaPedido, PedidoCompra)
         .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
-        .filter(LinhaPedido.status.notin_(['cancelado','faturado']))
-        .filter(LinhaPedido.status != None))
+        .filter(PedidoCompra.estado.notin_(['cancelado','concluido','arquivado','rejeitado']))
+        .filter(db.or_(
+            LinhaPedido.status.in_(STATUS_VISIVEIS),
+            LinhaPedido.status == None
+        )))
 
     artigos = query.order_by(
         case(
@@ -440,18 +444,19 @@ def artigos_pedidos_pdf():
                 if row: cliente_nome = row[0]
         except: cliente_nome = "Stock"
 
-        # Fornecedor - try multiple sources
+        # Fornecedor from fornecedores_json
         forn_nome = ""
         try:
-            if linha.fornecedor_id:
-                frow = db.session.execute(db.text('SELECT nome FROM fornecedores_phc WHERE id=:id'),{'id':linha.fornecedor_id}).fetchone()
-                if frow: forn_nome = frow[0]
-            if not forn_nome and hasattr(linha, 'fornecedor_nome') and linha.fornecedor_nome:
-                forn_nome = linha.fornecedor_nome
+            import json as _jpdf
+            fjs = _jpdf.loads(linha.fornecedores_json or '[]') if linha.fornecedores_json else []
+            if isinstance(fjs, list):
+                forn_nome = ', '.join(f.get('nome','') for f in fjs if isinstance(f,dict) and f.get('nome'))
         except: pass
+        if not forn_nome and linha.fornecedor_hab:
+            forn_nome = linha.fornecedor_hab
 
         # Apply filters
-        if forn_filtro and forn_filtro.lower() not in (forn_nome or '').lower(): continue
+        if forn_filtro and forn_filtro.lower() not in (forn_nome or '').lower() and forn_filtro.lower() not in (linha.fornecedor_hab or '').lower(): continue
         if cliente_filtro and cliente_filtro.lower() not in cliente_nome.lower(): continue
         if item_filtro and item_filtro.lower() not in (linha.designacao or '').lower(): continue
         if status_filtro and linha.status != status_filtro: continue
