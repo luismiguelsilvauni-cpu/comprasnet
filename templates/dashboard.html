@@ -522,7 +522,12 @@ function carregarArtigosPedidos() {
       // Search bar
       var searchDiv = document.createElement('div');
       searchDiv.style.cssText = 'margin-bottom:8px;display:flex;gap:8px;align-items:center';
-      searchDiv.innerHTML = '<input type="text" id="apSearch" class="input" placeholder="🔍 Pesquisar artigo, cliente, fornecedor..." style="max-width:340px;font-size:12px" oninput="filtrarArtigosPedidos()">';
+      searchDiv.innerHTML =
+        '<input type="text" id="apSearch" class="input" placeholder="🔍 Item / Ref..." style="flex:1;min-width:100px;max-width:180px;font-size:12px" oninput="filtrarArtigosPedidos()">' +
+        '<input type="text" id="apSearchForn" class="input" placeholder="🏭 Fornecedor..." style="flex:1;min-width:100px;max-width:180px;font-size:12px" oninput="filtrarArtigosPedidos()">' +
+        '<input type="text" id="apSearchCli" class="input" placeholder="👥 Cliente..." style="flex:1;min-width:80px;max-width:160px;font-size:12px" oninput="filtrarArtigosPedidos()">' +
+        '<button onclick="gerarPDFArtigos()" class="btn btn-ghost btn-sm" style="white-space:nowrap;font-size:11px">📄 PDF</button>';
+      searchDiv.style.flexWrap = 'wrap';
       wrap.insertBefore(searchDiv, wrap.firstChild);
 
       var tbody = document.createElement('tbody');
@@ -532,6 +537,7 @@ function carregarArtigosPedidos() {
         tr.dataset.cliente = r.cliente || '';
         tr.dataset.fornecedores = (r.fornecedores_nomes || []).join(' ');
         tr.dataset.artigo = r.designacao || '';
+        tr.dataset.ref = r.referencia || '';
         tr.style.cssText = 'border-bottom:1px solid var(--border)' + (r.dim ? ';opacity:0.5' : '');
         // Status cell
         var tdStatus = document.createElement('td');
@@ -582,14 +588,26 @@ function carregarArtigosPedidos() {
     .catch(function(e){ console.error('artigos pedidos:', e); });
 
 function filtrarArtigosPedidos() {
-  var q = (document.getElementById('apSearch') || {value:''}).value.toLowerCase();
-  if (!q) { document.querySelectorAll('.ap-row').forEach(function(r){ r.style.display=''; }); return; }
+  var q     = ((document.getElementById('apSearch')||{}).value||'').toLowerCase();
+  var qForn = ((document.getElementById('apSearchForn')||{}).value||'').toLowerCase();
+  var qCli  = ((document.getElementById('apSearchCli')||{}).value||'').toLowerCase();
   document.querySelectorAll('.ap-row').forEach(function(r) {
-    var cli = (r.dataset.cliente || '').toLowerCase();
+    var cli  = (r.dataset.cliente || '').toLowerCase();
     var forn = (r.dataset.fornecedores || '').toLowerCase();
-    var art = (r.dataset.artigo || '').toLowerCase();
-    r.style.display = (cli.includes(q) || forn.includes(q) || art.includes(q)) ? '' : 'none';
+    var art  = (r.dataset.artigo || '').toLowerCase();
+    var ref  = (r.dataset.ref || '').toLowerCase();
+    var matchArt  = !q     || art.includes(q)  || ref.includes(q);
+    var matchForn = !qForn || forn.includes(qForn);
+    var matchCli  = !qCli  || cli.includes(qCli);
+    r.style.display = (matchArt && matchForn && matchCli) ? '' : 'none';
   });
+}
+
+function gerarPDFArtigos() {
+  var q     = ((document.getElementById('apSearch')||{}).value||'');
+  var qForn = ((document.getElementById('apSearchForn')||{}).value||'');
+  var qCli  = ((document.getElementById('apSearchCli')||{}).value||'');
+  window.open('/api/artigos-pedidos/pdf?item='+encodeURIComponent(q)+'&fornecedor='+encodeURIComponent(qForn)+'&cliente='+encodeURIComponent(qCli),'_blank');
 }
 }
 

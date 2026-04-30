@@ -672,8 +672,8 @@ function buildCalendar() {
             lbl.textContent = parts.length > 1 ? parts[0]+' '+parts[parts.length-1] : parts[0];
             cell2.appendChild(lbl);
           }
-          cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ', ' + reg.dias_uteis + 'd úteis)';
-          cell2.onclick = (function(r){ return function(){ abrirEditarAusencia(r); }; })(reg);
+          cell2.title = f.nome + ': ' + (TIPOS_CONFIG[reg.tipo]?TIPOS_CONFIG[reg.tipo].label:reg.tipo) + ' (' + reg.data_inicio + ' – ' + reg.data_fim + ') — Clique para editar/eliminar';
+          cell2.onclick = (function(r){ return function(e){ e.stopPropagation(); abrirEditarAusencia(r); }; })(reg);
         }
         // Ponte auto-indicator: show ponte feriado as consumed férias if no override
         var ferD2 = isFeriado(ds2);
