@@ -537,9 +537,11 @@ function buildSaldoCards() {
     var d  = parseFloat(s.direito)   || 22;
     var g  = parseFloat(s.gozados)   || 0;
     var aj = parseFloat(s.ajuste)    || 0;
-    // Count future pontes not yet manually registered
+    // Count past pontes not yet manually registered (already consumed)
+    var hoje = new Date().toISOString().substring(0,10);
     var pontesAuto = FERIADOS.filter(function(fer) {
       if (fer.tipo !== 'ponte') return false;
+      if (fer.data > hoje) return false;  // ignore future pontes
       var dw = new Date(fer.data + 'T12:00:00').getDay();
       if (dw === 0 || dw === 6) return false;
       var jaReg = REGISTOS.find(function(reg) {
