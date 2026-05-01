@@ -34,14 +34,16 @@ self.addEventListener('fetch', e => {
   // Serve icons from cache
   if (url.pathname.match(/\.(png|ico)$/)) {
     e.respondWith(
-      caches.match(e.request).then(cached =>
-        cached || fetch(e.request).then(resp => {
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(resp => {
           if (resp.ok) {
-            caches.open(CACHE).then(c => c.put(e.request, resp.clone()));
+            const clone = resp.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
           }
           return resp;
-        })
-      )
+        });
+      })
     );
     return;
   }

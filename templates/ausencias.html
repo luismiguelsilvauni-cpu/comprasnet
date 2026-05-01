@@ -563,9 +563,9 @@ function buildSaldoCards() {
       '<div style="font-size:9px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:116px;margin-bottom:4px">' + nomeCurto(f.nome) + '</div>' +
       '<div style="display:grid;grid-template-columns:auto 1fr;gap:1px 6px;font-size:8px;line-height:1.5">' +
         '<span style="color:var(--text-muted)">Direito:</span><span style="font-weight:700">' + d.toFixed(1) + '</span>' +
-        '<span style="color:var(--text-muted)">Férias:</span><span style="font-weight:700;color:#f59e0b">' + f_ferias.toFixed(1) + '</span>' +
+        '<span style="color:var(--text-muted)">Férias:</span><span style="font-weight:700;color:#f59e0b">' + dias_ferias.toFixed(1) + '</span>' +
         '<span style="color:var(--text-muted)">Pontes:</span><span style="font-weight:700;color:#3b6ef0">' + totalPontes + '</span>' +
-        (f_fecho > 0 ? '<span style="color:var(--text-muted)">Fecho:</span><span style="font-weight:700;color:#94a3b8">' + f_fecho.toFixed(1) + '</span>' : '') +
+        (dias_fecho > 0 ? '<span style="color:var(--text-muted)">Fecho:</span><span style="font-weight:700;color:#94a3b8">' + dias_fecho.toFixed(1) + '</span>' : '') +
   '<span style="color:var(--text-muted)">Restantes:</span><span style="font-weight:800;color:' + cor + '">' + restantes.toFixed(1) + '</span>' +
       '</div>';
     strip.appendChild(div);
