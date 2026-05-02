@@ -2687,34 +2687,6 @@ def manifest_static():
     return send_from_directory('static', 'manifest.json',
                                mimetype='application/manifest+json')
 
-@app.route('/debug/pontes/<int:ano>')
-@login_required
-def debug_pontes(ano):
-    from datetime import date
-    result = {}
-    pontes = FeriasFeriado.query.filter_by(ano=ano, tipo='ponte').all()
-    funcs = Funcionario.query.filter_by(ativo=True).all()
-    for func in funcs:
-        pontes_info = []
-        for p in pontes:
-            if p.data.weekday() >= 5:
-                pontes_info.append({'data': str(p.data), 'nome': p.nome, 'conta': False, 'motivo': 'FDS'})
-                continue
-            reg = AusenciaRegisto.query.filter(
-                AusenciaRegisto.funcionario_id == func.id,
-                AusenciaRegisto.data_inicio <= p.data,
-                AusenciaRegisto.data_fim >= p.data,
-                AusenciaRegisto.ano == ano
-            ).first()
-            if reg:
-                pontes_info.append({'data': str(p.data), 'nome': p.nome, 'conta': False, 'motivo': f'reg:{reg.tipo}({reg.data_inicio}-{reg.data_fim})'})
-            else:
-                pontes_info.append({'data': str(p.data), 'nome': p.nome, 'conta': True, 'motivo': 'auto'})
-        result[func.nome] = {
-            'total_auto': sum(1 for p in pontes_info if p['conta']),
-            'pontes': pontes_info
-        }
-    return jsonify(result)
 
 
 @app.route('/versao')
