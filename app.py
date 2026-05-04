@@ -8121,7 +8121,8 @@ def salarios_verificar_pin():
     if not senha:
         return jsonify({'ok': True})  # No PIN set, allow access
     if pin == senha:
-        session['salarios_autorizado'] = True
+        from flask import session as _sess
+        _sess['salarios_autorizado'] = True
         return jsonify({'ok': True})
     return jsonify({'ok': False, 'error': 'PIN incorrecto'})
 
@@ -8130,9 +8131,8 @@ def salarios_verificar_pin():
 @login_required
 def salarios():
     cfg = ConfigGeral.query.first()
-    if cfg and hasattr(cfg,'salarios_senha') and cfg.salarios_senha and not session.get('salarios_autorizado'):
-        return render_template('salarios_pin.html', cfg=cfg)
-    from flask import session
+    if cfg and getattr(cfg,'salarios_senha', None) and not session.get('salarios_autorizado'):
+        return render_template('salarios_pin.html')
     cfg_pin = ConfigGeral.query.first()
     if cfg_pin and cfg_pin.salarios_pin and cfg_pin.salarios_pin.strip():
         if not session.get('salarios_ok') and not current_user.is_admin:

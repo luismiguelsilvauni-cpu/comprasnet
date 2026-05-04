@@ -474,4 +474,33 @@ function testarPasta(tipo) {
 
 }
 </script>
+function fazerBackupManual() {
+  var btn = document.getElementById('btnBackupManual');
+  var msg = document.getElementById('backupManualMsg');
+  btn.disabled = true;
+  btn.textContent = '⏳ A fazer backup...';
+  msg.style.display = 'none';
+  fetch('/api/backup/manual', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      msg.style.display = 'block';
+      if (d.ok) {
+        msg.style.cssText = 'display:block;font-size:12px;padding:8px;border-radius:6px;background:rgba(34,197,94,.1);color:#16a34a;border:1px solid rgba(34,197,94,.3)';
+        msg.textContent = '✅ ' + d.msg.split('\n')[0];
+      } else {
+        msg.style.cssText = 'display:block;font-size:12px;padding:8px;border-radius:6px;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)';
+        msg.textContent = '❌ ' + d.msg;
+      }
+      btn.disabled = false;
+      btn.textContent = '🔄 Fazer Backup Agora';
+      setTimeout(function(){ location.reload(); }, 3000);
+    })
+    .catch(function() {
+      msg.style.cssText = 'display:block;font-size:12px;padding:8px;border-radius:6px;background:rgba(239,68,68,.1);color:#ef4444';
+      msg.textContent = '❌ Erro de ligação';
+      btn.disabled = false;
+      btn.textContent = '🔄 Fazer Backup Agora';
+    });
+}
+
 {% endblock %}
