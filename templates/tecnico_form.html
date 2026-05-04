@@ -11,15 +11,15 @@
   <div style="width:92%;max-width:860px;height:88vh;background:var(--surface);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4)">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0">
       <div>
-        <div style="font-size:14px;font-weight:700;color:var(--accent)">📚 Manuais — Como Adicionar um Novo Equipamento</div>
+        <div style="font-size:14px;font-weight:700;color:var(--accent)">&#128218; Manuais &#8212; Como Adicionar um Novo Equipamento</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Seleccione um manual para visualizar ou descarregar</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;font-size:11px" title="Upload PDF (admin)">
-          ⬆ Adicionar PDF
-          <input type="file" accept=".pdf" multiple style="display:none" onchange="uploadManualFrm(this)">
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;font-size:11px">
+          &#8679; Adicionar PDF
+          <input type="file" accept=".pdf" multiple style="display:none" id="uploadInputFrm" onchange="uploadManualFrm(this)">
         </label>
-        <button type="button" onclick="fecharManuais()" class="btn btn-ghost btn-sm">✕</button>
+        <button type="button" onclick="fecharManuais()" class="btn btn-ghost btn-sm">&#10005;</button>
       </div>
     </div>
     <div style="display:flex;flex:1;overflow:hidden">
@@ -28,13 +28,13 @@
       </div>
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
         <div id="manuaisEmptyMsg" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;flex-direction:column;gap:8px">
-          <span style="font-size:36px">📄</span>
-          <span>Seleccione um manual para pré-visualizar</span>
+          <span style="font-size:36px">&#128196;</span>
+          <span>Seleccione um manual para pr&#233;-visualizar</span>
         </div>
         <iframe id="manuaisFrame" src="" style="flex:1;border:none;width:100%;display:none"></iframe>
         <div id="manuaisPreviewBar" style="display:none;padding:8px 14px;border-top:1px solid var(--border);background:var(--surface2);gap:10px;align-items:center;flex-shrink:0">
           <span id="manuaisPreviewNome" style="font-size:12px;color:var(--text-muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
-          <a id="manuaisDownloadBtn" href="#" download class="btn btn-primary btn-sm">⬇ Download</a>
+          <a id="manuaisDownloadBtn" href="#" download class="btn btn-primary btn-sm">&#8681; Download</a>
         </div>
       </div>
     </div>
@@ -42,8 +42,7 @@
 </div>
 <script>
 function abrirManuais() {
-  var modal = document.getElementById('modalManuais');
-  modal.style.display = 'flex';
+  document.getElementById('modalManuais').style.display = 'flex';
   document.body.style.overflow = 'hidden';
   carregarListaManuais();
 }
@@ -55,36 +54,61 @@ function fecharManuais() {
   document.getElementById('manuaisPreviewBar').style.display = 'none';
   document.body.style.overflow = '';
 }
-document.getElementById('modalManuais').addEventListener('click', function(e){ if(e.target===this) fecharManuais(); });
+document.getElementById('modalManuais').addEventListener('click', function(e) {
+  if (e.target === this) fecharManuais();
+});
 function carregarListaManuais() {
-  fetch('/manuais-embarcacoes').then(r=>r.json()).then(function(d) {
+  fetch('/manuais-embarcacoes').then(function(r){ return r.json(); }).then(function(d) {
     var lista = document.getElementById('manuaisListaFrm');
     if (!d.ok || !d.manuais.length) {
-      lista.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Nenhum manual disponível.<br><br>Contacte o administrador para adicionar manuais.</div>';
+      lista.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Nenhum manual dispon&#237;vel.<br><br>Clique em &ldquo;Adicionar PDF&rdquo; para fazer upload.</div>';
       return;
     }
     lista.innerHTML = '';
     d.manuais.forEach(function(m, i) {
-      var item = document.createElement('div');
-      item.style.cssText = 'padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer';
-      item.innerHTML =
-        '<div style="display:flex;gap:8px;align-items:flex-start">' +
-          '<span style="font-size:20px;flex-shrink:0">📄</span>' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="font-size:12px;font-weight:600;color:var(--text);word-break:break-word">' + m.nome + '</div>' +
-            '<div style="font-size:10px;color:var(--text-muted);margin-top:3px">' + m.tamanho + ' · ' + m.data + '</div>' +
-            '<div style="display:flex;gap:6px;margin-top:8px">' +
-              '<button type="button" onclick="previewManualFrm('' + encodeURIComponent(m.nome) + '','' + m.nome.replace(/'/g,"\'") + '')" class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px">👁 Ver</button>' +
-              '<a href="/manuais-embarcacoes/download/' + encodeURIComponent(m.nome) + '" download class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 8px;text-decoration:none">⬇ Download</a>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-      lista.appendChild(item);
-      if (i === 0) previewManualFrm(encodeURIComponent(m.nome), m.nome);
+      var enc = encodeURIComponent(m.nome);
+      var div = document.createElement('div');
+      div.style.cssText = 'padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px';
+      var nameDiv = document.createElement('div');
+      nameDiv.style.cssText = 'font-size:12px;font-weight:600;color:var(--text);word-break:break-word';
+      nameDiv.textContent = m.nome;
+      var metaDiv = document.createElement('div');
+      metaDiv.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:3px';
+      metaDiv.textContent = m.tamanho + ' \u00b7 ' + m.data;
+      var btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:6px;margin-top:8px';
+      var btnVer = document.createElement('button');
+      btnVer.type = 'button';
+      btnVer.className = 'btn btn-ghost btn-sm';
+      btnVer.style.cssText = 'font-size:10px;padding:3px 8px';
+      btnVer.textContent = 'Ver';
+      btnVer.onclick = (function(e, n){ return function(){ previewManualFrm(e, n); }; })(enc, m.nome);
+      var lnkDown = document.createElement('a');
+      lnkDown.href = '/manuais-embarcacoes/download/' + enc;
+      lnkDown.download = m.nome;
+      lnkDown.className = 'btn btn-primary btn-sm';
+      lnkDown.style.cssText = 'font-size:10px;padding:3px 8px;text-decoration:none';
+      lnkDown.textContent = 'Download';
+      btnRow.appendChild(btnVer);
+      btnRow.appendChild(lnkDown);
+      div.appendChild(nameDiv);
+      div.appendChild(metaDiv);
+      div.appendChild(btnRow);
+      lista.appendChild(div);
+      if (i === 0) previewManualFrm(enc, m.nome);
     });
-  }).catch(function(){
+  }).catch(function() {
     document.getElementById('manuaisListaFrm').innerHTML = '<div style="color:#ef4444;font-size:12px;padding:12px">Erro ao carregar manuais.</div>';
   });
+}
+function previewManualFrm(enc, nome) {
+  var frame = document.getElementById('manuaisFrame');
+  frame.src = '/manuais-embarcacoes/view/' + enc;
+  frame.style.display = 'block';
+  document.getElementById('manuaisEmptyMsg').style.display = 'none';
+  document.getElementById('manuaisPreviewBar').style.display = 'flex';
+  document.getElementById('manuaisPreviewNome').textContent = nome;
+  document.getElementById('manuaisDownloadBtn').href = '/manuais-embarcacoes/download/' + enc;
 }
 function uploadManualFrm(input) {
   var files = Array.from(input.files);
@@ -94,25 +118,15 @@ function uploadManualFrm(input) {
     var fd = new FormData();
     fd.append('pdf', file);
     fetch('/manuais-embarcacoes/upload', { method: 'POST', body: fd })
-      .then(r => r.json())
+      .then(function(r){ return r.json(); })
       .then(function(d) {
         done++;
         if (done === files.length) {
           input.value = '';
           carregarListaManuais();
-          if (!d.ok) alert('Erro: ' + d.error);
         }
       });
   });
-}
-function previewManualFrm(encNome, nome) {
-  var frame = document.getElementById('manuaisFrame');
-  frame.src = '/manuais-embarcacoes/view/' + encNome;
-  frame.style.display = 'block';
-  document.getElementById('manuaisEmptyMsg').style.display = 'none';
-  document.getElementById('manuaisPreviewBar').style.display = 'flex';
-  document.getElementById('manuaisPreviewNome').textContent = nome;
-  document.getElementById('manuaisDownloadBtn').href = '/manuais-embarcacoes/download/' + encNome;
 }
 </script>
 
