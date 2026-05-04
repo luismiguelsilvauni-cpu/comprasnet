@@ -14,7 +14,13 @@
         <div style="font-size:14px;font-weight:700;color:var(--accent)">📚 Manuais — Como Adicionar um Novo Equipamento</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Seleccione um manual para visualizar ou descarregar</div>
       </div>
-      <button type="button" onclick="fecharManuais()" class="btn btn-ghost btn-sm">✕</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;font-size:11px" title="Upload PDF (admin)">
+          ⬆ Adicionar PDF
+          <input type="file" accept=".pdf" multiple style="display:none" onchange="uploadManualFrm(this)">
+        </label>
+        <button type="button" onclick="fecharManuais()" class="btn btn-ghost btn-sm">✕</button>
+      </div>
     </div>
     <div style="display:flex;flex:1;overflow:hidden">
       <div style="width:280px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:12px" id="manuaisListaFrm">
@@ -78,6 +84,25 @@ function carregarListaManuais() {
     });
   }).catch(function(){
     document.getElementById('manuaisListaFrm').innerHTML = '<div style="color:#ef4444;font-size:12px;padding:12px">Erro ao carregar manuais.</div>';
+  });
+}
+function uploadManualFrm(input) {
+  var files = Array.from(input.files);
+  if (!files.length) return;
+  var done = 0;
+  files.forEach(function(file) {
+    var fd = new FormData();
+    fd.append('pdf', file);
+    fetch('/manuais-embarcacoes/upload', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(function(d) {
+        done++;
+        if (done === files.length) {
+          input.value = '';
+          carregarListaManuais();
+          if (!d.ok) alert('Erro: ' + d.error);
+        }
+      });
   });
 }
 function previewManualFrm(encNome, nome) {
