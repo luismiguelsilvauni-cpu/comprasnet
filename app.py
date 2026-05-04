@@ -2131,6 +2131,69 @@ def editar_cliente(cid):
 
 # ── Embarcações ──────────────────────────────────────────────
 
+# ══════════════════════════════════════════════════════════════════════
+# MANUAIS EMBARCAÇÕES — Upload / Download / Listagem
+# ══════════════════════════════════════════════════════════════════════
+MANUAIS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'manuais_embarcacoes')
+os.makedirs(MANUAIS_DIR, exist_ok=True)
+
+@app.route('/manuais-embarcacoes')
+@login_required
+def manuais_embarcacoes_list():
+    """Return list of uploaded manuals as JSON."""
+    files = []
+    try:
+        for fname in sorted(os.listdir(MANUAIS_DIR)):
+            if fname.lower().endswith('.pdf'):
+                path = os.path.join(MANUAIS_DIR, fname)
+                size = os.path.getsize(path)
+                mtime = os.path.getmtime(path)
+                from datetime import datetime as _dt
+                files.append({
+                    'nome': fname,
+                    'tamanho': f'{size/1024:.0f} KB' if size < 1024*1024 else f'{size/1024/1024:.1f} MB',
+                    'data': _dt.fromtimestamp(mtime).strftime('%d/%m/%Y'),
+                })
+    except Exception as e:
+        pass
+    return jsonify({'ok': True, 'manuais': files})
+
+@app.route('/manuais-embarcacoes/upload', methods=['POST'])
+@login_required
+def manuais_embarcacoes_upload():
+    """Upload a PDF manual."""
+    if 'pdf' not in request.files:
+        return jsonify({'ok': False, 'error': 'Nenhum ficheiro enviado'})
+    f = request.files['pdf']
+    if not f.filename.lower().endswith('.pdf'):
+        return jsonify({'ok': False, 'error': 'Apenas ficheiros PDF são permitidos'})
+    import re as _re
+    safe = _re.sub(r'[^\w\-\.\s]', '_', f.filename)
+    dest = os.path.join(MANUAIS_DIR, safe)
+    f.save(dest)
+    return jsonify({'ok': True, 'nome': safe})
+
+@app.route('/manuais-embarcacoes/download/<path:nome>')
+@login_required
+def manuais_embarcacoes_download(nome):
+    return send_from_directory(MANUAIS_DIR, nome, as_attachment=True)
+
+@app.route('/manuais-embarcacoes/view/<path:nome>')
+@login_required
+def manuais_embarcacoes_view(nome):
+    return send_from_directory(MANUAIS_DIR, nome, mimetype='application/pdf')
+
+@app.route('/manuais-embarcacoes/delete/<path:nome>', methods=['POST'])
+@login_required
+def manuais_embarcacoes_delete(nome):
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    path = os.path.join(MANUAIS_DIR, nome)
+    if os.path.exists(path):
+        os.remove(path)
+    return jsonify({'ok': True})
+
+
 @app.route('/clientes/<int:cid>/embarcacoes/nova', methods=['GET','POST'])
 @login_required
 def nova_embarcacao(cid):
