@@ -1,26 +1,40 @@
 {% extends "base.html" %}
-{% block title %}Acesso · Salários{% endblock %}
+{% block title %}Acesso — Salários{% endblock %}
 {% block page_title %}💶 Salários{% endblock %}
 {% block content %}
-<div style="max-width:380px;margin:60px auto">
-  <div class="card" style="padding:28px;text-align:center">
-    <div style="font-size:48px;margin-bottom:16px">🔐</div>
-    <div style="font-size:18px;font-weight:700;margin-bottom:6px">Acesso Restrito</div>
-    <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">Introduza o PIN para aceder ao módulo de Salários</div>
-    {% if erro %}
-    <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#ef4444;margin-bottom:16px">
-      ❌ PIN incorrecto. Tente novamente.
+<div style="max-width:360px;margin:60px auto">
+  <div class="card" style="text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">🔐</div>
+    <div style="font-size:18px;font-weight:700;color:var(--accent);margin-bottom:6px">Acesso Restrito</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">Introduza a password para aceder ao módulo de Salários</div>
+    <div class="form-group" style="text-align:left">
+      <label>Password</label>
+      <input type="password" id="pinInput" class="input" placeholder="••••••" autofocus
+        onkeydown="if(event.key==='Enter') verificarPin()">
     </div>
-    {% endif %}
-    <form method="POST">
-      <input type="password" name="pin" class="input" placeholder="••••••"
-        style="text-align:center;font-size:20px;letter-spacing:6px;margin-bottom:14px"
-        autofocus autocomplete="off" maxlength="10">
-      <button type="submit" class="btn btn-primary" style="width:100%">Entrar →</button>
-    </form>
+    <div id="pinError" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none">Password incorrecta</div>
+    <button onclick="verificarPin()" class="btn btn-primary" style="width:100%">Entrar</button>
     <div style="margin-top:16px">
-      <a href="{{ url_for('dashboard') }}" style="font-size:12px;color:var(--text-muted)">← Voltar ao Dashboard</a>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Voltar</a>
     </div>
   </div>
 </div>
+<script>
+function verificarPin() {
+  var pin = document.getElementById('pinInput').value;
+  fetch('/api/salarios/verificar-pin', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pin: pin})
+  }).then(r => r.json()).then(function(d) {
+    if (d.ok) {
+      window.location.href = '/salarios';
+    } else {
+      document.getElementById('pinError').style.display = 'block';
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinInput').focus();
+    }
+  });
+}
+</script>
 {% endblock %}

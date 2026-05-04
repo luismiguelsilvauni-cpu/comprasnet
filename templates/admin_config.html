@@ -177,9 +177,30 @@ function regenerarIcons() {
 }
 </script>
 
+
+<!-- Segurança Módulos -->
+<div class="card mb-16">
+  <div class="card-title">🔐 Segurança — Módulo Salários</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
+    Defina uma password para proteger o acesso ao módulo de Salários. Deixe em branco para acesso livre.
+  </div>
+  <div class="form-group">
+    <label>Password de Acesso a Salários</label>
+    <input type="password" name="salarios_senha" class="input" 
+      value="{{ cfg.salarios_senha or '' }}" placeholder="Deixar em branco = sem restrição"
+      autocomplete="new-password">
+  </div>
+</div>
+
 <!-- Backup -->
 <div class="card mb-16">
-  <div class="card-title">💾 Backup Automático</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div class="card-title" style="margin:0">💾 Backup Automático</div>
+    <button type="button" onclick="fazerBackupManual()" id="btnBackupManual" class="btn btn-primary btn-sm">
+      🔄 Fazer Backup Agora
+    </button>
+  </div>
+  <div id="backupManualMsg" style="display:none;font-size:12px;padding:8px;border-radius:6px;margin-bottom:10px"></div>
 
   <!-- Pasta local -->
   <div class="form-group">

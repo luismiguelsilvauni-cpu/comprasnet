@@ -146,6 +146,17 @@ def pwa_icon(size):
     return resp
 
 
+@app.route('/api/backup/manual', methods=['POST'])
+@login_required
+def backup_manual():
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    from backup_manager import fazer_backup
+    cfg = ConfigGeral.query.first()
+    ok, msg = fazer_backup(app, cfg)
+    return jsonify({'ok': ok, 'msg': msg})
+
+
 @app.route('/admin/regenerar-icons', methods=['POST'])
 @login_required
 def admin_regenerar_icons():
@@ -8100,9 +8111,27 @@ def salarios_pin():
     return render_template('salarios_pin.html', erro=False)
 
 
+@app.route('/api/salarios/verificar-pin', methods=['POST'])
+@login_required
+def salarios_verificar_pin():
+    data = request.get_json() or {}
+    pin = data.get('pin', '')
+    cfg = ConfigGeral.query.first()
+    senha = cfg.salarios_senha if cfg and hasattr(cfg, 'salarios_senha') and cfg.salarios_senha else None
+    if not senha:
+        return jsonify({'ok': True})  # No PIN set, allow access
+    if pin == senha:
+        session['salarios_autorizado'] = True
+        return jsonify({'ok': True})
+    return jsonify({'ok': False, 'error': 'PIN incorrecto'})
+
+
 @app.route('/salarios')
 @login_required
 def salarios():
+    cfg = ConfigGeral.query.first()
+    if cfg and hasattr(cfg,'salarios_senha') and cfg.salarios_senha and not session.get('salarios_autorizado'):
+        return render_template('salarios_pin.html', cfg=cfg)
     from flask import session
     cfg_pin = ConfigGeral.query.first()
     if cfg_pin and cfg_pin.salarios_pin and cfg_pin.salarios_pin.strip():

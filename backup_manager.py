@@ -2,21 +2,16 @@
 backup_manager.py
 ─────────────────
 Automated and manual backup of ComprasNet SQLite database.
-Supports local folder and network share destinations.
-Runs as a background thread with daily scheduling.
 """
 
-import os
-import shutil
-import logging
-import threading
-import time
+import os, shutil, logging, threading, time
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 _scheduler_thread = None
 _stop_event = threading.Event()
+_last_backup_check = None  # Track last date we ran backup
 
 
 def _backup_filename() -> str:
@@ -24,7 +19,6 @@ def _backup_filename() -> str:
 
 
 def _cleanup_old_backups(path: str, manter_dias: int):
-    """Remove backup files older than manter_dias."""
     if not os.path.isdir(path):
         return
     cutoff = datetime.now() - timedelta(days=manter_dias)
@@ -32,52 +26,46 @@ def _cleanup_old_backups(path: str, manter_dias: int):
         if fname.startswith('comprasnet_backup_') and fname.endswith('.db'):
             fpath = os.path.join(path, fname)
             try:
-                mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
-                if mtime < cutoff:
+                if datetime.fromtimestamp(os.path.getmtime(fpath)) < cutoff:
                     os.remove(fpath)
                     logger.info(f"Backup antigo removido: {fname}")
             except Exception as e:
-                logger.warning(f"Erro ao remover backup {fname}: {e}")
+                logger.warning(f"Erro ao remover {fname}: {e}")
 
 
-def fazer_backup(app, cfg=None) -> tuple[bool, str]:
-    """
-    Perform a backup of the SQLite database.
-    Returns (success, message).
-    """
+def _get_db_path(app):
+    for candidate in [
+        os.path.join(app.instance_path, 'compras.db'),
+        os.path.join(os.path.dirname(app.instance_path), 'instance', 'compras.db'),
+        os.path.join(os.path.dirname(app.root_path), 'instance', 'compras.db'),
+    ]:
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def fazer_backup(app, cfg=None) -> tuple:
     with app.app_context():
         if cfg is None:
             from models import ConfigGeral
             cfg = ConfigGeral.query.first()
 
-        db_path = os.path.join(
-            os.path.dirname(app.instance_path),
-            'instance', 'compras.db'
-        )
-        if not os.path.exists(db_path):
-            # Try instance_path directly
-            db_path = os.path.join(app.instance_path, 'compras.db')
-        if not os.path.exists(db_path):
+        db_path = _get_db_path(app)
+        if not db_path:
             return False, "Base de dados não encontrada."
 
         filename = _backup_filename()
         results = []
         ok = True
 
-        destinations = []
         local = (cfg.backup_local_path or 'backups').strip() if cfg else 'backups'
-        if local:
-            if not os.path.isabs(local):
-                local = os.path.join(os.path.dirname(db_path), '..', local)
-            destinations.append(('local', os.path.normpath(local)))
+        destinations = []
+        if not os.path.isabs(local):
+            local = os.path.join(os.path.dirname(db_path), local)
+        destinations.append(('local', os.path.normpath(local)))
 
         if cfg and cfg.backup_rede_path and cfg.backup_rede_path.strip():
             destinations.append(('rede', cfg.backup_rede_path.strip()))
-
-        if not destinations:
-            destinations.append(('local', os.path.normpath(
-                os.path.join(os.path.dirname(db_path), '..', 'backups')
-            )))
 
         for dest_type, dest_path in destinations:
             try:
@@ -86,18 +74,15 @@ def fazer_backup(app, cfg=None) -> tuple[bool, str]:
                 shutil.copy2(db_path, dest_file)
                 size_kb = os.path.getsize(dest_file) // 1024
                 results.append(f"✅ {dest_type}: {dest_path} ({size_kb} KB)")
-                # Cleanup old
-                manter = cfg.backup_manter_dias if cfg else 30
-                _cleanup_old_backups(dest_path, manter)
+                _cleanup_old_backups(dest_path, cfg.backup_manter_dias if cfg else 30)
             except Exception as e:
                 ok = False
                 results.append(f"❌ {dest_type} ({dest_path}): {e}")
 
-        # Update last backup timestamp
         try:
             from models import db, ConfigGeral
             if cfg:
-                cfg.ultimo_backup    = datetime.utcnow()
+                cfg.ultimo_backup = datetime.utcnow()
                 cfg.ultimo_backup_ok = ok
                 db.session.commit()
         except Exception:
@@ -108,19 +93,16 @@ def fazer_backup(app, cfg=None) -> tuple[bool, str]:
         return ok, msg
 
 
-def listar_backups(app, cfg=None) -> list[dict]:
-    """List all backup files with metadata."""
+def listar_backups(app, cfg=None) -> list:
     with app.app_context():
         if cfg is None:
             from models import ConfigGeral
             cfg = ConfigGeral.query.first()
-
+        db_path = _get_db_path(app) or ''
         local = (cfg.backup_local_path or 'backups').strip() if cfg else 'backups'
-        db_path = os.path.join(app.instance_path, 'compras.db')
         if not os.path.isabs(local):
-            local = os.path.join(os.path.dirname(db_path), '..', local)
+            local = os.path.join(os.path.dirname(db_path), local)
         local = os.path.normpath(local)
-
         backups = []
         if os.path.isdir(local):
             for fname in sorted(os.listdir(local), reverse=True):
@@ -129,20 +111,20 @@ def listar_backups(app, cfg=None) -> list[dict]:
                     try:
                         stat = os.stat(fpath)
                         backups.append({
-                            'nome':     fname,
-                            'caminho':  fpath,
-                            'tamanho':  stat.st_size // 1024,
-                            'data':     datetime.fromtimestamp(stat.st_mtime).strftime('%d/%m/%Y %H:%M'),
+                            'nome': fname,
+                            'caminho': fpath,
+                            'tamanho': stat.st_size // 1024,
+                            'data': datetime.fromtimestamp(stat.st_mtime).strftime('%d/%m/%Y %H:%M'),
                         })
                     except Exception:
                         pass
         return backups
 
 
-# ── Scheduler ─────────────────────────────────────────────────────────────────
+# ── Scheduler (fixed) ──────────────────────────────────────────────────────────
 
 def _scheduler_loop(app, get_cfg_fn):
-    """Background thread that runs daily backup at configured time."""
+    global _last_backup_check
     logger.info("Backup scheduler iniciado.")
     while not _stop_event.is_set():
         try:
@@ -152,29 +134,25 @@ def _scheduler_loop(app, get_cfg_fn):
                     hora_str = cfg.backup_hora or '02:00'
                     h, m = map(int, hora_str.split(':'))
                     now = datetime.now()
-                    target = now.replace(hour=h, minute=m, second=0, microsecond=0)
-                    if target <= now:
-                        target += timedelta(days=1)
-                    wait_secs = (target - now).total_seconds()
+                    today_target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                    today_str = now.strftime('%Y-%m-%d')
 
-                    # Sleep in small chunks to allow stop
-                    slept = 0
-                    while slept < wait_secs and not _stop_event.is_set():
-                        time.sleep(min(60, wait_secs - slept))
-                        slept += 60
-
-                    if not _stop_event.is_set():
+                    # Run if we're within 2 minutes of target and haven't run today
+                    diff = abs((now - today_target).total_seconds())
+                    if diff < 120 and _last_backup_check != today_str:
                         logger.info("A executar backup automático agendado...")
+                        _last_backup_check = today_str
                         fazer_backup(app, cfg)
                 else:
-                    time.sleep(300)  # Check every 5 min if backup becomes active
+                    pass
         except Exception as e:
             logger.error(f"Erro no scheduler de backup: {e}")
-            time.sleep(60)
+
+        # Check every 60 seconds
+        _stop_event.wait(60)
 
 
 def iniciar_scheduler(app):
-    """Start the background backup scheduler thread."""
     global _scheduler_thread, _stop_event
     _stop_event.clear()
 
