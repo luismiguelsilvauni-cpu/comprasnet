@@ -628,29 +628,33 @@ fetch('/api/admin/registos-count').then(r=>r.json()).then(d=>{
 </script>
 
 <!-- User Status Widget -->
-<div id="userStatusWidget" style="position:fixed;bottom:16px;right:16px;z-index:8000;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.25);min-width:180px;max-width:240px;overflow:hidden;transition:.2s">
-  <div id="userStatusDragHandle" style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:grab;user-select:none">
+<div id="userStatusWidget" style="position:fixed;bottom:16px;right:16px;z-index:8000;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.25);width:220px;overflow:hidden">
+  <div id="userStatusHandle" style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:grab;user-select:none;background:var(--surface2)">
     <span style="font-size:11px;font-weight:700;color:var(--text-muted)">👥 Estado Utilizadores</span>
-    <span id="statusWidgetArrow" style="font-size:10px;color:var(--text-muted)">▴</span>
+    <span id="statusWidgetArrow" style="font-size:10px;color:var(--text-muted);cursor:pointer;padding:2px 4px" title="Minimizar">▴</span>
   </div>
-  <div id="statusWidgetBody" style="padding:6px 0;max-height:200px;overflow-y:auto">
+  <div id="statusWidgetBody" style="max-height:200px;overflow-y:auto">
     <div style="padding:8px 12px;font-size:11px;color:var(--text-muted)">A carregar...</div>
   </div>
 </div>
 
 <script>
 var _statusOpen = true;
-function toggleStatusWidget() {
+
+// Toggle minimize
+document.getElementById('statusWidgetArrow').addEventListener('click', function(e) {
+  e.stopPropagation();
   _statusOpen = !_statusOpen;
   document.getElementById('statusWidgetBody').style.display = _statusOpen ? 'block' : 'none';
-  document.getElementById('statusWidgetArrow').textContent = _statusOpen ? '▴' : '▾';
-}
+  this.textContent = _statusOpen ? '▴' : '▾';
+});
 
 function atualizarStatus() {
   fetch('/api/users/status')
     .then(function(r){ return r.json(); })
     .then(function(users) {
       var body = document.getElementById('statusWidgetBody');
+      if (!body) return;
       body.innerHTML = users.map(function(u) {
         var dot, label, col;
         if (u.status === 'online') {
@@ -659,46 +663,69 @@ function atualizarStatus() {
           dot='🟡'; col='#f59e0b';
           label = u.mins < 60 ? 'Há ' + u.mins + ' min' : 'Há ' + Math.floor(u.mins/60) + 'h';
         } else {
-          dot='🔴'; col='#ef4444'; label='Offline';
+          dot='⚫'; col='var(--text-muted)';
+          label = u.last ? u.last : 'Offline';
         }
-        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid var(--border)">' +
-          '<span style="font-size:12px">' + dot + '</span>' +
+        return '<div style="padding:5px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">' +
+          '<span>' + dot + '</span>' +
           '<div style="flex:1;min-width:0">' +
-            '<div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + u.nome + '</div>' +
+            '<div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + u.nome + '</div>' +
             '<div style="font-size:10px;color:' + col + '">' + label + '</div>' +
           '</div></div>';
-      }).join('') || '<div style="padding:8px 12px;font-size:11px;color:var(--text-muted)">Sem dados</div>';
+      }).join('');
     }).catch(function(){});
 }
 
-// Heartbeat every 60s
-function heartbeat() {
-  fetch('/api/user/heartbeat', {method:'POST'}).catch(function(){});
-}
-{% if current_user.is_authenticated %}
-heartbeat();
-setInterval(heartbeat, 60000);
 atualizarStatus();
 setInterval(atualizarStatus, 30000);
-{% endif %}
+
+// ── Drag ──────────────────────────────────────────────────────────────────────
+(function() {
+  var el     = document.getElementById('userStatusWidget');
+  var handle = document.getElementById('userStatusHandle');
+  if (!el || !handle) return;
+
+  // Restore saved position
+  try {
+    var s = JSON.parse(localStorage.getItem('uwPos'));
+    if (s && s.left >= 0 && s.top >= 0) {
+      el.style.right  = 'auto';
+      el.style.bottom = 'auto';
+      el.style.left   = s.left + 'px';
+      el.style.top    = s.top  + 'px';
+    }
+  } catch(e) {}
+
+  var drag = false, ox = 0, oy = 0;
+
+  handle.addEventListener('mousedown', function(e) {
+    if (e.target.id === 'statusWidgetArrow') return;
+    drag = true;
+    var r = el.getBoundingClientRect();
+    ox = e.clientX - r.left;
+    oy = e.clientY - r.top;
+    el.style.right  = 'auto';
+    el.style.bottom = 'auto';
+    el.style.left   = r.left + 'px';
+    el.style.top    = r.top  + 'px';
+    handle.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!drag) return;
+    el.style.left = Math.max(0, Math.min(window.innerWidth  - el.offsetWidth,  e.clientX - ox)) + 'px';
+    el.style.top  = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, e.clientY - oy)) + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!drag) return;
+    drag = false;
+    handle.style.cursor = 'grab';
+    try { localStorage.setItem('uwPos', JSON.stringify({left:parseInt(el.style.left), top:parseInt(el.style.top)})); } catch(e){}
+  });
+})();
 </script>
 
-<script>
-if ('serviceWorker' in navigator) {
-  // Unregister old service workers and clear all caches
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    regs.forEach(function(reg) { reg.unregister(); });
-  });
-  if ('caches' in window) {
-    caches.keys().then(function(keys) {
-      keys.forEach(function(k) { caches.delete(k); });
-    });
-  }
-  // Re-register fresh
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').catch(function(){});
-  });
-}
-</script>
 </body>
 </html>

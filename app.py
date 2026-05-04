@@ -151,9 +151,9 @@ def pwa_icon(size):
 def backup_manual():
     if not current_user.is_admin:
         return jsonify({'ok': False, 'error': 'Sem permissão'})
-    from backup_manager import fazer_backup
+    from backup_manager import fazer_backup_completo
     cfg = ConfigGeral.query.first()
-    ok, msg = fazer_backup(app, cfg)
+    ok, msg = fazer_backup_completo(app, cfg)
     return jsonify({'ok': ok, 'msg': msg})
 
 
@@ -8131,13 +8131,13 @@ def salarios_verificar_pin():
 @login_required
 def salarios():
     cfg = ConfigGeral.query.first()
-    salarios_senha = getattr(cfg,'salarios_senha', None) if cfg else None
-    if salarios_senha and not session.get('salarios_autorizado'):
+    try:
+        salarios_senha = cfg.salarios_senha if cfg else None
+    except Exception:
+        salarios_senha = None
+    if salarios_senha and salarios_senha.strip() and not session.get('salarios_autorizado'):
         return render_template('salarios_pin.html')
-    cfg_pin = ConfigGeral.query.first()
-    if cfg_pin and cfg_pin.salarios_pin and cfg_pin.salarios_pin.strip():
-        if not session.get('salarios_ok') and not current_user.is_admin:
-            return redirect(url_for('salarios_pin'))
+
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     return render_template('salarios.html', funcionarios=funcionarios)
 

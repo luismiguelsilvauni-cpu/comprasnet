@@ -170,3 +170,79 @@ def iniciar_scheduler(app):
 
 def parar_scheduler():
     _stop_event.set()
+
+
+def fazer_backup_completo(app, cfg=None) -> tuple:
+    """
+    Full backup: SQLite DB + uploads folder → ZIP archive.
+    Includes: database, uploaded PDFs, photos, manuals, embarcacoes files.
+    """
+    import zipfile
+    with app.app_context():
+        if cfg is None:
+            from models import ConfigGeral
+            cfg = ConfigGeral.query.first()
+
+        db_path = _get_db_path(app)
+        if not db_path:
+            return False, "Base de dados não encontrada."
+
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        zip_name = f"comprasnet_backup_{ts}.zip"
+
+        local = (cfg.backup_local_path or 'backups').strip() if cfg else 'backups'
+        if not os.path.isabs(local):
+            local = os.path.join(os.path.dirname(db_path), local)
+        local = os.path.normpath(local)
+        os.makedirs(local, exist_ok=True)
+
+        zip_path = os.path.join(local, zip_name)
+        results = []
+        ok = True
+
+        try:
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # 1. Database
+                zf.write(db_path, 'compras.db')
+                results.append('✅ Base de dados')
+
+                # 2. Uploads folder
+                uploads_dir = os.path.join(os.path.dirname(db_path), 'uploads')
+                if os.path.isdir(uploads_dir):
+                    count = 0
+                    for root, dirs, files in os.walk(uploads_dir):
+                        for fname in files:
+                            fpath = os.path.join(root, fname)
+                            arcname = os.path.relpath(fpath, os.path.dirname(uploads_dir))
+                            zf.write(fpath, arcname)
+                            count += 1
+                    results.append(f'✅ Uploads ({count} ficheiros)')
+
+            size_mb = os.path.getsize(zip_path) / 1024 / 1024
+            results.append(f'📦 {zip_name} ({size_mb:.1f} MB)')
+
+            # Copy to network if configured
+            if cfg and cfg.backup_rede_path and cfg.backup_rede_path.strip():
+                try:
+                    import shutil
+                    shutil.copy2(zip_path, os.path.join(cfg.backup_rede_path.strip(), zip_name))
+                    results.append(f'✅ Rede: {cfg.backup_rede_path}')
+                except Exception as e:
+                    results.append(f'❌ Rede: {e}')
+
+            _cleanup_old_backups(local, cfg.backup_manter_dias if cfg else 30)
+
+        except Exception as e:
+            ok = False
+            results.append(f'❌ Erro: {e}')
+
+        try:
+            from models import db
+            if cfg:
+                cfg.ultimo_backup = datetime.utcnow()
+                cfg.ultimo_backup_ok = ok
+                db.session.commit()
+        except Exception:
+            pass
+
+        return ok, '\n'.join(results)
