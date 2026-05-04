@@ -343,7 +343,8 @@ class ConfigGeral(db.Model):
     # Claude chat
     claude_chat_ativo     = db.Column(db.Boolean,     default=True)
     claude_chat_sistema   = db.Column(db.Text,        default='És um assistente técnico especializado em equipamentos navais e hidráulicos. Responde sempre em português.')
-    salarios_pin          = db.Column(db.String(10),    default='')  # PIN to access salarios
+    salarios_pin          = db.Column(db.String(10),    default='')  # PIN to access salarios (legacy)
+    salarios_senha        = db.Column(db.String(50))  # Password to access salarios
 
 
 class NotaArtigo(db.Model):

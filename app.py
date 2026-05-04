@@ -1918,10 +1918,7 @@ def admin_config():
             cfg.backup_hora        = request.form.get('backup_hora', '02:00')
             cfg.backup_manter_dias = int(request.form.get('backup_manter_dias', 30))
             cfg.backup_auto_ativo  = request.form.get('backup_auto_ativo') == 'on'
-            try:
-                v = request.form.get('salarios_senha','').strip()
-                cfg.salarios_senha = v if v else None
-            except Exception: pass
+            cfg.salarios_pin = request.form.get('salarios_senha','').strip() or ''
             cfg.claude_chat_ativo  = request.form.get('claude_chat_ativo') == 'on'
             cfg.claude_chat_sistema= request.form.get('claude_chat_sistema', '').strip()
             try:
@@ -8126,7 +8123,7 @@ def salarios_verificar_pin():
     data = request.get_json() or {}
     pin = data.get('pin', '')
     cfg = ConfigGeral.query.first()
-    senha = cfg.salarios_senha if cfg and hasattr(cfg, 'salarios_senha') and cfg.salarios_senha else None
+    senha = (cfg.salarios_pin or '').strip() if cfg else None
     if not senha:
         return jsonify({'ok': True})  # No PIN set, allow access
     if pin == senha:
@@ -8140,11 +8137,8 @@ def salarios_verificar_pin():
 @login_required
 def salarios():
     cfg = ConfigGeral.query.first()
-    try:
-        salarios_senha = cfg.salarios_senha if cfg else None
-    except Exception:
-        salarios_senha = None
-    if salarios_senha and salarios_senha.strip() and not session.get('salarios_autorizado'):
+    salarios_senha = (cfg.salarios_pin or '').strip() if cfg else ''
+    if salarios_senha and not session.get('salarios_autorizado'):
         return render_template('salarios_pin.html')
 
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
