@@ -8131,7 +8131,8 @@ def salarios_verificar_pin():
 @login_required
 def salarios():
     cfg = ConfigGeral.query.first()
-    if cfg and getattr(cfg,'salarios_senha', None) and not session.get('salarios_autorizado'):
+    salarios_senha = getattr(cfg,'salarios_senha', None) if cfg else None
+    if salarios_senha and not session.get('salarios_autorizado'):
         return render_template('salarios_pin.html')
     cfg_pin = ConfigGeral.query.first()
     if cfg_pin and cfg_pin.salarios_pin and cfg_pin.salarios_pin.strip():
