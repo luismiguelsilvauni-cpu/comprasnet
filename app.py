@@ -192,6 +192,11 @@ def icon_debug():
     
     return jsonify(info)
 
+def _regenerar_pwa_icons_auto():
+    """Called on startup to restore icons from logo."""
+    with app.app_context():
+        _regenerar_pwa_icons()
+
 def _regenerar_pwa_icons():
     """Pre-generate all PWA icon sizes from the company logo."""
     cfg = ConfigGeral.query.first()
@@ -1913,6 +1918,10 @@ def admin_config():
             cfg.backup_hora        = request.form.get('backup_hora', '02:00')
             cfg.backup_manter_dias = int(request.form.get('backup_manter_dias', 30))
             cfg.backup_auto_ativo  = request.form.get('backup_auto_ativo') == 'on'
+            try:
+                v = request.form.get('salarios_senha','').strip()
+                cfg.salarios_senha = v if v else None
+            except Exception: pass
             cfg.claude_chat_ativo  = request.form.get('claude_chat_ativo') == 'on'
             cfg.claude_chat_sistema= request.form.get('claude_chat_sistema', '').strip()
             try:
