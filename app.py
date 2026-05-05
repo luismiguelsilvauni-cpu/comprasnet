@@ -55,11 +55,22 @@ def inject_perfil():
 
 @app.before_request
 def refresh_session():
-    """Keep session alive on every request."""
+    """Keep session alive and update last_seen on every request."""
     from flask_login import current_user
     if current_user.is_authenticated:
         session.permanent = True
         session.modified = True
+        # Update UserSession last_seen (skip static/api polling to avoid DB spam)
+        if not request.path.startswith('/static') and request.path != '/api/users/status':
+            try:
+                us = UserSession.query.filter_by(user_id=current_user.id).first()
+                if us:
+                    us.last_seen = datetime.now()
+                else:
+                    db.session.add(UserSession(user_id=current_user.id, last_seen=datetime.now()))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
 
 @login_manager.unauthorized_handler
@@ -8149,15 +8160,16 @@ def salarios():
     cfg = ConfigGeral.query.first()
     salarios_senha = (cfg.salarios_pin or '').strip() if cfg else ''
     if salarios_senha:
-        # Check if authorized and not expired (30 min timeout)
         auth_time = session.get('salarios_auth_time')
-        from datetime import datetime as _dt
-        authorized = (
-            session.get('salarios_autorizado') and
-            auth_time and
-            (_dt.now() - _dt.fromisoformat(auth_time)).seconds < 1800
-        )
-        if not authorized:
+        authed = False
+        if session.get('salarios_autorizado') and auth_time:
+            try:
+                from datetime import datetime as _dt
+                elapsed = (_dt.now() - _dt.fromisoformat(auth_time)).total_seconds()
+                authed = elapsed < 1800
+            except Exception:
+                authed = False
+        if not authed:
             session.pop('salarios_autorizado', None)
             session.pop('salarios_auth_time', None)
             return render_template('salarios_pin.html')

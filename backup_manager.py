@@ -206,28 +206,35 @@ def fazer_backup_completo(app, cfg=None) -> tuple:
                 zf.write(db_path, 'compras.db')
                 results.append('✅ Base de dados')
 
-                # 2. All upload/static directories
+                # 2. Find uploads folder - try multiple locations
                 app_root = app.root_path
-                search_dirs = [
-                    ('uploads', os.path.join(app_root, 'uploads')),
-                    ('uploads', os.path.join(os.path.dirname(db_path), 'uploads')),
+                uploads_candidates = [
+                    os.path.join(app_root, 'uploads'),
+                    os.path.join(os.path.dirname(app_root), 'uploads'),
+                    os.path.join(os.path.dirname(db_path), '..', 'uploads'),
+                    os.path.join(os.path.dirname(db_path), 'uploads'),
                 ]
-                # Also check instance folder
-                seen = set()
                 total_files = 0
-                for arc_base, udir in search_dirs:
-                    if not os.path.isdir(udir) or udir in seen:
+                backed_up = []
+                for udir in uploads_candidates:
+                    udir = os.path.normpath(udir)
+                    if not os.path.isdir(udir):
                         continue
-                    seen.add(udir)
+                    if udir in backed_up:
+                        continue
+                    backed_up.append(udir)
                     for root, dirs, files in os.walk(udir):
-                        # Skip backups folder inside uploads
-                        dirs[:] = [d for d in dirs if d != 'backups']
+                        dirs[:] = [d for d in dirs if d not in ('backups', '__pycache__')]
                         for fname in files:
                             fpath = os.path.join(root, fname)
-                            arcname = os.path.join(arc_base, os.path.relpath(fpath, udir))
-                            zf.write(fpath, arcname)
-                            total_files += 1
-                results.append(f'✅ Uploads/Fotos ({total_files} ficheiros)')
+                            arcname = os.path.join('uploads', os.path.relpath(fpath, udir))
+                            try:
+                                zf.write(fpath, arcname)
+                                total_files += 1
+                            except Exception:
+                                pass
+                    break  # Use first valid uploads dir found
+                results.append(f'{"✅" if total_files > 0 else "⚠️"} Uploads/Fotos ({total_files} ficheiros de {udir if backed_up else "nao encontrado"})')
 
             size_mb = os.path.getsize(zip_path) / 1024 / 1024
             results.append(f'📦 {zip_name} ({size_mb:.1f} MB)')
