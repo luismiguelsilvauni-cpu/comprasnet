@@ -3687,7 +3687,7 @@ def user_heartbeat():
 def api_users_status():
     now = datetime.now()
     sessions = {s.user_id: s for s in UserSession.query.all()}
-    all_users = User.query.filter_by(approved=True).order_by(User.nome).all()
+    all_users = User.query.order_by(User.nome).all()
     result = []
     for u in all_users:
         s = sessions.get(u.id)
