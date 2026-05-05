@@ -4110,6 +4110,7 @@ MENUS_DISPONIVEIS = [
     ('assistencias',       '🔧 Assistências'),
     ('entradas',           '📥 Entradas'),
     ('partilha',           '📁 Partilha'),
+    ('empresa',            '🏢 Empresa'),
     ('conectividade',      '🌐 Conectividade'),
     ('roadmap',            '🗺️ Roadmap'),
     ('changelog',          '📝 Changelog'),
