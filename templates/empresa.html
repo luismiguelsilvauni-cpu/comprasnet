@@ -159,8 +159,8 @@
 </div><!-- grid -->
 
 <!-- ── Modal: Adicionar Documento ─────────────────────────────────── -->
-<div id="modalDoc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
-  <div class="modal-box" style="width:520px;max-height:90vh;overflow-y:auto">
+<div id="modalDoc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div class="modal-box" style="width:520px;max-height:90vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,.4)">
     <div class="modal-head"><span>📎 Adicionar Documento</span><button onclick="fecharModalDoc()">✕</button></div>
     <form method="post" action="{{ url_for('empresa_doc_novo') }}" enctype="multipart/form-data">
       <div class="modal-body">
@@ -208,8 +208,8 @@
 </div>
 
 <!-- ── Modal: Editar Informações ──────────────────────────────────── -->
-<div id="modalInfo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
-  <div class="modal-box" style="width:640px;max-height:90vh;overflow-y:auto">
+<div id="modalInfo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div class="modal-box" style="width:640px;max-height:90vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,.4)">
     <div class="modal-head"><span>✏️ Informações da Empresa</span><button onclick="document.getElementById('modalInfo').style.display='none'">✕</button></div>
     <form method="post" action="{{ url_for('empresa_info_save') }}">
       <div class="modal-body">
