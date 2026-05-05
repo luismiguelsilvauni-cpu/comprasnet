@@ -8,7 +8,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
 from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
+import time as _time_module
 app = Flask(__name__)
+# Token changes on every server restart - invalidates all salary sessions
+_SERVER_START_TOKEN = str(int(_time_module.time()))
 app.permanent_session_lifetime = __import__('datetime').timedelta(days=30)
 app.config['SECRET_KEY'] = 'comprasnet-2024-change-in-production'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///compras.db'
@@ -8136,6 +8139,7 @@ def salarios_verificar_pin():
         from datetime import datetime as _dt2
         _sess['salarios_autorizado'] = True
         _sess['salarios_auth_time'] = _dt2.now().isoformat()
+        _sess['salarios_server_token'] = _SERVER_START_TOKEN
         return jsonify({'ok': True})
     return jsonify({'ok': False, 'error': 'PIN incorrecto'})
 
@@ -8146,18 +8150,21 @@ def salarios():
     cfg = ConfigGeral.query.first()
     salarios_senha = (cfg.salarios_pin or '').strip() if cfg else ''
     if salarios_senha:
-        auth_time = session.get('salarios_auth_time')
         authed = False
-        if session.get('salarios_autorizado') and auth_time:
-            try:
-                from datetime import datetime as _dt
+        try:
+            from datetime import datetime as _dt
+            auth_time = session.get('salarios_auth_time')
+            auth_token = session.get('salarios_server_token')
+            if (session.get('salarios_autorizado') and auth_time
+                    and auth_token == _SERVER_START_TOKEN):
                 elapsed = (_dt.now() - _dt.fromisoformat(auth_time)).total_seconds()
                 authed = elapsed < 1800
-            except Exception:
-                authed = False
+        except Exception:
+            authed = False
         if not authed:
             session.pop('salarios_autorizado', None)
             session.pop('salarios_auth_time', None)
+            session.pop('salarios_server_token', None)
             return render_template('salarios_pin.html')
 
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
