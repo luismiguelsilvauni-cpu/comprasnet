@@ -50,18 +50,9 @@
         <label>Título</label>
         <input type="text" id="editTitulo" class="input" value="{{ pedido.titulo }}">
       </div>
-      <div class="form-group" style="margin:0">
-        <label>Destino / Cliente</label>
-        <input type="hidden" id="editClienteId" value="{{ pedido.cliente_id or '' }}">
-        <div style="position:relative">
-          <input type="text" id="editClienteInput" class="input" autocomplete="off"
-            placeholder="Pesquisar cliente..."
-            value="{{ pedido.cliente.nome if pedido.cliente else '' }}"
-            oninput="searchEditCliente(this.value)"
-            onfocus="searchEditCliente(this.value)">
-          <div id="editClienteDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:400;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)"></div>
-        </div>
-      </div>
+      <input type="hidden" id="editClienteId" value="{{ pedido.cliente_id or '' }}">
+      <input type="hidden" id="editClienteInput" value="">
+      <div id="editClienteDrop" style="display:none"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-group" style="margin:0">
           <label>Departamento</label>
