@@ -206,17 +206,28 @@ def fazer_backup_completo(app, cfg=None) -> tuple:
                 zf.write(db_path, 'compras.db')
                 results.append('✅ Base de dados')
 
-                # 2. Uploads folder
-                uploads_dir = os.path.join(os.path.dirname(db_path), 'uploads')
-                if os.path.isdir(uploads_dir):
-                    count = 0
-                    for root, dirs, files in os.walk(uploads_dir):
+                # 2. All upload/static directories
+                app_root = app.root_path
+                search_dirs = [
+                    ('uploads', os.path.join(app_root, 'uploads')),
+                    ('uploads', os.path.join(os.path.dirname(db_path), 'uploads')),
+                ]
+                # Also check instance folder
+                seen = set()
+                total_files = 0
+                for arc_base, udir in search_dirs:
+                    if not os.path.isdir(udir) or udir in seen:
+                        continue
+                    seen.add(udir)
+                    for root, dirs, files in os.walk(udir):
+                        # Skip backups folder inside uploads
+                        dirs[:] = [d for d in dirs if d != 'backups']
                         for fname in files:
                             fpath = os.path.join(root, fname)
-                            arcname = os.path.relpath(fpath, os.path.dirname(uploads_dir))
+                            arcname = os.path.join(arc_base, os.path.relpath(fpath, udir))
                             zf.write(fpath, arcname)
-                            count += 1
-                    results.append(f'✅ Uploads ({count} ficheiros)')
+                            total_files += 1
+                results.append(f'✅ Uploads/Fotos ({total_files} ficheiros)')
 
             size_mb = os.path.getsize(zip_path) / 1024 / 1024
             results.append(f'📦 {zip_name} ({size_mb:.1f} MB)')

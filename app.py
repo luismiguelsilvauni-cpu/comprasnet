@@ -8117,6 +8117,14 @@ def salarios_pin():
     return render_template('salarios_pin.html', erro=False)
 
 
+@app.route('/salarios/logout')
+@login_required
+def salarios_logout():
+    session.pop('salarios_autorizado', None)
+    session.pop('salarios_auth_time', None)
+    return redirect(url_for('salarios'))
+
+
 @app.route('/api/salarios/verificar-pin', methods=['POST'])
 @login_required
 def salarios_verificar_pin():
@@ -8128,7 +8136,9 @@ def salarios_verificar_pin():
         return jsonify({'ok': True})  # No PIN set, allow access
     if pin == senha:
         from flask import session as _sess
+        from datetime import datetime as _dt2
         _sess['salarios_autorizado'] = True
+        _sess['salarios_auth_time'] = _dt2.now().isoformat()
         return jsonify({'ok': True})
     return jsonify({'ok': False, 'error': 'PIN incorrecto'})
 
@@ -8138,8 +8148,19 @@ def salarios_verificar_pin():
 def salarios():
     cfg = ConfigGeral.query.first()
     salarios_senha = (cfg.salarios_pin or '').strip() if cfg else ''
-    if salarios_senha and not session.get('salarios_autorizado'):
-        return render_template('salarios_pin.html')
+    if salarios_senha:
+        # Check if authorized and not expired (30 min timeout)
+        auth_time = session.get('salarios_auth_time')
+        from datetime import datetime as _dt
+        authorized = (
+            session.get('salarios_autorizado') and
+            auth_time and
+            (_dt.now() - _dt.fromisoformat(auth_time)).seconds < 1800
+        )
+        if not authorized:
+            session.pop('salarios_autorizado', None)
+            session.pop('salarios_auth_time', None)
+            return render_template('salarios_pin.html')
 
     funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     return render_template('salarios.html', funcionarios=funcionarios)
