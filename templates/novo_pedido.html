@@ -42,17 +42,7 @@
 <div>
 <div class="card" style="padding:14px;margin-bottom:12px">
   <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Detalhes</div>
-  <div class="form-group">
-    <label>Destino / Cliente</label>
-    <input type="hidden" name="cliente_id" id="clienteIdHidden" value="">
-    <div style="position:relative">
-      <input type="text" id="clienteSearchInput" class="input" autocomplete="off"
-        placeholder="🔍 Pesquisar cliente..." oninput="searchCliente(this.value)"
-        onfocus="searchCliente(this.value)">
-      <div id="clienteSearchDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 20px rgba(0,0,0,.2)"></div>
-    </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Deixe vazio para Stock Interno</div>
-  </div>
+  <input type="hidden" name="cliente_id" id="clienteIdHidden" value="">
   <div class="form-group">
     <label>Departamento</label>
     <input type="text" name="departamento" value="Compras" class="input">
@@ -291,7 +281,7 @@ document.getElementById('artigoModal').addEventListener('click', function(e) {
 
 renderLinhas();
 
-// ── Cliente search (header) ───────────────────────────────────────────────────
+// ── Cliente search (header - REMOVED) ──────────────────────────────────────────
 var _cliTimer = null;
 function searchCliente(q) {
   var dd = document.getElementById('clienteSearchDrop');
@@ -323,9 +313,8 @@ function searchCliente(q) {
   }, 200);
 }
 function selCli(id, nome) {
-  document.getElementById('clienteIdHidden').value = id;
-  document.getElementById('clienteSearchInput').value = (nome === 'Stock Interno') ? '' : nome;
-  document.getElementById('clienteSearchDrop').style.display = 'none';
+  var h = document.getElementById('clienteIdHidden');
+  if (h) h.value = id;
 }
 
 
