@@ -728,3 +728,46 @@ class UserSession(db.Model):
     user_id     = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
     last_seen   = db.Column(db.DateTime, default=datetime.utcnow)
     user        = db.relationship('User', foreign_keys=[user_id])
+
+class EmpresaDocumento(db.Model):
+    __tablename__ = 'empresa_documentos'
+    id            = db.Column(db.Integer, primary_key=True)
+    tipo          = db.Column(db.String(50), nullable=False)   # certidao, nao_divida_financas, nao_divida_ss, iban, outro
+    titulo        = db.Column(db.String(200), nullable=False)
+    numero_acesso = db.Column(db.String(100))   # certidão permanente access number
+    notas         = db.Column(db.Text)
+    pdf_path      = db.Column(db.String(300))
+    data_emissao  = db.Column(db.Date)
+    data_validade = db.Column(db.Date)   # NULL = sem prazo
+    data_upload   = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id       = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+class EmpresaInfo(db.Model):
+    __tablename__ = 'empresa_info'
+    id               = db.Column(db.Integer, primary_key=True)
+    # Identificação
+    nome_completo    = db.Column(db.String(200))
+    nome_comercial   = db.Column(db.String(200))
+    nif              = db.Column(db.String(20))
+    nipc             = db.Column(db.String(20))
+    cae              = db.Column(db.String(20))
+    forma_juridica   = db.Column(db.String(100))
+    # Contactos
+    morada           = db.Column(db.String(300))
+    codigo_postal    = db.Column(db.String(20))
+    localidade       = db.Column(db.String(100))
+    telefone         = db.Column(db.String(30))
+    email            = db.Column(db.String(200))
+    website          = db.Column(db.String(200))
+    # Bancários
+    banco            = db.Column(db.String(100))
+    iban             = db.Column(db.String(30))
+    swift            = db.Column(db.String(20))
+    # Registos
+    conservatoria    = db.Column(db.String(200))
+    num_registo      = db.Column(db.String(50))
+    capital_social   = db.Column(db.String(50))
+    # Seguros
+    seguradora       = db.Column(db.String(100))
+    apolice          = db.Column(db.String(50))
+    seguro_validade  = db.Column(db.Date)

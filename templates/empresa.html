@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Empresa · NavTech{% endblock %}
+{% block page_title %}🏢 Empresa{% endblock %}
+{% block topbar_actions %}
+  {% if current_user.is_admin %}
+  <button onclick="abrirModalDoc()" class="btn btn-primary btn-sm">+ Adicionar Documento</button>
+  <button onclick="document.getElementById('modalInfo').style.display='flex'" class="btn btn-ghost btn-sm">✏️ Editar Informações</button>
+  {% endif %}
+{% endblock %}
+{% block content %}
+
+<!-- ── Alertas de Validade ─────────────────────────────────────────── -->
+{% set alertas = [] %}
+{% for doc in docs %}
+  {% if doc.data_validade %}
+    {% set dias = (doc.data_validade - hoje).days %}
+    {% if dias < 0 %}{% set _ = alertas.append({'doc': doc, 'dias': dias, 'tipo': 'expirado'}) %}
+    {% elif dias <= 30 %}{% set _ = alertas.append({'doc': doc, 'dias': dias, 'tipo': 'urgente'}) %}
+    {% elif dias <= 90 %}{% set _ = alertas.append({'doc': doc, 'dias': dias, 'tipo': 'aviso'}) %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+{% if alertas %}
+<div class="card mb-16" style="border-left:4px solid #ef4444;background:rgba(239,68,68,.04)">
+  <div style="font-size:13px;font-weight:700;color:#ef4444;margin-bottom:8px">⚠️ Documentos a Requerer Atenção</div>
+  {% for a in alertas %}
+  <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <span>{{ tipos[a.doc.tipo]['icon'] if a.doc.tipo in tipos else '📁' }}</span>
+    <span style="flex:1">{{ a.doc.titulo }}</span>
+    {% if a.tipo == 'expirado' %}
+    <span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:4px;font-weight:700">❌ Expirado há {{ (-a.dias) }} dias</span>
+    {% elif a.tipo == 'urgente' %}
+    <span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:4px;font-weight:700">⚠️ Expira em {{ a.dias }} dias</span>
+    {% else %}
+    <span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:4px">ℹ️ Expira em {{ a.dias }} dias</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+<!-- ── Informações da Empresa ────────────────────────────────────── -->
+<div>
+<div class="card mb-16">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🏢 Identificação</div>
+  {% macro campo(label, val) %}
+  {% if val %}
+  <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <span style="color:var(--text-muted);min-width:140px;flex-shrink:0">{{ label }}</span>
+    <span style="font-weight:600">{{ val }}</span>
+  </div>
+  {% endif %}
+  {% endmacro %}
+  {% if info %}
+  {{ campo('Nome Completo', info.nome_completo) }}
+  {{ campo('Nome Comercial', info.nome_comercial) }}
+  {{ campo('NIF / NIPC', (info.nif or '') + (' / ' + info.nipc if info.nipc else '')) }}
+  {{ campo('CAE', info.cae) }}
+  {{ campo('Forma Jurídica', info.forma_juridica) }}
+  {{ campo('Capital Social', info.capital_social) }}
+  {{ campo('Conservatória', info.conservatoria) }}
+  {{ campo('Nº Registo', info.num_registo) }}
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">Sem informações. Clique em "Editar Informações".</div>
+  {% endif %}
+</div>
+
+<div class="card mb-16">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📞 Contactos</div>
+  {% if info %}
+  {{ campo('Morada', info.morada) }}
+  {{ campo('Código Postal', (info.codigo_postal or '') + (' ' + info.localidade if info.localidade else '')) }}
+  {{ campo('Telefone', info.telefone) }}
+  {{ campo('Email', info.email) }}
+  {{ campo('Website', info.website) }}
+  {% else %}<div style="color:var(--text-muted);font-size:12px;padding:8px">—</div>{% endif %}
+</div>
+
+<div class="card mb-16">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🏦 Dados Bancários</div>
+  {% if info %}
+  {{ campo('Banco', info.banco) }}
+  {{ campo('IBAN', info.iban) }}
+  {{ campo('SWIFT / BIC', info.swift) }}
+  {% else %}<div style="color:var(--text-muted);font-size:12px;padding:8px">—</div>{% endif %}
+</div>
+
+<div class="card mb-16">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🛡 Seguros</div>
+  {% if info %}
+  {{ campo('Seguradora', info.seguradora) }}
+  {{ campo('Apólice', info.apolice) }}
+  {{ campo('Validade', info.seguro_validade.strftime('%d/%m/%Y') if info.seguro_validade else None) }}
+  {% else %}<div style="color:var(--text-muted);font-size:12px;padding:8px">—</div>{% endif %}
+</div>
+</div>
+
+<!-- ── Documentos ──────────────────────────────────────────────────── -->
+<div>
+{% for tipo_key, tipo_info in tipos.items() %}
+{% set tipo_docs = docs | selectattr('tipo','equalto',tipo_key) | list %}
+<div class="card mb-16">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:13px;font-weight:700;color:{{ tipo_info.cor }}">{{ tipo_info.icon }} {{ tipo_info.label }}</div>
+    {% if current_user.is_admin %}
+    <button onclick="abrirModalDoc('{{ tipo_key }}')" class="btn btn-ghost btn-sm" style="font-size:10px">+ Adicionar</button>
+    {% endif %}
+  </div>
+  {% if tipo_docs %}
+    {% for doc in tipo_docs %}
+    <div style="padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface2)">
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;color:var(--text)">{{ doc.titulo }}</div>
+          {% if doc.numero_acesso %}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔑 {{ doc.numero_acesso }}</div>
+          {% endif %}
+          <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+            {% if doc.data_emissao %}
+            <span style="font-size:10px;color:var(--text-muted)">📅 Emissão: {{ doc.data_emissao.strftime('%d/%m/%Y') }}</span>
+            {% endif %}
+            {% if doc.data_validade %}
+              {% set dias = (doc.data_validade - hoje).days %}
+              {% if dias < 0 %}
+              <span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:3px;font-weight:700">❌ Expirado</span>
+              {% elif dias <= 30 %}
+              <span style="font-size:10px;background:#fef3c7;color:#d97706;padding:1px 6px;border-radius:3px;font-weight:700">⚠️ {{ dias }}d</span>
+              {% else %}
+              <span style="font-size:10px;color:var(--text-muted)">⏳ Válido até {{ doc.data_validade.strftime('%d/%m/%Y') }}</span>
+              {% endif %}
+            {% else %}
+            <span style="font-size:10px;color:#22c55e">✅ Sem prazo</span>
+            {% endif %}
+          </div>
+          {% if doc.notas %}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-style:italic">{{ doc.notas }}</div>
+          {% endif %}
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          {% if doc.pdf_path %}
+          <a href="{{ url_for('empresa_doc_ver', did=doc.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px">👁</a>
+          <a href="{{ url_for('empresa_doc_download', did=doc.id) }}" class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px">⬇</a>
+          {% endif %}
+          {% if current_user.is_admin %}
+          <button onclick="apagarDoc({{ doc.id }}, '{{ doc.titulo|replace("'","\\'") }}')" class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2)">🗑</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">Sem documentos</div>
+  {% endif %}
+</div>
+{% endfor %}
+</div><!-- col -->
+</div><!-- grid -->
+
+<!-- ── Modal: Adicionar Documento ─────────────────────────────────── -->
+<div id="modalDoc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+  <div class="modal-box" style="width:520px;max-height:90vh;overflow-y:auto">
+    <div class="modal-head"><span>📎 Adicionar Documento</span><button onclick="fecharModalDoc()">✕</button></div>
+    <form method="post" action="{{ url_for('empresa_doc_novo') }}" enctype="multipart/form-data">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Tipo de Documento</label>
+          <select name="tipo" id="docTipo" class="input" onchange="atualizarTituloDoc()">
+            {% for k, v in tipos.items() %}
+            <option value="{{ k }}">{{ v.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Título / Descrição</label>
+          <input type="text" name="titulo" id="docTitulo" class="input" placeholder="Ex: Certidão Permanente 2025">
+        </div>
+        <div class="form-group">
+          <label>Número de Acesso / Referência <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+          <input type="text" name="numero_acesso" class="input" placeholder="Ex: ABC-123456">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label>Data de Emissão</label>
+            <input type="date" name="data_emissao" class="input">
+          </div>
+          <div class="form-group">
+            <label>Data de Validade</label>
+            <input type="date" name="data_validade" class="input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notas</label>
+          <textarea name="notas" class="input" rows="2" placeholder="Observações..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Ficheiro PDF</label>
+          <input type="file" name="pdf" accept=".pdf" class="input">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="fecharModalDoc()" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary">💾 Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal: Editar Informações ──────────────────────────────────── -->
+<div id="modalInfo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+  <div class="modal-box" style="width:640px;max-height:90vh;overflow-y:auto">
+    <div class="modal-head"><span>✏️ Informações da Empresa</span><button onclick="document.getElementById('modalInfo').style.display='none'">✕</button></div>
+    <form method="post" action="{{ url_for('empresa_info_save') }}">
+      <div class="modal-body">
+        {% macro fi(label, name, val, placeholder='') %}
+        <div class="form-group" style="margin:0">
+          <label style="font-size:11px">{{ label }}</label>
+          <input type="text" name="{{ name }}" class="input" value="{{ val or '' }}" placeholder="{{ placeholder }}">
+        </div>
+        {% endmacro %}
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;text-transform:uppercase">Identificação</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          {{ fi('Nome Completo', 'nome_completo', info.nome_completo if info else '') }}
+          {{ fi('Nome Comercial', 'nome_comercial', info.nome_comercial if info else '') }}
+          {{ fi('NIF', 'nif', info.nif if info else '') }}
+          {{ fi('NIPC', 'nipc', info.nipc if info else '') }}
+          {{ fi('CAE', 'cae', info.cae if info else '') }}
+          {{ fi('Forma Jurídica', 'forma_juridica', info.forma_juridica if info else '') }}
+          {{ fi('Capital Social', 'capital_social', info.capital_social if info else '') }}
+          {{ fi('Conservatória', 'conservatoria', info.conservatoria if info else '') }}
+          {{ fi('Nº Registo', 'num_registo', info.num_registo if info else '') }}
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;text-transform:uppercase">Contactos</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          {{ fi('Morada', 'morada', info.morada if info else '') }}
+          {{ fi('Código Postal', 'codigo_postal', info.codigo_postal if info else '') }}
+          {{ fi('Localidade', 'localidade', info.localidade if info else '') }}
+          {{ fi('Telefone', 'telefone', info.telefone if info else '') }}
+          {{ fi('Email', 'email', info.email if info else '') }}
+          {{ fi('Website', 'website', info.website if info else '') }}
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;text-transform:uppercase">Dados Bancários</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          {{ fi('Banco', 'banco', info.banco if info else '') }}
+          {{ fi('IBAN', 'iban', info.iban if info else '') }}
+          {{ fi('SWIFT / BIC', 'swift', info.swift if info else '') }}
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;text-transform:uppercase">Seguros</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          {{ fi('Seguradora', 'seguradora', info.seguradora if info else '') }}
+          {{ fi('Apólice', 'apolice', info.apolice if info else '') }}
+          <div class="form-group" style="margin:0">
+            <label style="font-size:11px">Validade Seguro</label>
+            <input type="date" name="seguro_validade" class="input"
+              value="{{ info.seguro_validade.isoformat() if info and info.seguro_validade else '' }}">
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="document.getElementById('modalInfo').style.display='none'" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary">💾 Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+var TIPOS_LABELS = {{ tipos | tojson }};
+function abrirModalDoc(tipo) {
+  var m = document.getElementById('modalDoc');
+  m.style.display = 'flex';
+  if (tipo) document.getElementById('docTipo').value = tipo;
+  atualizarTituloDoc();
+}
+function fecharModalDoc() {
+  document.getElementById('modalDoc').style.display = 'none';
+}
+function atualizarTituloDoc() {
+  var tipo = document.getElementById('docTipo').value;
+  var label = TIPOS_LABELS[tipo] ? TIPOS_LABELS[tipo].label : '';
+  document.getElementById('docTitulo').placeholder = label;
+}
+document.getElementById('modalDoc').addEventListener('click', function(e){ if(e.target===this) fecharModalDoc(); });
+document.getElementById('modalInfo').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
+
+function apagarDoc(id, titulo) {
+  if (!confirm('Eliminar "' + titulo + '"?')) return;
+  fetch('/empresa/doc/' + id + '/apagar', {method:'POST'})
+    .then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); });
+}
+</script>
+{% endblock %}

@@ -321,6 +321,9 @@
               <span class="icon">📁</span><span>Partilha</span>
             </a>
             {% endif %}
+            <a href="{{ url_for('empresa') }}" class="nav-item nav-sub {% if request.endpoint and 'empresa' in request.endpoint %}active{% endif %}">
+              <span class="icon">🏢</span><span>Empresa</span>
+            </a>
           </div>
         </div>
 

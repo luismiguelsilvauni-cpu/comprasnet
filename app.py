@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, EmpresaDocumento, EmpresaInfo, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 import time as _time_module
 app = Flask(__name__)
@@ -2167,6 +2167,122 @@ def editar_cliente(cid):
 # ══════════════════════════════════════════════════════════════════════
 MANUAIS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'manuais_embarcacoes')
 os.makedirs(MANUAIS_DIR, exist_ok=True)
+
+# ══════════════════════════════════════════════════════════════════════
+# EMPRESA
+# ══════════════════════════════════════════════════════════════════════
+EMPRESA_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'empresa')
+os.makedirs(EMPRESA_UPLOAD_DIR, exist_ok=True)
+
+EMPRESA_TIPOS = {
+    'certidao':            {'label': '📜 Certidão Permanente',           'icon': '📜', 'cor': '#3b6ef0'},
+    'nao_divida_financas': {'label': '🧾 Declaração Não Dívida Finanças', 'icon': '🧾', 'cor': '#f59e0b'},
+    'nao_divida_ss':       {'label': '🏛 Declaração Não Dívida Seg. Social','icon': '🏛', 'cor': '#8b5cf6'},
+    'iban':                {'label': '🏦 Comprovativo Bancário / IBAN',    'icon': '🏦', 'cor': '#10b981'},
+    'outro':               {'label': '📁 Outro Documento',                 'icon': '📁', 'cor': '#64748b'},
+}
+
+@app.route('/empresa')
+@login_required
+def empresa():
+    info = EmpresaInfo.query.first()
+    docs = EmpresaDocumento.query.order_by(EmpresaDocumento.tipo, EmpresaDocumento.data_upload.desc()).all()
+    from datetime import date, timedelta
+    hoje = date.today()
+    return render_template('empresa.html',
+        info=info, docs=docs, tipos=EMPRESA_TIPOS,
+        hoje=hoje, timedelta=timedelta)
+
+@app.route('/empresa/info', methods=['POST'])
+@login_required
+def empresa_info_save():
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    info = EmpresaInfo.query.first()
+    if not info:
+        info = EmpresaInfo()
+        db.session.add(info)
+    campos = ['nome_completo','nome_comercial','nif','nipc','cae','forma_juridica',
+              'morada','codigo_postal','localidade','telefone','email','website',
+              'banco','iban','swift','conservatoria','num_registo','capital_social',
+              'seguradora','apolice']
+    for c in campos:
+        setattr(info, c, request.form.get(c, '').strip() or None)
+    # seguro_validade
+    sv = request.form.get('seguro_validade','').strip()
+    if sv:
+        from datetime import date as _d
+        try: info.seguro_validade = _d.fromisoformat(sv)
+        except: pass
+    else:
+        info.seguro_validade = None
+    db.session.commit()
+    flash('Informações da empresa guardadas ✅', 'success')
+    return redirect(url_for('empresa'))
+
+@app.route('/empresa/doc/novo', methods=['POST'])
+@login_required
+def empresa_doc_novo():
+    tipo   = request.form.get('tipo', 'outro')
+    titulo = request.form.get('titulo', '').strip()
+    if not titulo:
+        titulo = EMPRESA_TIPOS.get(tipo, {}).get('label', 'Documento')
+    doc = EmpresaDocumento(
+        tipo=tipo, titulo=titulo,
+        numero_acesso=request.form.get('numero_acesso','').strip() or None,
+        notas=request.form.get('notas','').strip() or None,
+        user_id=current_user.id,
+    )
+    de = request.form.get('data_emissao','').strip()
+    dv = request.form.get('data_validade','').strip()
+    from datetime import date as _d
+    try:
+        if de: doc.data_emissao = _d.fromisoformat(de)
+        if dv: doc.data_validade = _d.fromisoformat(dv)
+    except: pass
+    db.session.add(doc)
+    db.session.flush()
+    # PDF upload
+    f = request.files.get('pdf')
+    if f and f.filename.lower().endswith('.pdf'):
+        import re as _re
+        safe = _re.sub(r'[^\w\-\.]', '_', f.filename)
+        fname = f'{doc.id}_{safe}'
+        f.save(os.path.join(EMPRESA_UPLOAD_DIR, fname))
+        doc.pdf_path = fname
+    db.session.commit()
+    flash('Documento adicionado ✅', 'success')
+    return redirect(url_for('empresa'))
+
+@app.route('/empresa/doc/<int:did>/ver')
+@login_required
+def empresa_doc_ver(did):
+    doc = EmpresaDocumento.query.get_or_404(did)
+    if not doc.pdf_path:
+        return 'Sem PDF', 404
+    return send_from_directory(EMPRESA_UPLOAD_DIR, doc.pdf_path, mimetype='application/pdf')
+
+@app.route('/empresa/doc/<int:did>/download')
+@login_required
+def empresa_doc_download(did):
+    doc = EmpresaDocumento.query.get_or_404(did)
+    if not doc.pdf_path:
+        return 'Sem PDF', 404
+    return send_from_directory(EMPRESA_UPLOAD_DIR, doc.pdf_path, as_attachment=True, download_name=doc.titulo+'.pdf')
+
+@app.route('/empresa/doc/<int:did>/apagar', methods=['POST'])
+@login_required
+def empresa_doc_apagar(did):
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    doc = EmpresaDocumento.query.get_or_404(did)
+    if doc.pdf_path:
+        try: os.remove(os.path.join(EMPRESA_UPLOAD_DIR, doc.pdf_path))
+        except: pass
+    db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'ok': True})
+
 
 @app.route('/manuais-embarcacoes')
 @login_required
