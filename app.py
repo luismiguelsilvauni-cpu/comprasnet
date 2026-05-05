@@ -3682,27 +3682,28 @@ def user_heartbeat():
 @app.route('/api/users/status')
 @login_required
 def api_users_status():
-    from datetime import timedelta
     now = datetime.now()
-    sessions = UserSession.query.all()
+    sessions = {s.user_id: s for s in UserSession.query.all()}
+    all_users = User.query.filter_by(approved=True).order_by(User.nome).all()
     result = []
-    for s in sessions:
-        diff = (now - s.last_seen).total_seconds()
-        if diff < 120:     status = 'online'
-        elif diff < 3600:  status = 'recente'
-        else:              status = 'offline'
-        result.append({
-            'nome': s.user.nome if s.user else '?',
-            'status': status,
-            'mins': int(diff // 60),
-        })
-    # Add users never seen
-    all_users = User.query.filter_by(approved=True).all()         if hasattr(User, 'approved') else User.query.all()
-    seen_ids = {s.user_id for s in sessions}
     for u in all_users:
-        if u.id not in seen_ids:
-            result.append({'nome': u.nome, 'status': 'offline', 'mins': None})
-    result.sort(key=lambda x: (0 if x['status']=='online' else 1 if x['status']=='recente' else 2, x['nome']))
+        s = sessions.get(u.id)
+        if s and s.last_seen:
+            diff = (now - s.last_seen).total_seconds()
+            if diff < 300:    status = 'online'
+            elif diff < 7200: status = 'recente'
+            else:             status = 'offline'
+            mins = int(diff // 60)
+        else:
+            status = 'offline'
+            mins = 9999
+        result.append({
+            'id': u.id,
+            'nome': u.nome,
+            'status': status,
+            'mins': mins,
+        })
+    result.sort(key=lambda x: (0 if x['status']=='online' else 1 if x['status']=='recente' else 2, x['mins']))
     return jsonify(result)
 
 
@@ -8111,21 +8112,6 @@ def api_funcionario_faltas(fid, ano):
 
 # ── SALÁRIOS ROUTES ───────────────────────────────────────────────────────────
 
-@app.route('/salarios/pin', methods=['GET','POST'])
-@login_required
-def salarios_pin():
-    cfg = ConfigGeral.query.first()
-    pin_required = cfg and cfg.salarios_pin and cfg.salarios_pin.strip()
-    if not pin_required:
-        return redirect(url_for('salarios'))
-    if request.method == 'POST':
-        pin = request.form.get('pin','').strip()
-        if pin == cfg.salarios_pin:
-            from flask import session
-            session['salarios_ok'] = True
-            return redirect(url_for('salarios'))
-        return render_template('salarios_pin.html', erro=True)
-    return render_template('salarios_pin.html', erro=False)
 
 
 @app.route('/salarios/logout')

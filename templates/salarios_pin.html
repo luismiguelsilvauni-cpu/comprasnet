@@ -3,37 +3,49 @@
 {% block page_title %}💶 Salários{% endblock %}
 {% block content %}
 <div style="max-width:360px;margin:60px auto">
-  <div class="card" style="text-align:center">
-    <div style="font-size:48px;margin-bottom:12px">🔐</div>
+  <div class="card" style="text-align:center;padding:32px">
+    <div style="font-size:48px;margin-bottom:16px">🔐</div>
     <div style="font-size:18px;font-weight:700;color:var(--accent);margin-bottom:6px">Acesso Restrito</div>
-    <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">Introduza a password para aceder ao módulo de Salários</div>
-    <div class="form-group" style="text-align:left">
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">
+      Introduza a password para aceder ao módulo de Salários
+    </div>
+    <div class="form-group" style="text-align:left;margin-bottom:8px">
       <label>Password</label>
       <input type="password" id="pinInput" class="input" placeholder="••••••" autofocus
         onkeydown="if(event.key==='Enter') verificarPin()">
     </div>
-    <div id="pinError" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none">Password incorrecta</div>
-    <button onclick="verificarPin()" class="btn btn-primary" style="width:100%">Entrar</button>
-    <div style="margin-top:16px">
-      <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Voltar</a>
+    <div id="pinError" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none;padding:8px;background:rgba(239,68,68,.1);border-radius:6px">
+      ❌ Password incorrecta
     </div>
+    <button onclick="verificarPin()" class="btn btn-primary" style="width:100%;margin-bottom:12px">
+      Entrar
+    </button>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Voltar ao Dashboard</a>
   </div>
 </div>
 <script>
 function verificarPin() {
   var pin = document.getElementById('pinInput').value;
+  var errEl = document.getElementById('pinError');
+  errEl.style.display = 'none';
   fetch('/api/salarios/verificar-pin', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({pin: pin})
-  }).then(r => r.json()).then(function(d) {
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
     if (d.ok) {
       window.location.href = '/salarios';
     } else {
-      document.getElementById('pinError').style.display = 'block';
+      errEl.style.display = 'block';
       document.getElementById('pinInput').value = '';
       document.getElementById('pinInput').focus();
     }
+  })
+  .catch(function() {
+    errEl.textContent = '❌ Erro de ligação';
+    errEl.style.display = 'block';
   });
 }
 </script>

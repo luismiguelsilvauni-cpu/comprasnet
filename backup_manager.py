@@ -34,12 +34,40 @@ def _cleanup_old_backups(path: str, manter_dias: int):
 
 
 def _get_db_path(app):
+    # Try app.config first (most reliable)
+    try:
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if db_uri.startswith('sqlite:///'):
+            p = db_uri.replace('sqlite:///', '')
+            if not os.path.isabs(p):
+                p = os.path.join(app.root_path, p)
+            if os.path.exists(p):
+                return p
+    except Exception:
+        pass
     for candidate in [
         os.path.join(app.instance_path, 'compras.db'),
-        os.path.join(os.path.dirname(app.instance_path), 'instance', 'compras.db'),
-        os.path.join(os.path.dirname(app.root_path), 'instance', 'compras.db'),
+        os.path.join(app.root_path, 'instance', 'compras.db'),
+        os.path.join(app.root_path, 'compras.db'),
     ]:
         if os.path.exists(candidate):
+            return candidate
+    return None
+
+def _get_uploads_dir(app):
+    """Find the uploads directory."""
+    # Check app.config first
+    try:
+        p = app.config.get('UPLOAD_FOLDER')
+        if p and os.path.isdir(p):
+            return p
+    except Exception:
+        pass
+    for candidate in [
+        os.path.join(app.root_path, 'uploads'),
+        os.path.join(os.path.dirname(app.root_path), 'uploads'),
+    ]:
+        if os.path.isdir(candidate):
             return candidate
     return None
 
@@ -206,23 +234,10 @@ def fazer_backup_completo(app, cfg=None) -> tuple:
                 zf.write(db_path, 'compras.db')
                 results.append('✅ Base de dados')
 
-                # 2. Find uploads folder - try multiple locations
-                app_root = app.root_path
-                uploads_candidates = [
-                    os.path.join(app_root, 'uploads'),
-                    os.path.join(os.path.dirname(app_root), 'uploads'),
-                    os.path.join(os.path.dirname(db_path), '..', 'uploads'),
-                    os.path.join(os.path.dirname(db_path), 'uploads'),
-                ]
+                # 2. Uploads folder
+                udir = _get_uploads_dir(app)
                 total_files = 0
-                backed_up = []
-                for udir in uploads_candidates:
-                    udir = os.path.normpath(udir)
-                    if not os.path.isdir(udir):
-                        continue
-                    if udir in backed_up:
-                        continue
-                    backed_up.append(udir)
+                if udir:
                     for root, dirs, files in os.walk(udir):
                         dirs[:] = [d for d in dirs if d not in ('backups', '__pycache__')]
                         for fname in files:
@@ -233,8 +248,9 @@ def fazer_backup_completo(app, cfg=None) -> tuple:
                                 total_files += 1
                             except Exception:
                                 pass
-                    break  # Use first valid uploads dir found
-                results.append(f'{"✅" if total_files > 0 else "⚠️"} Uploads/Fotos ({total_files} ficheiros de {udir if backed_up else "nao encontrado"})')
+                    results.append(f'✅ Uploads ({total_files} ficheiros — {udir})')
+                else:
+                    results.append('⚠️ Pasta uploads nao encontrada')
 
             size_mb = os.path.getsize(zip_path) / 1024 / 1024
             results.append(f'📦 {zip_name} ({size_mb:.1f} MB)')
