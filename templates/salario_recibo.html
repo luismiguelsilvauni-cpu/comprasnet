@@ -113,6 +113,9 @@
   <div class="val-row" style="grid-template-columns:2fr 80px 90px 90px 90px">
     <span class="val-label">Outros Abonos</span>
     <span></span><span></span><span></span>
+    <input type="hidden" name="total_iliquido" id="total_iliquido_excel" value="{{ '%.2f'|format(recibo.total_abonos|float if recibo and recibo.total_abonos else 0) }}">
+    <input type="hidden" name="total_descontos" id="total_descontos_excel" value="{{ '%.2f'|format(recibo.total_descontos|float if recibo and recibo.total_descontos else 0) }}">
+    <input type="hidden" name="liquido" id="liquido_excel" value="{{ '%.2f'|format(recibo.liquido|float if recibo and recibo.liquido else 0) }}">
     <input type="number" name="outros_abonos" id="outros_abonos" value="{{ '%.2f'|format(recibo.outros_abonos|float if recibo and recibo.outros_abonos else 0) }}" class="val-input" step="0.01" min="0" oninput="calcular()">
   </div>
 
@@ -275,9 +278,20 @@ function calcular(){
   if(irs_pct) irs_pct.textContent = irs_taxa>0 ? '(' + (irs_taxa*100).toFixed(2) + '%)' : '';
   sid('ss_emp_show').textContent = fmt(ssEmp);
   sid('seg_social_emp').value = ssEmp.toFixed(2);
-  sid('totalAbonos').textContent = fmt(totalA);
-  sid('totalDescontos').textContent = fmt(totalD);
-  sid('liquido').textContent = fmt(liq);
+  // Use Excel values if they exist (from H17/H24/H26)
+  var excelTotalA = parseFloat(document.getElementById('total_iliquido_excel')?.value || 0);
+  var excelTotalD = parseFloat(document.getElementById('total_descontos_excel')?.value || 0);
+  var excelLiq    = parseFloat(document.getElementById('liquido_excel')?.value || 0);
+  var showA = excelTotalA > 0 ? excelTotalA : totalA;
+  var showD = excelTotalD > 0 ? excelTotalD : totalD;
+  var showL = excelLiq    > 0 ? excelLiq    : liq;
+  // Update hidden fields with current calculated values if Excel values are zero
+  if (excelTotalA === 0) document.getElementById('total_iliquido_excel').value = totalA.toFixed(2);
+  if (excelTotalD === 0) document.getElementById('total_descontos_excel').value = totalD.toFixed(2);
+  if (excelLiq === 0)    document.getElementById('liquido_excel').value = liq.toFixed(2);
+  sid('totalAbonos').textContent = fmt(showA);
+  sid('totalDescontos').textContent = fmt(showD);
+  sid('liquido').textContent = fmt(showL);
   sid('transf_info').textContent = 'Transferência conta: ' + fmt(liq - refTot) + ' + Refeição: ' + fmt(refTot);
 }
 

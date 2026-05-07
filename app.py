@@ -8357,10 +8357,15 @@ def salario_recibo(fid, ano, mes):
         # Horas extra valor = horas * RHT
         hex_valor = recibo.horas_extra * recibo.horas_extra_rht if recibo.horas_extra and recibo.horas_extra_rht else n('horas_extra_valor')
 
-        # Calculate totals
-        recibo.total_abonos    = float(recibo.vencimento_base or 0) + float(recibo.subsidio_refeicao or 0) + hex_valor + float(recibo.premios or 0) + float(recibo.outros_abonos or 0)
-        recibo.total_descontos = float(recibo.irs_retencao or 0) + float(recibo.seg_social_func or 0) + float(recibo.outros_descontos or 0) + float(recibo.faltas_valor or 0)
-        recibo.liquido         = recibo.total_abonos - recibo.total_descontos
+        # Calculate totals - use form values if provided (from Excel H17/H24/H26)
+        form_total_iliq = n('total_iliquido')
+        form_total_desc = n('total_descontos')
+        form_liquido    = n('liquido')
+        calc_abonos  = float(recibo.vencimento_base or 0) + float(recibo.subsidio_refeicao or 0) + hex_valor + float(recibo.premios or 0) + float(recibo.outros_abonos or 0)
+        calc_descontos = float(recibo.irs_retencao or 0) + float(recibo.seg_social_func or 0) + float(recibo.outros_descontos or 0) + float(recibo.faltas_valor or 0)
+        recibo.total_abonos    = form_total_iliq if form_total_iliq > 0 else calc_abonos
+        recibo.total_descontos = form_total_desc if form_total_desc > 0 else calc_descontos
+        recibo.liquido         = form_liquido if form_liquido > 0 else recibo.total_abonos - recibo.total_descontos
         recibo.atualizado_em   = datetime.now()
         db.session.commit()
 
