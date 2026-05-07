@@ -291,24 +291,27 @@
             <span class="icon">👥</span><span>Gestão</span><span class="dd-arrow">▸</span>
           </button>
           <div class="nav-dd-items" id="ddi-gestao">
+            {% if pode_aceder('agenda') %}
+            <a href="{{ url_for('agenda') }}" class="nav-item nav-sub {% if request.endpoint and 'agenda' in request.endpoint %}active{% endif %}">
+              <span class="icon">📅</span><span>Agenda Digital</span>
+            </a>
+            {% endif %}
             {% if pode_aceder('clientes') %}
             <a href="{{ url_for('clientes') }}" class="nav-item nav-sub {% if request.endpoint in ['clientes','novo_cliente','editar_cliente','cliente_detalhe','nova_embarcacao','embarcacao_detalhe'] %}active{% endif %}">
               <span class="icon">👥</span><span>Clientes</span>
             </a>
             {% endif %}
-            {% if pode_aceder('funcionarios') %}
-            <a href="{{ url_for('funcionarios') }}" class="nav-item nav-sub {% if 'funcionario' in (request.endpoint or '') %}active{% endif %}">
-              <span class="icon">🪪</span><span>Funcionários</span>
+            <a href="{{ url_for('empresa') }}" class="nav-item nav-sub {% if request.endpoint and 'empresa' in request.endpoint %}active{% endif %}">
+              <span class="icon">🏢</span><span>Empresa</span>
             </a>
-            {% endif %}
-            {% if pode_aceder('salarios') %}
-            <a href="{{ url_for('salarios') }}" class="nav-item nav-sub {% if 'salario' in (request.endpoint or '') %}active{% endif %}">
-              <span class="icon">💶</span><span>Salários</span>
-            </a>
-            {% endif %}
             {% if pode_aceder('fornecedores') %}
             <a href="{{ url_for('fornecedores') }}" class="nav-item nav-sub {% if request.endpoint in ['fornecedores','fornecedor_marcas'] %}active{% endif %}">
               <span class="icon">🏭</span><span>Fornecedores</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('funcionarios') %}
+            <a href="{{ url_for('funcionarios') }}" class="nav-item nav-sub {% if 'funcionario' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">🪪</span><span>Funcionários</span>
             </a>
             {% endif %}
             {% if pode_aceder('ferias') %}
@@ -321,12 +324,9 @@
               <span class="icon">📁</span><span>Partilha</span>
             </a>
             {% endif %}
-            <a href="{{ url_for('empresa') }}" class="nav-item nav-sub {% if request.endpoint and 'empresa' in request.endpoint %}active{% endif %}">
-              <span class="icon">🏢</span><span>Empresa</span>
-            </a>
-            {% if pode_aceder('agenda') %}
-            <a href="{{ url_for('agenda') }}" class="nav-item nav-sub {% if request.endpoint and 'agenda' in request.endpoint %}active{% endif %}">
-              <span class="icon">📅</span><span>Agenda Digital</span>
+            {% if pode_aceder('salarios') %}
+            <a href="{{ url_for('salarios') }}" class="nav-item nav-sub {% if 'salario' in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">💶</span><span>Salários</span>
             </a>
             {% endif %}
           </div>
@@ -339,24 +339,23 @@
             <span class="icon">📦</span><span>Logística</span><span class="dd-arrow">▸</span>
           </button>
           <div class="nav-dd-items" id="ddi-log">
-            {% if pode_aceder('pedidos') %}
-            <a href="{{ url_for('pedidos', estado='aberto') }}" class="nav-item nav-sub {% if 'pedido' in (request.endpoint or '') and 'reposicao' not in (request.endpoint or '') %}active{% endif %}">
-              <span class="icon">🛒</span><span>Pedidos de Compra</span>
-            </a>
-            {% endif %}
             {% if pode_aceder('inventario') %}
-            <a href="{{ url_for('stock') }}" class="nav-item nav-sub {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
-              <span class="icon">📊</span><span>Stock</span>
+            <a href="{{ url_for('inventario') }}" class="nav-item nav-sub {% if request.endpoint == 'inventario' %}active{% endif %}">
+              <span class="icon">📈</span><span>Análise de Inventário</span>
             </a>
             {% endif %}
+            <a href="{{ url_for('pendentes') }}" class="nav-item nav-sub {% if request.endpoint == 'pendentes' %}active{% endif %}">
+              <span class="icon">🔗</span><span>Associações Pendentes</span>
+              <span id="sidebarBadgePendentes" style="margin-left:auto;background:var(--warning);color:#000;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center"></span>
+            </a>
             {% if pode_aceder('entradas') %}
             <a href="{{ url_for('entradas') }}" class="nav-item nav-sub {% if request.endpoint in ['entradas','entrada_nova','entrada_detalhe','entrada_editar'] %}active{% endif %}">
               <span class="icon">📥</span><span>Entradas</span>
             </a>
             {% endif %}
-            {% if pode_aceder('inventario') %}
-            <a href="{{ url_for('inventario') }}" class="nav-item nav-sub {% if request.endpoint == 'inventario' %}active{% endif %}">
-              <span class="icon">📈</span><span>Análise de Inventário</span>
+            {% if pode_aceder('pedidos') %}
+            <a href="{{ url_for('pedidos', estado='aberto') }}" class="nav-item nav-sub {% if 'pedido' in (request.endpoint or '') and 'reposicao' not in (request.endpoint or '') %}active{% endif %}">
+              <span class="icon">🛒</span><span>Pedidos de Compra</span>
             </a>
             {% endif %}
             {% if pode_aceder('reposicao') %}
@@ -364,10 +363,11 @@
               <span class="icon">🔄</span><span>Reposição de Stock</span>
             </a>
             {% endif %}
-            <a href="{{ url_for('pendentes') }}" class="nav-item nav-sub {% if request.endpoint == 'pendentes' %}active{% endif %}">
-              <span class="icon">🔗</span><span>Associações Pendentes</span>
-              <span id="sidebarBadgePendentes" style="margin-left:auto;background:var(--warning);color:#000;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center"></span>
+            {% if pode_aceder('inventario') %}
+            <a href="{{ url_for('stock') }}" class="nav-item nav-sub {% if request.endpoint in ['stock','stock_artigo'] %}active{% endif %}">
+              <span class="icon">📊</span><span>Stock</span>
             </a>
+            {% endif %}
           </div>
         </div>
 
@@ -393,14 +393,14 @@
               <span class="icon">⚙️</span><span>Base Dados Industriais</span>
             </a>
             {% endif %}
-            {% if pode_aceder('fichas') %}
-            <a href="{{ url_for('fichas') }}" class="nav-item nav-sub {% if request.endpoint in ['fichas','ficha_nova','ficha_detalhe','ficha_editar'] %}active{% endif %}">
-              <span class="icon">📋</span><span>Fichas de Equipamentos</span>
-            </a>
-            {% endif %}
             {% if pode_aceder('biblioteca_modelos') %}
             <a href="{{ url_for('biblioteca_modelos') }}" class="nav-item nav-sub {% if 'biblioteca' in (request.endpoint or '') %}active{% endif %}">
               <span class="icon">📚</span><span>Biblioteca PDF</span>
+            </a>
+            {% endif %}
+            {% if pode_aceder('fichas') %}
+            <a href="{{ url_for('fichas') }}" class="nav-item nav-sub {% if request.endpoint in ['fichas','ficha_nova','ficha_detalhe','ficha_editar'] %}active{% endif %}">
+              <span class="icon">📋</span><span>Fichas de Equipamentos</span>
             </a>
             {% endif %}
           </div>
