@@ -1,66 +1,293 @@
 <!DOCTYPE html>
 <html lang="pt">
-<head><meta charset="UTF-8"><title>Relatório Serviço</title>
+<head>
+<meta charset="UTF-8">
+<title>Relatório de Serviço — {{ sv.titulo }}</title>
 <style>
-@page{size:A4;margin:1.5cm}
-@media print{.no-print{display:none}body{-webkit-print-color-adjust:exact}}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;font-size:10px;color:#1e293b}
-.header{border-bottom:3px solid #1e3a5f;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start}
-h1{font-size:16px;font-weight:800;color:#1e3a5f}
-h2{font-size:12px;color:#64748b;margin-top:4px}
-.section{margin-bottom:14px}
-.section-title{font-size:11px;font-weight:700;color:#1e3a5f;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:8px;text-transform:uppercase}
-.day-block{border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px;overflow:hidden}
-.day-head{background:#1e3a5f;color:white;padding:6px 10px;display:flex;justify-content:space-between;font-size:10px;font-weight:700}
-.reg{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:9.5px}
-.reg:last-child{border-bottom:none}
-.reg-name{font-weight:700;color:#1e3a5f}
-.print-btn{position:fixed;top:16px;right:16px;background:#1e3a5f;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700}
-</style></head>
+@page { size: A4; margin: 1.5cm 1.5cm 2cm 1.5cm; }
+@media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; color: #1e293b; background: #fff; }
+
+/* Print button */
+.print-btn { position: fixed; top: 16px; right: 16px; background: #1e3a5f; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; z-index: 999; }
+
+/* Header */
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 16px; }
+.logo-box { width: 120px; }
+.logo-box img { max-width: 120px; max-height: 60px; object-fit: contain; }
+.logo-box .no-logo { font-size: 16px; font-weight: 900; color: #1e3a5f; letter-spacing: -0.5px; }
+.doc-info { text-align: right; font-size: 8pt; color: #64748b; }
+.doc-info strong { color: #1e3a5f; font-size: 10pt; }
+
+/* Report title */
+.report-title { background: #1e3a5f; color: #fff; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+.report-title h1 { font-size: 13pt; font-weight: 800; }
+.report-title .sub { font-size: 9pt; color: rgba(255,255,255,.8); margin-top: 4px; }
+
+/* Info grid */
+.info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.info-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; }
+.info-box .lbl { font-size: 7.5pt; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 3px; }
+.info-box .val { font-size: 9.5pt; font-weight: 700; color: #1e3a5f; }
+
+/* Técnicos */
+.tecnicos { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 8px 12px; margin-bottom: 14px; }
+.tecnicos .tec-title { font-size: 8pt; font-weight: 700; color: #0369a1; text-transform: uppercase; margin-bottom: 6px; }
+.tecnicos .tec-list { display: flex; gap: 12px; flex-wrap: wrap; }
+.tecnicos .tec-badge { background: #0369a1; color: #fff; padding: 3px 10px; border-radius: 12px; font-size: 8pt; font-weight: 700; }
+
+/* Section */
+.section-title { font-size: 9pt; font-weight: 800; color: #1e3a5f; text-transform: uppercase; letter-spacing: .05em; border-bottom: 2px solid #1e3a5f; padding-bottom: 4px; margin: 14px 0 8px; }
+
+/* Day block */
+.day-block { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; page-break-inside: avoid; }
+.day-head { background: #1e3a5f; color: #fff; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; }
+.day-head .day-date { font-size: 10pt; font-weight: 800; }
+.day-head .day-totals { font-size: 8pt; color: rgba(255,255,255,.85); }
+
+/* Registo row */
+.reg { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.reg:last-child { border-bottom: none; }
+.reg-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.reg-name { font-size: 10pt; font-weight: 800; color: #1e3a5f; }
+.reg-hours { font-size: 9pt; font-weight: 700; background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; }
+.reg-desc { font-size: 9pt; color: #334155; margin: 6px 0; border-left: 3px solid #e2e8f0; padding-left: 8px; white-space: pre-wrap; line-height: 1.5; }
+.reg-extras { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.tag { display: inline-flex; align-items: center; gap: 4px; font-size: 8pt; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.tag-he { background: #fef3c7; color: #92400e; }
+.tag-desl { background: #eff6ff; color: #1e40af; }
+.tag-ref { background: #f0fdf4; color: #166534; }
+.tag-mat { background: #faf5ff; color: #6b21a8; }
+
+/* Materials table */
+.mat-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 8.5pt; }
+.mat-table th { background: #f8fafc; padding: 4px 8px; text-align: left; border: 1px solid #e2e8f0; font-weight: 700; color: #64748b; }
+.mat-table td { padding: 4px 8px; border: 1px solid #e2e8f0; }
+
+/* Summary table */
+.summ-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+.summ-table th { background: #1e3a5f; color: #fff; padding: 6px 10px; text-align: left; }
+.summ-table td { padding: 5px 10px; border-bottom: 1px solid #e2e8f0; }
+.summ-table tr:nth-child(even) td { background: #f8fafc; }
+.summ-total td { font-weight: 800; background: #eff6ff !important; color: #1e3a5f; border-top: 2px solid #1e3a5f; }
+
+/* Footer */
+.page-footer { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 7.5pt; color: #94a3b8; }
+
+/* Signature */
+.sign-box { border-top: 1px solid #334155; margin-top: 6px; padding-top: 4px; min-width: 180px; text-align: center; font-size: 7.5pt; color: #64748b; }
+</style>
+</head>
 <body>
-<button class="no-print print-btn" onclick="window.print()">🖨 Imprimir</button>
-<div class="header">
-  <div>
-    <h1>Relatório de Serviço</h1>
-    <h2>{{ sv.cliente.nome if sv.cliente else sv.tipo }} {% if sv.embarcacao_nome %} — {{ sv.embarcacao_nome }}{% endif %}</h2>
-    <div style="font-size:9px;color:#94a3b8;margin-top:4px">
-      {{ sv.data_inicio.strftime('%d/%m/%Y') if sv.data_inicio else '—' }} → {{ sv.data_fim.strftime('%d/%m/%Y') if sv.data_fim else 'Em curso' }}
-    </div>
+<button class="no-print print-btn" onclick="window.print()">🖨 Imprimir / PDF</button>
+
+{% set tecnicos_ids = [] %}
+{% for r in registos %}{% if r.funcionario_id not in tecnicos_ids %}{% set _ = tecnicos_ids.append(r.funcionario_id) %}{% endif %}{% endfor %}
+{% set tecnicos = [] %}
+{% for r in registos %}{% if r.funcionario not in tecnicos %}{% set _ = tecnicos.append(r.funcionario) %}{% endif %}{% endfor %}
+
+{% set total_horas = registos|sum(attribute='horas') %}
+{% set total_he = registos|sum(attribute='he_horas') %}
+{% set total_alm = registos|sum(attribute='n_almoco') %}
+{% set total_ref = registos|sum(attribute='custo_refeicao') %}
+
+<!-- Header -->
+<div class="page-header">
+  <div class="logo-box">
+    {% if cfg and cfg.empresa_logo_path %}
+    <img src="{{ request.host_url }}static/logo_empresa.png" alt="Logo">
+    {% else %}
+    <div class="no-logo">{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }}</div>
+    {% endif %}
   </div>
-  <div style="text-align:right;font-size:9px;color:#94a3b8">
+  <div style="flex:1;padding:0 20px">
+    <div style="font-size:7.5pt;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:.05em">Relatório de Serviço</div>
+    <div style="font-size:13pt;font-weight:900;color:#1e3a5f;margin-top:2px">{{ sv.titulo }}</div>
+  </div>
+  <div class="doc-info">
     {% if cfg %}<strong>{{ cfg.empresa_nome }}</strong><br>{% endif %}
-    Gerado em {{ now().strftime('%d/%m/%Y %H:%M') if now else '' }}
+    {% if cfg and cfg.nif %}NIF: {{ cfg.nif }}<br>{% endif %}
+    Gerado em {{ now.strftime('%d/%m/%Y %H:%M') if now else '' }}
+  </div>
+</div>
+
+<!-- Info Grid -->
+<div class="info-grid">
+  <div class="info-box">
+    <div class="lbl">👥 Cliente</div>
+    <div class="val">{{ sv.cliente.nome if sv.cliente else ('Serviço da Casa' if sv.tipo=='casa' else 'Para Stock') }}</div>
+  </div>
+  <div class="info-box">
+    <div class="lbl">⛵ Embarcação / Equipamento</div>
+    <div class="val">{{ sv.embarcacao_nome or sv.equipamento or '—' }}</div>
+  </div>
+  <div class="info-box">
+    <div class="lbl">📍 Local</div>
+    <div class="val">{{ sv.local_servico or '—' }}</div>
+  </div>
+  <div class="info-box">
+    <div class="lbl">📅 Data Início</div>
+    <div class="val">{{ sv.data_inicio.strftime('%d/%m/%Y') if sv.data_inicio else '—' }}</div>
+  </div>
+  <div class="info-box">
+    <div class="lbl">📅 Data Fim</div>
+    <div class="val">{{ sv.data_fim.strftime('%d/%m/%Y') if sv.data_fim else 'Em curso' }}</div>
+  </div>
+  <div class="info-box">
+    <div class="lbl">⏱ Total Horas</div>
+    <div class="val">{{ '%.1f'|format(total_horas) }}h {% if total_he %} + {{ '%.1f'|format(total_he) }}h HE{% endif %}</div>
+  </div>
+</div>
+
+<!-- Técnicos -->
+<div class="tecnicos">
+  <div class="tec-title">👷 Técnicos Envolvidos ({{ tecnicos|length }})</div>
+  <div class="tec-list">
+    {% for t in tecnicos %}
+    <span class="tec-badge">{{ t.nome }}</span>
+    {% endfor %}
   </div>
 </div>
 
 {% if sv.descricao %}
-<div class="section">
-  <div class="section-title">Descrição Geral</div>
-  <p style="font-size:10px;color:#334155">{{ sv.descricao }}</p>
+<div style="background:#fafafa;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;margin-bottom:14px">
+  <div style="font-size:7.5pt;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Descrição Geral do Serviço</div>
+  <div style="font-size:9.5pt;color:#334155;white-space:pre-wrap;line-height:1.5">{{ sv.descricao }}</div>
 </div>
 {% endif %}
 
-<div class="section">
-  <div class="section-title">Trabalhos Realizados</div>
-  {% set dias = registos|groupby('data') %}
-  {% for data, regs in dias %}
-  <div class="day-block">
-    <div class="day-head">
-      <span>{{ data.strftime('%A, %d/%m/%Y') }}</span>
-      <span>{{ '%.1f'|format(regs|sum(attribute='horas')) }}h{% set he_d = regs|sum(attribute='he_horas') %}{% if he_d %} + {{ '%.1f'|format(he_d) }}h HE{% endif %}</span>
+<!-- Body por dia -->
+<div class="section-title">📋 Trabalhos Realizados por Dia</div>
+
+{% set dias_sorted = registos|sort(attribute='data') %}
+{% set seen_dias = namespace(list=[]) %}
+
+{% for reg in dias_sorted %}
+{% if reg.data not in seen_dias.list %}
+{% set _ = seen_dias.list.append(reg.data) %}
+{% set dia_regs = registos|selectattr('data','equalto',reg.data)|list %}
+{% set dia_h = dia_regs|sum(attribute='horas') %}
+{% set dia_he = dia_regs|sum(attribute='he_horas') %}
+
+<div class="day-block">
+  <div class="day-head">
+    <div class="day-date">{{ reg.data.strftime('%A, %d de %B de %Y') }}</div>
+    <div class="day-totals">
+      {{ '%.1f'|format(dia_h) }}h
+      {% if dia_he %} + {{ '%.1f'|format(dia_he) }}h HE{% endif %}
+      — {{ dia_regs|length }} técnico(s)
     </div>
-    {% for r in regs %}
-    <div class="reg">
-      <div class="reg-name">{{ r.funcionario.nome }} — {{ '%.1f'|format(r.horas) }}h{% if r.hora_inicio %} ({{ r.hora_inicio }}–{{ r.hora_fim }}){% endif %}{% if r.he_horas %} + {{ '%.1f'|format(r.he_horas) }}h HE{% if r.he_inicio %} ({{ r.he_inicio }}–{{ r.he_fim }}){% endif %}{% endif %}</div>
-      {% if r.descricao_trabalho %}<div style="margin-top:4px;color:#334155;white-space:pre-wrap">{{ r.descricao_trabalho }}</div>{% endif %}
+  </div>
+
+  {% for r in dia_regs|sort(attribute='funcionario.nome') %}
+  <div class="reg">
+    <div class="reg-header">
+      <div class="reg-name">{{ r.funcionario.nome }}</div>
+      <div>
+        <span class="reg-hours">{{ '%.1f'|format(r.horas) }}h
+          {% if r.hora_inicio %}({{ r.hora_inicio }}–{{ r.hora_fim }}){% endif %}
+        </span>
+        {% if r.he_horas %}
+        <span class="tag tag-he" style="margin-left:4px">HE {{ '%.1f'|format(r.he_horas) }}h {% if r.he_inicio %}({{ r.he_inicio }}–{{ r.he_fim }}){% endif %}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if r.descricao_trabalho %}
+    <div class="reg-desc">{{ r.descricao_trabalho }}</div>
+    {% endif %}
+
+    <div class="reg-extras">
+      {% if r.deslocacao_viatura %}
+      <span class="tag tag-desl">🚗 {{ 'Nossa viatura' if r.viatura_tipo=='propria' else 'Viatura cliente' }} — {{ r.n_viagens }} viagem(ns){% if r.km %} / {{ r.km }} km{% endif %}</span>
+      {% endif %}
+      {% if r.n_almoco %}
+      <span class="tag tag-ref">🍽 {{ r.n_almoco }} almoço(s) — {{ '%.2f'|format(r.custo_refeicao) }}€{% if r.obs_refeicao %} — {{ r.obs_refeicao }}{% endif %}</span>
+      {% endif %}
       {% set mats = r.materiais.all() %}
-      {% if mats %}<div style="margin-top:4px;color:#8b5cf6">📦 Materiais: {% for m in mats %}{{ m.descricao }} ({{ m.quantidade }} {{ m.unidade }}){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
-      {% if r.deslocacao_viatura %}<div style="color:#3b6ef0">🚗 {{ 'Nossa viatura' if r.viatura_tipo=='propria' else 'Viatura cliente' }} — {{ r.n_viagens }} viagem(ns){% if r.km %}, {{ r.km }} km{% endif %}</div>{% endif %}
-      {% if r.n_almoco %}<div style="color:#16a34a">🍽 {{ r.n_almoco }} almoço(s) — {{ '%.2f'|format(r.custo_refeicao) }}€</div>{% endif %}
+      {% if mats %}
+      <span class="tag tag-mat">📦 {{ mats|length }} material(is)</span>
+      {% endif %}
     </div>
-    {% endfor %}
+
+    {% set mats = r.materiais.all() %}
+    {% if mats %}
+    <table class="mat-table" style="margin-top:8px">
+      <thead><tr><th>Ref.</th><th>Descrição</th><th>Qtd.</th><th>Unid.</th><th>Obs.</th></tr></thead>
+      <tbody>
+        {% for m in mats %}
+        <tr>
+          <td>{{ m.artigo_ref or '—' }}</td>
+          <td>{{ m.descricao }}</td>
+          <td>{{ m.quantidade }}</td>
+          <td>{{ m.unidade }}</td>
+          <td>{{ m.observacoes or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
-</body></html>
+{% endif %}
+{% endfor %}
+
+<!-- Resumo Final -->
+<div class="section-title">📊 Resumo do Serviço</div>
+<table class="summ-table" style="margin-bottom:16px">
+  <thead><tr><th>Técnico</th><th>Dias</th><th>Horas</th><th>HE</th><th>Viagens</th><th>Almoços</th><th>Custo Ref.</th></tr></thead>
+  <tbody>
+    {% for t in tecnicos %}
+    {% set t_regs = registos|selectattr('funcionario_id','equalto',t.id)|list %}
+    {% set t_h = t_regs|sum(attribute='horas') %}
+    {% set t_he = t_regs|sum(attribute='he_horas') %}
+    {% set t_dias = t_regs|map(attribute='data')|unique|list|length %}
+    {% set t_viag = t_regs|sum(attribute='n_viagens') %}
+    {% set t_alm = t_regs|sum(attribute='n_almoco') %}
+    {% set t_ref = t_regs|sum(attribute='custo_refeicao') %}
+    <tr>
+      <td><strong>{{ t.nome }}</strong></td>
+      <td>{{ t_dias }}</td>
+      <td><strong>{{ '%.1f'|format(t_h) }}h</strong></td>
+      <td>{% if t_he %}{{ '%.1f'|format(t_he) }}h{% else %}—{% endif %}</td>
+      <td>{% if t_viag %}{{ t_viag }}{% else %}—{% endif %}</td>
+      <td>{% if t_alm %}{{ t_alm }}{% else %}—{% endif %}</td>
+      <td>{% if t_ref %}{{ '%.2f'|format(t_ref) }}€{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr class="summ-total">
+      <td><strong>TOTAL</strong></td>
+      <td>{{ registos|map(attribute='data')|unique|list|length }}</td>
+      <td><strong>{{ '%.1f'|format(total_horas) }}h</strong></td>
+      <td><strong>{{ '%.1f'|format(total_he) }}h</strong></td>
+      <td><strong>{{ registos|sum(attribute='n_viagens') }}</strong></td>
+      <td><strong>{{ total_alm }}</strong></td>
+      <td><strong>{{ '%.2f'|format(total_ref) }}€</strong></td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- Assinaturas -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:20px">
+  <div>
+    <div class="sign-box">Técnico Responsável</div>
+  </div>
+  <div>
+    <div class="sign-box">Responsável Cliente</div>
+  </div>
+  <div>
+    <div class="sign-box">Chefe de Serviço</div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="page-footer">
+  <span>{{ cfg.empresa_nome if cfg and cfg.empresa_nome else 'NavTech' }} — Documento interno</span>
+  <span>Gerado automaticamente pelo NavTech em {{ now.strftime('%d/%m/%Y às %H:%M') if now else '' }}</span>
+</div>
+</body>
+</html>

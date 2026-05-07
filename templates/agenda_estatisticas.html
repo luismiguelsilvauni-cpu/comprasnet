@@ -3,67 +3,209 @@
 {% block page_title %}📊 Estatísticas da Agenda{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('agenda') }}" class="btn btn-ghost btn-sm">← Agenda</a>
+  <a href="{{ url_for('agenda_servicos') }}" class="btn btn-ghost btn-sm">📋 Serviços</a>
 {% endblock %}
 {% block content %}
-{% set MESES = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+{% set MESES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] %}
+
+<!-- Filter -->
 <div class="card mb-16" style="padding:10px">
-  <form method="get" style="display:flex;gap:10px;align-items:center">
-    <select name="mes" class="input" style="width:120px">
+  <form method="get" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--text-muted);font-weight:600">Período:</span>
+    <select name="mes" class="input" style="width:130px">
       {% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m==mes }}>{{ MESES[m] }}</option>{% endfor %}
     </select>
     <select name="ano" class="input" style="width:90px">
-      {% for a in range(2024, 2028) %}<option value="{{ a }}" {{ 'selected' if a==ano }}>{{ a }}</option>{% endfor %}
+      {% for a in range(2024,2028) %}<option value="{{ a }}" {{ 'selected' if a==ano }}>{{ a }}</option>{% endfor %}
     </select>
-    <button type="submit" class="btn btn-primary btn-sm">Ver</button>
+    <button type="submit" class="btn btn-primary btn-sm">Actualizar</button>
+    <span style="font-size:12px;color:var(--text-muted);margin-left:8px">{{ MESES[mes] }} {{ ano }}</span>
   </form>
 </div>
 
+<!-- KPI Strip -->
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px">
+  {% set tot_h = stats|sum(attribute='horas') %}
+  {% set tot_he = stats|sum(attribute='he') %}
+  {% set tot_alm = stats|sum(attribute='almoco') %}
+  {% set tot_ref = stats|sum(attribute='custo_ref') %}
+  <div class="card" style="text-align:center;padding:10px">
+    <div style="font-size:22px;font-weight:800;color:var(--accent)">{{ '%.0f'|format(tot_h) }}</div>
+    <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Horas Totais</div>
+  </div>
+  <div class="card" style="text-align:center;padding:10px">
+    <div style="font-size:22px;font-weight:800;color:#f59e0b">{{ '%.0f'|format(tot_he) }}</div>
+    <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Horas Extra</div>
+  </div>
+  <div class="card" style="text-align:center;padding:10px">
+    <div style="font-size:22px;font-weight:800;color:#22c55e">{{ stats|length }}</div>
+    <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Técnicos Activos</div>
+  </div>
+  <div class="card" style="text-align:center;padding:10px">
+    <div style="font-size:22px;font-weight:800;color:#3b6ef0">{{ sv_em_curso }}</div>
+    <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Serviços em Curso</div>
+  </div>
+  <div class="card" style="text-align:center;padding:10px">
+    <div style="font-size:22px;font-weight:800;color:#8b5cf6">{{ sv_concluido }}</div>
+    <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Serviços Concluídos</div>
+  </div>
+  <div class="card" style="text-align:center;padding:10px">
+    <div style="font-size:22px;font-weight:800;color:#16a34a">{{ '%.0f'|format(tot_ref) }}€</div>
+    <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Custo Refeições</div>
+  </div>
+</div>
+
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<!-- Coluna Esquerda -->
 <div>
+
+<!-- Horas por Funcionário (barras) -->
 <div class="card mb-14">
-  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">👷 Horas por Funcionário</div>
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:14px">👷 Horas por Funcionário — {{ MESES[mes] }} {{ ano }}</div>
+  {% if stats %}
+  {% set max_h = stats[0].horas %}
   {% for s in stats %}
+  <div style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <span style="font-weight:700">{{ s.func.nome }}</span>
+      <span style="display:flex;gap:8px">
+        <span style="color:var(--accent);font-weight:700">{{ '%.1f'|format(s.horas) }}h</span>
+        {% if s.he %}<span style="color:#f59e0b">+{{ '%.1f'|format(s.he) }}h HE</span>{% endif %}
+        <span style="color:var(--text-muted);font-size:11px">{{ s.dias }}d</span>
+      </span>
+    </div>
+    <!-- Stacked bar -->
+    <div style="height:12px;background:var(--border);border-radius:6px;overflow:hidden;display:flex">
+      {% if max_h > 0 %}
+      <div style="height:100%;background:#3b6ef0;width:{{ (s.h_cliente / max_h * 100)|int }}%;border-radius:6px 0 0 6px" title="Cliente: {{ '%.1f'|format(s.h_cliente) }}h"></div>
+      <div style="height:100%;background:#f59e0b;width:{{ (s.h_casa / max_h * 100)|int }}%" title="Casa: {{ '%.1f'|format(s.h_casa) }}h"></div>
+      <div style="height:100%;background:#8b5cf6;width:{{ (s.h_stock / max_h * 100)|int }}%" title="Stock: {{ '%.1f'|format(s.h_stock) }}h"></div>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:var(--text-muted)">
+      <span style="color:#3b6ef0">■ Cliente {{ '%.1f'|format(s.h_cliente) }}h</span>
+      {% if s.h_casa %}<span style="color:#f59e0b">■ Casa {{ '%.1f'|format(s.h_casa) }}h</span>{% endif %}
+      {% if s.h_stock %}<span style="color:#8b5cf6">■ Stock {{ '%.1f'|format(s.h_stock) }}h</span>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Sem dados para {{ MESES[mes] }} {{ ano }}</div>
+  {% endif %}
+</div>
+
+<!-- Histórico últimos 6 meses -->
+<div class="card mb-14">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📈 Histórico Horas (6 meses)</div>
+  {% set max_mh = meses_hist|map(attribute='horas')|max if meses_hist else 1 %}
+  {% if max_mh == 0 %}{% set max_mh = 1 %}{% endif %}
+  <div style="display:flex;align-items:flex-end;gap:6px;height:100px">
+    {% for m in meses_hist %}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="font-size:9px;color:var(--text-muted);font-weight:700">{{ '%.0f'|format(m.horas) }}</div>
+      <div style="width:100%;border-radius:4px 4px 0 0;min-height:2px;background:var(--accent);height:{{ [(m.horas / max_mh * 80)|int, 2]|max }}px;transition:.3s"></div>
+      <div style="font-size:9px;color:var(--text-muted);white-space:nowrap">{{ m.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Refeições Detalhe -->
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🍽 Refeições — {{ MESES[mes] }}</div>
+  <table style="width:100%;font-size:12px;border-collapse:collapse">
+    <thead><tr style="background:var(--surface2)">
+      <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text-muted)">Técnico</th>
+      <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-muted)">Almoços</th>
+      <th style="padding:6px 8px;text-align:right;font-size:11px;color:var(--text-muted)">Custo</th>
+    </tr></thead>
+    <tbody>
+    {% for s in stats if s.almoco %}
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:5px 8px">{{ s.func.nome }}</td>
+      <td style="padding:5px 8px;text-align:center;font-weight:700">{{ s.almoco }}</td>
+      <td style="padding:5px 8px;text-align:right;color:#16a34a;font-weight:700">{{ '%.2f'|format(s.custo_ref) }}€</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr style="background:var(--surface2);font-weight:700">
+      <td style="padding:6px 8px">Total</td>
+      <td style="padding:6px 8px;text-align:center">{{ tot_alm }}</td>
+      <td style="padding:6px 8px;text-align:right;color:#16a34a">{{ '%.2f'|format(tot_ref) }}€</td>
+    </tr></tfoot>
+  </table>
+</div>
+
+</div>
+<!-- Coluna Direita -->
+<div>
+
+<!-- Top Clientes -->
+<div class="card mb-14">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">👥 Top Clientes — {{ MESES[mes] }}</div>
+  {% if top_cli %}
+  {% set max_cli_h = top_cli[0][2] or 1 %}
+  {% for cli, n_serv, h_total in top_cli %}
   <div style="margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-      <span style="font-weight:600">{{ s.func.nome.split()[0] }}</span>
-      <span>{{ '%.1f'|format(s.horas) }}h{% if s.he %} + {{ '%.1f'|format(s.he) }}h HE{% endif %}</span>
+      <span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="{{ cli }}">{{ cli }}</span>
+      <span style="display:flex;gap:8px;flex-shrink:0">
+        <span style="color:#3b6ef0;font-weight:700">{{ '%.1f'|format(h_total or 0) }}h</span>
+        <span style="color:var(--text-muted);font-size:11px">{{ n_serv }} serv.</span>
+      </span>
     </div>
     <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-      <div style="height:100%;background:var(--accent);border-radius:4px;width:{{ [(s.horas / (stats[0].horas or 1) * 100)|int, 100]|min }}%"></div>
+      <div style="height:100%;background:#3b6ef0;border-radius:4px;width:{{ [((h_total or 0) / (max_cli_h or 1) * 100)|int, 100]|min }}%"></div>
     </div>
   </div>
-  {% else %}
-  <div style="color:var(--text-muted);font-size:12px">Sem dados para este período</div>
   {% endfor %}
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Sem dados</div>
+  {% endif %}
 </div>
-</div>
-<div>
+
+<!-- Serviços Status -->
 <div class="card mb-14">
-  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">👥 Top Clientes</div>
-  {% for cli, n in top_cli %}
-  <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
-    <span>{{ cli }}</span>
-    <span style="font-weight:700;color:var(--accent)">{{ n }} serviço(s)</span>
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📋 Estado dos Serviços</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div style="text-align:center;padding:16px;background:rgba(59,110,240,.08);border-radius:10px;border:1px solid rgba(59,110,240,.2)">
+      <div style="font-size:32px;font-weight:900;color:#3b6ef0">{{ sv_em_curso }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Em Curso</div>
+      <a href="{{ url_for('agenda_servicos', estado='em_curso') }}" class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:8px">Ver todos</a>
+    </div>
+    <div style="text-align:center;padding:16px;background:rgba(34,197,94,.08);border-radius:10px;border:1px solid rgba(34,197,94,.2)">
+      <div style="font-size:32px;font-weight:900;color:#22c55e">{{ sv_concluido }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Concluídos</div>
+      <a href="{{ url_for('agenda_servicos', estado='concluido') }}" class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:8px">Ver todos</a>
+    </div>
   </div>
-  {% else %}
-  <div style="color:var(--text-muted);font-size:12px">Sem dados</div>
+  <!-- Pie chart approximate -->
+  {% set total_sv = sv_em_curso + sv_concluido %}
+  {% if total_sv > 0 %}
+  <div style="margin-top:12px;height:10px;background:var(--border);border-radius:6px;overflow:hidden;display:flex">
+    <div style="height:100%;background:#3b6ef0;width:{{ (sv_em_curso / total_sv * 100)|int }}%"></div>
+    <div style="height:100%;background:#22c55e;flex:1"></div>
+  </div>
+  <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--text-muted)">
+    <span style="color:#3b6ef0">■ Em Curso {{ (sv_em_curso / total_sv * 100)|int }}%</span>
+    <span style="color:#22c55e">■ Concluídos {{ (sv_concluido / total_sv * 100)|int }}%</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Top Equipamentos -->
+{% if top_equip %}
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">⚙️ Equipamentos Mais Intervencionados</div>
+  {% for equip, n in top_equip %}
+  <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">{{ equip }}</span>
+    <span style="font-weight:700;color:var(--accent);flex-shrink:0">{{ n }}x</span>
+  </div>
   {% endfor %}
 </div>
-<div class="card">
-  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🍽 Refeições</div>
-  {% set total_ref = stats|sum(attribute='custo_ref') %}
-  {% set total_alm = stats|sum(attribute='almoco') %}
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
-      <div style="font-size:20px;font-weight:800;color:#16a34a">{{ total_alm }}</div>
-      <div style="font-size:10px;color:var(--text-muted)">Total Almoços</div>
-    </div>
-    <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
-      <div style="font-size:20px;font-weight:800;color:#16a34a">{{ '%.2f'|format(total_ref) }}€</div>
-      <div style="font-size:10px;color:var(--text-muted)">Custo Refeições</div>
-    </div>
-  </div>
-</div>
+{% endif %}
+
 </div>
 </div>
 {% endblock %}

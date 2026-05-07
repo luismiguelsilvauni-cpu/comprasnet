@@ -2706,10 +2706,7 @@ def agenda_servico_pdf(sid):
     sv = AgendaServico.query.get_or_404(sid)
     registos = AgendaRegisto.query.filter_by(servico_id=sid).order_by(AgendaRegisto.data, AgendaRegisto.funcionario_id).all()
     cfg = ConfigGeral.query.first()
-    logo_path = None
-    if cfg and cfg.empresa_logo_path:
-        logo_path = url_for('static', filename='logo_empresa.png', _external=True)
-    return render_template('agenda_servico_pdf.html', sv=sv, registos=registos, cfg=cfg)
+    return render_template('agenda_servico_pdf.html', sv=sv, registos=registos, cfg=cfg, now=datetime.now())
 
 @app.route('/agenda/estatisticas')
 @login_required
@@ -2720,7 +2717,10 @@ def agenda_estatisticas():
     mes = int(request.args.get('mes', _d.today().month))
     mes_ini = _d(ano, mes, 1)
     mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
+
     funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+
+    # Per-funcionario stats
     stats = []
     for f in funcs:
         regs = AgendaRegisto.query.filter(
@@ -2728,25 +2728,70 @@ def agenda_estatisticas():
             AgendaRegisto.data >= mes_ini,
             AgendaRegisto.data <= mes_fim,
         ).all()
-        if regs:
-            stats.append({
-                'func': f,
-                'horas': sum(r.horas or 0 for r in regs),
-                'he': sum(r.he_horas or 0 for r in regs),
-                'dias': len(set(r.data for r in regs)),
-                'almoco': sum(r.n_almoco or 0 for r in regs),
-                'custo_ref': sum(r.custo_refeicao or 0 for r in regs),
-            })
+        if not regs: continue
+        h_total = sum(r.horas or 0 for r in regs)
+        # By tipo
+        servico_ids = list(set(r.servico_id for r in regs))
+        servicos = {sv.id: sv for sv in AgendaServico.query.filter(AgendaServico.id.in_(servico_ids)).all()}
+        h_casa  = sum(r.horas or 0 for r in regs if servicos.get(r.servico_id) and servicos[r.servico_id].tipo == 'casa')
+        h_stock = sum(r.horas or 0 for r in regs if servicos.get(r.servico_id) and servicos[r.servico_id].tipo == 'stock')
+        h_cli   = h_total - h_casa - h_stock
+        stats.append({
+            'func': f,
+            'horas': h_total,
+            'he': sum(r.he_horas or 0 for r in regs),
+            'dias': len(set(r.data for r in regs)),
+            'almoco': sum(r.n_almoco or 0 for r in regs),
+            'custo_ref': sum(r.custo_refeicao or 0 for r in regs),
+            'h_cliente': h_cli,
+            'h_casa': h_casa,
+            'h_stock': h_stock,
+            'n_servicos': len(set(r.servico_id for r in regs)),
+        })
     stats.sort(key=lambda x: x['horas'], reverse=True)
+
     # Top clients
     top_cli = db.session.query(
-        Cliente.nome, db.func.count(AgendaServico.id).label('n')
-    ).join(AgendaServico, AgendaServico.cliente_id == Cliente.id).filter(
-        AgendaServico.criado_em >= mes_ini
-    ).group_by(Cliente.nome).order_by(db.text('n desc')).limit(10).all()
+        Cliente.nome,
+        db.func.count(db.distinct(AgendaServico.id)).label('n_serv'),
+        db.func.sum(AgendaRegisto.horas).label('h_total')
+    ).join(AgendaServico, AgendaServico.cliente_id == Cliente.id
+    ).join(AgendaRegisto, AgendaRegisto.servico_id == AgendaServico.id
+    ).filter(AgendaRegisto.data >= mes_ini, AgendaRegisto.data <= mes_fim
+    ).group_by(Cliente.nome).order_by(db.text('h_total desc')).limit(10).all()
+
+    # Services stats
+    sv_em_curso = AgendaServico.query.filter_by(estado='em_curso').count()
+    sv_concluido = AgendaServico.query.filter_by(estado='concluido').count()
+
+    # Top equipamentos
+    top_equip = db.session.query(
+        AgendaServico.equipamento,
+        db.func.count(db.distinct(AgendaServico.id)).label('n')
+    ).filter(
+        AgendaServico.equipamento != None,
+        AgendaServico.equipamento != ''
+    ).group_by(AgendaServico.equipamento).order_by(db.text('n desc')).limit(8).all()
+
+    # Monthly horas (last 6 months for chart)
+    meses_hist = []
+    for i in range(5, -1, -1):
+        m2 = mes - i
+        a2 = ano
+        while m2 <= 0: m2 += 12; a2 -= 1
+        m_ini = _d(a2, m2, 1)
+        m_fim = _d(a2, m2, _cal.monthrange(a2, m2)[1])
+        h = db.session.query(db.func.sum(AgendaRegisto.horas)).filter(
+            AgendaRegisto.data >= m_ini, AgendaRegisto.data <= m_fim
+        ).scalar() or 0
+        meses_hist.append({'label': f'{m2:02d}/{a2}', 'horas': round(float(h), 1)})
+
     return render_template('agenda_estatisticas.html',
-        stats=stats, top_cli=top_cli, ano=ano, mes=mes,
-        mes_ini=mes_ini, mes_fim=mes_fim)
+        stats=stats, top_cli=top_cli, top_equip=top_equip,
+        sv_em_curso=sv_em_curso, sv_concluido=sv_concluido,
+        meses_hist=meses_hist,
+        ano=ano, mes=mes, mes_ini=mes_ini, mes_fim=mes_fim)
+
 
 @app.route('/api/agenda/embarcacoes')
 @login_required
