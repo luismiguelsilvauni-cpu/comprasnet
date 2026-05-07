@@ -2528,7 +2528,8 @@ def agenda_dia(fid, ano, mes, dia):
     servicos_curso = AgendaServico.query.filter(
         AgendaServico.estado == 'em_curso'
     ).order_by(AgendaServico.atualizado_em.desc()).limit(20).all()
-    clientes = Cliente.query.order_by(Cliente.nome).all()
+    clientes_obj = Cliente.query.order_by(Cliente.nome).all()
+    clientes = [{'id': c.id, 'nome': c.nome} for c in clientes_obj]
     # Embarcacao suggestions
     emb_sugs = db.session.query(AgendaServico.embarcacao_nome).filter(
         AgendaServico.embarcacao_nome != None,
