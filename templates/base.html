@@ -388,6 +388,11 @@
               <span class="icon">⚓</span><span>Base Dados Embarcações</span>
             </a>
             {% endif %}
+            {% if pode_aceder('eq_industriais') %}
+            <a href="{{ url_for('eq_industriais') }}" class="nav-item nav-sub {% if request.endpoint and 'eq_industrial' in request.endpoint %}active{% endif %}">
+              <span class="icon">⚙️</span><span>Base Dados Industriais</span>
+            </a>
+            {% endif %}
             {% if pode_aceder('fichas') %}
             <a href="{{ url_for('fichas') }}" class="nav-item nav-sub {% if request.endpoint in ['fichas','ficha_nova','ficha_detalhe','ficha_editar'] %}active{% endif %}">
               <span class="icon">📋</span><span>Fichas de Equipamentos</span>
