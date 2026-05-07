@@ -2481,8 +2481,8 @@ def agenda_config_users():
         db.session.commit()
         flash('Configuração guardada ✅', 'success')
         return redirect(url_for('agenda'))
-    users = User.query.order_by(User.nome).all()
-    return render_template('agenda_config_users.html', users=users)
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    return render_template('agenda_config_users.html', funcs=funcs)
 
 
 @app.route('/agenda/funcionario/<int:fid>')
