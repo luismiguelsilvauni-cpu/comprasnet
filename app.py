@@ -2196,8 +2196,13 @@ def eq_industrial_novo():
     clientes = Cliente.query.order_by(Cliente.nome).all()
     if request.method == 'POST':
         from datetime import date as _d
+        cid = request.form.get('cliente_id','').strip()
+        if not cid:
+            flash('Seleccione um cliente', 'error')
+            clientes = Cliente.query.order_by(Cliente.nome).all()
+            return render_template('eq_industrial_form.html', clientes=clientes, tipos=EQ_TIPOS, eq=None)
         eq = EquipamentoIndustrial(
-            cliente_id=int(request.form['cliente_id']),
+            cliente_id=int(cid),
             nome=request.form.get('nome','').strip(),
             tipo=request.form.get('tipo','outro'),
             referencia_interna=request.form.get('referencia_interna','').strip() or None,
