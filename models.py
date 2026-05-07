@@ -250,6 +250,7 @@ class Cliente(db.Model):
     # Extra manual fields
     notas            = db.Column(db.Text)
     ativo            = db.Column(db.Boolean, default=True)
+    agenda_ativo     = db.Column(db.Boolean, default=True)  # aparece na Agenda Digital
     # Meta
     criado_em        = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em    = db.Column(db.DateTime, default=datetime.utcnow)

@@ -2449,7 +2449,8 @@ os.makedirs(MANUAIS_DIR, exist_ok=True)
 @app.route('/agenda')
 @login_required
 def agenda():
-    funcs = User.query.filter_by(ativo=True).order_by(User.nome).all()
+    all_funcs = User.query.filter_by(ativo=True).order_by(User.nome).all()
+    funcs = all_funcs  # all users shown, agenda_ativo controls stats
     # Stats per funcionário
     from datetime import date as _d
     hoje = _d.today()
@@ -2468,6 +2469,22 @@ def agenda():
             'ultimo': max((r.data for r in regs), default=None),
         }
     return render_template('agenda.html', funcs=funcs, stats=stats, hoje=hoje)
+
+@app.route('/agenda/config-users', methods=['GET','POST'])
+@login_required
+def agenda_config_users():
+    if not current_user.is_admin:
+        return redirect(url_for('agenda'))
+    if request.method == 'POST':
+        users = User.query.filter_by(ativo=True).all()
+        for u in users:
+            u.agenda_ativo = str(u.id) in request.form.getlist('agenda_ativo')
+        db.session.commit()
+        flash('Configuração guardada ✅', 'success')
+        return redirect(url_for('agenda'))
+    users = User.query.filter_by(ativo=True).order_by(User.nome).all()
+    return render_template('agenda_config_users.html', users=users)
+
 
 @app.route('/agenda/funcionario/<int:fid>')
 @login_required
@@ -2718,7 +2735,7 @@ def agenda_estatisticas():
     mes_ini = _d(ano, mes, 1)
     mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
 
-    funcs = User.query.filter_by(ativo=True).order_by(User.nome).all()
+    funcs = User.query.filter_by(ativo=True, agenda_ativo=True).order_by(User.nome).all()
 
     # Per-funcionario stats
     stats = []
