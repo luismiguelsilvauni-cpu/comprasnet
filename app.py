@@ -2449,7 +2449,7 @@ os.makedirs(MANUAIS_DIR, exist_ok=True)
 @app.route('/agenda')
 @login_required
 def agenda():
-    funcs = User.query.order_by(User.nome).all()
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     # Stats per funcionário
     from datetime import date as _d
     hoje = _d.today()
@@ -2475,8 +2475,8 @@ def agenda_config_users():
     if not current_user.is_admin:
         return redirect(url_for('agenda'))
     if request.method == 'POST':
-        users = User.query.all()
-        for u in users:
+        funcs = Funcionario.query.filter_by(ativo=True).all()
+        for u in funcs:
             u.agenda_ativo = str(u.id) in request.form.getlist('agenda_ativo')
         db.session.commit()
         flash('Configuração guardada ✅', 'success')
@@ -2488,7 +2488,7 @@ def agenda_config_users():
 @app.route('/agenda/funcionario/<int:fid>')
 @login_required
 def agenda_funcionario(fid):
-    func = User.query.get_or_404(fid)
+    func = Funcionario.query.get_or_404(fid)
     ano  = int(request.args.get('ano', datetime.now().year))
     mes  = int(request.args.get('mes', datetime.now().month))
     from datetime import date as _d
@@ -2518,7 +2518,7 @@ def agenda_funcionario(fid):
 @app.route('/agenda/funcionario/<int:fid>/dia/<int:ano>/<int:mes>/<int:dia>')
 @login_required
 def agenda_dia(fid, ano, mes, dia):
-    func = User.query.get_or_404(fid)
+    func = Funcionario.query.get_or_404(fid)
     from datetime import date as _d
     data = _d(ano, mes, dia)
     registos = AgendaRegisto.query.filter_by(
@@ -2734,7 +2734,7 @@ def agenda_estatisticas():
     mes_ini = _d(ano, mes, 1)
     mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
 
-    funcs = User.query.filter_by(agenda_ativo=True).order_by(User.nome).all()
+    funcs = Funcionario.query.filter_by(ativo=True, agenda_ativo=True).order_by(Funcionario.nome).all()
 
     # Per-funcionario stats
     stats = []
@@ -5875,6 +5875,7 @@ class Funcionario(db.Model):
     nome                = db.Column(db.String(200), nullable=False)
     categoria           = db.Column(db.String(100))
     ativo               = db.Column(db.Boolean, default=True)
+    agenda_ativo        = db.Column(db.Boolean, default=False)  # aparece na Agenda Digital
     # Identificação
     data_admissao       = db.Column(db.Date)
     data_nascimento     = db.Column(db.Date)

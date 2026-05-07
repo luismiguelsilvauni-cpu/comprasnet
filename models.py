@@ -13,7 +13,6 @@ class User(UserMixin, db.Model):
     is_admin      = db.Column(db.Boolean, default=False)
     email         = db.Column(db.String(200))
     must_change_password = db.Column(db.Boolean, default=False)
-    agenda_ativo  = db.Column(db.Boolean, default=True)  # aparece na Agenda Digital
     departamento  = db.Column(db.String(100))
     data_criacao  = db.Column(db.DateTime, default=datetime.utcnow)
     pedidos_criados       = db.relationship('PedidoCompra', foreign_keys='PedidoCompra.criado_por', backref='criador', lazy=True)
@@ -884,7 +883,7 @@ class AgendaRegisto(db.Model):
     __tablename__ = 'agenda_registos'
     id                  = db.Column(db.Integer, primary_key=True)
     servico_id          = db.Column(db.Integer, db.ForeignKey('agenda_servicos.id'), nullable=False)
-    funcionario_id      = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    funcionario_id      = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     data                = db.Column(db.Date, nullable=False)
     # Horas
     horas               = db.Column(db.Float, default=0)
@@ -910,7 +909,7 @@ class AgendaRegisto(db.Model):
     criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     # Relationships
-    user                = db.relationship('User', foreign_keys=[funcionario_id], backref='agenda_registos')
+    # Note: Funcionario is defined in app.py, relationship added via backref in app.py
     materiais           = db.relationship('AgendaMaterial', backref='registo', lazy='dynamic', cascade='all, delete-orphan')
 
 class AgendaMaterial(db.Model):

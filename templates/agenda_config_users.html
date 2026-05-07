@@ -1,29 +1,29 @@
 {% extends "base.html" %}
 {% block title %}Técnicos da Agenda · NavTech{% endblock %}
-{% block page_title %}⚙️ Configurar Técnicos da Agenda{% endblock %}
+{% block page_title %}⚙️ Técnicos na Agenda Digital{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('agenda') }}" class="btn btn-ghost btn-sm">← Agenda</a>
 {% endblock %}
 {% block content %}
-<div class="card" style="max-width:500px">
+<div class="card" style="max-width:520px">
   <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
-    Seleccione os utilizadores que fazem registos diários na Agenda Digital.
-    Os não seleccionados aparecem apenas com o nome, sem estatísticas.
+    Seleccione os funcionários que fazem registos diários na Agenda Digital.
+    Os não seleccionados aparecem com badge cinzento sem estatísticas.
   </div>
   <form method="post">
-    {% for u in users %}
+    {% for f in funcs %}
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:34px;height:34px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--accent)">{{ u.nome[0] }}</div>
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--accent)">{{ f.nome[0] }}</div>
         <div>
-          <div style="font-size:13px;font-weight:600">{{ u.nome }}</div>
-          <div style="font-size:11px;color:var(--text-muted)">{{ u.departamento or u.email or '' }}</div>
+          <div style="font-size:13px;font-weight:600">{{ f.nome }}</div>
+          <div style="font-size:11px;color:var(--text-muted)">{{ f.categoria or f.numero }}</div>
         </div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <span style="font-size:12px;color:var(--text-muted)">Agenda</span>
-        <input type="checkbox" name="agenda_ativo" value="{{ u.id }}"
-          {{ 'checked' if u.agenda_ativo is none or u.agenda_ativo }}
+        <input type="checkbox" name="agenda_ativo" value="{{ f.id }}"
+          {{ 'checked' if f.agenda_ativo }}
           style="width:18px;height:18px;cursor:pointer">
       </label>
     </div>
