@@ -8393,6 +8393,21 @@ def salario_recibo(fid, ano, mes):
 def salario_recibo_pdf(rid):
     """Return printable HTML — user saves as PDF via browser print dialog."""
     db.session.expire_all()  # force fresh read from DB
+    # Auto-fix: if totals are 0, recalculate from components
+    _recibo_fix = ReciboSalario.query.get(rid)
+    if _recibo_fix and (not _recibo_fix.total_abonos or float(_recibo_fix.total_abonos) == 0):
+        try:
+            _hex = float(_recibo_fix.horas_extra or 0) * float(_recibo_fix.horas_extra_rht or 0)
+            _recibo_fix.total_abonos = (float(_recibo_fix.vencimento_base or 0) +
+                float(_recibo_fix.subsidio_refeicao or 0) + _hex +
+                float(_recibo_fix.premios or 0) + float(_recibo_fix.outros_abonos or 0))
+            _recibo_fix.total_descontos = (float(_recibo_fix.irs_retencao or 0) +
+                float(_recibo_fix.seg_social_func or 0) +
+                float(_recibo_fix.outros_descontos or 0) + float(_recibo_fix.faltas_valor or 0))
+            _recibo_fix.liquido = float(_recibo_fix.total_abonos) - float(_recibo_fix.total_descontos)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
     r = ReciboSalario.query.get_or_404(rid)
     func = Funcionario.query.get(r.funcionario_id)
     cfg = ConfigGeral.query.first()

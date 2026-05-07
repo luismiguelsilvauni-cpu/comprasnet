@@ -278,20 +278,13 @@ function calcular(){
   if(irs_pct) irs_pct.textContent = irs_taxa>0 ? '(' + (irs_taxa*100).toFixed(2) + '%)' : '';
   sid('ss_emp_show').textContent = fmt(ssEmp);
   sid('seg_social_emp').value = ssEmp.toFixed(2);
-  // Use Excel values if they exist (from H17/H24/H26)
-  var excelTotalA = parseFloat(document.getElementById('total_iliquido_excel')?.value || 0);
-  var excelTotalD = parseFloat(document.getElementById('total_descontos_excel')?.value || 0);
-  var excelLiq    = parseFloat(document.getElementById('liquido_excel')?.value || 0);
-  var showA = excelTotalA > 0 ? excelTotalA : totalA;
-  var showD = excelTotalD > 0 ? excelTotalD : totalD;
-  var showL = excelLiq    > 0 ? excelLiq    : liq;
-  // Update hidden fields with current calculated values if Excel values are zero
-  if (excelTotalA === 0) document.getElementById('total_iliquido_excel').value = totalA.toFixed(2);
-  if (excelTotalD === 0) document.getElementById('total_descontos_excel').value = totalD.toFixed(2);
-  if (excelLiq === 0)    document.getElementById('liquido_excel').value = liq.toFixed(2);
-  sid('totalAbonos').textContent = fmt(showA);
-  sid('totalDescontos').textContent = fmt(showD);
-  sid('liquido').textContent = fmt(showL);
+  // Always update hidden fields with calculated values so they get saved
+  document.getElementById('total_iliquido_excel').value = totalA.toFixed(2);
+  document.getElementById('total_descontos_excel').value = totalD.toFixed(2);
+  document.getElementById('liquido_excel').value = liq.toFixed(2);
+  sid('totalAbonos').textContent = fmt(totalA);
+  sid('totalDescontos').textContent = fmt(totalD);
+  sid('liquido').textContent = fmt(liq);
   sid('transf_info').textContent = 'Transferência conta: ' + fmt(liq - refTot) + ' + Refeição: ' + fmt(refTot);
 }
 
