@@ -2594,7 +2594,7 @@ def agenda_registo_novo():
         custo_refeicao=float(data.get('custo_refeicao') or 0),
         obs_refeicao=data.get('obs_refeicao','').strip() or None,
         descricao_trabalho=data.get('descricao_trabalho','').strip() or None,
-        estado='em_curso',
+        estado=data.get('estado','em_curso'),
     )
     db.session.add(reg)
     db.session.flush()
@@ -2632,6 +2632,7 @@ def agenda_registo_get(rid):
         'deslocacao_viatura': r.deslocacao_viatura, 'viatura_tipo': r.viatura_tipo or 'propria',
         'n_viagens': r.n_viagens, 'km': r.km or '',
         'n_almoco': r.n_almoco, 'custo_refeicao': r.custo_refeicao, 'obs_refeicao': r.obs_refeicao or '',
+        'estado': r.estado or 'em_curso',
         'descricao_trabalho': r.descricao_trabalho or '',
         'materiais': [{'ref': m.artigo_ref or '', 'descricao': m.descricao, 'quantidade': m.quantidade,
                        'unidade': m.unidade, 'observacoes': m.observacoes or '', 'origem': m.origem} for m in r.materiais.all()],
@@ -2666,6 +2667,7 @@ def agenda_registo_editar(rid):
     r.custo_refeicao   = float(data.get('custo_refeicao') or 0)
     r.obs_refeicao     = data.get('obs_refeicao','').strip() or None
     r.descricao_trabalho = data.get('descricao_trabalho','').strip() or None
+    r.estado           = data.get('estado', r.estado)
     r.atualizado_em    = datetime.now()
     # Replace materiais
     for m in r.materiais.all():

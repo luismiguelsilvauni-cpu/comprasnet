@@ -187,6 +187,16 @@
         </div>
       </div>
 
+      <!-- Estado do Serviço -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:8px">📌 Estado do Trabalho</div>
+        <div style="display:flex;gap:8px">
+          <button type="button" onclick="setEstado('em_curso')" id="btnEmCurso" class="btn btn-primary btn-sm" style="flex:1">🔵 Em Curso</button>
+          <button type="button" onclick="setEstado('concluido')" id="btnConcluido" class="btn btn-ghost btn-sm" style="flex:1">✅ Concluído</button>
+        </div>
+        <input type="hidden" id="rEstado" value="em_curso">
+      </div>
+
       <!-- Descrição -->
       <div class="form-group">
         <label>Descrição do Trabalho Realizado</label>
@@ -205,6 +215,12 @@
         <div id="matList"></div>
       </div>
 
+    </div>
+    <div id="offerConcluirServico" style="display:none;padding:8px 18px;background:rgba(34,197,94,.08);border-top:1px solid rgba(34,197,94,.2)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#16a34a">
+        <input type="checkbox" id="concluirServico" style="width:16px;height:16px">
+        Marcar o serviço completo como concluído para todos os técnicos
+      </label>
     </div>
     <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px;background:var(--surface2);border-radius:0 0 12px 12px">
       <button onclick="guardarRegisto()" class="btn btn-primary" id="btnGuardar">💾 Guardar</button>
@@ -358,11 +374,25 @@ function getFormData() {
     n_almoco: parseInt(document.getElementById('rAlmoco').value)||0,
     custo_refeicao: parseFloat(document.getElementById('rCustoRef').value)||0,
     obs_refeicao: document.getElementById('rObsRef').value.trim(),
+    estado: document.getElementById('rEstado').value,
     descricao_trabalho: document.getElementById('rDesc').value.trim(),
     materiais: getMats(),
   };
 }
 
+function setEstado(e) {
+  document.getElementById('rEstado').value = e;
+  document.getElementById('btnEmCurso').className = 'btn btn-sm ' + (e==='em_curso' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('btnEmCurso').style.flex = '1';
+  document.getElementById('btnConcluido').className = 'btn btn-sm ' + (e==='concluido' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('btnConcluido').style.flex = '1';
+  // If concluding a service, offer to mark the whole service as done
+  if (e==='concluido' && document.getElementById('rServicoId').value) {
+    document.getElementById('offerConcluirServico').style.display = 'block';
+  } else {
+    document.getElementById('offerConcluirServico').style.display = 'none';
+  }
+}
 function abrirNovoRegisto() {
   document.getElementById('rEditId').value = '';
   document.getElementById('modalTitulo').textContent = '📋 Novo Trabalho — {{ data.strftime("%d/%m/%Y") }}';
@@ -385,6 +415,9 @@ function abrirNovoRegisto() {
   document.getElementById('rDesc').value = '';
   _mats = []; _matIdx = 0; renderMats();
   setTipo('cliente');
+  setEstado('em_curso');
+  document.getElementById('offerConcluirServico').style.display='none';
+  if(document.getElementById('concluirServico')) document.getElementById('concluirServico').checked=false;
   document.getElementById('modalRegisto').style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
@@ -420,6 +453,7 @@ function editarRegisto(rid) {
     _matIdx = _mats.length;
     renderMats();
     setTipo(d.tipo);
+    setEstado(d.estado || 'em_curso');
     document.getElementById('modalRegisto').style.display = 'flex';
     document.body.style.overflow = 'hidden';
   });
@@ -433,8 +467,16 @@ function guardarRegisto() {
   btn.disabled = true; btn.textContent = '⏳ A guardar...';
   fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
     .then(r=>r.json()).then(function(d){
-      if (d.ok) { fecharModal(); location.reload(); }
-      else { alert('Erro: '+(d.error||'desconhecido')); btn.disabled=false; btn.textContent='💾 Guardar'; }
+      if (d.ok) {
+        var svId = document.getElementById('rServicoId').value;
+        var concl = document.getElementById('concluirServico');
+        if (svId && concl && concl.checked) {
+          fetch('/agenda/servico/'+svId+'/concluir', {method:'POST'})
+            .then(function(){ fecharModal(); location.reload(); });
+        } else {
+          fecharModal(); location.reload();
+        }
+      } else { alert('Erro: '+(d.error||'desconhecido')); btn.disabled=false; btn.textContent='💾 Guardar'; }
     });
 }
 
@@ -446,9 +488,14 @@ function apagarRegisto(rid) {
 }
 
 function fecharModal() {
+  var temDados = document.getElementById('rHoras').value != '8' ||
+    document.getElementById('rDesc').value.trim() ||
+    document.getElementById('rClienteInput').value.trim() ||
+    _mats.length > 0;
+  if (temDados && !confirm('Fechar e perder as alterações?')) return;
   document.getElementById('modalRegisto').style.display = 'none';
   document.body.style.overflow = '';
 }
-document.getElementById('modalRegisto').addEventListener('click', function(e){ if(e.target===this) fecharModal(); });
+// Click outside disabled - use Cancel button or X to close
 </script>
 {% endblock %}
