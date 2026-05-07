@@ -8827,7 +8827,7 @@ def _parse_sheet_xls(ws, sname, mes_global=''):
         'vencimento_base_g':   fv(RB,  6),  # G
         'premios':             fv(RPR, 7),  # H
         'faltas_dias':         fv(RFD, 3),  # D
-        'faltas_horas':        fv(RFH, 4),  # E
+        'faltas_horas':        fv(RFH, 3),  # D col index 3 = column D
         'horas_extra_horas':   fv(RHE, 4),  # E
         'horas_extra_rht':     fv(RHE, 5),  # F
         'horas_extra':         fv(RHE, 7),  # H
@@ -8873,10 +8873,11 @@ def _parse_recibos_xlsx(filepath):
             'func_match': None, 'func_match_id': None, 'func_match_nome': '—',
             'mes_global': '',
             'vencimento_base': fv(9,8), 'premios': fv(10,8),
+            'faltas_dias': fv(11,4), 'faltas_horas': fv(12,4),  # D12
             'horas_extra': fv(13,8), 'subsidio_refeicao': fv(14,8),
-            'outros_abonos': fv(15,8), 'total_iliquido': fv(16,8),
-            'seg_social': fv(18,6), 'irs': fv(19,8),
-            'total_descontos': fv(23,8), 'liquido': fv(25,8),
+            'outros_abonos': fv(15,8), 'total_iliquido': fv(17,8),  # H17
+            'seg_social': fv(19,6), 'irs': fv(20,8),
+            'total_descontos': fv(24,8), 'liquido': fv(26,8),  # H24, H26
             'transf_conta': fv(27,8), 'transf_refeicao': fv(28,8),
         })
     return resultado
