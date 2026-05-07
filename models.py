@@ -803,9 +803,11 @@ class EqIndComponente(db.Model):
     tipo            = db.Column(db.String(30), nullable=False)  # motor, alternador, quadro, outro
     # Motor / Grupo
     marca_grupo         = db.Column(db.String(100))
+    modelo_grupo        = db.Column(db.String(100))
     nserie_grupo        = db.Column(db.String(100))
     dados_grupo         = db.Column(db.Text)
     marca_motor         = db.Column(db.String(100))
+    modelo_motor        = db.Column(db.String(100))
     nserie_motor        = db.Column(db.String(100))
     familia_motor       = db.Column(db.String(100))
     tipo_motor          = db.Column(db.String(100))
@@ -829,6 +831,16 @@ class EqIndComponente(db.Model):
     descricao           = db.Column(db.String(200))
     dados_outros        = db.Column(db.Text)
     criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
+    medias              = db.relationship("EqIndComponenteMedia", backref="componente", lazy="dynamic", cascade="all, delete-orphan")
+
+class EqIndComponenteMedia(db.Model):
+    __tablename__ = "eq_ind_comp_media"
+    id              = db.Column(db.Integer, primary_key=True)
+    componente_id   = db.Column(db.Integer, db.ForeignKey("eq_ind_componentes.id"), nullable=False)
+    tipo            = db.Column(db.String(10))  # foto, pdf
+    ficheiro_path   = db.Column(db.String(300))
+    titulo          = db.Column(db.String(200))
+    data_upload     = db.Column(db.DateTime, default=datetime.utcnow)
 
 class EqIndDocumento(db.Model):
     __tablename__ = 'eq_ind_documentos'

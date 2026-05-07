@@ -85,13 +85,17 @@
         <div style="font-size:12px;font-weight:700;color:var(--accent)">
           {{ '⚙️ Motor / Grupo' if comp.tipo=='grupo' else '⚡ Alternador' if comp.tipo=='alternador' else '📦 ' + (comp.descricao or 'Outro') }}
         </div>
-        <button onclick="apagarComp({{ comp.id }})" class="btn btn-sm" style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>
+        <div style="display:flex;gap:4px">
+          <button onclick="editarComp({{ comp.id }})" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px">✏️ Editar</button>
+          <button onclick="mediaComp({{ comp.id }})" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px">📎 Ficheiros</button>
+          <button onclick="apagarComp({{ comp.id }})" class="btn btn-sm" style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>
+        </div>
       </div>
       <div style="padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:12px">
         {% macro cr(lbl,val) %}{% if val %}<div style="color:var(--text-muted)">{{ lbl }}</div><div style="font-weight:600">{{ val }}</div>{% endif %}{% endmacro %}
         {% if comp.tipo == 'grupo' %}
-          {{ cr('Marca Grupo', comp.marca_grupo) }}{{ cr('Nº Série Grupo', comp.nserie_grupo) }}
-          {{ cr('Marca Motor', comp.marca_motor) }}{{ cr('Nº Série Motor', comp.nserie_motor) }}
+          {{ cr('Marca Grupo', comp.marca_grupo) }}{{ cr('Modelo Grupo', comp.modelo_grupo) }}{{ cr('Nº Série Grupo', comp.nserie_grupo) }}
+          {{ cr('Marca Motor', comp.marca_motor) }}{{ cr('Modelo Motor', comp.modelo_motor) }}{{ cr('Nº Série Motor', comp.nserie_motor) }}
           {{ cr('Família Motor', comp.familia_motor) }}{{ cr('Tipo Motor', comp.tipo_motor) }}
           {{ cr('Potência (kW)', comp.potencia_motor_kw|string + ' kW' if comp.potencia_motor_kw else None) }}
           {{ cr('Potência (CV)', comp.potencia_motor_cv|string + ' CV' if comp.potencia_motor_cv else None) }}
@@ -101,6 +105,13 @@
           {{ cr('Instalação Eléct.', comp.instalacao_eletrica) }}
           {% if comp.dados_motor %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic;margin-top:4px">{{ comp.dados_motor }}</div>{% endif %}
           {% if comp.dados_grupo %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic">{{ comp.dados_grupo }}</div>{% endif %}
+          {% set comp_medias = comp.medias.all() %}{% if comp_medias %}
+          <div style="grid-column:1/-1;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            {% for m in comp_medias %}
+            <a href="{{ url_for('eq_ind_comp_media_ver', mid=m.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">
+              {{ '🖼' if m.tipo=='foto' else '📄' }} {{ m.titulo[:20] }}
+            </a>{% endfor %}
+          </div>{% endif %}
         {% elif comp.tipo == 'alternador' %}
           {{ cr('Marca', comp.marca_alternador) }}{{ cr('Nº Série', comp.nserie_alternador) }}
           {{ cr('Potência kVA', comp.potencia_kva|string + ' kVA' if comp.potencia_kva else None) }}
@@ -108,6 +119,10 @@
           {{ cr('Tensão Saída', comp.tensao_saida) }}{{ cr('Frequência', comp.frequencia|string + ' Hz' if comp.frequencia else None) }}
           {{ cr('Factor Potência', comp.fator_potencia) }}
           {% if comp.dados_alternador %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic;margin-top:4px">{{ comp.dados_alternador }}</div>{% endif %}
+          {% set comp_medias = comp.medias.all() %}{% if comp_medias %}
+          <div style="grid-column:1/-1;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            {% for m in comp_medias %}<a href="{{ url_for('eq_ind_comp_media_ver', mid=m.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">{{ '🖼' if m.tipo=='foto' else '📄' }} {{ m.titulo[:20] }}</a>{% endfor %}
+          </div>{% endif %}
         {% else %}
           {{ cr('Descrição', comp.descricao) }}
           {% if comp.dados_outros %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic">{{ comp.dados_outros }}</div>{% endif %}
@@ -119,6 +134,26 @@
     {% endfor %}
   </div>
 </div>
+</div>
+
+
+<!-- ── Modal Component Media ─────────────────────────────────────── -->
+<div id="modalCompMedia" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="width:480px;max-height:80vh;overflow-y:auto;background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700;color:var(--accent)">📎 Ficheiros do Componente</span>
+      <button onclick="document.getElementById('modalCompMedia').style.display='none'" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <div style="padding:14px">
+      <div id="compMediaList" style="margin-bottom:12px"></div>
+      <div style="border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">Adicionar Ficheiro</div>
+        <div class="form-group"><label>Título</label><input type="text" id="compMediaTitulo" class="input" placeholder="Ex: Manual Motor JD 4045"></div>
+        <div class="form-group"><label>Ficheiro (PDF ou imagem)</label><input type="file" id="compMediaFile" class="input" accept=".pdf,image/*"></div>
+        <button onclick="uploadCompMedia()" class="btn btn-primary btn-sm">⬆ Upload</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ── Modal Editar Equipamento ────────────────────────────────── -->
@@ -228,9 +263,9 @@ function fta(id, lbl) {
 var COMP_FORMS = {
   grupo: '<input type="hidden" id="c_tipo" value="grupo"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
     '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase">Grupo</div>'+
-    fg('c_marca_grupo','Marca Grupo')+fg('c_nserie_grupo','Nº Série Grupo')+fta('c_dados_grupo','Outros Dados Grupo')+
+    fg('c_marca_grupo','Marca Grupo')+fg('c_modelo_grupo','Modelo Grupo')+fg('c_nserie_grupo','Nº Série Grupo')+fta('c_dados_grupo','Outros Dados Grupo')+
     '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-top:8px">Motor</div>'+
-    fg('c_marca_motor','Marca Motor')+fg('c_nserie_motor','Nº Série Motor')+
+    fg('c_marca_motor','Marca Motor')+fg('c_modelo_motor','Modelo Motor')+fg('c_nserie_motor','Nº Série Motor')+
     fg('c_familia_motor','Família Motor')+fg('c_tipo_motor','Tipo Motor')+
     fg('c_potencia_motor_kw','Potência (kW)','Ex: 88','number')+fg('c_potencia_motor_cv','Potência (CV)','Ex: 120','number')+
     fg('c_rpm_motor','RPM','Ex: 1500','number')+fg('c_cilindros','Cilindros','Ex: 4','number')+
@@ -323,6 +358,75 @@ function searchClienteEdit(q) {
     dd.style.display=dd.children.length?'block':'none';
   });
 }
+
+// ── Edit Component ───────────────────────────────────────────────────
+function editarComp(cid) {
+  fetch('/equipamentos-industriais/componente/'+cid+'/dados')
+    .then(r=>r.json()).then(function(d) {
+      if (!d.ok) return;
+      var tipo = d.tipo;
+      document.getElementById('modalCompTitulo').textContent = tipo==='grupo' ? '✏️ Editar Motor/Grupo' : tipo==='alternador' ? '✏️ Editar Alternador' : '✏️ Editar Componente';
+      document.getElementById('modalCompBody').innerHTML = COMP_FORMS[tipo||'outro'] +
+        '<div style="display:flex;gap:10px;margin-top:14px">'+
+        '<button onclick="guardarEditComp('+cid+')" class="btn btn-primary">💾 Guardar</button>'+
+        '<button onclick="fecharModalComp()" class="btn btn-ghost">Cancelar</button></div>';
+      // Populate fields
+      Object.keys(d).forEach(function(k) {
+        var el = document.getElementById('c_'+k);
+        if (el && d[k] !== null && d[k] !== undefined) el.value = d[k];
+      });
+      document.getElementById('modalComp').style.display='flex';
+    });
+}
+function guardarEditComp(cid) {
+  var data = {};
+  document.querySelectorAll('#modalCompBody [id^="c_"]').forEach(function(el) {
+    data[el.id.replace('c_','')] = el.value.trim();
+  });
+  fetch('/equipamentos-industriais/componente/'+cid+'/editar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json()).then(function(d) {
+    if (d.ok) { fecharModalComp(); location.reload(); }
+  });
+}
+
+// ── Component Media ──────────────────────────────────────────────────
+var _mediaCompId = null;
+function mediaComp(cid) {
+  _mediaCompId = cid;
+  // Load current medias
+  fetch('/equipamentos-industriais/componente/'+cid+'/dados').then(r=>r.json()).then(function(d) {
+    var list = '';
+    (d.medias||[]).forEach(function(m) {
+      list += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px" id="cmedia'+m.id+'">'+
+        '<span>'+(m.tipo==='foto'?'🖼':'📄')+'</span>'+
+        '<span style="flex:1">'+m.titulo+'</span>'+
+        '<a href="/equipamentos-industriais/comp-media/'+m.id+'/ver" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px">👁</a>'+
+        '<button onclick="apagarCompMedia('+m.id+')" class="btn btn-sm" style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>'+
+        '</div>';
+    });
+    document.getElementById('compMediaList').innerHTML = list || '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:8px">Sem ficheiros</div>';
+    document.getElementById('modalCompMedia').style.display='flex';
+  });
+}
+function uploadCompMedia() {
+  var f = document.getElementById('compMediaFile').files[0];
+  if (!f) { alert('Seleccione um ficheiro'); return; }
+  var fd = new FormData();
+  fd.append('ficheiro', f);
+  fd.append('titulo', document.getElementById('compMediaTitulo').value || f.name);
+  fetch('/equipamentos-industriais/componente/'+_mediaCompId+'/media/upload', {method:'POST', body:fd})
+    .then(r=>r.json()).then(function(d) {
+      if (d.ok) { mediaComp(_mediaCompId); document.getElementById('compMediaFile').value=''; document.getElementById('compMediaTitulo').value=''; }
+    });
+}
+function apagarCompMedia(mid) {
+  if (!confirm('Eliminar ficheiro?')) return;
+  fetch('/equipamentos-industriais/comp-media/'+mid+'/apagar', {method:'POST'})
+    .then(r=>r.json()).then(function(d){ if(d.ok) { var el=document.getElementById('cmedia'+mid); if(el) el.remove(); }});
+}
+document.getElementById('modalCompMedia').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
 
 document.getElementById('modalComp').addEventListener('click',function(e){if(e.target===this)fecharModalComp();});
 document.getElementById('modalUploadDoc').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});

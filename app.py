@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, EqIndComponenteMedia, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 import time as _time_module
 app = Flask(__name__)
@@ -2283,8 +2283,8 @@ def eq_industrial_componente_add(eid):
         except: return None
     comp = EqIndComponente(
         equipamento_id=eid, tipo=g('tipo') or 'motor',
-        marca_grupo=g('marca_grupo'), nserie_grupo=g('nserie_grupo'), dados_grupo=g('dados_grupo'),
-        marca_motor=g('marca_motor'), nserie_motor=g('nserie_motor'),
+        marca_grupo=g('marca_grupo'), modelo_grupo=g('modelo_grupo'), nserie_grupo=g('nserie_grupo'), dados_grupo=g('dados_grupo'),
+        marca_motor=g('marca_motor'), modelo_motor=g('modelo_motor'), nserie_motor=g('nserie_motor'),
         familia_motor=g('familia_motor'), tipo_motor=g('tipo_motor'),
         potencia_motor_kw=gf('potencia_motor_kw'), potencia_motor_cv=gf('potencia_motor_cv'),
         rpm_motor=gi('rpm_motor'), cilindros=gi('cilindros'),
@@ -2298,6 +2298,91 @@ def eq_industrial_componente_add(eid):
     db.session.add(comp)
     db.session.commit()
     return jsonify({'ok': True, 'id': comp.id})
+
+@app.route('/equipamentos-industriais/componente/<int:cid>/editar', methods=['POST'])
+@login_required
+def eq_industrial_componente_edit(cid):
+    comp = EqIndComponente.query.get_or_404(cid)
+    data = request.get_json() or {}
+    def g(k): return data.get(k,'') or None
+    def gf(k):
+        v = data.get(k,'')
+        try: return float(v) if v else None
+        except: return None
+    def gi(k):
+        v = data.get(k,'')
+        try: return int(v) if v else None
+        except: return None
+    # Update all fields
+    for field in ['marca_grupo','modelo_grupo','nserie_grupo','dados_grupo',
+                  'marca_motor','modelo_motor','nserie_motor','familia_motor','tipo_motor',
+                  'combustivel','instalacao_eletrica','dados_motor',
+                  'marca_alternador','nserie_alternador','tensao_saida','fator_potencia','dados_alternador',
+                  'descricao','dados_outros']:
+        setattr(comp, field, g(field))
+    for field in ['potencia_motor_kw','potencia_motor_cv','potencia_kva','potencia_kw_alt']:
+        setattr(comp, field, gf(field))
+    for field in ['rpm_motor','cilindros','frequencia']:
+        setattr(comp, field, gi(field))
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/equipamentos-industriais/componente/<int:cid>/media/upload', methods=['POST'])
+@login_required
+def eq_ind_comp_media_upload(cid):
+    comp = EqIndComponente.query.get_or_404(cid)
+    f = request.files.get('ficheiro')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import re as _re
+    safe = _re.sub(r'[^\w\-\.]', '_', f.filename)
+    tipo = 'pdf' if f.filename.lower().endswith('.pdf') else 'foto'
+    fname = f'comp{cid}_{int(datetime.now().timestamp())}_{safe}'
+    f.save(os.path.join(EQ_IND_UPLOAD_DIR, fname))
+    m = EqIndComponenteMedia(
+        componente_id=cid, tipo=tipo,
+        ficheiro_path=fname,
+        titulo=request.form.get('titulo','').strip() or f.filename,
+    )
+    db.session.add(m)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': m.id, 'titulo': m.titulo, 'tipo': tipo, 'path': fname})
+
+@app.route('/equipamentos-industriais/comp-media/<int:mid>/ver')
+@login_required
+def eq_ind_comp_media_ver(mid):
+    m = EqIndComponenteMedia.query.get_or_404(mid)
+    return send_from_directory(EQ_IND_UPLOAD_DIR, m.ficheiro_path)
+
+@app.route('/equipamentos-industriais/comp-media/<int:mid>/apagar', methods=['POST'])
+@login_required
+def eq_ind_comp_media_apagar(mid):
+    m = EqIndComponenteMedia.query.get_or_404(mid)
+    try: os.remove(os.path.join(EQ_IND_UPLOAD_DIR, m.ficheiro_path))
+    except: pass
+    db.session.delete(m)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/equipamentos-industriais/componente/<int:cid>/dados')
+@login_required
+def eq_ind_comp_dados(cid):
+    comp = EqIndComponente.query.get_or_404(cid)
+    medias = [{'id': m.id, 'titulo': m.titulo, 'tipo': m.tipo} for m in comp.medias.all()]
+    return jsonify({'ok': True, 'tipo': comp.tipo,
+        'marca_grupo': comp.marca_grupo, 'modelo_grupo': comp.modelo_grupo, 'nserie_grupo': comp.nserie_grupo, 'dados_grupo': comp.dados_grupo,
+        'marca_motor': comp.marca_motor, 'modelo_motor': comp.modelo_motor, 'nserie_motor': comp.nserie_motor,
+        'familia_motor': comp.familia_motor, 'tipo_motor': comp.tipo_motor,
+        'potencia_motor_kw': comp.potencia_motor_kw, 'potencia_motor_cv': comp.potencia_motor_cv,
+        'rpm_motor': comp.rpm_motor, 'cilindros': comp.cilindros,
+        'combustivel': comp.combustivel, 'instalacao_eletrica': comp.instalacao_eletrica, 'dados_motor': comp.dados_motor,
+        'marca_alternador': comp.marca_alternador, 'nserie_alternador': comp.nserie_alternador,
+        'potencia_kva': comp.potencia_kva, 'potencia_kw_alt': comp.potencia_kw_alt,
+        'tensao_saida': comp.tensao_saida, 'frequencia': comp.frequencia,
+        'fator_potencia': comp.fator_potencia, 'dados_alternador': comp.dados_alternador,
+        'descricao': comp.descricao, 'dados_outros': comp.dados_outros,
+        'medias': medias})
+
 
 @app.route('/equipamentos-industriais/componente/<int:cid>', methods=['DELETE'])
 @login_required
