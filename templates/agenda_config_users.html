@@ -1,8 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Técnicos da Agenda · NavTech{% endblock %}
+{% block title %}Técnicos da Agenda · NavTech<div id="syncMsg" style="display:none;margin-top:12px;padding:10px;border-radius:8px;font-size:12px"></div>
+<script>
+function sincronizar() {
+  var btn = document.getElementById('btnSync');
+  var msg = document.getElementById('syncMsg');
+  btn.disabled = true;
+  btn.textContent = '⏳ A sincronizar...';
+  fetch('/agenda/sync-funcionarios', {method:'POST'})
+    .then(r=>r.json())
+    .then(function(d) {
+      msg.style.display = 'block';
+      if (d.ok) {
+        msg.style.cssText = 'display:block;margin-top:12px;padding:10px;border-radius:8px;font-size:12px;background:rgba(34,197,94,.1);color:#16a34a;border:1px solid rgba(34,197,94,.3)';
+        msg.textContent = '✅ Sincronizado — ' + d.com_agenda + ' funcionários com agenda / ' + d.total_ativos + ' activos. ' + (d.alterados ? d.alterados + ' desactivado(s) automaticamente.' : '');
+        setTimeout(function(){ location.reload(); }, 2000);
+      } else {
+        msg.style.cssText = 'display:block;margin-top:12px;padding:10px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.1);color:#ef4444';
+        msg.textContent = '❌ ' + d.error;
+      }
+      btn.disabled = false;
+      btn.textContent = '🔄 Sincronizar Funcionários';
+    });
+}
+</script>
+{% endblock %}
 {% block page_title %}⚙️ Técnicos na Agenda Digital{% endblock %}
 {% block topbar_actions %}
   <a href="{{ url_for('agenda') }}" class="btn btn-ghost btn-sm">← Agenda</a>
+  <button onclick="sincronizar()" class="btn btn-ghost btn-sm" id="btnSync">🔄 Sincronizar Funcionários</button>
 {% endblock %}
 {% block content %}
 <div class="card" style="max-width:520px">

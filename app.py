@@ -2449,7 +2449,7 @@ os.makedirs(MANUAIS_DIR, exist_ok=True)
 @app.route('/agenda')
 @login_required
 def agenda():
-    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    funcs = Funcionario.query.filter_by(ativo=True, agenda_ativo=True).order_by(Funcionario.nome).all()
     # Stats per funcionário
     from datetime import date as _d
     hoje = _d.today()
@@ -2483,6 +2483,24 @@ def agenda_config_users():
         return redirect(url_for('agenda'))
     funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
     return render_template('agenda_config_users.html', funcs=funcs)
+
+
+@app.route('/agenda/sync-funcionarios', methods=['POST'])
+@login_required
+def agenda_sync_funcionarios():
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    # Mark inactive funcionarios as agenda_ativo=False
+    todos = Funcionario.query.all()
+    alterados = 0
+    for f in todos:
+        if not f.ativo and f.agenda_ativo:
+            f.agenda_ativo = False
+            alterados += 1
+    db.session.commit()
+    ativos = Funcionario.query.filter_by(ativo=True).count()
+    agenda = Funcionario.query.filter_by(ativo=True, agenda_ativo=True).count()
+    return jsonify({'ok': True, 'alterados': alterados, 'total_ativos': ativos, 'com_agenda': agenda})
 
 
 @app.route('/agenda/funcionario/<int:fid>')
