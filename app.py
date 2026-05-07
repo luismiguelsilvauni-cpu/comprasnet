@@ -2449,7 +2449,7 @@ os.makedirs(MANUAIS_DIR, exist_ok=True)
 @app.route('/agenda')
 @login_required
 def agenda():
-    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    funcs = User.query.filter_by(ativo=True).order_by(User.nome).all()
     # Stats per funcionário
     from datetime import date as _d
     hoje = _d.today()
@@ -2472,7 +2472,7 @@ def agenda():
 @app.route('/agenda/funcionario/<int:fid>')
 @login_required
 def agenda_funcionario(fid):
-    func = Funcionario.query.get_or_404(fid)
+    func = User.query.get_or_404(fid)
     ano  = int(request.args.get('ano', datetime.now().year))
     mes  = int(request.args.get('mes', datetime.now().month))
     from datetime import date as _d
@@ -2502,7 +2502,7 @@ def agenda_funcionario(fid):
 @app.route('/agenda/funcionario/<int:fid>/dia/<int:ano>/<int:mes>/<int:dia>')
 @login_required
 def agenda_dia(fid, ano, mes, dia):
-    func = Funcionario.query.get_or_404(fid)
+    func = User.query.get_or_404(fid)
     from datetime import date as _d
     data = _d(ano, mes, dia)
     registos = AgendaRegisto.query.filter_by(
@@ -2718,7 +2718,7 @@ def agenda_estatisticas():
     mes_ini = _d(ano, mes, 1)
     mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
 
-    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    funcs = User.query.filter_by(ativo=True).order_by(User.nome).all()
 
     # Per-funcionario stats
     stats = []

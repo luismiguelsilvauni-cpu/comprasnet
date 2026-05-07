@@ -883,7 +883,7 @@ class AgendaRegisto(db.Model):
     __tablename__ = 'agenda_registos'
     id                  = db.Column(db.Integer, primary_key=True)
     servico_id          = db.Column(db.Integer, db.ForeignKey('agenda_servicos.id'), nullable=False)
-    funcionario_id      = db.Column(db.Integer, db.ForeignKey('funcionarios.id'), nullable=False)
+    funcionario_id      = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     data                = db.Column(db.Date, nullable=False)
     # Horas
     horas               = db.Column(db.Float, default=0)
@@ -909,7 +909,7 @@ class AgendaRegisto(db.Model):
     criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     # Relationships
-    funcionario         = db.relationship('Funcionario', backref='agenda_registos')
+    funcionario         = db.relationship('User', foreign_keys=[funcionario_id], backref='agenda_registos')
     materiais           = db.relationship('AgendaMaterial', backref='registo', lazy='dynamic', cascade='all, delete-orphan')
 
 class AgendaMaterial(db.Model):
