@@ -105,13 +105,6 @@
           {{ cr('Instalação Eléct.', comp.instalacao_eletrica) }}
           {% if comp.dados_motor %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic;margin-top:4px">{{ comp.dados_motor }}</div>{% endif %}
           {% if comp.dados_grupo %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic">{{ comp.dados_grupo }}</div>{% endif %}
-          {% set comp_medias = comp.medias.all() %}{% if comp_medias %}
-          <div style="grid-column:1/-1;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-            {% for m in comp_medias %}
-            <a href="{{ url_for('eq_ind_comp_media_ver', mid=m.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">
-              {{ '🖼' if m.tipo=='foto' else '📄' }} {{ m.titulo[:20] }}
-            </a>{% endfor %}
-          </div>{% endif %}
         {% elif comp.tipo == 'alternador' %}
           {{ cr('Marca', comp.marca_alternador) }}{{ cr('Nº Série', comp.nserie_alternador) }}
           {{ cr('Potência kVA', comp.potencia_kva|string + ' kVA' if comp.potencia_kva else None) }}
@@ -119,10 +112,6 @@
           {{ cr('Tensão Saída', comp.tensao_saida) }}{{ cr('Frequência', comp.frequencia|string + ' Hz' if comp.frequencia else None) }}
           {{ cr('Factor Potência', comp.fator_potencia) }}
           {% if comp.dados_alternador %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic;margin-top:4px">{{ comp.dados_alternador }}</div>{% endif %}
-          {% set comp_medias = comp.medias.all() %}{% if comp_medias %}
-          <div style="grid-column:1/-1;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-            {% for m in comp_medias %}<a href="{{ url_for('eq_ind_comp_media_ver', mid=m.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">{{ '🖼' if m.tipo=='foto' else '📄' }} {{ m.titulo[:20] }}</a>{% endfor %}
-          </div>{% endif %}
         {% else %}
           {{ cr('Descrição', comp.descricao) }}
           {% if comp.dados_outros %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic">{{ comp.dados_outros }}</div>{% endif %}
