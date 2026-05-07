@@ -180,10 +180,10 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; color: #1e29
     </div>
   </div>
 
-  {% for r in dia_regs|sort(attribute='user.nome') %}
+  {% for r in dia_regs|sort(attribute='funcionario.nome') %}
   <div class="reg">
     <div class="reg-header">
-      <div class="reg-name">{{ r.user.nome }}</div>
+      <div class="reg-name">{{ r.funcionario.nome if r.funcionario else "?" }}</div>
       <div>
         <span class="reg-hours">{{ '%.1f'|format(r.horas) }}h
           {% if r.hora_inicio %}({{ r.hora_inicio }}–{{ r.hora_fim }}){% endif %}
