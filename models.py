@@ -852,3 +852,75 @@ class EqIndDocumento(db.Model):
     notas           = db.Column(db.Text)
     data_upload     = db.Column(db.DateTime, default=datetime.utcnow)
     user_id         = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+# ══════════════════════════════════════════════════════════════════════
+# AGENDA DIGITAL
+# ══════════════════════════════════════════════════════════════════════
+class AgendaServico(db.Model):
+    """Um serviço pode durar vários dias e envolver vários funcionários."""
+    __tablename__ = 'agenda_servicos'
+    id              = db.Column(db.Integer, primary_key=True)
+    titulo          = db.Column(db.String(300), nullable=False)
+    cliente_id      = db.Column(db.Integer, db.ForeignKey('clientes.id'))
+    embarcacao_nome = db.Column(db.String(200))   # free text + suggestions
+    equipamento     = db.Column(db.String(200))
+    local_servico   = db.Column(db.String(200))
+    tipo            = db.Column(db.String(30), default='cliente')  # cliente, casa, stock
+    estado          = db.Column(db.String(20), default='em_curso')  # em_curso, concluido
+    data_inicio     = db.Column(db.Date)
+    data_fim        = db.Column(db.Date)
+    descricao       = db.Column(db.Text)
+    criado_por      = db.Column(db.Integer, db.ForeignKey('users.id'))
+    criado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    # Relationships
+    cliente         = db.relationship('Cliente', backref='agenda_servicos')
+    criador         = db.relationship('User', backref='agenda_servicos_criados')
+    registos        = db.relationship('AgendaRegisto', backref='servico', lazy='dynamic', cascade='all, delete-orphan')
+
+class AgendaRegisto(db.Model):
+    """Registo diário de um funcionário num serviço."""
+    __tablename__ = 'agenda_registos'
+    id                  = db.Column(db.Integer, primary_key=True)
+    servico_id          = db.Column(db.Integer, db.ForeignKey('agenda_servicos.id'), nullable=False)
+    funcionario_id      = db.Column(db.Integer, db.ForeignKey('funcionarios.id'), nullable=False)
+    data                = db.Column(db.Date, nullable=False)
+    # Horas
+    horas               = db.Column(db.Float, default=0)
+    hora_inicio         = db.Column(db.String(5))   # HH:MM
+    hora_fim            = db.Column(db.String(5))
+    # Horas extra
+    tem_he              = db.Column(db.Boolean, default=False)
+    he_inicio           = db.Column(db.String(5))
+    he_fim              = db.Column(db.String(5))
+    he_horas            = db.Column(db.Float, default=0)
+    # Deslocação
+    deslocacao_viatura  = db.Column(db.Boolean, default=False)
+    viatura_tipo        = db.Column(db.String(20), default='propria')  # propria, cliente
+    n_viagens           = db.Column(db.Integer, default=0)
+    km                  = db.Column(db.Float)
+    # Refeições
+    n_almoco            = db.Column(db.Integer, default=0)
+    custo_refeicao      = db.Column(db.Float, default=0)
+    obs_refeicao        = db.Column(db.String(300))
+    # Descrição
+    descricao_trabalho  = db.Column(db.Text)
+    estado              = db.Column(db.String(20), default='em_curso')  # em_curso, concluido
+    criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    # Relationships
+    funcionario         = db.relationship('Funcionario', backref='agenda_registos')
+    materiais           = db.relationship('AgendaMaterial', backref='registo', lazy='dynamic', cascade='all, delete-orphan')
+
+class AgendaMaterial(db.Model):
+    """Material aplicado num registo diário."""
+    __tablename__ = 'agenda_materiais'
+    id          = db.Column(db.Integer, primary_key=True)
+    registo_id  = db.Column(db.Integer, db.ForeignKey('agenda_registos.id'), nullable=False)
+    # PHC ou manual
+    artigo_ref  = db.Column(db.String(50))
+    descricao   = db.Column(db.String(300), nullable=False)
+    quantidade  = db.Column(db.Float, default=1)
+    unidade     = db.Column(db.String(20), default='un')
+    observacoes = db.Column(db.String(300))
+    origem      = db.Column(db.String(10), default='manual')  # phc, manual

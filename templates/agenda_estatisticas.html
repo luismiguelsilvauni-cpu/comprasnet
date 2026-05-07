@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Estatísticas · Agenda Digital{% endblock %}
+{% block page_title %}📊 Estatísticas da Agenda{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('agenda') }}" class="btn btn-ghost btn-sm">← Agenda</a>
+{% endblock %}
+{% block content %}
+{% set MESES = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+<div class="card mb-16" style="padding:10px">
+  <form method="get" style="display:flex;gap:10px;align-items:center">
+    <select name="mes" class="input" style="width:120px">
+      {% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m==mes }}>{{ MESES[m] }}</option>{% endfor %}
+    </select>
+    <select name="ano" class="input" style="width:90px">
+      {% for a in range(2024, 2028) %}<option value="{{ a }}" {{ 'selected' if a==ano }}>{{ a }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">Ver</button>
+  </form>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<div>
+<div class="card mb-14">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">👷 Horas por Funcionário</div>
+  {% for s in stats %}
+  <div style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+      <span style="font-weight:600">{{ s.func.nome.split()[0] }}</span>
+      <span>{{ '%.1f'|format(s.horas) }}h{% if s.he %} + {{ '%.1f'|format(s.he) }}h HE{% endif %}</span>
+    </div>
+    <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+      <div style="height:100%;background:var(--accent);border-radius:4px;width:{{ [(s.horas / (stats[0].horas or 1) * 100)|int, 100]|min }}%"></div>
+    </div>
+  </div>
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px">Sem dados para este período</div>
+  {% endfor %}
+</div>
+</div>
+<div>
+<div class="card mb-14">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">👥 Top Clientes</div>
+  {% for cli, n in top_cli %}
+  <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <span>{{ cli }}</span>
+    <span style="font-weight:700;color:var(--accent)">{{ n }} serviço(s)</span>
+  </div>
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px">Sem dados</div>
+  {% endfor %}
+</div>
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🍽 Refeições</div>
+  {% set total_ref = stats|sum(attribute='custo_ref') %}
+  {% set total_alm = stats|sum(attribute='almoco') %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
+      <div style="font-size:20px;font-weight:800;color:#16a34a">{{ total_alm }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">Total Almoços</div>
+    </div>
+    <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
+      <div style="font-size:20px;font-weight:800;color:#16a34a">{{ '%.2f'|format(total_ref) }}€</div>
+      <div style="font-size:10px;color:var(--text-muted)">Custo Refeições</div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+{% endblock %}

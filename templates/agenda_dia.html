@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% block title %}Agenda {{ data.strftime('%d/%m/%Y') }} · {{ func.nome }}{% endblock %}
+{% block page_title %}📅 {{ func.nome }} — {{ data.strftime('%d/%m/%Y') }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('agenda_funcionario', fid=func.id, ano=data.year, mes=data.month) }}" class="btn btn-ghost btn-sm">← Calendário</a>
+  <button onclick="abrirNovoRegisto()" class="btn btn-primary btn-sm">+ Novo Trabalho</button>
+{% endblock %}
+{% block content %}
+
+<!-- Existing Registos -->
+<div id="registosList">
+{% if registos %}
+{% for r in registos %}
+<div class="card mb-12" id="regCard{{ r.id }}" style="border-left:4px solid {{ '#22c55e' if r.estado=='concluido' else '#3b6ef0' }}">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:700;color:var(--accent)">
+        {{ r.servico.cliente.nome if r.servico.cliente else ('🏭 Serviço da Casa' if r.servico.tipo=='casa' else '📦 Serviço para Stock') }}
+      </div>
+      {% if r.servico.embarcacao_nome %}
+      <div style="font-size:12px;color:var(--text-muted)">⛵ {{ r.servico.embarcacao_nome }}</div>
+      {% endif %}
+      {% if r.servico.equipamento %}
+      <div style="font-size:12px;color:var(--text-muted)">⚙️ {{ r.servico.equipamento }}</div>
+      {% endif %}
+      {% if r.servico.local_servico %}
+      <div style="font-size:12px;color:var(--text-muted)">📍 {{ r.servico.local_servico }}</div>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <span style="font-size:11px;background:var(--surface2);padding:3px 8px;border-radius:4px;font-weight:700">
+        {{ '%.1f'|format(r.horas) }}h
+        {% if r.he_horas %} + {{ '%.1f'|format(r.he_horas) }}h HE{% endif %}
+      </span>
+      <button onclick="editarRegisto({{ r.id }})" class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px">✏️</button>
+      <button onclick="apagarRegisto({{ r.id }})" class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>
+    </div>
+  </div>
+  {% if r.descricao_trabalho %}
+  <div style="font-size:12px;color:var(--text-muted);border-left:3px solid var(--border);padding-left:10px;margin-bottom:8px;white-space:pre-wrap">{{ r.descricao_trabalho }}</div>
+  {% endif %}
+  <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px">
+    {% if r.hora_inicio %}
+    <span style="color:var(--text-muted)">🕐 {{ r.hora_inicio }}–{{ r.hora_fim }}</span>
+    {% endif %}
+    {% if r.tem_he %}
+    <span style="color:#f59e0b">⏱ HE {{ r.he_inicio }}–{{ r.he_fim }}</span>
+    {% endif %}
+    {% if r.deslocacao_viatura %}
+    <span style="color:#3b6ef0">🚗 {{ 'Nossa viatura' if r.viatura_tipo=='propria' else 'Viatura cliente' }} ({{ r.n_viagens }}x)</span>
+    {% endif %}
+    {% if r.n_almoco %}
+    <span style="color:#16a34a">🍽 {{ r.n_almoco }} almoço(s) — {{ '%.2f'|format(r.custo_refeicao) }}€</span>
+    {% endif %}
+    {% set mats = r.materiais.all() %}
+    {% if mats %}
+    <span style="color:#8b5cf6">📦 {{ mats|length }} material(is)</span>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)" id="emptyMsg">
+  <div style="font-size:36px;margin-bottom:10px">📋</div>
+  <div>Sem registos para este dia</div>
+  <div style="margin-top:10px">
+    <button onclick="abrirNovoRegisto()" class="btn btn-primary btn-sm">+ Adicionar Trabalho</button>
+  </div>
+</div>
+{% endif %}
+</div>
+
+<!-- Modal Novo/Editar Registo -->
+<div id="modalRegisto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;backdrop-filter:blur(4px)">
+  <div style="width:100%;max-width:680px;background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);margin:auto">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:12px 12px 0 0">
+      <span style="font-size:14px;font-weight:700;color:var(--accent)" id="modalTitulo">📋 Novo Trabalho</span>
+      <button onclick="fecharModal()" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <div style="padding:18px" id="modalBody">
+
+      <!-- Tipo de Serviço -->
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button onclick="setTipo('cliente')" id="btnCliente" class="btn btn-primary btn-sm" style="flex:1">👥 Cliente</button>
+        <button onclick="setTipo('casa')" id="btnCasa" class="btn btn-ghost btn-sm" style="flex:1">🏭 Serviço da Casa</button>
+        <button onclick="setTipo('stock')" id="btnStock" class="btn btn-ghost btn-sm" style="flex:1">📦 Para Stock</button>
+      </div>
+      <input type="hidden" id="rTipo" value="cliente">
+      <input type="hidden" id="rEditId" value="">
+
+      <!-- Serviço em curso -->
+      <div class="form-group" id="servicoEmCursoDiv">
+        <label>Serviço em curso (ou criar novo)</label>
+        <select id="rServicoId" class="input" onchange="onServicoChange()">
+          <option value="">➕ Criar novo serviço</option>
+          {% for sv in servicos_curso %}
+          <option value="{{ sv.id }}" data-cliente="{{ sv.cliente.nome if sv.cliente else '' }}" data-emb="{{ sv.embarcacao_nome or '' }}" data-equip="{{ sv.equipamento or '' }}" data-local="{{ sv.local_servico or '' }}" data-tipo="{{ sv.tipo }}">
+            {{ sv.titulo }} {% if sv.cliente %}— {{ sv.cliente.nome }}{% endif %}{% if sv.embarcacao_nome %} / {{ sv.embarcacao_nome }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Cliente -->
+      <div class="form-group" id="clienteDiv">
+        <label>Cliente</label>
+        <div style="position:relative">
+          <input type="text" id="rClienteInput" class="input" placeholder="🔍 Pesquisar..." oninput="searchAgCli(this.value)" autocomplete="off">
+          <input type="hidden" id="rClienteId">
+          <div id="rCliDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:160px;overflow-y:auto;box-shadow:0 8px 20px rgba(0,0,0,.2)"></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Embarcação / Equipamento</label>
+          <input type="text" id="rEmb" class="input" placeholder="Nome..." list="embList" autocomplete="off">
+          <datalist id="embList">{% for e in emb_sugs %}<option value="{{ e }}">{% endfor %}</datalist>
+        </div>
+        <div class="form-group">
+          <label>Equipamento Específico</label>
+          <input type="text" id="rEquip" class="input" placeholder="Motor, gerador...">
+        </div>
+        <div class="form-group">
+          <label>Local do Serviço</label>
+          <input type="text" id="rLocal" class="input" placeholder="Porto, Douro...">
+        </div>
+        <div class="form-group">
+          <label>Nº Horas</label>
+          <input type="number" id="rHoras" class="input" step="0.5" min="0" value="8" oninput="calcHoras()">
+        </div>
+        <div class="form-group">
+          <label>Hora Início</label>
+          <input type="time" id="rHIni" class="input" value="08:00" oninput="calcHoras()">
+        </div>
+        <div class="form-group">
+          <label>Hora Fim</label>
+          <input type="time" id="rHFim" class="input" value="17:00" oninput="calcHoras()">
+        </div>
+      </div>
+
+      <!-- Deslocação -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;text-transform:uppercase">🚗 Deslocação</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" id="rDeslocacao" onchange="toggleDeslocacao()"> Nossa viatura
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" id="rDeslocacaoCli"> Viatura cliente
+          </label>
+          <div id="deslocacaoExtra" style="display:none;display:flex;gap:10px">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:11px">Nº Viagens</label>
+              <input type="number" id="rViagens" class="input" value="1" min="0" style="width:80px">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:11px">KM</label>
+              <input type="number" id="rKm" class="input" step="0.1" style="width:80px" placeholder="0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horas Extra -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase">⏱ Horas Extra</div>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" id="rTemHE" onchange="toggleHE()"> Tem horas extra
+          </label>
+        </div>
+        <div id="heExtra" style="display:none;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Início HE</label><input type="time" id="rHEIni" class="input" oninput="calcHE()"></div>
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Fim HE</label><input type="time" id="rHEFim" class="input" oninput="calcHE()"></div>
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Total HE (h)</label><input type="number" id="rHEHoras" class="input" step="0.5" value="0"></div>
+        </div>
+      </div>
+
+      <!-- Refeições -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:8px">🍽 Refeições</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Nº Almoços</label><input type="number" id="rAlmoco" class="input" value="0" min="0"></div>
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Custo Total €</label><input type="number" id="rCustoRef" class="input" step="0.01" value="0"></div>
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Observações</label><input type="text" id="rObsRef" class="input" placeholder="..."></div>
+        </div>
+      </div>
+
+      <!-- Descrição -->
+      <div class="form-group">
+        <label>Descrição do Trabalho Realizado</label>
+        <textarea id="rDesc" class="input" rows="4" placeholder="Descreva os trabalhos realizados, anomalias encontradas, peças substituídas..."></textarea>
+      </div>
+
+      <!-- Materiais -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:#8b5cf6;text-transform:uppercase">📦 Materiais Aplicados</div>
+          <div style="display:flex;gap:6px">
+            <button onclick="addMaterialPHC()" class="btn btn-ghost btn-sm" style="font-size:10px">+ PHC</button>
+            <button onclick="addMaterialManual()" class="btn btn-ghost btn-sm" style="font-size:10px">+ Manual</button>
+          </div>
+        </div>
+        <div id="matList"></div>
+      </div>
+
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px;background:var(--surface2);border-radius:0 0 12px 12px">
+      <button onclick="guardarRegisto()" class="btn btn-primary" id="btnGuardar">💾 Guardar</button>
+      <button onclick="fecharModal()" class="btn btn-ghost">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var FID  = {{ func.id }};
+var DATA = '{{ data.isoformat() }}';
+var CLIENTES = {{ clientes|tojson }};
+
+function setTipo(t) {
+  document.getElementById('rTipo').value = t;
+  ['Cliente','Casa','Stock'].forEach(function(x) {
+    var btn = document.getElementById('btn'+x);
+    btn.className = 'btn btn-sm ' + (x.toLowerCase()===t ? 'btn-primary' : 'btn-ghost');
+    btn.style.flex = '1';
+  });
+  document.getElementById('clienteDiv').style.display = t==='cliente' ? 'block' : 'none';
+}
+
+function onServicoChange() {
+  var sel = document.getElementById('rServicoId');
+  var opt = sel.options[sel.selectedIndex];
+  if (!sel.value) return;
+  if (opt.dataset.cliente) document.getElementById('rClienteInput').value = opt.dataset.cliente;
+  if (opt.dataset.emb)     document.getElementById('rEmb').value = opt.dataset.emb;
+  if (opt.dataset.equip)   document.getElementById('rEquip').value = opt.dataset.equip;
+  if (opt.dataset.local)   document.getElementById('rLocal').value = opt.dataset.local;
+  if (opt.dataset.tipo)    setTipo(opt.dataset.tipo);
+}
+
+function calcHoras() {
+  var ini = document.getElementById('rHIni').value;
+  var fim = document.getElementById('rHFim').value;
+  if (ini && fim) {
+    var m = (parseInt(fim.split(':')[0])*60+parseInt(fim.split(':')[1])) - (parseInt(ini.split(':')[0])*60+parseInt(ini.split(':')[1]));
+    if (m > 0) document.getElementById('rHoras').value = (m/60).toFixed(1);
+  }
+}
+function calcHE() {
+  var ini = document.getElementById('rHEIni').value;
+  var fim = document.getElementById('rHEFim').value;
+  if (ini && fim) {
+    var m = (parseInt(fim.split(':')[0])*60+parseInt(fim.split(':')[1])) - (parseInt(ini.split(':')[0])*60+parseInt(ini.split(':')[1]));
+    if (m > 0) document.getElementById('rHEHoras').value = (m/60).toFixed(1);
+  }
+}
+function toggleHE() {
+  document.getElementById('heExtra').style.display = document.getElementById('rTemHE').checked ? 'grid' : 'none';
+}
+function toggleDeslocacao() {
+  document.getElementById('deslocacaoExtra').style.display = document.getElementById('rDeslocacao').checked ? 'flex' : 'none';
+}
+
+// Cliente search
+var _agCt = null;
+function searchAgCli(q) {
+  clearTimeout(_agCt);
+  var dd = document.getElementById('rCliDrop');
+  if (!q || q.length < 2) { dd.style.display='none'; return; }
+  _agCt = setTimeout(function(){
+    fetch('/api/clientes/search?q='+encodeURIComponent(q)).then(r=>r.json()).then(function(d){
+      dd.innerHTML='';
+      (d.clientes||d).forEach(function(c){
+        var div=document.createElement('div');
+        div.style.cssText='padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)';
+        div.textContent=c.nome;
+        div.onclick=function(){ document.getElementById('rClienteInput').value=c.nome; document.getElementById('rClienteId').value=c.id; dd.style.display='none'; };
+        dd.appendChild(div);
+      });
+      dd.style.display=dd.children.length?'block':'none';
+    });
+  }, 200);
+}
+document.addEventListener('click', function(e){ if(!e.target.closest('#rCliDrop') && e.target.id!=='rClienteInput') document.getElementById('rCliDrop').style.display='none'; });
+
+// Materiais
+var _mats = [];
+var _matIdx = 0;
+function addMaterialManual() {
+  var idx = _matIdx++;
+  _mats.push({idx:idx, origem:'manual'});
+  renderMats();
+  document.getElementById('mDesc_'+idx).focus();
+}
+var _phcTimer = null;
+function addMaterialPHC() {
+  var q = prompt('Pesquisar artigo PHC (referência ou nome):');
+  if (!q) return;
+  fetch('/api/artigos?q='+encodeURIComponent(q)).then(r=>r.json()).then(function(d){
+    if (!d || !d.length) { alert('Nenhum artigo encontrado'); return; }
+    var item = d[0];
+    _mats.push({idx:_matIdx++, origem:'phc', ref:item.referencia||'', descricao:item.designacao||item.nome||'', unidade:item.unidade||'un', quantidade:1});
+    renderMats();
+  }).catch(function(){ addMaterialManual(); });
+}
+function removeMat(idx) {
+  _mats = _mats.filter(function(m){ return m.idx !== idx; });
+  renderMats();
+}
+function renderMats() {
+  var html = '';
+  _mats.forEach(function(m, i) {
+    html += '<div style="display:grid;grid-template-columns:80px 1fr 60px 50px auto;gap:6px;align-items:center;margin-bottom:6px" id="matRow_'+m.idx+'">';
+    html += '<input type="text" id="mRef_'+m.idx+'" class="input" placeholder="Ref." value="'+(m.ref||'')+'" style="font-size:11px">';
+    html += '<input type="text" id="mDesc_'+m.idx+'" class="input" placeholder="Descrição *" value="'+(m.descricao||'')+'" style="font-size:11px">';
+    html += '<input type="number" id="mQty_'+m.idx+'" class="input" value="'+(m.quantidade||1)+'" step="0.01" style="font-size:11px">';
+    html += '<input type="text" id="mUn_'+m.idx+'" class="input" value="'+(m.unidade||'un')+'" style="font-size:11px">';
+    html += '<button onclick="removeMat('+m.idx+')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;padding:2px">✕</button>';
+    html += '</div>';
+  });
+  document.getElementById('matList').innerHTML = html || '<div style="color:var(--text-muted);font-size:12px">Nenhum material adicionado</div>';
+}
+
+function getMats() {
+  return _mats.map(function(m) {
+    return {
+      ref: (document.getElementById('mRef_'+m.idx)||{value:''}).value.trim(),
+      descricao: document.getElementById('mDesc_'+m.idx).value.trim(),
+      quantidade: parseFloat(document.getElementById('mQty_'+m.idx).value)||1,
+      unidade: document.getElementById('mUn_'+m.idx).value.trim()||'un',
+      origem: m.origem,
+    };
+  }).filter(function(m){ return m.descricao; });
+}
+
+function getFormData() {
+  return {
+    funcionario_id: FID,
+    data: DATA,
+    servico_id: document.getElementById('rServicoId').value || null,
+    tipo: document.getElementById('rTipo').value,
+    cliente_id: document.getElementById('rClienteId').value || null,
+    embarcacao_nome: document.getElementById('rEmb').value.trim(),
+    equipamento: document.getElementById('rEquip').value.trim(),
+    local_servico: document.getElementById('rLocal').value.trim(),
+    horas: parseFloat(document.getElementById('rHoras').value)||0,
+    hora_inicio: document.getElementById('rHIni').value,
+    hora_fim: document.getElementById('rHFim').value,
+    tem_he: document.getElementById('rTemHE').checked,
+    he_inicio: document.getElementById('rHEIni').value,
+    he_fim: document.getElementById('rHEFim').value,
+    he_horas: parseFloat(document.getElementById('rHEHoras').value)||0,
+    deslocacao_viatura: document.getElementById('rDeslocacao').checked,
+    viatura_tipo: document.getElementById('rDeslocacaoCli').checked ? 'cliente' : 'propria',
+    n_viagens: parseInt(document.getElementById('rViagens').value)||0,
+    km: parseFloat(document.getElementById('rKm').value)||0,
+    n_almoco: parseInt(document.getElementById('rAlmoco').value)||0,
+    custo_refeicao: parseFloat(document.getElementById('rCustoRef').value)||0,
+    obs_refeicao: document.getElementById('rObsRef').value.trim(),
+    descricao_trabalho: document.getElementById('rDesc').value.trim(),
+    materiais: getMats(),
+  };
+}
+
+function abrirNovoRegisto() {
+  document.getElementById('rEditId').value = '';
+  document.getElementById('modalTitulo').textContent = '📋 Novo Trabalho — {{ data.strftime("%d/%m/%Y") }}';
+  document.getElementById('rServicoId').value = '';
+  document.getElementById('rClienteInput').value = '';
+  document.getElementById('rClienteId').value = '';
+  document.getElementById('rEmb').value = '';
+  document.getElementById('rEquip').value = '';
+  document.getElementById('rLocal').value = '';
+  document.getElementById('rHoras').value = '8';
+  document.getElementById('rHIni').value = '08:00';
+  document.getElementById('rHFim').value = '17:00';
+  document.getElementById('rTemHE').checked = false;
+  document.getElementById('heExtra').style.display = 'none';
+  document.getElementById('rDeslocacao').checked = false;
+  document.getElementById('deslocacaoExtra').style.display = 'none';
+  document.getElementById('rAlmoco').value = '0';
+  document.getElementById('rCustoRef').value = '0';
+  document.getElementById('rObsRef').value = '';
+  document.getElementById('rDesc').value = '';
+  _mats = []; _matIdx = 0; renderMats();
+  setTipo('cliente');
+  document.getElementById('modalRegisto').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function editarRegisto(rid) {
+  fetch('/agenda/registo/'+rid).then(r=>r.json()).then(function(d){
+    if (!d.ok) return;
+    document.getElementById('rEditId').value = rid;
+    document.getElementById('modalTitulo').textContent = '✏️ Editar Trabalho';
+    document.getElementById('rClienteInput').value = d.cliente_nome;
+    document.getElementById('rClienteId').value = d.cliente_id || '';
+    document.getElementById('rEmb').value = d.embarcacao_nome;
+    document.getElementById('rEquip').value = d.equipamento;
+    document.getElementById('rLocal').value = d.local_servico;
+    document.getElementById('rHoras').value = d.horas;
+    document.getElementById('rHIni').value = d.hora_inicio;
+    document.getElementById('rHFim').value = d.hora_fim;
+    document.getElementById('rTemHE').checked = d.tem_he;
+    document.getElementById('heExtra').style.display = d.tem_he ? 'grid' : 'none';
+    document.getElementById('rHEIni').value = d.he_inicio;
+    document.getElementById('rHEFim').value = d.he_fim;
+    document.getElementById('rHEHoras').value = d.he_horas;
+    document.getElementById('rDeslocacao').checked = d.deslocacao_viatura;
+    document.getElementById('deslocacaoExtra').style.display = d.deslocacao_viatura ? 'flex' : 'none';
+    document.getElementById('rDeslocacaoCli').checked = d.viatura_tipo === 'cliente';
+    document.getElementById('rViagens').value = d.n_viagens;
+    document.getElementById('rKm').value = d.km || '';
+    document.getElementById('rAlmoco').value = d.n_almoco;
+    document.getElementById('rCustoRef').value = d.custo_refeicao;
+    document.getElementById('rObsRef').value = d.obs_refeicao;
+    document.getElementById('rDesc').value = d.descricao_trabalho;
+    _mats = (d.materiais||[]).map(function(m,i){ return Object.assign({idx:i}, m); });
+    _matIdx = _mats.length;
+    renderMats();
+    setTipo(d.tipo);
+    document.getElementById('modalRegisto').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  });
+}
+
+function guardarRegisto() {
+  var editId = document.getElementById('rEditId').value;
+  var data = getFormData();
+  var url = editId ? '/agenda/registo/'+editId+'/editar' : '/agenda/registo/novo';
+  var btn = document.getElementById('btnGuardar');
+  btn.disabled = true; btn.textContent = '⏳ A guardar...';
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(r=>r.json()).then(function(d){
+      if (d.ok) { fecharModal(); location.reload(); }
+      else { alert('Erro: '+(d.error||'desconhecido')); btn.disabled=false; btn.textContent='💾 Guardar'; }
+    });
+}
+
+function apagarRegisto(rid) {
+  if (!confirm('Eliminar este registo?')) return;
+  fetch('/agenda/registo/'+rid+'/apagar', {method:'POST'}).then(r=>r.json()).then(function(d){
+    if (d.ok) location.reload();
+  });
+}
+
+function fecharModal() {
+  document.getElementById('modalRegisto').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.getElementById('modalRegisto').addEventListener('click', function(e){ if(e.target===this) fecharModal(); });
+</script>
+{% endblock %}

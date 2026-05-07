@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, EqIndComponenteMedia, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, EqIndComponenteMedia, AgendaServico, AgendaRegisto, AgendaMaterial, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 import time as _time_module
 app = Flask(__name__)
@@ -2444,6 +2444,321 @@ MANUAIS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads'
 os.makedirs(MANUAIS_DIR, exist_ok=True)
 
 # ══════════════════════════════════════════════════════════════════════
+# AGENDA DIGITAL
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/agenda')
+@login_required
+def agenda():
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    # Stats per funcionário
+    from datetime import date as _d
+    hoje = _d.today()
+    mes_ini = hoje.replace(day=1)
+    stats = {}
+    for f in funcs:
+        regs = AgendaRegisto.query.filter(
+            AgendaRegisto.funcionario_id == f.id,
+            AgendaRegisto.data >= mes_ini,
+            AgendaRegisto.data <= hoje
+        ).all()
+        stats[f.id] = {
+            'horas_mes': sum(r.horas or 0 for r in regs),
+            'he_mes': sum(r.he_horas or 0 for r in regs),
+            'registos_mes': len(regs),
+            'ultimo': max((r.data for r in regs), default=None),
+        }
+    return render_template('agenda.html', funcs=funcs, stats=stats, hoje=hoje)
+
+@app.route('/agenda/funcionario/<int:fid>')
+@login_required
+def agenda_funcionario(fid):
+    func = Funcionario.query.get_or_404(fid)
+    ano  = int(request.args.get('ano', datetime.now().year))
+    mes  = int(request.args.get('mes', datetime.now().month))
+    from datetime import date as _d
+    import calendar as _cal
+    # Get registos for this month
+    mes_ini = _d(ano, mes, 1)
+    mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
+    registos = AgendaRegisto.query.filter(
+        AgendaRegisto.funcionario_id == fid,
+        AgendaRegisto.data >= mes_ini,
+        AgendaRegisto.data <= mes_fim,
+    ).all()
+    # Map by date
+    reg_map = {}
+    for r in registos:
+        if r.data not in reg_map:
+            reg_map[r.data] = []
+        reg_map[r.data].append(r)
+    # Stats
+    total_horas = sum(r.horas or 0 for r in registos)
+    total_he    = sum(r.he_horas or 0 for r in registos)
+    return render_template('agenda_funcionario.html',
+        func=func, ano=ano, mes=mes, mes_ini=mes_ini, mes_fim=mes_fim,
+        reg_map=reg_map, total_horas=total_horas, total_he=total_he,
+        hoje=_d.today(), cal=_cal)
+
+@app.route('/agenda/funcionario/<int:fid>/dia/<int:ano>/<int:mes>/<int:dia>')
+@login_required
+def agenda_dia(fid, ano, mes, dia):
+    func = Funcionario.query.get_or_404(fid)
+    from datetime import date as _d
+    data = _d(ano, mes, dia)
+    registos = AgendaRegisto.query.filter_by(
+        funcionario_id=fid, data=data
+    ).order_by(AgendaRegisto.criado_em).all()
+    # Services in progress for suggestions
+    servicos_curso = AgendaServico.query.filter(
+        AgendaServico.estado == 'em_curso'
+    ).order_by(AgendaServico.atualizado_em.desc()).limit(20).all()
+    clientes = Cliente.query.order_by(Cliente.nome).all()
+    # Embarcacao suggestions
+    emb_sugs = db.session.query(AgendaServico.embarcacao_nome).filter(
+        AgendaServico.embarcacao_nome != None,
+        AgendaServico.embarcacao_nome != ''
+    ).distinct().limit(30).all()
+    emb_sugs = [e[0] for e in emb_sugs if e[0]]
+    return render_template('agenda_dia.html',
+        func=func, data=data, registos=registos,
+        servicos_curso=servicos_curso, clientes=clientes,
+        emb_sugs=emb_sugs)
+
+@app.route('/agenda/registo/novo', methods=['POST'])
+@login_required
+def agenda_registo_novo():
+    data = request.get_json() or {}
+    from datetime import date as _d
+    try:
+        dt = _d.fromisoformat(data.get('data',''))
+    except:
+        return jsonify({'ok': False, 'error': 'Data inválida'})
+    fid = data.get('funcionario_id')
+    if not fid:
+        return jsonify({'ok': False, 'error': 'Funcionário obrigatório'})
+    # Get or create servico
+    servico_id = data.get('servico_id')
+    if not servico_id:
+        # Create new servico
+        sv = AgendaServico(
+            titulo=data.get('titulo') or data.get('equipamento') or 'Serviço ' + dt.strftime('%d/%m/%Y'),
+            cliente_id=int(data['cliente_id']) if data.get('cliente_id') else None,
+            embarcacao_nome=data.get('embarcacao_nome','').strip() or None,
+            equipamento=data.get('equipamento','').strip() or None,
+            local_servico=data.get('local_servico','').strip() or None,
+            tipo=data.get('tipo','cliente'),
+            estado='em_curso',
+            data_inicio=dt,
+            descricao=data.get('descricao','').strip() or None,
+            criado_por=current_user.id,
+        )
+        db.session.add(sv)
+        db.session.flush()
+        servico_id = sv.id
+    else:
+        sv = AgendaServico.query.get(int(servico_id))
+
+    reg = AgendaRegisto(
+        servico_id=servico_id,
+        funcionario_id=int(fid),
+        data=dt,
+        horas=float(data.get('horas') or 0),
+        hora_inicio=data.get('hora_inicio','').strip() or None,
+        hora_fim=data.get('hora_fim','').strip() or None,
+        tem_he=bool(data.get('tem_he')),
+        he_inicio=data.get('he_inicio','').strip() or None,
+        he_fim=data.get('he_fim','').strip() or None,
+        he_horas=float(data.get('he_horas') or 0),
+        deslocacao_viatura=bool(data.get('deslocacao_viatura')),
+        viatura_tipo=data.get('viatura_tipo','propria'),
+        n_viagens=int(data.get('n_viagens') or 0),
+        km=float(data.get('km') or 0) or None,
+        n_almoco=int(data.get('n_almoco') or 0),
+        custo_refeicao=float(data.get('custo_refeicao') or 0),
+        obs_refeicao=data.get('obs_refeicao','').strip() or None,
+        descricao_trabalho=data.get('descricao_trabalho','').strip() or None,
+        estado='em_curso',
+    )
+    db.session.add(reg)
+    db.session.flush()
+    # Materiais
+    for m in data.get('materiais', []):
+        mat = AgendaMaterial(
+            registo_id=reg.id,
+            artigo_ref=m.get('ref','').strip() or None,
+            descricao=m.get('descricao','').strip(),
+            quantidade=float(m.get('quantidade') or 1),
+            unidade=m.get('unidade','un'),
+            observacoes=m.get('observacoes','').strip() or None,
+            origem=m.get('origem','manual'),
+        )
+        db.session.add(mat)
+    db.session.commit()
+    return jsonify({'ok': True, 'registo_id': reg.id, 'servico_id': servico_id})
+
+@app.route('/agenda/registo/<int:rid>', methods=['GET'])
+@login_required
+def agenda_registo_get(rid):
+    r = AgendaRegisto.query.get_or_404(rid)
+    sv = r.servico
+    return jsonify({'ok': True,
+        'id': r.id, 'data': r.data.isoformat(),
+        'servico_id': r.servico_id,
+        'titulo': sv.titulo, 'cliente_id': sv.cliente_id,
+        'cliente_nome': sv.cliente.nome if sv.cliente else '',
+        'embarcacao_nome': sv.embarcacao_nome or '',
+        'equipamento': sv.equipamento or '',
+        'local_servico': sv.local_servico or '',
+        'tipo': sv.tipo or 'cliente',
+        'horas': r.horas, 'hora_inicio': r.hora_inicio or '', 'hora_fim': r.hora_fim or '',
+        'tem_he': r.tem_he, 'he_inicio': r.he_inicio or '', 'he_fim': r.he_fim or '', 'he_horas': r.he_horas,
+        'deslocacao_viatura': r.deslocacao_viatura, 'viatura_tipo': r.viatura_tipo or 'propria',
+        'n_viagens': r.n_viagens, 'km': r.km or '',
+        'n_almoco': r.n_almoco, 'custo_refeicao': r.custo_refeicao, 'obs_refeicao': r.obs_refeicao or '',
+        'descricao_trabalho': r.descricao_trabalho or '',
+        'materiais': [{'ref': m.artigo_ref or '', 'descricao': m.descricao, 'quantidade': m.quantidade,
+                       'unidade': m.unidade, 'observacoes': m.observacoes or '', 'origem': m.origem} for m in r.materiais.all()],
+    })
+
+@app.route('/agenda/registo/<int:rid>/editar', methods=['POST'])
+@login_required
+def agenda_registo_editar(rid):
+    r = AgendaRegisto.query.get_or_404(rid)
+    data = request.get_json() or {}
+    sv = r.servico
+    # Update servico fields
+    if data.get('cliente_id'): sv.cliente_id = int(data['cliente_id'])
+    sv.embarcacao_nome = data.get('embarcacao_nome','').strip() or sv.embarcacao_nome
+    sv.equipamento     = data.get('equipamento','').strip() or sv.equipamento
+    sv.local_servico   = data.get('local_servico','').strip() or sv.local_servico
+    sv.tipo            = data.get('tipo', sv.tipo)
+    sv.atualizado_em   = datetime.now()
+    # Update registo
+    r.horas            = float(data.get('horas') or 0)
+    r.hora_inicio      = data.get('hora_inicio','').strip() or None
+    r.hora_fim         = data.get('hora_fim','').strip() or None
+    r.tem_he           = bool(data.get('tem_he'))
+    r.he_inicio        = data.get('he_inicio','').strip() or None
+    r.he_fim           = data.get('he_fim','').strip() or None
+    r.he_horas         = float(data.get('he_horas') or 0)
+    r.deslocacao_viatura = bool(data.get('deslocacao_viatura'))
+    r.viatura_tipo     = data.get('viatura_tipo','propria')
+    r.n_viagens        = int(data.get('n_viagens') or 0)
+    r.km               = float(data.get('km') or 0) or None
+    r.n_almoco         = int(data.get('n_almoco') or 0)
+    r.custo_refeicao   = float(data.get('custo_refeicao') or 0)
+    r.obs_refeicao     = data.get('obs_refeicao','').strip() or None
+    r.descricao_trabalho = data.get('descricao_trabalho','').strip() or None
+    r.atualizado_em    = datetime.now()
+    # Replace materiais
+    for m in r.materiais.all():
+        db.session.delete(m)
+    for m in data.get('materiais', []):
+        mat = AgendaMaterial(
+            registo_id=r.id,
+            artigo_ref=m.get('ref','').strip() or None,
+            descricao=m.get('descricao','').strip(),
+            quantidade=float(m.get('quantidade') or 1),
+            unidade=m.get('unidade','un'),
+            observacoes=m.get('observacoes','').strip() or None,
+            origem=m.get('origem','manual'),
+        )
+        db.session.add(mat)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/agenda/registo/<int:rid>/apagar', methods=['POST'])
+@login_required
+def agenda_registo_apagar(rid):
+    r = AgendaRegisto.query.get_or_404(rid)
+    db.session.delete(r)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/agenda/servico/<int:sid>/concluir', methods=['POST'])
+@login_required
+def agenda_servico_concluir(sid):
+    sv = AgendaServico.query.get_or_404(sid)
+    from datetime import date as _d
+    sv.estado = 'concluido'
+    sv.data_fim = _d.today()
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/agenda/servicos')
+@login_required
+def agenda_servicos():
+    estado = request.args.get('estado','em_curso')
+    q      = request.args.get('q','').strip()
+    query  = AgendaServico.query
+    if estado: query = query.filter_by(estado=estado)
+    if q:
+        query = query.filter(db.or_(
+            AgendaServico.titulo.ilike(f'%{q}%'),
+            AgendaServico.embarcacao_nome.ilike(f'%{q}%'),
+        ))
+    servicos = query.order_by(AgendaServico.atualizado_em.desc()).all()
+    return render_template('agenda_servicos.html', servicos=servicos, estado=estado, q=q)
+
+@app.route('/agenda/servico/<int:sid>/pdf')
+@login_required
+def agenda_servico_pdf(sid):
+    sv = AgendaServico.query.get_or_404(sid)
+    registos = AgendaRegisto.query.filter_by(servico_id=sid).order_by(AgendaRegisto.data, AgendaRegisto.funcionario_id).all()
+    cfg = ConfigGeral.query.first()
+    logo_path = None
+    if cfg and cfg.empresa_logo_path:
+        logo_path = url_for('static', filename='logo_empresa.png', _external=True)
+    return render_template('agenda_servico_pdf.html', sv=sv, registos=registos, cfg=cfg)
+
+@app.route('/agenda/estatisticas')
+@login_required
+def agenda_estatisticas():
+    from datetime import date as _d
+    import calendar as _cal
+    ano = int(request.args.get('ano', _d.today().year))
+    mes = int(request.args.get('mes', _d.today().month))
+    mes_ini = _d(ano, mes, 1)
+    mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
+    funcs = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    stats = []
+    for f in funcs:
+        regs = AgendaRegisto.query.filter(
+            AgendaRegisto.funcionario_id == f.id,
+            AgendaRegisto.data >= mes_ini,
+            AgendaRegisto.data <= mes_fim,
+        ).all()
+        if regs:
+            stats.append({
+                'func': f,
+                'horas': sum(r.horas or 0 for r in regs),
+                'he': sum(r.he_horas or 0 for r in regs),
+                'dias': len(set(r.data for r in regs)),
+                'almoco': sum(r.n_almoco or 0 for r in regs),
+                'custo_ref': sum(r.custo_refeicao or 0 for r in regs),
+            })
+    stats.sort(key=lambda x: x['horas'], reverse=True)
+    # Top clients
+    top_cli = db.session.query(
+        Cliente.nome, db.func.count(AgendaServico.id).label('n')
+    ).join(AgendaServico, AgendaServico.cliente_id == Cliente.id).filter(
+        AgendaServico.criado_em >= mes_ini
+    ).group_by(Cliente.nome).order_by(db.text('n desc')).limit(10).all()
+    return render_template('agenda_estatisticas.html',
+        stats=stats, top_cli=top_cli, ano=ano, mes=mes,
+        mes_ini=mes_ini, mes_fim=mes_fim)
+
+@app.route('/api/agenda/embarcacoes')
+@login_required
+def api_agenda_embarcacoes():
+    q = request.args.get('q','').strip()
+    sugs = db.session.query(AgendaServico.embarcacao_nome).filter(
+        AgendaServico.embarcacao_nome.ilike(f'%{q}%')
+    ).distinct().limit(15).all()
+    return jsonify([s[0] for s in sugs if s[0]])
+
+
+# ══════════════════════════════════════════════════════════════════════
 # EMPRESA
 # ══════════════════════════════════════════════════════════════════════
 EMPRESA_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'empresa')
@@ -4387,6 +4702,7 @@ MENUS_DISPONIVEIS = [
     ('partilha',           '📁 Partilha'),
     ('empresa',            '🏢 Empresa'),
     ('eq_industriais',     '⚙️ Equipamentos Industriais'),
+    ('agenda',             '📅 Agenda Digital'),
     ('conectividade',      '🌐 Conectividade'),
     ('roadmap',            '🗺️ Roadmap'),
     ('changelog',          '📝 Changelog'),
