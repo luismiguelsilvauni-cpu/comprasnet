@@ -13,6 +13,7 @@ class User(UserMixin, db.Model):
     is_admin      = db.Column(db.Boolean, default=False)
     email         = db.Column(db.String(200))
     must_change_password = db.Column(db.Boolean, default=False)
+    agenda_ativo  = db.Column(db.Boolean, default=True)  # aparece na Agenda Digital
     departamento  = db.Column(db.String(100))
     data_criacao  = db.Column(db.DateTime, default=datetime.utcnow)
     pedidos_criados       = db.relationship('PedidoCompra', foreign_keys='PedidoCompra.criado_por', backref='criador', lazy=True)
@@ -250,7 +251,6 @@ class Cliente(db.Model):
     # Extra manual fields
     notas            = db.Column(db.Text)
     ativo            = db.Column(db.Boolean, default=True)
-    agenda_ativo     = db.Column(db.Boolean, default=True)  # aparece na Agenda Digital
     # Meta
     criado_em        = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em    = db.Column(db.DateTime, default=datetime.utcnow)
@@ -910,7 +910,7 @@ class AgendaRegisto(db.Model):
     criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     # Relationships
-    funcionario         = db.relationship('User', foreign_keys=[funcionario_id], backref='agenda_registos')
+    user                = db.relationship('User', foreign_keys=[funcionario_id], backref='agenda_registos')
     materiais           = db.relationship('AgendaMaterial', backref='registo', lazy='dynamic', cascade='all, delete-orphan')
 
 class AgendaMaterial(db.Model):
