@@ -909,7 +909,7 @@ class AgendaRegisto(db.Model):
     criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em       = db.Column(db.DateTime, default=datetime.utcnow)
     # Relationships
-    # Note: Funcionario is defined in app.py, relationship added via backref in app.py
+    funcionario         = db.relationship('Funcionario', foreign_keys=[funcionario_id], backref='agenda_registos', lazy='joined')
     materiais           = db.relationship('AgendaMaterial', backref='registo', lazy='dynamic', cascade='all, delete-orphan')
 
 class AgendaMaterial(db.Model):
