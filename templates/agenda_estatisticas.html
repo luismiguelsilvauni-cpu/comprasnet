@@ -19,7 +19,9 @@
       {% for a in range(2024,2028) %}<option value="{{ a }}" {{ 'selected' if a==ano }}>{{ a }}</option>{% endfor %}
     </select>
     <button type="submit" class="btn btn-primary btn-sm">Actualizar</button>
-    <span style="font-size:12px;color:var(--text-muted);margin-left:8px">{{ MESES[mes] }} {{ ano }}</span>
+    <span style="font-size:12px;color:var(--text-muted);margin-left:8px">
+      {{ MESES[mes] }} {{ ano }} — <strong>{{ dias_uteis }} dias úteis</strong> — {{ horas_teoricas }}h teóricas ({{ dias_uteis }}×8h)
+    </span>
   </form>
 </div>
 
@@ -55,85 +57,84 @@
   </div>
 </div>
 
+<!-- Chart: Barras Agrupadas por Funcionário -->
+<div class="card mb-16">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--accent)">
+      📊 Horas por Técnico — {{ MESES[mes] }} {{ ano }}
+    </div>
+    <div style="display:flex;gap:14px;font-size:11px">
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;background:#3b6ef0;border-radius:2px;display:inline-block"></span>Serviço Cliente</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px;display:inline-block"></span>Serviço da Casa</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;background:#8b5cf6;border-radius:2px;display:inline-block"></span>Para Stock</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border:2px dashed #ef4444;border-radius:2px;display:inline-block"></span>Teórico ({{ horas_teoricas }}h)</span>
+    </div>
+  </div>
+  <div style="position:relative;height:320px">
+    <canvas id="chartHoras"></canvas>
+  </div>
+</div>
+
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 <!-- Coluna Esquerda -->
 <div>
 
-<!-- Horas por Funcionário (barras) -->
+<!-- Tabela detalhe por funcionário -->
 <div class="card mb-14">
-  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:14px">👷 Horas por Funcionário — {{ MESES[mes] }} {{ ano }}</div>
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">👷 Detalhe por Técnico</div>
   {% if stats %}
-  {% set max_h = stats[0].horas %}
-  {% for s in stats %}
-  <div style="margin-bottom:12px">
-    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
-      <span style="font-weight:700">{{ s.func.nome }}</span>
-      <span style="display:flex;gap:8px">
-        <span style="color:var(--accent);font-weight:700">{{ '%.1f'|format(s.horas) }}h</span>
-        {% if s.he %}<span style="color:#f59e0b">+{{ '%.1f'|format(s.he) }}h HE</span>{% endif %}
-        <span style="color:var(--text-muted);font-size:11px">{{ s.dias }}d</span>
-      </span>
-    </div>
-    <!-- Stacked bar -->
-    <div style="height:12px;background:var(--border);border-radius:6px;overflow:hidden;display:flex">
-      {% if max_h > 0 %}
-      <div style="height:100%;background:#3b6ef0;width:{{ (s.h_cliente / max_h * 100)|int }}%;border-radius:6px 0 0 6px" title="Cliente: {{ '%.1f'|format(s.h_cliente) }}h"></div>
-      <div style="height:100%;background:#f59e0b;width:{{ (s.h_casa / max_h * 100)|int }}%" title="Casa: {{ '%.1f'|format(s.h_casa) }}h"></div>
-      <div style="height:100%;background:#8b5cf6;width:{{ (s.h_stock / max_h * 100)|int }}%" title="Stock: {{ '%.1f'|format(s.h_stock) }}h"></div>
-      {% endif %}
-    </div>
-    <div style="display:flex;gap:12px;margin-top:3px;font-size:10px;color:var(--text-muted)">
-      <span style="color:#3b6ef0">■ Cliente {{ '%.1f'|format(s.h_cliente) }}h</span>
-      {% if s.h_casa %}<span style="color:#f59e0b">■ Casa {{ '%.1f'|format(s.h_casa) }}h</span>{% endif %}
-      {% if s.h_stock %}<span style="color:#8b5cf6">■ Stock {{ '%.1f'|format(s.h_stock) }}h</span>{% endif %}
-    </div>
-  </div>
-  {% endfor %}
-  {% else %}
-  <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Sem dados para {{ MESES[mes] }} {{ ano }}</div>
-  {% endif %}
-</div>
-
-<!-- Histórico últimos 6 meses -->
-<div class="card mb-14">
-  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📈 Histórico Horas (6 meses)</div>
-  {% set max_mh = meses_hist|map(attribute='horas')|max if meses_hist else 1 %}
-  {% if max_mh == 0 %}{% set max_mh = 1 %}{% endif %}
-  <div style="display:flex;align-items:flex-end;gap:6px;height:100px">
-    {% for m in meses_hist %}
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-      <div style="font-size:9px;color:var(--text-muted);font-weight:700">{{ '%.0f'|format(m.horas) }}</div>
-      <div style="width:100%;border-radius:4px 4px 0 0;min-height:2px;background:var(--accent);height:{{ [(m.horas / max_mh * 80)|int, 2]|max }}px;transition:.3s"></div>
-      <div style="font-size:9px;color:var(--text-muted);white-space:nowrap">{{ m.label }}</div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-
-<!-- Refeições Detalhe -->
-<div class="card">
-  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🍽 Refeições — {{ MESES[mes] }}</div>
-  <table style="width:100%;font-size:12px;border-collapse:collapse">
+  <table style="width:100%;font-size:11px;border-collapse:collapse">
     <thead><tr style="background:var(--surface2)">
-      <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text-muted)">Técnico</th>
-      <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-muted)">Almoços</th>
-      <th style="padding:6px 8px;text-align:right;font-size:11px;color:var(--text-muted)">Custo</th>
+      <th style="padding:6px 8px;text-align:left">Técnico</th>
+      <th style="padding:6px 8px;text-align:center;color:#3b6ef0">Cliente</th>
+      <th style="padding:6px 8px;text-align:center;color:#f59e0b">Casa</th>
+      <th style="padding:6px 8px;text-align:center;color:#8b5cf6">Stock</th>
+      <th style="padding:6px 8px;text-align:center;font-weight:800">Total</th>
+      <th style="padding:6px 8px;text-align:center;color:#f59e0b">HE</th>
+      <th style="padding:6px 8px;text-align:center">Dias</th>
     </tr></thead>
     <tbody>
-    {% for s in stats if s.almoco %}
+    {% for s in stats %}
     <tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:5px 8px">{{ s.func.nome }}</td>
-      <td style="padding:5px 8px;text-align:center;font-weight:700">{{ s.almoco }}</td>
-      <td style="padding:5px 8px;text-align:right;color:#16a34a;font-weight:700">{{ '%.2f'|format(s.custo_ref) }}€</td>
+      <td style="padding:5px 8px;font-weight:600">{{ s.func.nome.split()[0] }} {{ s.func.nome.split()[-1] }}</td>
+      <td style="padding:5px 8px;text-align:center;color:#3b6ef0">{{ '%.1f'|format(s.h_cliente) }}</td>
+      <td style="padding:5px 8px;text-align:center;color:#f59e0b">{{ '%.1f'|format(s.h_casa) if s.h_casa else '—' }}</td>
+      <td style="padding:5px 8px;text-align:center;color:#8b5cf6">{{ '%.1f'|format(s.h_stock) if s.h_stock else '—' }}</td>
+      <td style="padding:5px 8px;text-align:center;font-weight:800;color:var(--accent)">{{ '%.1f'|format(s.horas) }}</td>
+      <td style="padding:5px 8px;text-align:center;color:#f59e0b">{{ '%.1f'|format(s.he) if s.he else '—' }}</td>
+      <td style="padding:5px 8px;text-align:center">{{ s.dias }}</td>
     </tr>
     {% endfor %}
     </tbody>
     <tfoot><tr style="background:var(--surface2);font-weight:700">
       <td style="padding:6px 8px">Total</td>
-      <td style="padding:6px 8px;text-align:center">{{ tot_alm }}</td>
-      <td style="padding:6px 8px;text-align:right;color:#16a34a">{{ '%.2f'|format(tot_ref) }}€</td>
+      <td style="padding:6px 8px;text-align:center;color:#3b6ef0">{{ '%.1f'|format(stats|sum(attribute='h_cliente')) }}</td>
+      <td style="padding:6px 8px;text-align:center;color:#f59e0b">{{ '%.1f'|format(stats|sum(attribute='h_casa')) }}</td>
+      <td style="padding:6px 8px;text-align:center;color:#8b5cf6">{{ '%.1f'|format(stats|sum(attribute='h_stock')) }}</td>
+      <td style="padding:6px 8px;text-align:center;color:var(--accent)">{{ '%.1f'|format(tot_h) }}</td>
+      <td style="padding:6px 8px;text-align:center;color:#f59e0b">{{ '%.1f'|format(tot_he) }}</td>
+      <td style="padding:6px 8px;text-align:center">—</td>
     </tr></tfoot>
   </table>
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Sem dados para {{ MESES[mes] }} {{ ano }}</div>
+  {% endif %}
+</div>
+
+<!-- Histórico 6 meses -->
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📈 Histórico (6 meses)</div>
+  {% set max_mh = meses_hist|map(attribute='horas')|max if meses_hist else 1 %}
+  {% if max_mh == 0 %}{% set max_mh = 1 %}{% endif %}
+  <div style="display:flex;align-items:flex-end;gap:6px;height:80px">
+    {% for m in meses_hist %}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="font-size:9px;color:var(--text-muted);font-weight:700">{{ '%.0f'|format(m.horas) }}</div>
+      <div style="width:100%;border-radius:4px 4px 0 0;background:var(--accent);height:{{ [(m.horas/max_mh*70)|int, 2]|max }}px"></div>
+      <div style="font-size:9px;color:var(--text-muted)">{{ m.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
 </div>
 
 </div>
@@ -155,7 +156,7 @@
       </span>
     </div>
     <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-      <div style="height:100%;background:#3b6ef0;border-radius:4px;width:{{ [((h_total or 0) / (max_cli_h or 1) * 100)|int, 100]|min }}%"></div>
+      <div style="height:100%;background:#3b6ef0;border-radius:4px;width:{{ [((h_total or 0)/(max_cli_h or 1)*100)|int,100]|min }}%"></div>
     </div>
   </div>
   {% endfor %}
@@ -164,33 +165,43 @@
   {% endif %}
 </div>
 
-<!-- Serviços Status -->
+<!-- Estado Serviços -->
 <div class="card mb-14">
   <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📋 Estado dos Serviços</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <div style="text-align:center;padding:16px;background:rgba(59,110,240,.08);border-radius:10px;border:1px solid rgba(59,110,240,.2)">
-      <div style="font-size:32px;font-weight:900;color:#3b6ef0">{{ sv_em_curso }}</div>
+    <div style="text-align:center;padding:14px;background:rgba(59,110,240,.08);border-radius:10px;border:1px solid rgba(59,110,240,.2)">
+      <div style="font-size:28px;font-weight:900;color:#3b6ef0">{{ sv_em_curso }}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Em Curso</div>
       <a href="{{ url_for('agenda_servicos', estado='em_curso') }}" class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:8px">Ver todos</a>
     </div>
-    <div style="text-align:center;padding:16px;background:rgba(34,197,94,.08);border-radius:10px;border:1px solid rgba(34,197,94,.2)">
-      <div style="font-size:32px;font-weight:900;color:#22c55e">{{ sv_concluido }}</div>
+    <div style="text-align:center;padding:14px;background:rgba(34,197,94,.08);border-radius:10px;border:1px solid rgba(34,197,94,.2)">
+      <div style="font-size:28px;font-weight:900;color:#22c55e">{{ sv_concluido }}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Concluídos</div>
       <a href="{{ url_for('agenda_servicos', estado='concluido') }}" class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:8px">Ver todos</a>
     </div>
   </div>
-  <!-- Pie chart approximate -->
   {% set total_sv = sv_em_curso + sv_concluido %}
   {% if total_sv > 0 %}
-  <div style="margin-top:12px;height:10px;background:var(--border);border-radius:6px;overflow:hidden;display:flex">
-    <div style="height:100%;background:#3b6ef0;width:{{ (sv_em_curso / total_sv * 100)|int }}%"></div>
+  <div style="margin-top:10px;height:8px;background:var(--border);border-radius:6px;overflow:hidden;display:flex">
+    <div style="height:100%;background:#3b6ef0;width:{{ (sv_em_curso/total_sv*100)|int }}%"></div>
     <div style="height:100%;background:#22c55e;flex:1"></div>
   </div>
-  <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--text-muted)">
-    <span style="color:#3b6ef0">■ Em Curso {{ (sv_em_curso / total_sv * 100)|int }}%</span>
-    <span style="color:#22c55e">■ Concluídos {{ (sv_concluido / total_sv * 100)|int }}%</span>
-  </div>
   {% endif %}
+</div>
+
+<!-- Refeições -->
+<div class="card mb-14">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🍽 Refeições</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
+      <div style="font-size:20px;font-weight:800;color:#16a34a">{{ tot_alm }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">Total Almoços</div>
+    </div>
+    <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
+      <div style="font-size:20px;font-weight:800;color:#16a34a">{{ '%.2f'|format(tot_ref) }}€</div>
+      <div style="font-size:10px;color:var(--text-muted)">Custo Total</div>
+    </div>
+  </div>
 </div>
 
 <!-- Top Equipamentos -->
@@ -208,4 +219,96 @@
 
 </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+var raw = {{ chart_data|safe }};
+var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+var gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)';
+var textColor = isDark ? '#94a3b8' : '#64748b';
+
+var ctx = document.getElementById('chartHoras').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: raw.labels,
+    datasets: [
+      {
+        label: 'Serviço Cliente',
+        data: raw.cliente,
+        backgroundColor: 'rgba(59,110,240,.85)',
+        borderRadius: 4,
+        borderSkipped: false,
+      },
+      {
+        label: 'Serviço da Casa',
+        data: raw.casa,
+        backgroundColor: 'rgba(245,158,11,.85)',
+        borderRadius: 4,
+        borderSkipped: false,
+      },
+      {
+        label: 'Para Stock',
+        data: raw.stock,
+        backgroundColor: 'rgba(139,92,246,.85)',
+        borderRadius: 4,
+        borderSkipped: false,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          afterBody: function(items) {
+            var total = items.reduce(function(s,i){ return s + i.parsed.y; }, 0);
+            return ['─────────', 'Total: ' + total.toFixed(1) + 'h', 'Teórico: ' + raw.teorico + 'h'];
+          }
+        }
+      },
+      annotation: {}
+    },
+    scales: {
+      x: {
+        stacked: true,
+        grid: { display: false },
+        ticks: { color: textColor, font: { size: 11 } }
+      },
+      y: {
+        stacked: true,
+        grid: { color: gridColor },
+        ticks: { color: textColor, font: { size: 11 },
+          callback: function(v){ return v + 'h'; }
+        },
+        title: { display: true, text: 'Horas', color: textColor, font: { size: 11 } }
+      }
+    }
+  },
+  plugins: [{
+    id: 'teoricoLine',
+    afterDraw: function(chart) {
+      var yScale = chart.scales.y;
+      var xScale = chart.scales.x;
+      var y = yScale.getPixelForValue(raw.teorico);
+      var ctx2 = chart.ctx;
+      ctx2.save();
+      ctx2.beginPath();
+      ctx2.setLineDash([6, 4]);
+      ctx2.strokeStyle = '#ef4444';
+      ctx2.lineWidth = 2;
+      ctx2.moveTo(xScale.left, y);
+      ctx2.lineTo(xScale.right, y);
+      ctx2.stroke();
+      ctx2.setLineDash([]);
+      ctx2.fillStyle = '#ef4444';
+      ctx2.font = 'bold 10px sans-serif';
+      ctx2.fillText('Teórico ' + raw.teorico + 'h', xScale.right - 80, y - 5);
+      ctx2.restore();
+    }
+  }]
+});
+</script>
 {% endblock %}

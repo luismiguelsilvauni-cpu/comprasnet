@@ -2732,41 +2732,89 @@ def agenda_servico_pdf(sid):
 def agenda_estatisticas():
     from datetime import date as _d
     import calendar as _cal
+
     ano = int(request.args.get('ano', _d.today().year))
     mes = int(request.args.get('mes', _d.today().month))
     mes_ini = _d(ano, mes, 1)
     mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
 
+    # Calcular dias úteis do mês (excl. fds e feriados nacionais)
+    feriados = set()
+    try:
+        for f in FeriasFeriado.query.filter(
+            FeriasFeriado.data >= mes_ini,
+            FeriasFeriado.data <= mes_fim
+        ).all():
+            feriados.add(f.data)
+    except Exception:
+        pass
+
+    # Also exclude empresa_fechos
+    try:
+        for f in EmpresaFecho.query.filter(
+            EmpresaFecho.data >= mes_ini,
+            EmpresaFecho.data <= mes_fim
+        ).all():
+            feriados.add(f.data)
+    except Exception:
+        pass
+
+    dias_uteis = 0
+    cur = mes_ini
+    from datetime import timedelta
+    while cur <= mes_fim:
+        if cur.weekday() < 5 and cur not in feriados:
+            dias_uteis += 1
+        cur += timedelta(days=1)
+    horas_teoricas = dias_uteis * 8
+
     funcs = Funcionario.query.filter_by(ativo=True, agenda_ativo=True).order_by(Funcionario.nome).all()
 
-    # Per-funcionario stats
+    # Per-funcionario stats with tipo breakdown
     stats = []
+    chart_labels = []
+    chart_cliente = []
+    chart_casa = []
+    chart_stock = []
+
     for f in funcs:
         regs = AgendaRegisto.query.filter(
             AgendaRegisto.funcionario_id == f.id,
             AgendaRegisto.data >= mes_ini,
             AgendaRegisto.data <= mes_fim,
         ).all()
-        if not regs: continue
-        h_total = sum(r.horas or 0 for r in regs)
-        # By tipo
+        if not regs:
+            continue
+
         servico_ids = list(set(r.servico_id for r in regs))
         servicos = {sv.id: sv for sv in AgendaServico.query.filter(AgendaServico.id.in_(servico_ids)).all()}
-        h_casa  = sum(r.horas or 0 for r in regs if servicos.get(r.servico_id) and servicos[r.servico_id].tipo == 'casa')
-        h_stock = sum(r.horas or 0 for r in regs if servicos.get(r.servico_id) and servicos[r.servico_id].tipo == 'stock')
-        h_cli   = h_total - h_casa - h_stock
+
+        h_cli   = round(sum(r.horas or 0 for r in regs if servicos.get(r.servico_id) and servicos[r.servico_id].tipo == 'cliente'), 1)
+        h_casa  = round(sum(r.horas or 0 for r in regs if servicos.get(r.servico_id) and servicos[r.servico_id].tipo == 'casa'), 1)
+        h_stock = round(sum(r.horas or 0 for r in regs if servicos.get(r.servico_id) and servicos[r.servico_id].tipo == 'stock'), 1)
+        h_total = round(h_cli + h_casa + h_stock, 1)
+        he      = round(sum(r.he_horas or 0 for r in regs), 1)
+
         stats.append({
             'func': f,
             'horas': h_total,
-            'he': sum(r.he_horas or 0 for r in regs),
+            'he': he,
             'dias': len(set(r.data for r in regs)),
             'almoco': sum(r.n_almoco or 0 for r in regs),
-            'custo_ref': sum(r.custo_refeicao or 0 for r in regs),
+            'custo_ref': round(sum(r.custo_refeicao or 0 for r in regs), 2),
             'h_cliente': h_cli,
             'h_casa': h_casa,
             'h_stock': h_stock,
             'n_servicos': len(set(r.servico_id for r in regs)),
         })
+
+        # Chart data - use first name only for readability
+        nome_curto = f.nome.split()[0] + ' ' + f.nome.split()[-1] if len(f.nome.split()) > 1 else f.nome
+        chart_labels.append(nome_curto)
+        chart_cliente.append(h_cli)
+        chart_casa.append(h_casa)
+        chart_stock.append(h_stock)
+
     stats.sort(key=lambda x: x['horas'], reverse=True)
 
     # Top clients
@@ -2780,7 +2828,7 @@ def agenda_estatisticas():
     ).group_by(Cliente.nome).order_by(db.text('h_total desc')).limit(10).all()
 
     # Services stats
-    sv_em_curso = AgendaServico.query.filter_by(estado='em_curso').count()
+    sv_em_curso  = AgendaServico.query.filter_by(estado='em_curso').count()
     sv_concluido = AgendaServico.query.filter_by(estado='concluido').count()
 
     # Top equipamentos
@@ -2792,11 +2840,10 @@ def agenda_estatisticas():
         AgendaServico.equipamento != ''
     ).group_by(AgendaServico.equipamento).order_by(db.text('n desc')).limit(8).all()
 
-    # Monthly horas (last 6 months for chart)
+    # Monthly horas (last 6 months)
     meses_hist = []
     for i in range(5, -1, -1):
-        m2 = mes - i
-        a2 = ano
+        m2 = mes - i; a2 = ano
         while m2 <= 0: m2 += 12; a2 -= 1
         m_ini = _d(a2, m2, 1)
         m_fim = _d(a2, m2, _cal.monthrange(a2, m2)[1])
@@ -2805,10 +2852,20 @@ def agenda_estatisticas():
         ).scalar() or 0
         meses_hist.append({'label': f'{m2:02d}/{a2}', 'horas': round(float(h), 1)})
 
+    import json
+    chart_data = json.dumps({
+        'labels': chart_labels,
+        'cliente': chart_cliente,
+        'casa': chart_casa,
+        'stock': chart_stock,
+        'teorico': horas_teoricas,
+    })
+
     return render_template('agenda_estatisticas.html',
         stats=stats, top_cli=top_cli, top_equip=top_equip,
         sv_em_curso=sv_em_curso, sv_concluido=sv_concluido,
-        meses_hist=meses_hist,
+        meses_hist=meses_hist, chart_data=chart_data,
+        dias_uteis=dias_uteis, horas_teoricas=horas_teoricas,
         ano=ano, mes=mes, mes_ini=mes_ini, mes_fim=mes_fim)
 
 
