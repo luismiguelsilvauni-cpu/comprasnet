@@ -81,9 +81,12 @@
     </div>
     {% for comp in eq.componentes.all() %}
     <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden" id="comp{{ comp.id }}">
-      <div style="background:var(--surface2);padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:12px;font-weight:700;color:var(--accent)">
-          {{ '⚙️ Motor / Grupo' if comp.tipo=='grupo' else '⚡ Alternador' if comp.tipo=='alternador' else '📦 ' + (comp.descricao or 'Outro') }}
+      <div style="background:var(--surface2);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="comp_foto_{{ comp.id }}" style="width:48px;height:48px;border-radius:6px;overflow:hidden;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px">⚙️</div>
+          <div style="font-size:12px;font-weight:700;color:var(--accent)">
+            {{ '⚙️ Motor / Grupo' if comp.tipo=='grupo' else '⚡ Alternador' if comp.tipo=='alternador' else '📦 ' + (comp.descricao or 'Outro') }}
+          </div>
         </div>
         <div style="display:flex;gap:4px">
           <button onclick="editarComp({{ comp.id }})" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px">✏️ Editar</button>
@@ -105,6 +108,12 @@
           {{ cr('Instalação Eléct.', comp.instalacao_eletrica) }}
           {% if comp.dados_motor %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic;margin-top:4px">{{ comp.dados_motor }}</div>{% endif %}
           {% if comp.dados_grupo %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic">{{ comp.dados_grupo }}</div>{% endif %}
+          {% if comp.marca_alternador %}
+          <div style="grid-column:1/-1;font-size:10px;font-weight:700;color:var(--accent);margin-top:4px;text-transform:uppercase">⚡ Alternador</div>
+          {{ cr('Marca', comp.marca_alternador) }}{{ cr('Nº Série', comp.nserie_alternador) }}
+          {{ cr('Potência', (comp.potencia_kva|string + ' kVA') if comp.potencia_kva else None) }}
+          {{ cr('Tensão Saída', comp.tensao_saida) }}
+          {% endif %}
         {% elif comp.tipo == 'alternador' %}
           {{ cr('Marca', comp.marca_alternador) }}{{ cr('Nº Série', comp.nserie_alternador) }}
           {{ cr('Potência kVA', comp.potencia_kva|string + ' kVA' if comp.potencia_kva else None) }}
@@ -241,6 +250,16 @@
 var EID = {{ eq.id }};
 
 // ── Componentes ──────────────────────────────────────────────────────
+function previewFotoComp(input) {
+  var f = input.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var prev = document.getElementById('c_foto_preview');
+    if (prev) prev.innerHTML = '<img src="'+e.target.result+'" style="height:80px;border-radius:6px;border:1px solid var(--border)">';
+  };
+  reader.readAsDataURL(f);
+}
 function fg(id, lbl, placeholder, type) {
   type = type||'text';
   return '<div class="form-group" style="margin:0"><label style="font-size:11px">'+lbl+'</label><input type="'+type+'" id="'+id+'" class="input" step="any" placeholder="'+(placeholder||'')+'"></div>';
@@ -251,15 +270,24 @@ function fta(id, lbl) {
 
 var COMP_FORMS = {
   grupo: '<input type="hidden" id="c_tipo" value="grupo"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
-    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase">Grupo</div>'+
+    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase">📦 Grupo</div>'+
     fg('c_marca_grupo','Marca Grupo')+fg('c_modelo_grupo','Modelo Grupo')+fg('c_nserie_grupo','Nº Série Grupo')+fta('c_dados_grupo','Outros Dados Grupo')+
-    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-top:8px">Motor</div>'+
+    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-top:8px">⚙️ Motor</div>'+
     fg('c_marca_motor','Marca Motor')+fg('c_modelo_motor','Modelo Motor')+fg('c_nserie_motor','Nº Série Motor')+
     fg('c_familia_motor','Família Motor')+fg('c_tipo_motor','Tipo Motor')+
     fg('c_potencia_motor_kw','Potência (kW)','Ex: 88','number')+fg('c_potencia_motor_cv','Potência (CV)','Ex: 120','number')+
     fg('c_rpm_motor','RPM','Ex: 1500','number')+fg('c_cilindros','Cilindros','Ex: 4','number')+
     fg('c_combustivel','Combustível','Diesel / Gás')+fg('c_instalacao_eletrica','Instalação Eléctrica','Ex: 400V 3F')+
-    fta('c_dados_motor','Outros Dados Motor')+'</div>',
+    fta('c_dados_motor','Outros Dados Motor')+
+    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-top:8px">⚡ Alternador (se aplicável)</div>'+
+    fg('c_marca_alternador','Marca Alternador')+fg('c_nserie_alternador','Nº Série Alternador')+
+    fg('c_potencia_kva','Potência (kVA)','Ex: 100','number')+fg('c_potencia_kw_alt','Potência (kW)','Ex: 80','number')+
+    fg('c_tensao_saida','Tensão Saída','Ex: 230/400V')+fg('c_frequencia','Frequência (Hz)','50','number')+
+    fg('c_fator_potencia','Factor Potência','Ex: 0.8')+fta('c_dados_alternador','Outros Dados Alternador')+
+    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-top:8px">📷 Foto do Grupo</div>'+
+    '<div style="grid-column:1/-1"><div id="c_foto_preview" style="margin-bottom:6px"></div>'+
+    '<input type="file" id="c_foto_file" accept="image/*" class="input" onchange="previewFotoComp(this)" style="font-size:11px"></div>'+
+    '</div>',
   alternador: '<input type="hidden" id="c_tipo" value="alternador"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
     '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase">Alternador</div>'+
     fg('c_marca_alternador','Marca Alternador')+fg('c_nserie_alternador','Nº Série Alternador')+
@@ -288,13 +316,25 @@ function gv(id) { var e=document.getElementById(id); return e ? e.value.trim() :
 function guardarComp() {
   var data = {};
   document.querySelectorAll('#modalCompBody [id^="c_"]').forEach(function(el) {
-    data[el.id.replace('c_','')] = el.value.trim();
+    if (el.type !== 'file') data[el.id.replace('c_','')] = el.value.trim();
   });
   fetch('/equipamentos-industriais/{{ eq.id }}/componente', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(data)
   }).then(r=>r.json()).then(function(d) {
-    if (d.ok) { fecharModalComp(); location.reload(); }
+    if (!d.ok) return;
+    // Upload foto if selected
+    var fotoInput = document.getElementById('c_foto_file');
+    if (fotoInput && fotoInput.files.length > 0) {
+      var fd = new FormData();
+      fd.append('ficheiro', fotoInput.files[0]);
+      fd.append('tipo', 'foto');
+      fd.append('titulo', 'Foto do Grupo');
+      fetch('/equipamentos-industriais/componente/'+d.id+'/media/upload', {method:'POST', body:fd})
+        .then(function(){ fecharModalComp(); location.reload(); });
+    } else {
+      fecharModalComp(); location.reload();
+    }
   });
 }
 function apagarComp(id) {
@@ -416,6 +456,21 @@ function apagarCompMedia(mid) {
     .then(r=>r.json()).then(function(d){ if(d.ok) { var el=document.getElementById('cmedia'+mid); if(el) el.remove(); }});
 }
 document.getElementById('modalCompMedia').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+
+
+// Load component fotos
+document.querySelectorAll('[id^="comp_foto_"]').forEach(function(el) {
+  var cid = el.id.replace('comp_foto_','');
+  fetch('/equipamentos-industriais/componente/'+cid+'/dados')
+    .then(r=>r.json()).then(function(d) {
+      if (d.medias && d.medias.length > 0) {
+        var foto = d.medias.find(function(m){ return m.tipo==='foto'; });
+        if (foto) {
+          el.innerHTML = '<img src="/equipamentos-industriais/comp-media/'+foto.id+'/ver" style="width:100%;height:100%;object-fit:cover">';
+        }
+      }
+    }).catch(function(){});
+});
 
 document.getElementById('modalComp').addEventListener('click',function(e){if(e.target===this)fecharModalComp();});
 document.getElementById('modalUploadDoc').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
