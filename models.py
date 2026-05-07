@@ -771,3 +771,72 @@ class EmpresaInfo(db.Model):
     seguradora       = db.Column(db.String(100))
     apolice          = db.Column(db.String(50))
     seguro_validade  = db.Column(db.Date)
+
+# ══════════════════════════════════════════════════════════════════════
+# EQUIPAMENTOS INDUSTRIAIS
+# ══════════════════════════════════════════════════════════════════════
+class EquipamentoIndustrial(db.Model):
+    __tablename__ = 'equipamentos_industriais'
+    id                  = db.Column(db.Integer, primary_key=True)
+    cliente_id          = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
+    # Identificação
+    nome                = db.Column(db.String(200), nullable=False)
+    tipo                = db.Column(db.String(50))   # gerador, grupo_hidraulico, motor, outro
+    referencia_interna  = db.Column(db.String(50))
+    local_instalacao    = db.Column(db.String(200))
+    data_instalacao     = db.Column(db.Date)
+    data_fabricacao     = db.Column(db.Date)
+    estado              = db.Column(db.String(30), default='ativo')  # ativo, inativo, abate
+    notas               = db.Column(db.Text)
+    foto_path           = db.Column(db.String(300))
+    criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em       = db.Column(db.DateTime, default=datetime.utcnow)
+    # Relationships
+    cliente             = db.relationship('Cliente', backref='equipamentos_industriais')
+    componentes         = db.relationship('EqIndComponente', backref='equipamento', lazy='dynamic', cascade='all, delete-orphan')
+    documentos          = db.relationship('EqIndDocumento', backref='equipamento', lazy='dynamic', cascade='all, delete-orphan')
+
+class EqIndComponente(db.Model):
+    __tablename__ = 'eq_ind_componentes'
+    id              = db.Column(db.Integer, primary_key=True)
+    equipamento_id  = db.Column(db.Integer, db.ForeignKey('equipamentos_industriais.id'), nullable=False)
+    tipo            = db.Column(db.String(30), nullable=False)  # motor, alternador, quadro, outro
+    # Motor / Grupo
+    marca_grupo         = db.Column(db.String(100))
+    nserie_grupo        = db.Column(db.String(100))
+    dados_grupo         = db.Column(db.Text)
+    marca_motor         = db.Column(db.String(100))
+    nserie_motor        = db.Column(db.String(100))
+    familia_motor       = db.Column(db.String(100))
+    tipo_motor          = db.Column(db.String(100))
+    potencia_motor_kw   = db.Column(db.Float)
+    potencia_motor_cv   = db.Column(db.Float)
+    rpm_motor           = db.Column(db.Integer)
+    cilindros           = db.Column(db.Integer)
+    combustivel         = db.Column(db.String(50))   # diesel, gas, gasolina
+    instalacao_eletrica = db.Column(db.String(100))  # 230V, 400V, etc
+    dados_motor         = db.Column(db.Text)
+    # Alternador
+    marca_alternador    = db.Column(db.String(100))
+    nserie_alternador   = db.Column(db.String(100))
+    potencia_kva        = db.Column(db.Float)
+    potencia_kw_alt     = db.Column(db.Float)
+    tensao_saida        = db.Column(db.String(50))   # 230V, 400V, 230/400V
+    frequencia          = db.Column(db.Integer)      # 50Hz, 60Hz
+    fator_potencia      = db.Column(db.String(20))   # 0.8, 1.0
+    dados_alternador    = db.Column(db.Text)
+    # Outros
+    descricao           = db.Column(db.String(200))
+    dados_outros        = db.Column(db.Text)
+    criado_em           = db.Column(db.DateTime, default=datetime.utcnow)
+
+class EqIndDocumento(db.Model):
+    __tablename__ = 'eq_ind_documentos'
+    id              = db.Column(db.Integer, primary_key=True)
+    equipamento_id  = db.Column(db.Integer, db.ForeignKey('equipamentos_industriais.id'), nullable=False)
+    tipo            = db.Column(db.String(30))   # manual, ficha_tecnica, foto, certificado, outro
+    titulo          = db.Column(db.String(200), nullable=False)
+    ficheiro_path   = db.Column(db.String(300))
+    notas           = db.Column(db.Text)
+    data_upload     = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id         = db.Column(db.Integer, db.ForeignKey('users.id'))

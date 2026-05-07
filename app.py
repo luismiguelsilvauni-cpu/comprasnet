@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, EmpresaDocumento, EmpresaInfo, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 import time as _time_module
 app = Flask(__name__)
@@ -2163,6 +2163,191 @@ def editar_cliente(cid):
 # ── Embarcações ──────────────────────────────────────────────
 
 # ══════════════════════════════════════════════════════════════════════
+# BASE DADOS EQUIPAMENTOS INDUSTRIAIS
+# ══════════════════════════════════════════════════════════════════════
+EQ_IND_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'eq_industrial')
+os.makedirs(EQ_IND_UPLOAD_DIR, exist_ok=True)
+
+EQ_TIPOS = {'gerador': 'Grupo Gerador', 'grupo_hidraulico': 'Grupo Hidráulico',
+             'motor': 'Motor Industrial', 'compressor': 'Compressor', 'outro': 'Outro Equipamento'}
+
+@app.route('/equipamentos-industriais')
+@login_required
+def eq_industriais():
+    q    = request.args.get('q','').strip()
+    tipo = request.args.get('tipo','').strip()
+    query = EquipamentoIndustrial.query
+    if q:
+        query = query.filter(db.or_(
+            EquipamentoIndustrial.nome.ilike(f'%{q}%'),
+            EquipamentoIndustrial.referencia_interna.ilike(f'%{q}%'),
+            EquipamentoIndustrial.local_instalacao.ilike(f'%{q}%'),
+        ))
+    if tipo:
+        query = query.filter_by(tipo=tipo)
+    equipamentos = query.order_by(EquipamentoIndustrial.criado_em.desc()).all()
+    clientes = Cliente.query.order_by(Cliente.nome).all()
+    return render_template('eq_industriais.html',
+        equipamentos=equipamentos, clientes=clientes, tipos=EQ_TIPOS, q=q, tipo=tipo)
+
+@app.route('/equipamentos-industriais/novo', methods=['GET','POST'])
+@login_required
+def eq_industrial_novo():
+    clientes = Cliente.query.order_by(Cliente.nome).all()
+    if request.method == 'POST':
+        from datetime import date as _d
+        eq = EquipamentoIndustrial(
+            cliente_id=int(request.form['cliente_id']),
+            nome=request.form.get('nome','').strip(),
+            tipo=request.form.get('tipo','outro'),
+            referencia_interna=request.form.get('referencia_interna','').strip() or None,
+            local_instalacao=request.form.get('local_instalacao','').strip() or None,
+            notas=request.form.get('notas','').strip() or None,
+            estado='ativo',
+        )
+        di = request.form.get('data_instalacao','').strip()
+        df = request.form.get('data_fabricacao','').strip()
+        try:
+            if di: eq.data_instalacao = _d.fromisoformat(di)
+            if df: eq.data_fabricacao = _d.fromisoformat(df)
+        except: pass
+        db.session.add(eq)
+        db.session.flush()
+        # Foto upload
+        f = request.files.get('foto')
+        if f and f.filename:
+            import re as _re
+            safe = _re.sub(r'[^\w\-\.]', '_', f.filename)
+            fname = f'eq{eq.id}_{safe}'
+            f.save(os.path.join(EQ_IND_UPLOAD_DIR, fname))
+            eq.foto_path = fname
+        db.session.commit()
+        flash('Equipamento criado ✅', 'success')
+        return redirect(url_for('eq_industrial_detalhe', eid=eq.id))
+    return render_template('eq_industrial_form.html', clientes=clientes, tipos=EQ_TIPOS, eq=None)
+
+@app.route('/equipamentos-industriais/<int:eid>')
+@login_required
+def eq_industrial_detalhe(eid):
+    eq = EquipamentoIndustrial.query.get_or_404(eid)
+    return render_template('eq_industrial_detalhe.html', eq=eq, tipos=EQ_TIPOS)
+
+@app.route('/equipamentos-industriais/<int:eid>/editar', methods=['POST'])
+@login_required
+def eq_industrial_editar(eid):
+    eq = EquipamentoIndustrial.query.get_or_404(eid)
+    from datetime import date as _d
+    eq.nome              = request.form.get('nome', eq.nome).strip()
+    eq.tipo              = request.form.get('tipo', eq.tipo)
+    eq.cliente_id        = int(request.form.get('cliente_id', eq.cliente_id))
+    eq.referencia_interna= request.form.get('referencia_interna','').strip() or None
+    eq.local_instalacao  = request.form.get('local_instalacao','').strip() or None
+    eq.estado            = request.form.get('estado', eq.estado)
+    eq.notas             = request.form.get('notas','').strip() or None
+    eq.atualizado_em     = datetime.now()
+    di = request.form.get('data_instalacao','').strip()
+    df = request.form.get('data_fabricacao','').strip()
+    try:
+        if di: eq.data_instalacao = _d.fromisoformat(di)
+        if df: eq.data_fabricacao = _d.fromisoformat(df)
+    except: pass
+    f = request.files.get('foto')
+    if f and f.filename:
+        import re as _re
+        safe = _re.sub(r'[^\w\-\.]', '_', f.filename)
+        fname = f'eq{eq.id}_{safe}'
+        f.save(os.path.join(EQ_IND_UPLOAD_DIR, fname))
+        eq.foto_path = fname
+    db.session.commit()
+    flash('Equipamento actualizado ✅', 'success')
+    return redirect(url_for('eq_industrial_detalhe', eid=eid))
+
+@app.route('/equipamentos-industriais/<int:eid>/componente', methods=['POST'])
+@login_required
+def eq_industrial_componente_add(eid):
+    eq = EquipamentoIndustrial.query.get_or_404(eid)
+    data = request.get_json() or {}
+    def g(k): return data.get(k,'') or None
+    def gf(k):
+        v = data.get(k,'')
+        try: return float(v) if v else None
+        except: return None
+    def gi(k):
+        v = data.get(k,'')
+        try: return int(v) if v else None
+        except: return None
+    comp = EqIndComponente(
+        equipamento_id=eid, tipo=g('tipo') or 'motor',
+        marca_grupo=g('marca_grupo'), nserie_grupo=g('nserie_grupo'), dados_grupo=g('dados_grupo'),
+        marca_motor=g('marca_motor'), nserie_motor=g('nserie_motor'),
+        familia_motor=g('familia_motor'), tipo_motor=g('tipo_motor'),
+        potencia_motor_kw=gf('potencia_motor_kw'), potencia_motor_cv=gf('potencia_motor_cv'),
+        rpm_motor=gi('rpm_motor'), cilindros=gi('cilindros'),
+        combustivel=g('combustivel'), instalacao_eletrica=g('instalacao_eletrica'), dados_motor=g('dados_motor'),
+        marca_alternador=g('marca_alternador'), nserie_alternador=g('nserie_alternador'),
+        potencia_kva=gf('potencia_kva'), potencia_kw_alt=gf('potencia_kw_alt'),
+        tensao_saida=g('tensao_saida'), frequencia=gi('frequencia'),
+        fator_potencia=g('fator_potencia'), dados_alternador=g('dados_alternador'),
+        descricao=g('descricao'), dados_outros=g('dados_outros'),
+    )
+    db.session.add(comp)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': comp.id})
+
+@app.route('/equipamentos-industriais/componente/<int:cid>', methods=['DELETE'])
+@login_required
+def eq_industrial_componente_del(cid):
+    comp = EqIndComponente.query.get_or_404(cid)
+    db.session.delete(comp)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/equipamentos-industriais/<int:eid>/doc/upload', methods=['POST'])
+@login_required
+def eq_industrial_doc_upload(eid):
+    eq = EquipamentoIndustrial.query.get_or_404(eid)
+    f  = request.files.get('ficheiro')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': 'Sem ficheiro'})
+    import re as _re
+    safe = _re.sub(r'[^\w\-\.]', '_', f.filename)
+    fname = f'eqdoc{eid}_{int(datetime.now().timestamp())}_{safe}'
+    f.save(os.path.join(EQ_IND_UPLOAD_DIR, fname))
+    doc = EqIndDocumento(
+        equipamento_id=eid,
+        tipo=request.form.get('tipo','outro'),
+        titulo=request.form.get('titulo','').strip() or f.filename,
+        ficheiro_path=fname,
+        notas=request.form.get('notas','').strip() or None,
+        user_id=current_user.id,
+    )
+    db.session.add(doc)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': doc.id, 'titulo': doc.titulo})
+
+@app.route('/equipamentos-industriais/doc/<int:did>/ver')
+@login_required
+def eq_industrial_doc_ver(did):
+    doc = EqIndDocumento.query.get_or_404(did)
+    return send_from_directory(EQ_IND_UPLOAD_DIR, doc.ficheiro_path)
+
+@app.route('/equipamentos-industriais/doc/<int:did>/apagar', methods=['POST'])
+@login_required
+def eq_industrial_doc_apagar(did):
+    doc = EqIndDocumento.query.get_or_404(did)
+    try: os.remove(os.path.join(EQ_IND_UPLOAD_DIR, doc.ficheiro_path))
+    except: pass
+    db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/equipamentos-industriais/foto/<path:fname>')
+@login_required
+def eq_industrial_foto(fname):
+    return send_from_directory(EQ_IND_UPLOAD_DIR, fname)
+
+
+# ══════════════════════════════════════════════════════════════════════
 # MANUAIS EMBARCAÇÕES — Upload / Download / Listagem
 # ══════════════════════════════════════════════════════════════════════
 MANUAIS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'manuais_embarcacoes')
@@ -4111,6 +4296,7 @@ MENUS_DISPONIVEIS = [
     ('entradas',           '📥 Entradas'),
     ('partilha',           '📁 Partilha'),
     ('empresa',            '🏢 Empresa'),
+    ('eq_industriais',     '⚙️ Equipamentos Industriais'),
     ('conectividade',      '🌐 Conectividade'),
     ('roadmap',            '🗺️ Roadmap'),
     ('changelog',          '📝 Changelog'),

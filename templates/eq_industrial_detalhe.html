@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% block title %}{{ eq.nome }} · NavTech{% endblock %}
+{% block page_title %}⚙️ {{ eq.nome }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('eq_industriais') }}" class="btn btn-ghost btn-sm">← Equipamentos</a>
+  <button onclick="document.getElementById('modalEditarEq').style.display='flex'" class="btn btn-ghost btn-sm">✏️ Editar</button>
+{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start">
+
+<!-- ── Coluna Esquerda ─────────────────────────────────────────── -->
+<div>
+  <!-- Foto -->
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
+    <div style="height:200px;background:var(--surface2);position:relative">
+      {% if eq.foto_path %}
+      <img src="{{ url_for('eq_industrial_foto', fname=eq.foto_path) }}" style="width:100%;height:100%;object-fit:cover">
+      {% else %}
+      <div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:64px">⚙️</div>
+      {% endif %}
+    </div>
+    <div style="padding:14px">
+      <div style="font-size:15px;font-weight:800;color:var(--accent)">{{ eq.nome }}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ tipos.get(eq.tipo, eq.tipo) }}</div>
+      <div style="margin-top:8px;display:inline-block;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;
+        background:{{ 'rgba(34,197,94,.15)' if eq.estado=='ativo' else 'rgba(239,68,68,.15)' }};
+        color:{{ '#22c55e' if eq.estado=='ativo' else '#ef4444' }}">
+        {{ eq.estado|upper }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Info -->
+  <div class="card mb-14">
+    <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">📋 Informações</div>
+    {% macro row(lbl, val) %}{% if val %}
+    <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:var(--text-muted);min-width:110px;flex-shrink:0">{{ lbl }}</span>
+      <span style="font-weight:600">{{ val }}</span>
+    </div>{% endif %}{% endmacro %}
+    {{ row('Cliente', eq.cliente.nome if eq.cliente else '—') }}
+    {{ row('Referência', eq.referencia_interna) }}
+    {{ row('Local', eq.local_instalacao) }}
+    {{ row('Fabricação', eq.data_fabricacao.strftime('%d/%m/%Y') if eq.data_fabricacao else None) }}
+    {{ row('Instalação', eq.data_instalacao.strftime('%d/%m/%Y') if eq.data_instalacao else None) }}
+    {% if eq.notas %}
+    <div style="margin-top:8px;font-size:11px;color:var(--text-muted);font-style:italic">{{ eq.notas }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Documentos -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--accent)">📎 Documentos / PDFs</div>
+      <button onclick="abrirUploadDoc()" class="btn btn-ghost btn-sm" style="font-size:10px">+ Adicionar</button>
+    </div>
+    <div id="docsList">
+    {% for doc in eq.documentos.all() %}
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px" id="doc{{ doc.id }}">
+      <span>{{ '📄' if doc.ficheiro_path and doc.ficheiro_path.endswith('.pdf') else '🖼' }}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ doc.titulo }}">{{ doc.titulo }}</span>
+      <a href="{{ url_for('eq_industrial_doc_ver', did=doc.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px">👁</a>
+      <button onclick="apagarDoc({{ doc.id }})" class="btn btn-sm" style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>
+    </div>
+    {% else %}
+    <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:12px" id="docsEmpty">Sem documentos</div>
+    {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Coluna Direita ──────────────────────────────────────────── -->
+<div>
+  <!-- Componentes -->
+  <div class="card mb-14">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--accent)">🔧 Componentes Técnicos</div>
+      <button onclick="abrirModalComp('grupo')" class="btn btn-ghost btn-sm" style="font-size:11px">+ Grupo</button>
+      <button onclick="abrirModalComp('alternador')" class="btn btn-ghost btn-sm" style="font-size:11px">+ Alternador</button>
+      <button onclick="abrirModalComp('outro')" class="btn btn-ghost btn-sm" style="font-size:11px">+ Outro</button>
+    </div>
+    {% for comp in eq.componentes.all() %}
+    <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden" id="comp{{ comp.id }}">
+      <div style="background:var(--surface2);padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:12px;font-weight:700;color:var(--accent)">
+          {{ '⚙️ Motor / Grupo' if comp.tipo=='grupo' else '⚡ Alternador' if comp.tipo=='alternador' else '📦 ' + (comp.descricao or 'Outro') }}
+        </div>
+        <button onclick="apagarComp({{ comp.id }})" class="btn btn-sm" style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>
+      </div>
+      <div style="padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:12px">
+        {% macro cr(lbl,val) %}{% if val %}<div style="color:var(--text-muted)">{{ lbl }}</div><div style="font-weight:600">{{ val }}</div>{% endif %}{% endmacro %}
+        {% if comp.tipo == 'grupo' %}
+          {{ cr('Marca Grupo', comp.marca_grupo) }}{{ cr('Nº Série Grupo', comp.nserie_grupo) }}
+          {{ cr('Marca Motor', comp.marca_motor) }}{{ cr('Nº Série Motor', comp.nserie_motor) }}
+          {{ cr('Família Motor', comp.familia_motor) }}{{ cr('Tipo Motor', comp.tipo_motor) }}
+          {{ cr('Potência (kW)', comp.potencia_motor_kw|string + ' kW' if comp.potencia_motor_kw else None) }}
+          {{ cr('Potência (CV)', comp.potencia_motor_cv|string + ' CV' if comp.potencia_motor_cv else None) }}
+          {{ cr('RPM', comp.rpm_motor|string if comp.rpm_motor else None) }}
+          {{ cr('Cilindros', comp.cilindros|string if comp.cilindros else None) }}
+          {{ cr('Combustível', comp.combustivel) }}
+          {{ cr('Instalação Eléct.', comp.instalacao_eletrica) }}
+          {% if comp.dados_motor %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic;margin-top:4px">{{ comp.dados_motor }}</div>{% endif %}
+          {% if comp.dados_grupo %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic">{{ comp.dados_grupo }}</div>{% endif %}
+        {% elif comp.tipo == 'alternador' %}
+          {{ cr('Marca', comp.marca_alternador) }}{{ cr('Nº Série', comp.nserie_alternador) }}
+          {{ cr('Potência kVA', comp.potencia_kva|string + ' kVA' if comp.potencia_kva else None) }}
+          {{ cr('Potência kW', comp.potencia_kw_alt|string + ' kW' if comp.potencia_kw_alt else None) }}
+          {{ cr('Tensão Saída', comp.tensao_saida) }}{{ cr('Frequência', comp.frequencia|string + ' Hz' if comp.frequencia else None) }}
+          {{ cr('Factor Potência', comp.fator_potencia) }}
+          {% if comp.dados_alternador %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic;margin-top:4px">{{ comp.dados_alternador }}</div>{% endif %}
+        {% else %}
+          {{ cr('Descrição', comp.descricao) }}
+          {% if comp.dados_outros %}<div style="grid-column:1/-1;color:var(--text-muted);font-style:italic">{{ comp.dados_outros }}</div>{% endif %}
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Sem componentes registados</div>
+    {% endfor %}
+  </div>
+</div>
+</div>
+
+<!-- ── Modal Editar Equipamento ────────────────────────────────── -->
+<div id="modalEditarEq" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="width:580px;max-height:90vh;overflow-y:auto;background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700;color:var(--accent)">✏️ Editar Equipamento</span>
+      <button onclick="document.getElementById('modalEditarEq').style.display='none'" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('eq_industrial_editar', eid=eq.id) }}" enctype="multipart/form-data" style="padding:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="grid-column:1/-1;margin:0">
+          <label>Nome *</label><input type="text" name="nome" class="input" value="{{ eq.nome }}" required>
+        </div>
+        <div class="form-group" style="margin:0"><label>Tipo</label>
+          <select name="tipo" class="input">{% for k,v in tipos.items() %}<option value="{{ k }}" {{ 'selected' if eq.tipo==k }}>{{ v }}</option>{% endfor %}</select>
+        </div>
+        <div class="form-group" style="margin:0"><label>Estado</label>
+          <select name="estado" class="input">
+            <option value="ativo" {{ 'selected' if eq.estado=='ativo' }}>✅ Activo</option>
+            <option value="inativo" {{ 'selected' if eq.estado=='inativo' }}>⏸ Inactivo</option>
+            <option value="abate" {{ 'selected' if eq.estado=='abate' }}>❌ Abate</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;margin:0"><label>Cliente</label>
+          <input type="text" id="editClienteInput" class="input" value="{{ eq.cliente.nome if eq.cliente else '' }}" oninput="searchClienteEdit(this.value)">
+          <input type="hidden" name="cliente_id" id="editClienteId" value="{{ eq.cliente_id }}">
+          <div id="editClienteDrop" style="display:none;position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:160px;overflow-y:auto;z-index:200;box-shadow:0 8px 20px rgba(0,0,0,.2)"></div>
+        </div>
+        <div class="form-group" style="margin:0"><label>Local</label><input type="text" name="local_instalacao" class="input" value="{{ eq.local_instalacao or '' }}"></div>
+        <div class="form-group" style="margin:0"><label>Ref. Interna</label><input type="text" name="referencia_interna" class="input" value="{{ eq.referencia_interna or '' }}"></div>
+        <div class="form-group" style="margin:0"><label>Data Fabricação</label><input type="date" name="data_fabricacao" class="input" value="{{ eq.data_fabricacao.isoformat() if eq.data_fabricacao else '' }}"></div>
+        <div class="form-group" style="margin:0"><label>Data Instalação</label><input type="date" name="data_instalacao" class="input" value="{{ eq.data_instalacao.isoformat() if eq.data_instalacao else '' }}"></div>
+        <div class="form-group" style="grid-column:1/-1;margin:0"><label>Foto</label><input type="file" name="foto" accept="image/*" class="input"></div>
+        <div class="form-group" style="grid-column:1/-1;margin:0"><label>Notas</label><textarea name="notas" class="input" rows="2">{{ eq.notas or '' }}</textarea></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button type="submit" class="btn btn-primary">💾 Guardar</button>
+        <button type="button" onclick="document.getElementById('modalEditarEq').style.display='none'" class="btn btn-ghost">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal Componente ─────────────────────────────────────────── -->
+<div id="modalComp" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="width:620px;max-height:90vh;overflow-y:auto;background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span id="modalCompTitulo" style="font-weight:700;color:var(--accent)">🔧 Novo Componente</span>
+      <button onclick="fecharModalComp()" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <div style="padding:16px" id="modalCompBody"></div>
+  </div>
+</div>
+
+<!-- ── Modal Upload Doc ─────────────────────────────────────────── -->
+<div id="modalUploadDoc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="width:440px;background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700;color:var(--accent)">📎 Adicionar Documento</span>
+      <button onclick="document.getElementById('modalUploadDoc').style.display='none'" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <div style="padding:16px">
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="docTipo" class="input">
+          <option value="manual">📖 Manual</option>
+          <option value="ficha_tecnica">📋 Ficha Técnica</option>
+          <option value="certificado">🏅 Certificado</option>
+          <option value="foto">🖼 Foto</option>
+          <option value="outro">📁 Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="docTitulo" class="input" placeholder="Ex: Manual Motor JD 4045">
+      </div>
+      <div class="form-group">
+        <label>Ficheiro (PDF, imagem)</label>
+        <input type="file" id="docFicheiro" class="input" accept=".pdf,image/*">
+      </div>
+      <div class="form-group">
+        <label>Notas</label>
+        <input type="text" id="docNotas" class="input" placeholder="Observações...">
+      </div>
+      <div id="uploadDocMsg" style="display:none;font-size:12px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="uploadDoc()" class="btn btn-primary">⬆ Upload</button>
+        <button onclick="document.getElementById('modalUploadDoc').style.display='none'" class="btn btn-ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var EID = {{ eq.id }};
+
+// ── Componentes ──────────────────────────────────────────────────────
+function fg(id, lbl, placeholder, type) {
+  type = type||'text';
+  return '<div class="form-group" style="margin:0"><label style="font-size:11px">'+lbl+'</label><input type="'+type+'" id="'+id+'" class="input" step="any" placeholder="'+(placeholder||'')+'"></div>';
+}
+function fta(id, lbl) {
+  return '<div class="form-group" style="margin:0;grid-column:1/-1"><label style="font-size:11px">'+lbl+'</label><textarea id="'+id+'" class="input" rows="2"></textarea></div>';
+}
+
+var COMP_FORMS = {
+  grupo: '<input type="hidden" id="c_tipo" value="grupo"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase">Grupo</div>'+
+    fg('c_marca_grupo','Marca Grupo')+fg('c_nserie_grupo','Nº Série Grupo')+fta('c_dados_grupo','Outros Dados Grupo')+
+    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-top:8px">Motor</div>'+
+    fg('c_marca_motor','Marca Motor')+fg('c_nserie_motor','Nº Série Motor')+
+    fg('c_familia_motor','Família Motor')+fg('c_tipo_motor','Tipo Motor')+
+    fg('c_potencia_motor_kw','Potência (kW)','Ex: 88','number')+fg('c_potencia_motor_cv','Potência (CV)','Ex: 120','number')+
+    fg('c_rpm_motor','RPM','Ex: 1500','number')+fg('c_cilindros','Cilindros','Ex: 4','number')+
+    fg('c_combustivel','Combustível','Diesel / Gás')+fg('c_instalacao_eletrica','Instalação Eléctrica','Ex: 400V 3F')+
+    fta('c_dados_motor','Outros Dados Motor')+'</div>',
+  alternador: '<input type="hidden" id="c_tipo" value="alternador"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+    '<div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase">Alternador</div>'+
+    fg('c_marca_alternador','Marca Alternador')+fg('c_nserie_alternador','Nº Série Alternador')+
+    fg('c_potencia_kva','Potência (kVA)','Ex: 100','number')+fg('c_potencia_kw_alt','Potência (kW)','Ex: 80','number')+
+    fg('c_tensao_saida','Tensão Saída','Ex: 230/400V')+fg('c_frequencia','Frequência (Hz)','50','number')+
+    fg('c_fator_potencia','Factor Potência','Ex: 0.8')+
+    fta('c_dados_alternador','Outros Dados')+'</div>',
+  outro: '<input type="hidden" id="c_tipo" value="outro"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+    fg('c_descricao','Descrição','Ex: Quadro de Comando')+'<div></div>'+
+    fta('c_dados_outros','Dados / Observações')+'</div>',
+};
+
+function abrirModalComp(tipo) {
+  var m = document.getElementById('modalComp');
+  var titles = {grupo:'⚙️ Motor / Grupo', alternador:'⚡ Alternador', outro:'📦 Outro Componente'};
+  document.getElementById('modalCompTitulo').textContent = titles[tipo]||'Componente';
+  document.getElementById('modalCompBody').innerHTML = COMP_FORMS[tipo||'outro'] +
+    '<div style="display:flex;gap:10px;margin-top:14px">'+
+    '<button onclick="guardarComp()" class="btn btn-primary">💾 Guardar</button>'+
+    '<button onclick="fecharModalComp()" class="btn btn-ghost">Cancelar</button></div>';
+  m.style.display = 'flex';
+}
+function fecharModalComp() { document.getElementById('modalComp').style.display='none'; }
+
+function gv(id) { var e=document.getElementById(id); return e ? e.value.trim() : ''; }
+function guardarComp() {
+  var data = {};
+  document.querySelectorAll('#modalCompBody [id^="c_"]').forEach(function(el) {
+    data[el.id.replace('c_','')] = el.value.trim();
+  });
+  fetch('/equipamentos-industriais/{{ eq.id }}/componente', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json()).then(function(d) {
+    if (d.ok) { fecharModalComp(); location.reload(); }
+  });
+}
+function apagarComp(id) {
+  if (!confirm('Eliminar componente?')) return;
+  fetch('/equipamentos-industriais/componente/'+id, {method:'DELETE'})
+    .then(r=>r.json()).then(function(d){ if(d.ok) document.getElementById('comp'+id).remove(); });
+}
+
+// ── Documentos ───────────────────────────────────────────────────────
+function abrirUploadDoc() { document.getElementById('modalUploadDoc').style.display='flex'; }
+function uploadDoc() {
+  var f = document.getElementById('docFicheiro').files[0];
+  if (!f) { alert('Seleccione um ficheiro'); return; }
+  var fd = new FormData();
+  fd.append('ficheiro', f);
+  fd.append('tipo', document.getElementById('docTipo').value);
+  fd.append('titulo', document.getElementById('docTitulo').value || f.name);
+  fd.append('notas', document.getElementById('docNotas').value);
+  var msg = document.getElementById('uploadDocMsg');
+  msg.style.display='block'; msg.textContent='A carregar...'; msg.style.color='var(--text-muted)';
+  fetch('/equipamentos-industriais/{{ eq.id }}/doc/upload', {method:'POST', body:fd})
+    .then(r=>r.json()).then(function(d) {
+      if (d.ok) {
+        msg.textContent='✅ Documento adicionado'; msg.style.color='#22c55e';
+        setTimeout(function(){ location.reload(); }, 800);
+      } else {
+        msg.textContent='❌ '+d.error; msg.style.color='#ef4444';
+      }
+    });
+}
+function apagarDoc(id) {
+  if (!confirm('Eliminar documento?')) return;
+  fetch('/equipamentos-industriais/doc/'+id+'/apagar', {method:'POST'})
+    .then(r=>r.json()).then(function(d){ if(d.ok) document.getElementById('doc'+id).remove(); });
+}
+
+// ── Cliente search (edit modal) ──────────────────────────────────────
+function searchClienteEdit(q) {
+  var dd = document.getElementById('editClienteDrop');
+  if (!q || q.length < 2) { dd.style.display='none'; return; }
+  fetch('/api/clientes/search?q='+encodeURIComponent(q)).then(r=>r.json()).then(function(data) {
+    dd.innerHTML='';
+    (data.clientes||data).forEach(function(c){
+      var div=document.createElement('div');
+      div.style.cssText='padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)';
+      div.textContent=c.nome;
+      div.onclick=function(){ document.getElementById('editClienteInput').value=c.nome; document.getElementById('editClienteId').value=c.id; dd.style.display='none'; };
+      dd.appendChild(div);
+    });
+    dd.style.display=dd.children.length?'block':'none';
+  });
+}
+
+document.getElementById('modalComp').addEventListener('click',function(e){if(e.target===this)fecharModalComp();});
+document.getElementById('modalUploadDoc').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+document.getElementById('modalEditarEq').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+</script>
+{% endblock %}

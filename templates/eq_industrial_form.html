@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if eq else 'Novo' }} Equipamento · NavTech{% endblock %}
+{% block page_title %}{{ '✏️ Editar' if eq else '➕ Novo' }} Equipamento Industrial{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('eq_industriais') }}" class="btn btn-ghost btn-sm">← Equipamentos</a>
+{% endblock %}
+{% block content %}
+<div class="card" style="max-width:700px">
+  <form method="post" enctype="multipart/form-data">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Nome / Designação *</label>
+        <input type="text" name="nome" class="input" required value="{{ eq.nome if eq else '' }}" placeholder="Ex: Grupo Gerador 100kVA">
+      </div>
+      <div class="form-group">
+        <label>Tipo de Equipamento</label>
+        <select name="tipo" class="input">
+          {% for k,v in tipos.items() %}
+          <option value="{{ k }}" {{ 'selected' if eq and eq.tipo==k }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Referência Interna</label>
+        <input type="text" name="referencia_interna" class="input" value="{{ eq.referencia_interna if eq else '' }}" placeholder="Ref. UCN / Nº processo">
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Cliente *</label>
+        <div style="position:relative">
+          <input type="text" id="clienteInput" class="input" autocomplete="off"
+            placeholder="🔍 Pesquisar cliente..." oninput="searchCliente(this.value)"
+            value="{{ eq.cliente.nome if eq and eq.cliente else '' }}">
+          <input type="hidden" name="cliente_id" id="clienteId" value="{{ eq.cliente_id if eq else '' }}" required>
+          <div id="clienteDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 20px rgba(0,0,0,.2)"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Local de Instalação</label>
+        <input type="text" name="local_instalacao" class="input" value="{{ eq.local_instalacao if eq else '' }}" placeholder="Ex: Central Técnica, Porto">
+      </div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select name="estado" class="input">
+          <option value="ativo" {{ 'selected' if not eq or eq.estado=='ativo' }}>✅ Activo</option>
+          <option value="inativo" {{ 'selected' if eq and eq.estado=='inativo' }}>⏸ Inactivo</option>
+          <option value="abate" {{ 'selected' if eq and eq.estado=='abate' }}>❌ Abate</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Data de Fabricação</label>
+        <input type="date" name="data_fabricacao" class="input" value="{{ eq.data_fabricacao.isoformat() if eq and eq.data_fabricacao else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Data de Instalação</label>
+        <input type="date" name="data_instalacao" class="input" value="{{ eq.data_instalacao.isoformat() if eq and eq.data_instalacao else '' }}">
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Foto do Equipamento</label>
+        <input type="file" name="foto" accept="image/*" class="input">
+        {% if eq and eq.foto_path %}<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Foto actual: {{ eq.foto_path }}</div>{% endif %}
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Notas / Observações</label>
+        <textarea name="notas" class="input" rows="3">{{ eq.notas if eq else '' }}</textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button type="submit" class="btn btn-primary">💾 Guardar</button>
+      <a href="{{ url_for('eq_industriais') }}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+</div>
+<script>
+var _ct = null;
+function searchCliente(q) {
+  clearTimeout(_ct);
+  var dd = document.getElementById('clienteDrop');
+  if (!q || q.length < 2) { dd.style.display='none'; return; }
+  _ct = setTimeout(function(){
+    fetch('/api/clientes/search?q='+encodeURIComponent(q))
+      .then(r=>r.json()).then(function(data) {
+        dd.innerHTML = '';
+        (data.clientes||data).forEach(function(c) {
+          var d = document.createElement('div');
+          d.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)';
+          d.textContent = c.nome;
+          d.onmouseover = function(){ this.style.background='var(--surface2)'; };
+          d.onmouseout  = function(){ this.style.background=''; };
+          d.onclick = function(){
+            document.getElementById('clienteInput').value = c.nome;
+            document.getElementById('clienteId').value = c.id;
+            dd.style.display='none';
+          };
+          dd.appendChild(d);
+        });
+        dd.style.display = dd.children.length ? 'block' : 'none';
+      });
+  }, 200);
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('#clienteDrop') && e.target.id !== 'clienteInput')
+    document.getElementById('clienteDrop').style.display='none';
+});
+</script>
+{% endblock %}
