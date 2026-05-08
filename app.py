@@ -2602,6 +2602,7 @@ def agenda_registo_novo():
             tipo=data.get('tipo','cliente'),
             estado='em_curso',
             data_inicio=dt,
+            nota_servico=data.get('nota_servico','').strip() or None,
             descricao=data.get('descricao','').strip() or None,
             criado_por=current_user.id,
         )
@@ -2661,7 +2662,7 @@ def agenda_registo_get(rid):
     return jsonify({'ok': True,
         'id': r.id, 'data': r.data.isoformat(),
         'servico_id': r.servico_id,
-        'numero': sv.numero or '', 'titulo': sv.titulo, 'cliente_id': sv.cliente_id,
+        'numero': sv.numero or '', 'nota_servico': sv.nota_servico or '', 'titulo': sv.titulo, 'cliente_id': sv.cliente_id,
         'cliente_nome': sv.cliente.nome if sv.cliente else '',
         'embarcacao_nome': sv.embarcacao_nome or '',
         'equipamento': sv.equipamento or '',

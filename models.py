@@ -861,6 +861,7 @@ class AgendaServico(db.Model):
     __tablename__ = 'agenda_servicos'
     id              = db.Column(db.Integer, primary_key=True)
     numero          = db.Column(db.Integer)  # auto-assigned service number
+    nota_servico    = db.Column(db.String(300))  # manual note shown in dropdown
     titulo          = db.Column(db.String(300), nullable=False)
     cliente_id      = db.Column(db.Integer, db.ForeignKey('clientes.id'))
     embarcacao_nome = db.Column(db.String(200))   # free text + suggestions

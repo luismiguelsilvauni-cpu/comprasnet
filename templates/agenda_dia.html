@@ -98,8 +98,8 @@
           <option value="novo">➕ Criar Novo Serviço</option>
           <option value="" disabled style="color:var(--text-muted);font-size:10px">── Serviços em Curso ──</option>
           {% for sv in servicos_curso %}
-          <option value="{{ sv.id }}" data-cliente="{{ sv.cliente.nome if sv.cliente else '' }}" data-emb="{{ sv.embarcacao_nome or '' }}" data-equip="{{ sv.equipamento or '' }}" data-local="{{ sv.local_servico or '' }}" data-tipo="{{ sv.tipo }}">
-            {% if sv.numero %}#{{ sv.numero }} — {% endif %}{{ sv.data_inicio.strftime('%d/%m/%Y') if sv.data_inicio else '' }}{% if sv.cliente %} · {{ sv.cliente.nome }}{% endif %}{% if sv.embarcacao_nome %} · {{ sv.embarcacao_nome }}{% endif %}
+          <option value="{{ sv.id }}" data-cliente="{{ sv.cliente.nome if sv.cliente else '' }}" data-emb="{{ sv.embarcacao_nome or '' }}" data-equip="{{ sv.equipamento or '' }}" data-local="{{ sv.local_servico or '' }}" data-nota="{{ sv.nota_servico or '' }}" data-tipo="{{ sv.tipo }}">
+            {% if sv.numero %}#{{ sv.numero }} — {% endif %}{{ sv.data_inicio.strftime('%d/%m/%Y') if sv.data_inicio else '' }}{% if sv.cliente %} · {{ sv.cliente.nome }}{% endif %}{% if sv.embarcacao_nome %} · {{ sv.embarcacao_nome }}{% endif %}{% if sv.nota_servico %} · {{ sv.nota_servico }}{% endif %}
           </option>
           {% endfor %}
         </select>
@@ -131,6 +131,10 @@
         <div class="form-group">
           <label>Local do Serviço</label>
           <input type="text" id="rLocal" class="input" placeholder="Porto, Douro...">
+        </div>
+        <div class="form-group">
+          <label>Nota do Serviço <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+          <input type="text" id="rNotaServico" class="input" placeholder="Ex: Avaria bomba hidráulica, revisão anual...">
         </div>
         <div class="form-group">
           <label>Nº Horas</label>
@@ -317,10 +321,11 @@ function onServicoChange() {
   sel.style.boxShadow = '';
   if (sel.value === 'novo' || sel.value === '') return;
   if (opt.dataset.cliente) document.getElementById('rClienteInput').value = opt.dataset.cliente;
-  if (opt.dataset.emb)     document.getElementById('rEmb').value = opt.dataset.emb;
-  if (opt.dataset.equip)   document.getElementById('rEquip').value = opt.dataset.equip;
-  if (opt.dataset.local)   document.getElementById('rLocal').value = opt.dataset.local;
-  if (opt.dataset.tipo)    setTipo(opt.dataset.tipo);
+  if (opt.dataset.emb)    document.getElementById('rEmb').value = opt.dataset.emb;
+  if (opt.dataset.equip)  document.getElementById('rEquip').value = opt.dataset.equip;
+  if (opt.dataset.local)  document.getElementById('rLocal').value = opt.dataset.local;
+  if (opt.dataset.nota)   document.getElementById('rNotaServico').value = opt.dataset.nota;
+  if (opt.dataset.tipo)   setTipo(opt.dataset.tipo);
 }
 
 function calcHoras() {
@@ -428,6 +433,7 @@ function getFormData() {
     embarcacao_nome: document.getElementById('rEmb').value.trim(),
     equipamento: document.getElementById('rEquip').value.trim(),
     local_servico: document.getElementById('rLocal').value.trim(),
+    nota_servico: document.getElementById('rNotaServico').value.trim(),
     horas: parseFloat(document.getElementById('rHoras').value)||0,
     hora_inicio: document.getElementById('rHIni').value,
     hora_fim: document.getElementById('rHFim').value,
@@ -501,6 +507,7 @@ function abrirNovoRegisto() {
   document.getElementById('rEmb').value = '';
   document.getElementById('rEquip').value = '';
   document.getElementById('rLocal').value = '';
+  document.getElementById('rNotaServico').value = '';
   document.getElementById('rHoras').value = '8';
   document.getElementById('rHIni').value = '08:00';
   document.getElementById('rHFim').value = '17:00';
@@ -536,6 +543,7 @@ function editarRegisto(rid) {
     document.getElementById('rEmb').value = d.embarcacao_nome;
     document.getElementById('rEquip').value = d.equipamento;
     document.getElementById('rLocal').value = d.local_servico;
+    document.getElementById('rNotaServico').value = d.nota_servico || '';
     document.getElementById('rHoras').value = d.horas;
     document.getElementById('rHIni').value = d.hora_inicio;
     document.getElementById('rHFim').value = d.hora_fim;
