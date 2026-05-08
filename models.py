@@ -860,6 +860,7 @@ class AgendaServico(db.Model):
     """Um serviço pode durar vários dias e envolver vários funcionários."""
     __tablename__ = 'agenda_servicos'
     id              = db.Column(db.Integer, primary_key=True)
+    numero          = db.Column(db.Integer)  # auto-assigned service number
     titulo          = db.Column(db.String(300), nullable=False)
     cliente_id      = db.Column(db.Integer, db.ForeignKey('clientes.id'))
     embarcacao_nome = db.Column(db.String(200))   # free text + suggestions

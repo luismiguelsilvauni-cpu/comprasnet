@@ -2449,26 +2449,28 @@ os.makedirs(MANUAIS_DIR, exist_ok=True)
 @app.route('/agenda')
 @login_required
 def agenda():
-    funcs = Funcionario.query.filter_by(ativo=True, agenda_ativo=True).order_by(Funcionario.nome).all()
-    # Stats per funcionário
     from datetime import date as _d
+    import calendar as _cal
     hoje = _d.today()
-    mes_ini = hoje.replace(day=1)
+    ano = int(request.args.get('ano', hoje.year))
+    mes = int(request.args.get('mes', hoje.month))
+    mes_ini = _d(ano, mes, 1)
+    mes_fim = _d(ano, mes, _cal.monthrange(ano, mes)[1])
+    funcs = Funcionario.query.filter_by(ativo=True, agenda_ativo=True).order_by(Funcionario.nome).all()
     stats = {}
     for f in funcs:
         regs = AgendaRegisto.query.filter(
             AgendaRegisto.funcionario_id == f.id,
             AgendaRegisto.data >= mes_ini,
-            AgendaRegisto.data <= hoje
+            AgendaRegisto.data <= mes_fim,
         ).all()
         stats[f.id] = {
             'horas_mes': sum(r.horas or 0 for r in regs),
             'he_mes': sum(r.he_horas or 0 for r in regs),
             'faltas_mes': sum(r.falta_horas or 0 for r in regs if r.tem_falta),
             'registos_mes': len(regs),
-            'ultimo': max((r.data for r in regs), default=None),
         }
-    return render_template('agenda.html', funcs=funcs, stats=stats, hoje=hoje)
+    return render_template('agenda.html', funcs=funcs, stats=stats, hoje=hoje, ano=ano, mes=mes)
 
 @app.route('/agenda/config-users', methods=['GET','POST'])
 @login_required
@@ -2546,7 +2548,7 @@ def agenda_dia(fid, ano, mes, dia):
     # Services in progress for suggestions
     servicos_curso = AgendaServico.query.filter(
         AgendaServico.estado == 'em_curso'
-    ).order_by(AgendaServico.atualizado_em.desc()).limit(20).all()
+    ).order_by(AgendaServico.numero.desc().nullslast(), AgendaServico.atualizado_em.desc()).limit(30).all()
     clientes_obj = Cliente.query.order_by(Cliente.nome).all()
     clientes = [{'id': c.id, 'nome': c.nome} for c in clientes_obj]
     # Embarcacao suggestions
@@ -2576,7 +2578,10 @@ def agenda_registo_novo():
     servico_id = data.get('servico_id')
     if not servico_id:
         # Create new servico
+        # Auto-assign service number
+        ultimo_num = db.session.query(db.func.max(AgendaServico.numero)).scalar() or 0
         sv = AgendaServico(
+            numero=ultimo_num + 1,
             titulo=data.get('titulo') or data.get('equipamento') or 'Serviço ' + dt.strftime('%d/%m/%Y'),
             cliente_id=int(data['cliente_id']) if data.get('cliente_id') else None,
             embarcacao_nome=data.get('embarcacao_nome','').strip() or None,
@@ -2644,7 +2649,7 @@ def agenda_registo_get(rid):
     return jsonify({'ok': True,
         'id': r.id, 'data': r.data.isoformat(),
         'servico_id': r.servico_id,
-        'titulo': sv.titulo, 'cliente_id': sv.cliente_id,
+        'numero': sv.numero or '', 'titulo': sv.titulo, 'cliente_id': sv.cliente_id,
         'cliente_nome': sv.cliente.nome if sv.cliente else '',
         'embarcacao_nome': sv.embarcacao_nome or '',
         'equipamento': sv.equipamento or '',
@@ -2724,6 +2729,17 @@ def agenda_registo_apagar(rid):
     db.session.delete(r)
     db.session.commit()
     return jsonify({'ok': True})
+
+@app.route('/agenda/servico/<int:sid>/apagar', methods=['POST'])
+@login_required
+def agenda_servico_apagar(sid):
+    sv = AgendaServico.query.get_or_404(sid)
+    # Delete all registos and their materiais (cascade)
+    db.session.delete(sv)
+    db.session.commit()
+    flash('Serviço eliminado ✅', 'success')
+    return jsonify({'ok': True})
+
 
 @app.route('/agenda/servico/<int:sid>/concluir', methods=['POST'])
 @login_required

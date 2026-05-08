@@ -9,22 +9,31 @@
   {% endif %}
 {% endblock %}
 {% block content %}
-<div style="margin-bottom:14px;font-size:13px;color:var(--text-muted)">
-  {{ hoje.strftime('%B %Y') }} — Clique num técnico para ver a agenda
+{% set MESES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] %}
+
+<!-- Month Navigation -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  {% set prev_mes = mes - 1 if mes > 1 else 12 %}
+  {% set prev_ano = ano if mes > 1 else ano - 1 %}
+  {% set next_mes = mes + 1 if mes < 12 else 1 %}
+  {% set next_ano = ano if mes < 12 else ano + 1 %}
+  <a href="{{ url_for('agenda', ano=prev_ano, mes=prev_mes) }}" class="btn btn-ghost btn-sm">‹ {{ MESES[prev_mes] }}</a>
+  <div style="font-size:15px;font-weight:700;color:var(--accent)">{{ MESES[mes] }} {{ ano }}</div>
+  {% if not (ano == hoje.year and mes == hoje.month) %}
+  <a href="{{ url_for('agenda', ano=next_ano, mes=next_mes) }}" class="btn btn-ghost btn-sm">{{ MESES[next_mes] }} ›</a>
+  {% else %}
+  <span class="btn btn-ghost btn-sm" style="opacity:.3;pointer-events:none">{{ MESES[next_mes] }} ›</span>
+  {% endif %}
 </div>
+
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
   {% for f in funcs %}
   {% set s = stats.get(f.id, {}) %}
-
-  {% if f.agenda_ativo %}
-  <!-- Técnico com Agenda -->
-  <a href="{{ url_for('agenda_funcionario', fid=f.id) }}" style="text-decoration:none">
+  <a href="{{ url_for('agenda_funcionario', fid=f.id, ano=ano, mes=mes) }}" style="text-decoration:none">
   <div class="card" style="padding:0;overflow:hidden;transition:.15s;border:1px solid var(--border)"
     onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.15)'" onmouseout="this.style.boxShadow=''">
     <div style="background:linear-gradient(135deg,#1e3a5f,#2d5a8e);padding:12px 14px;display:flex;align-items:center;gap:10px">
-      <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:white;flex-shrink:0">
-        {{ f.nome[0] }}
-      </div>
+      <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:white;flex-shrink:0">{{ f.nome[0] }}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.nome }}</div>
         <div style="font-size:10px;color:rgba(255,255,255,.7)">{{ f.categoria or 'Técnico' }}</div>
@@ -33,11 +42,11 @@
     <div style="padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
       <div style="text-align:center;padding:5px;background:var(--surface2);border-radius:6px">
         <div style="font-size:17px;font-weight:800;color:var(--accent)">{{ '%.1f'|format(s.get('horas_mes',0)) }}</div>
-        <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">Horas mês</div>
+        <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">Horas</div>
       </div>
       <div style="text-align:center;padding:5px;background:var(--surface2);border-radius:6px">
         <div style="font-size:17px;font-weight:800;color:#f59e0b">{{ '%.1f'|format(s.get('he_mes',0)) }}</div>
-        <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">HE mês</div>
+        <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">HE</div>
       </div>
       <div style="text-align:center;padding:5px;background:var(--surface2);border-radius:6px">
         <div style="font-size:15px;font-weight:700;color:#22c55e">{{ s.get('registos_mes',0) }}</div>
@@ -50,19 +59,6 @@
     </div>
   </div>
   </a>
-
-  {% else %}
-  <!-- Funcionário sem Agenda -->
-  <div class="card" style="padding:12px 14px;border:1px solid var(--border);opacity:.5;display:flex;align-items:center;gap:10px">
-    <div style="width:36px;height:36px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--text-muted);flex-shrink:0">
-      {{ f.nome[0] }}
-    </div>
-    <div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-muted)">{{ f.nome }}</div>
-      <div style="font-size:10px;color:var(--text-muted)">Sem agenda</div>
-    </div>
-  </div>
-  {% endif %}
   {% endfor %}
 </div>
 {% endblock %}

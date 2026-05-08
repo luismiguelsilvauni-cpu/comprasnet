@@ -96,7 +96,7 @@
           <option value="">➕ Criar novo serviço</option>
           {% for sv in servicos_curso %}
           <option value="{{ sv.id }}" data-cliente="{{ sv.cliente.nome if sv.cliente else '' }}" data-emb="{{ sv.embarcacao_nome or '' }}" data-equip="{{ sv.equipamento or '' }}" data-local="{{ sv.local_servico or '' }}" data-tipo="{{ sv.tipo }}">
-            {{ sv.titulo }} {% if sv.cliente %}— {{ sv.cliente.nome }}{% endif %}{% if sv.embarcacao_nome %} / {{ sv.embarcacao_nome }}{% endif %}
+            {% if sv.numero %}#{{ sv.numero }} — {% endif %}{{ sv.data_inicio.strftime('%d/%m/%Y') if sv.data_inicio else '' }}{% if sv.cliente %} · {{ sv.cliente.nome }}{% endif %}{% if sv.embarcacao_nome %} · {{ sv.embarcacao_nome }}{% endif %}
           </option>
           {% endfor %}
         </select>

@@ -20,7 +20,10 @@
 <div class="card mb-10" style="border-left:4px solid {{ '#3b6ef0' if sv.estado=='em_curso' else '#22c55e' }}">
   <div style="display:flex;align-items:flex-start;justify-content:space-between">
     <div style="flex:1">
-      <div style="font-size:13px;font-weight:700;color:var(--accent)">{{ sv.titulo }}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        {% if sv.numero %}<span style="background:var(--accent);color:white;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px">#{{ sv.numero }}</span>{% endif %}
+        <div style="font-size:13px;font-weight:700;color:var(--accent)">{{ sv.titulo }}</div>
+      </div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
         {% if sv.cliente %}<span>👥 {{ sv.cliente.nome }}</span>{% endif %}
         {% if sv.embarcacao_nome %}<span>⛵ {{ sv.embarcacao_nome }}</span>{% endif %}
@@ -34,6 +37,7 @@
       {% if sv.estado == 'em_curso' %}
       <button onclick="concluirServico({{ sv.id }})" class="btn btn-ghost btn-sm" style="font-size:10px;color:#22c55e">✅ Concluir</button>
       {% endif %}
+      <button onclick="apagarServico({{ sv.id }}, '{{ sv.titulo|replace("'", "") }}')" class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑 Eliminar</button>
     </div>
   </div>
 </div>
@@ -44,6 +48,10 @@
 </div>
 {% endfor %}
 <script>
+function apagarServico(id, titulo) {
+  if (!confirm('Eliminar o serviço "' + titulo + '" e todos os registos associados?\nEsta acção não pode ser revertida.')) return;
+  fetch('/agenda/servico/'+id+'/apagar', {method:'POST'}).then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); });
+}
 function concluirServico(id) {
   if (!confirm('Marcar serviço como concluído?')) return;
   fetch('/agenda/servico/'+id+'/concluir', {method:'POST'}).then(r=>r.json()).then(function(d){ if(d.ok) location.reload(); });
