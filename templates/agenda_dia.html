@@ -49,6 +49,7 @@
     {% if r.deslocacao_viatura %}
     <span style="color:#3b6ef0">🚗 {{ 'Nossa viatura' if r.viatura_tipo=='propria' else 'Viatura cliente' }} ({{ r.n_viagens }}x)</span>
     {% endif %}
+    {% if r.tem_falta %}<span style="color:#ef4444">🚫 Falta: {{ '%.1f'|format(r.falta_horas or 0) }}h{% if r.falta_obs %} — {{ r.falta_obs }}{% endif %}</span>{% endif %}
     {% if r.n_almoco %}
     <span style="color:#16a34a">🍽 {{ r.n_almoco }} almoço(s) — {{ '%.2f'|format(r.custo_refeicao) }}€</span>
     {% endif %}
@@ -184,6 +185,35 @@
           <div class="form-group" style="margin:0"><label style="font-size:11px">Nº Almoços</label><input type="number" id="rAlmoco" class="input" value="0" min="0"></div>
           <div class="form-group" style="margin:0"><label style="font-size:11px">Custo Total €</label><input type="number" id="rCustoRef" class="input" step="0.01" value="0"></div>
           <div class="form-group" style="margin:0"><label style="font-size:11px">Observações</label><input type="text" id="rObsRef" class="input" placeholder="..."></div>
+        </div>
+      </div>
+
+      <!-- Falta -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:#ef4444;text-transform:uppercase">🚫 Falta</div>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" id="rTemFalta" onchange="toggleFalta()"> Registar falta
+          </label>
+        </div>
+        <div id="faltaExtra" style="display:none;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="form-group" style="margin:0;grid-column:1/-1">
+            <label style="font-size:11px">Tipo de Falta</label>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <button type="button" onclick="setFaltaTipo('dia_completo')" id="fBtnDia" class="btn btn-primary btn-sm" style="flex:1">Dia Completo (8h)</button>
+              <button type="button" onclick="setFaltaTipo('meio_dia')" id="fBtnMeio" class="btn btn-ghost btn-sm" style="flex:1">Meio Dia (4h)</button>
+              <button type="button" onclick="setFaltaTipo('horas')" id="fBtnHoras" class="btn btn-ghost btn-sm" style="flex:1">Nº Horas</button>
+            </div>
+            <input type="hidden" id="rFaltaTipo" value="dia_completo">
+          </div>
+          <div class="form-group" style="margin:0" id="faltaHorasDiv">
+            <label style="font-size:11px">Horas de Falta</label>
+            <input type="number" id="rFaltaHoras" class="input" step="0.5" min="0" max="8" value="8">
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1">
+            <label style="font-size:11px">Observações da Falta</label>
+            <input type="text" id="rFaltaObs" class="input" placeholder="Motivo, justificação...">
+          </div>
         </div>
       </div>
 
@@ -363,6 +393,10 @@ function getFormData() {
     horas: parseFloat(document.getElementById('rHoras').value)||0,
     hora_inicio: document.getElementById('rHIni').value,
     hora_fim: document.getElementById('rHFim').value,
+    tem_falta: document.getElementById('rTemFalta').checked,
+    falta_tipo: document.getElementById('rFaltaTipo').value,
+    falta_horas: parseFloat(document.getElementById('rFaltaHoras').value)||0,
+    falta_obs: document.getElementById('rFaltaObs').value.trim(),
     tem_he: document.getElementById('rTemHE').checked,
     he_inicio: document.getElementById('rHEIni').value,
     he_fim: document.getElementById('rHEFim').value,
@@ -378,6 +412,29 @@ function getFormData() {
     descricao_trabalho: document.getElementById('rDesc').value.trim(),
     materiais: getMats(),
   };
+}
+
+
+function toggleFalta() {
+  var checked = document.getElementById('rTemFalta').checked;
+  document.getElementById('faltaExtra').style.display = checked ? 'grid' : 'none';
+  // If falta, disable horas (or set to 0)
+  if (checked) {
+    setFaltaTipo(document.getElementById('rFaltaTipo').value || 'dia_completo');
+  }
+}
+function setFaltaTipo(t) {
+  document.getElementById('rFaltaTipo').value = t;
+  ['Dia','Meio','Horas'].forEach(function(x) {
+    var btn = document.getElementById('fBtn'+x);
+    btn.className = 'btn btn-sm ' + (
+      (x==='Dia' && t==='dia_completo') || (x==='Meio' && t==='meio_dia') || (x==='Horas' && t==='horas')
+      ? 'btn-primary' : 'btn-ghost');
+    btn.style.flex = '1';
+  });
+  document.getElementById('faltaHorasDiv').style.display = t==='horas' ? 'block' : 'none';
+  if (t==='dia_completo') document.getElementById('rFaltaHoras').value = 8;
+  else if (t==='meio_dia') document.getElementById('rFaltaHoras').value = 4;
 }
 
 function setEstado(e) {
@@ -416,6 +473,11 @@ function abrirNovoRegisto() {
   _mats = []; _matIdx = 0; renderMats();
   setTipo('cliente');
   setEstado('em_curso');
+  document.getElementById('rTemFalta').checked=false;
+  document.getElementById('faltaExtra').style.display='none';
+  document.getElementById('rFaltaTipo').value='dia_completo';
+  document.getElementById('rFaltaHoras').value='8';
+  document.getElementById('rFaltaObs').value='';
   document.getElementById('offerConcluirServico').style.display='none';
   if(document.getElementById('concluirServico')) document.getElementById('concluirServico').checked=false;
   document.getElementById('modalRegisto').style.display = 'flex';
@@ -453,6 +515,12 @@ function editarRegisto(rid) {
     _matIdx = _mats.length;
     renderMats();
     setTipo(d.tipo);
+    document.getElementById('rTemFalta').checked = d.tem_falta || false;
+    document.getElementById('faltaExtra').style.display = d.tem_falta ? 'grid' : 'none';
+    document.getElementById('rFaltaTipo').value = d.falta_tipo || 'dia_completo';
+    document.getElementById('rFaltaHoras').value = d.falta_horas || 8;
+    document.getElementById('rFaltaObs').value = d.falta_obs || '';
+    if (d.tem_falta) setFaltaTipo(d.falta_tipo || 'dia_completo');
     setEstado(d.estado || 'em_curso');
     document.getElementById('modalRegisto').style.display = 'flex';
     document.body.style.overflow = 'hidden';

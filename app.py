@@ -2464,6 +2464,7 @@ def agenda():
         stats[f.id] = {
             'horas_mes': sum(r.horas or 0 for r in regs),
             'he_mes': sum(r.he_horas or 0 for r in regs),
+            'faltas_mes': sum(r.falta_horas or 0 for r in regs if r.tem_falta),
             'registos_mes': len(regs),
             'ultimo': max((r.data for r in regs), default=None),
         }
@@ -2611,6 +2612,10 @@ def agenda_registo_novo():
         n_almoco=int(data.get('n_almoco') or 0),
         custo_refeicao=float(data.get('custo_refeicao') or 0),
         obs_refeicao=data.get('obs_refeicao','').strip() or None,
+        tem_falta=bool(data.get('tem_falta')),
+        falta_tipo=data.get('falta_tipo','') or None,
+        falta_horas=float(data.get('falta_horas') or 0),
+        falta_obs=data.get('falta_obs','').strip() or None,
         descricao_trabalho=data.get('descricao_trabalho','').strip() or None,
         estado=data.get('estado','em_curso'),
     )
@@ -2651,6 +2656,10 @@ def agenda_registo_get(rid):
         'n_viagens': r.n_viagens, 'km': r.km or '',
         'n_almoco': r.n_almoco, 'custo_refeicao': r.custo_refeicao, 'obs_refeicao': r.obs_refeicao or '',
         'estado': r.estado or 'em_curso',
+        'tem_falta': r.tem_falta or False,
+        'falta_tipo': r.falta_tipo or 'dia_completo',
+        'falta_horas': r.falta_horas or 0,
+        'falta_obs': r.falta_obs or '',
         'descricao_trabalho': r.descricao_trabalho or '',
         'materiais': [{'ref': m.artigo_ref or '', 'descricao': m.descricao, 'quantidade': m.quantidade,
                        'unidade': m.unidade, 'observacoes': m.observacoes or '', 'origem': m.origem} for m in r.materiais.all()],
@@ -2684,6 +2693,10 @@ def agenda_registo_editar(rid):
     r.n_almoco         = int(data.get('n_almoco') or 0)
     r.custo_refeicao   = float(data.get('custo_refeicao') or 0)
     r.obs_refeicao     = data.get('obs_refeicao','').strip() or None
+    r.tem_falta        = bool(data.get('tem_falta'))
+    r.falta_tipo       = data.get('falta_tipo','') or None
+    r.falta_horas      = float(data.get('falta_horas') or 0)
+    r.falta_obs        = data.get('falta_obs','').strip() or None
     r.descricao_trabalho = data.get('descricao_trabalho','').strip() or None
     r.estado           = data.get('estado', r.estado)
     r.atualizado_em    = datetime.now()

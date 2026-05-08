@@ -903,6 +903,11 @@ class AgendaRegisto(db.Model):
     n_almoco            = db.Column(db.Integer, default=0)
     custo_refeicao      = db.Column(db.Float, default=0)
     obs_refeicao        = db.Column(db.String(300))
+    # Falta
+    tem_falta           = db.Column(db.Boolean, default=False)
+    falta_tipo          = db.Column(db.String(20))  # dia_completo, meio_dia, horas
+    falta_horas         = db.Column(db.Float, default=0)
+    falta_obs           = db.Column(db.String(300))
     # Descrição
     descricao_trabalho  = db.Column(db.Text)
     estado              = db.Column(db.String(20), default='em_curso')  # em_curso, concluido

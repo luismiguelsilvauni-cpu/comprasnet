@@ -39,9 +39,13 @@
         <div style="font-size:17px;font-weight:800;color:#f59e0b">{{ '%.1f'|format(s.get('he_mes',0)) }}</div>
         <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">HE mês</div>
       </div>
-      <div style="text-align:center;padding:5px;background:var(--surface2);border-radius:6px;grid-column:1/-1">
+      <div style="text-align:center;padding:5px;background:var(--surface2);border-radius:6px">
         <div style="font-size:15px;font-weight:700;color:#22c55e">{{ s.get('registos_mes',0) }}</div>
-        <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">Registos este mês</div>
+        <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">Registos</div>
+      </div>
+      <div style="text-align:center;padding:5px;background:{% if s.get('faltas_mes',0) > 0 %}rgba(239,68,68,.1){% else %}var(--surface2){% endif %};border-radius:6px">
+        <div style="font-size:15px;font-weight:700;color:{% if s.get('faltas_mes',0) > 0 %}#ef4444{% else %}var(--text-muted){% endif %}">{{ '%.1f'|format(s.get('faltas_mes',0)) }}</div>
+        <div style="font-size:8px;color:var(--text-muted);text-transform:uppercase">Faltas (h)</div>
       </div>
     </div>
   </div>
