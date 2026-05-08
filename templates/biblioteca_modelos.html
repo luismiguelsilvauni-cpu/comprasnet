@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Biblioteca PDF · ComprasNet{% endblock %}
+{% block title %}Biblioteca PDF · NavTech{% endblock %}
 {% block page_title %}Biblioteca de Documentos Técnicos{% endblock %}
 {% block topbar_actions %}
   <button onclick="tog('uploadForm')" class="btn btn-primary btn-sm">+ Adicionar PDF</button>
@@ -21,11 +21,18 @@
 .nothumb .ex{font-size:10px;font-weight:700;background:var(--accent);color:#fff;padding:2px 7px;border-radius:4px;margin-top:4px}
 .model-tag{position:absolute;bottom:6px;left:6px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff}
 .pdf-body{padding:10px 12px}
-.pdf-title{font-size:12px;font-weight:700;color:var(--text);line-height:1.3;word-break:break-word;margin-bottom:3px}
+.pdf-title{font-size:12px;font-weight:700;color:var(--text);line-height:1.3;word-break:break-word;margin-bottom:2px}
+.pdf-marca{font-size:10px;font-weight:600;color:var(--accent);margin-bottom:2px}
 .pdf-sub{font-size:10px;color:var(--text-muted);line-height:1.4}
+.pdf-refs{font-size:10px;color:var(--text-dim);font-style:italic;margin-top:2px}
 .pdf-acts{display:flex;gap:3px;margin-top:8px;flex-wrap:wrap}
-.sec-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:20px 0 10px;display:flex;align-items:center;gap:8px}
-.sec-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.sec-tipo{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text);margin:24px 0 4px;display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:2px solid var(--accent)}
+.sec-marca{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:14px 0 8px;display:flex;align-items:center;gap:8px}
+.sec-marca::after{content:'';flex:1;height:1px;background:var(--border)}
+.edit-panel{display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px}
+.edit-panel label{font-size:10px;color:var(--text-muted);display:block;margin-bottom:2px;margin-top:6px}
+.edit-panel label:first-child{margin-top:0}
+.edit-panel .input{font-size:11px;padding:4px 6px}
 </style>
 
 <!-- Upload form -->
@@ -33,24 +40,59 @@
   <div class="card" style="padding:18px">
     <div style="font-size:14px;font-weight:600;margin-bottom:14px">📄 Adicionar Documento</div>
     <form method="post" enctype="multipart/form-data">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="form-group" style="margin:0"><label>Título *</label><input type="text" name="titulo" required class="input" placeholder="Ex: Manual Serviço TM170..."></div>
-        <div class="form-group" style="margin:0"><label>Tipo</label>
-          <input type="text" name="tipo_componente" class="input" list="tiposList" placeholder="Tipo..." oninput="updateModelos(this.value)">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0">
+          <label>Título *</label>
+          <input type="text" name="titulo" required class="input" list="titulosList"
+                 placeholder="Ex: Manual de Serviço..." autocomplete="off">
+          <datalist id="titulosList">
+            {% for t in titulos_existentes %}<option value="{{ t }}">{% endfor %}
+          </datalist>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Tipo</label>
+          <input type="text" name="tipo_componente" class="input" list="tiposList"
+                 placeholder="Tipo..." oninput="updateModelos(this.value)" autocomplete="off">
           <datalist id="tiposList">
-            <option value="caixa">Caixa Red./Inv.</option>
             <option value="motor">Motor</option>
+            <option value="caixa">Caixa Red./Inv.</option>
             <option value="factory_code">Factory Code</option>
+            <option value="aux">Motor Auxiliar</option>
             <option value="outros">Outros</option>
             <option value="geral">Geral</option>
           </datalist>
         </div>
-        <div class="form-group" style="margin:0"><label>Modelo / Código</label>
-          <input type="text" name="modelo_codigo" class="input" list="modelosList" placeholder="Ex: TM170...">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0">
+          <label>Marca</label>
+          <input type="text" name="marca" class="input" list="marcasList"
+                 placeholder="Ex: IVECO, CUMMINS..." autocomplete="off">
+          <datalist id="marcasList">
+            {% for m in marcas_existentes %}<option value="{{ m }}">{% endfor %}
+            <option value="IVECO"><option value="CUMMINS"><option value="DEUTZ">
+            <option value="JOHN DEERE"><option value="VOLVO PENTA"><option value="CATERPILLAR">
+            <option value="SCANIA"><option value="MAN"><option value="MTU">
+            <option value="ZF"><option value="TWIN DISC"><option value="CAPITOL">
+            <option value="WARNER"><option value="YANMAR"><option value="BAUDOUIN">
+          </datalist>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Modelo / Código</label>
+          <input type="text" name="modelo_codigo" class="input" list="modelosList"
+                 placeholder="Ex: TM170, D13K..." autocomplete="off">
           <datalist id="modelosList"></datalist>
         </div>
+        <div class="form-group" style="margin:0">
+          <label>Outras Referências</label>
+          <input type="text" name="outras_referencias" class="input"
+                 placeholder="Refs cruzadas, part numbers...">
+        </div>
       </div>
-      <div class="form-group"><label>Ficheiro PDF *</label><input type="file" name="pdf" accept=".pdf,.PDF" required class="input"></div>
+      <div class="form-group">
+        <label>Ficheiro PDF *</label>
+        <input type="file" name="pdf" accept=".pdf,.PDF" required class="input">
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:8px">
         <button type="button" onclick="tog('uploadForm')" class="btn btn-ghost btn-sm">Cancelar</button>
         <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
@@ -61,7 +103,7 @@
 
 <!-- Search -->
 <form method="get" style="display:flex;gap:8px;margin-bottom:18px">
-  <input type="text" name="q" value="{{ q }}" placeholder="🔍 Pesquisar título, modelo..."
+  <input type="text" name="q" value="{{ q }}" placeholder="🔍 Pesquisar título, marca, modelo, referências..."
     style="flex:1;padding:9px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text)">
   <button type="submit" class="btn btn-ghost btn-sm">Pesquisar</button>
   {% if q %}<a href="{{ url_for('biblioteca_modelos') }}" class="btn btn-ghost btn-sm">Limpar</a>{% endif %}
@@ -69,78 +111,169 @@
 <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">{{ pdfs|length }} documento(s)</div>
 
 {% if pdfs %}
-{% set known_tipos = ['caixa','motor','factory_code','aux','outros','geral'] %}
-{% set tipo_labels = [
-  ('caixa','⚙️ Caixas Inversoras / Redutoras'),
-  ('motor','🔧 Motores'),
-  ('factory_code','🔢 Factory Codes'),
-  ('aux','⚡ Motores Auxiliares'),
-  ('outros','📂 Outros'),
-  ('geral','📁 Geral')
-] %}
 
 {% macro render_badge(p) %}
 <div class="pdf-badge" id="pb-{{ p.id }}">
   <div class="pdf-preview" onclick="window.open('{{ url_for('modelo_pdf_ver', pid=p.id) }}','_blank')">
-    {% if p.thumb_path %}<img src="{{ url_for('biblioteca_thumb', pid=p.id) }}" alt="preview" loading="lazy">
-    {% else %}<div class="nothumb"><span class="ic">📄</span><span class="ex">PDF</span></div>{% endif %}
+    {% if p.thumb_path %}
+      <img src="{{ url_for('biblioteca_thumb', pid=p.id) }}" alt="preview" loading="lazy">
+    {% else %}
+      <div class="nothumb"><span class="ic">📄</span><span class="ex">PDF</span></div>
+    {% endif %}
     {% if p.modelo_codigo %}<div class="model-tag">{{ p.modelo_codigo }}</div>{% endif %}
   </div>
   <div class="pdf-body">
     <div class="pdf-title">{{ p.titulo }}</div>
+    {% if p.marca %}<div class="pdf-marca">{{ p.marca }}</div>{% endif %}
     <div class="pdf-sub">{{ p.pdf_filename }}<br>{{ p.criado_em.strftime('%d/%m/%Y') }}</div>
-    <div id="pedit-{{ p.id }}" style="display:none;margin-top:6px">
+    {% if p.outras_referencias %}<div class="pdf-refs">🔗 {{ p.outras_referencias }}</div>{% endif %}
+
+    <div class="edit-panel" id="pedit-{{ p.id }}">
       <form method="post" action="{{ url_for('modelo_pdf_editar', pid=p.id) }}">
-        <input type="text" name="titulo" value="{{ p.titulo }}" class="input" style="font-size:11px;padding:4px 6px;margin-bottom:4px">
-        <div style="display:flex;gap:3px">
-          <button type="submit" class="btn btn-primary btn-sm" style="font-size:10px;padding:2px 7px">OK</button>
-          <button type="button" onclick="document.getElementById('pedit-{{ p.id }}').style.display='none'" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 7px">✕</button>
+        <label>Título</label>
+        <input type="text" name="titulo" value="{{ p.titulo }}" class="input"
+               list="titulosList" autocomplete="off">
+        <label>Marca</label>
+        <input type="text" name="marca" value="{{ p.marca or '' }}" class="input"
+               list="marcasList" autocomplete="off">
+        <label>Modelo / Código</label>
+        <input type="text" name="modelo_codigo" value="{{ p.modelo_codigo }}" class="input">
+        <label>Outras Referências</label>
+        <input type="text" name="outras_referencias" value="{{ p.outras_referencias or '' }}" class="input"
+               placeholder="Refs cruzadas, part numbers...">
+        <div style="display:flex;gap:4px;margin-top:8px">
+          <button type="submit" class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 8px">Guardar</button>
+          <button type="button" onclick="toggleEdit({{ p.id }})"
+                  class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px">Cancelar</button>
         </div>
       </form>
     </div>
+
     <div class="pdf-acts">
-      <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px">👁</a>
-      <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}" class="btn btn-ghost btn-sm" style="font-size:11px">⬇</a>
-      <button onclick="document.getElementById('pedit-{{ p.id }}').style.display=document.getElementById('pedit-{{ p.id }}').style.display==='none'?'block':'none'" class="btn btn-ghost btn-sm" style="font-size:11px">✏️</button>
-      <button onclick="apagarBib({{ p.id }})" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)">✕</button>
+      <a href="{{ url_for('modelo_pdf_ver', pid=p.id) }}" target="_blank"
+         class="btn btn-ghost btn-sm" style="font-size:11px" title="Visualizar">👁</a>
+      <a href="{{ url_for('modelo_pdf_download', pid=p.id) }}"
+         class="btn btn-ghost btn-sm" style="font-size:11px" title="Download">⬇</a>
+      <button onclick="toggleEdit({{ p.id }})"
+              class="btn btn-ghost btn-sm" style="font-size:11px" title="Editar">✏️</button>
+      <button onclick="apagarBib({{ p.id }})"
+              class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger)" title="Remover">✕</button>
     </div>
   </div>
 </div>
 {% endmacro %}
 
-<!-- Known tipo sections -->
-{% for tipo_key, tipo_label in tipo_labels %}
-  {% set grupo = pdfs|selectattr('tipo_componente','equalto',tipo_key)|list %}
-  {% if grupo %}
-  <div class="sec-lbl">{{ tipo_label }} <span style="font-weight:400;font-size:10px;margin-left:4px">({{ grupo|length }})</span></div>
-  <div class="badge-grid" style="margin-bottom:8px">{% for p in grupo %}{{ render_badge(p) }}{% endfor %}</div>
+{# Tipos conhecidos na ordem certa #}
+{% set tipo_labels = [
+  ('motor',        '🔧 Motores'),
+  ('caixa',        '⚙️ Caixas Inversoras / Redutoras'),
+  ('factory_code', '🔢 Factory Codes'),
+  ('aux',          '⚡ Motores Auxiliares'),
+  ('outros',       '📂 Outros'),
+  ('geral',        '📁 Geral')
+] %}
+{% set known_tipos = tipo_labels | map(attribute=0) | list %}
+
+{# Todos os tipos presentes: conhecidos primeiro, depois custom #}
+{% set all_tipos = namespace(list=[]) %}
+{% for tk, tl in tipo_labels %}
+  {% if pdfs | selectattr('tipo_componente','equalto',tk) | list %}
+    {% set all_tipos.list = all_tipos.list + [(tk, tl)] %}
+  {% endif %}
+{% endfor %}
+{% for p in pdfs %}
+  {% if p.tipo_componente not in known_tipos %}
+    {% set already = all_tipos.list | map(attribute=0) | list %}
+    {% if p.tipo_componente not in already %}
+      {% set all_tipos.list = all_tipos.list + [(p.tipo_componente, '📋 ' + p.tipo_componente|title)] %}
+    {% endif %}
   {% endif %}
 {% endfor %}
 
-<!-- Custom tipos (not in known list) - deduplicated -->
-{% set seen_custom = namespace(tipos=[]) %}
-{% for p in pdfs %}
-  {% if p.tipo_componente not in known_tipos and p.tipo_componente not in seen_custom.tipos %}
-    {% set _ = seen_custom.tipos.append(p.tipo_componente) %}
-    {% set grupo = pdfs|selectattr('tipo_componente','equalto',p.tipo_componente)|list %}
-    <div class="sec-lbl">📋 {{ p.tipo_componente|title }} <span style="font-weight:400;font-size:10px;margin-left:4px">({{ grupo|length }})</span></div>
-    <div class="badge-grid" style="margin-bottom:8px">{% for pp in grupo %}{{ render_badge(pp) }}{% endfor %}</div>
+{% for tipo_key, tipo_label in all_tipos.list %}
+  {% set grupo_tipo = pdfs | selectattr('tipo_componente','equalto',tipo_key) | list %}
+  {% if grupo_tipo %}
+  <div class="sec-tipo">
+    {{ tipo_label }}
+    <span style="font-size:11px;font-weight:400;opacity:.6">({{ grupo_tipo|length }})</span>
+  </div>
+
+  {# Marcas únicas neste tipo, ordenadas #}
+  {% set marcas_vistas = namespace(list=[]) %}
+  {% for p in grupo_tipo %}
+    {% set m = p.marca if p.marca else '' %}
+    {% if m not in marcas_vistas.list %}
+      {% set marcas_vistas.list = marcas_vistas.list + [m] %}
+    {% endif %}
+  {% endfor %}
+  {% set marcas_com_nome = marcas_vistas.list | reject('equalto','') | sort | list %}
+  {% set marcas_sem_nome = marcas_vistas.list | select('equalto','') | list %}
+  {% set marcas_ordenadas = marcas_com_nome + marcas_sem_nome %}
+
+  {% for marca in marcas_ordenadas %}
+    {% if marca %}
+      {% set grupo_marca = grupo_tipo | selectattr('marca','equalto',marca) | list %}
+    {% else %}
+      {% set grupo_marca = grupo_tipo | selectattr('marca','none') | list %}
+      {% if not grupo_marca %}
+        {% set grupo_marca = grupo_tipo | selectattr('marca','equalto','') | list %}
+      {% endif %}
+    {% endif %}
+
+    {% if grupo_marca %}
+      {% if marca %}
+        <div class="sec-marca">
+          {{ marca }}
+          <span style="font-weight:400;font-size:10px">({{ grupo_marca|length }})</span>
+        </div>
+      {% elif marcas_com_nome %}
+        <div class="sec-marca" style="opacity:.5">
+          Sem marca
+          <span style="font-weight:400;font-size:10px">({{ grupo_marca|length }})</span>
+        </div>
+      {% endif %}
+      <div class="badge-grid" style="margin-bottom:10px">
+        {% for p in grupo_marca | sort(attribute='titulo') %}{{ render_badge(p) }}{% endfor %}
+      </div>
+    {% endif %}
+  {% endfor %}
   {% endif %}
 {% endfor %}
 
 {% else %}
 <div style="text-align:center;padding:48px;color:var(--text-muted)">
   <div style="font-size:48px;margin-bottom:16px">📚</div>
-  <div style="font-size:16px;font-weight:600;margin-bottom:8px">{% if q %}Sem resultados para "{{ q }}"{% else %}Biblioteca vazia{% endif %}</div>
-  {% if not q %}<button onclick="tog('uploadForm')" class="btn btn-primary btn-sm">+ Adicionar primeiro documento</button>{% endif %}
+  <div style="font-size:16px;font-weight:600;margin-bottom:8px">
+    {% if q %}Sem resultados para "{{ q }}"{% else %}Biblioteca vazia{% endif %}
+  </div>
+  {% if not q %}
+  <button onclick="tog('uploadForm')" class="btn btn-primary btn-sm">+ Adicionar primeiro documento</button>
+  {% endif %}
 </div>
 {% endif %}
 
 <script>
-var caixas = {{ caixas|tojson }};
+var caixas  = {{ caixas|tojson }};
 var motores = {{ motores|tojson }};
-function updateModelos(tipo){var dl=document.getElementById('modelosList');var vals=tipo==='caixa'?caixas:tipo==='motor'?motores:[];dl.innerHTML=vals.map(v=>'<option value="'+v+'">').join('');}
-function tog(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
-function apagarBib(pid){if(!confirm('Remover da biblioteca?'))return;fetch('/modelo-pdf/'+pid+'/apagar',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.ok)document.getElementById('pb-'+pid).remove();});}
+
+function updateModelos(tipo) {
+  var dl   = document.getElementById('modelosList');
+  var vals = tipo === 'caixa' ? caixas : tipo === 'motor' ? motores : [];
+  dl.innerHTML = vals.map(function(v){ return '<option value="' + v + '">'; }).join('');
+}
+function tog(id) {
+  var e = document.getElementById(id);
+  e.style.display = e.style.display === 'none' ? 'block' : 'none';
+}
+function toggleEdit(pid) {
+  var panel = document.getElementById('pedit-' + pid);
+  panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
+}
+function apagarBib(pid) {
+  if (!confirm('Remover da biblioteca?')) return;
+  fetch('/modelo-pdf/' + pid + '/apagar', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (d.ok) document.getElementById('pb-' + pid).remove(); });
+}
 </script>
 {% endblock %}

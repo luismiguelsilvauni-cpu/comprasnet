@@ -6268,6 +6268,8 @@ class ModeloPDF(db.Model):
     tipo_componente = db.Column(db.String(50), nullable=False)  # 'caixa', 'motor', 'aux', 'factory_code'
     modelo_codigo   = db.Column(db.String(100), nullable=False, index=True)  # e.g. 'TM170', '1152'
     titulo          = db.Column(db.String(300), nullable=False)
+    marca           = db.Column(db.String(150))   # ex: IVECO, CUMMINS, DEUTZ, ZF
+    outras_referencias = db.Column(db.String(500))  # outros códigos / referências cruzadas
     pdf_filename    = db.Column(db.String(500))
     pdf_path        = db.Column(db.String(1000))
     thumb_path      = db.Column(db.String(1000))
@@ -7642,9 +7644,15 @@ def modelo_pdf_download(pid):
 def modelo_pdf_editar(pid):
     p = ModeloPDF.query.get_or_404(pid)
     novo_titulo = request.form.get('titulo', '').strip()
+    nova_marca  = request.form.get('marca', '').strip()
+    novo_modelo = request.form.get('modelo_codigo', '').strip()
+    novas_refs  = request.form.get('outras_referencias', '').strip()
     if novo_titulo:
         p.titulo = novo_titulo
-        db.session.commit()
+    p.marca              = nova_marca or None
+    p.modelo_codigo      = novo_modelo or p.modelo_codigo
+    p.outras_referencias = novas_refs or None
+    db.session.commit()
     return redirect(request.referrer or url_for('biblioteca_modelos'))
 
 @app.route('/modelo-pdf/<int:pid>/apagar', methods=['POST'])
@@ -7701,22 +7709,24 @@ def tecnico_upload_modelo(eid):
 @login_required
 def biblioteca_modelos():
     q = request.args.get('q', '').strip()
-    
+
     if request.method == 'POST':
         f = request.files.get('pdf')
-        titulo = request.form.get('titulo', '').strip()
-        tipo_comp = request.form.get('tipo_componente', 'geral').strip()
+        titulo     = request.form.get('titulo', '').strip()
+        tipo_comp  = request.form.get('tipo_componente', 'geral').strip()
         modelo_cod = request.form.get('modelo_codigo', '').strip()
-        
+        marca      = request.form.get('marca', '').strip()
+        outras_ref = request.form.get('outras_referencias', '').strip()
+
         if not f or not titulo:
             flash('Título e ficheiro são obrigatórios.', 'error')
             return redirect(url_for('biblioteca_modelos'))
-        
+
         ensure_upload_dir()
         safe = f"bib_{tipo_comp}_{modelo_cod}_{f.filename.replace(' ','_')}".replace('/','_')
         path = os.path.join(UPLOAD_TECNICO, safe)
         f.save(path)
-        
+
         # Generate thumbnail of first page
         thumb = None
         try:
@@ -7729,33 +7739,23 @@ def biblioteca_modelos():
                 thumb = thumb_name
         except Exception as ex:
             app.logger.warning(f"Thumbnail error: {ex}")
-        
+
         p = ModeloPDF(
             tipo_componente=tipo_comp,
             modelo_codigo=modelo_cod,
             titulo=titulo,
+            marca=marca or None,
+            outras_referencias=outras_ref or None,
             pdf_filename=f.filename,
             pdf_path=safe,
+            thumb_path=thumb,
         )
-        # Store thumb in notas field temporarily — we'll add a column
-        if thumb:
-            p.pdf_path = safe  # keep path
         db.session.add(p)
         db.session.commit()
-        
-        # Store thumbnail path
-        if thumb:
-            try:
-                from sqlalchemy import text
-                with db.engine.begin() as conn:
-                    conn.execute(text("UPDATE modelo_pdf SET thumb_path=:t WHERE id=:id"),
-                                {'t': thumb, 'id': p.id})
-            except Exception:
-                pass
-        
+
         flash(f'"{titulo}" adicionado à biblioteca.', 'success')
         return redirect(url_for('biblioteca_modelos'))
-    
+
     query = ModeloPDF.query
     if q:
         query = query.filter(
@@ -7763,17 +7763,32 @@ def biblioteca_modelos():
                 ModeloPDF.titulo.ilike(f'%{q}%'),
                 ModeloPDF.modelo_codigo.ilike(f'%{q}%'),
                 ModeloPDF.tipo_componente.ilike(f'%{q}%'),
+                ModeloPDF.marca.ilike(f'%{q}%'),
+                ModeloPDF.outras_referencias.ilike(f'%{q}%'),
             )
         )
-    pdfs = query.order_by(ModeloPDF.tipo_componente, ModeloPDF.modelo_codigo, ModeloPDF.titulo).all()
-    
-    # Collect unique models for suggestions
+    pdfs = query.order_by(
+        ModeloPDF.tipo_componente,
+        ModeloPDF.marca,
+        ModeloPDF.modelo_codigo,
+        ModeloPDF.titulo
+    ).all()
+
+    # Suggestions: unique titles, marcas, modelos already in DB
+    titulos_existentes = sorted(set(
+        p.titulo for p in ModeloPDF.query.with_entities(ModeloPDF.titulo).all() if p.titulo
+    ))
+    marcas_existentes = sorted(set(
+        p.marca for p in ModeloPDF.query.with_entities(ModeloPDF.marca).all() if p.marca
+    ))
     caixas = db.session.query(Equipamento.caixa_modelo).filter(
         Equipamento.caixa_modelo.isnot(None)).distinct().all()
     motores = db.session.query(Equipamento.motor_modelo).filter(
         Equipamento.motor_modelo.isnot(None)).distinct().all()
-    
+
     return render_template('biblioteca_modelos.html', pdfs=pdfs, q=q,
+                           titulos_existentes=titulos_existentes,
+                           marcas_existentes=marcas_existentes,
                            caixas=[c[0] for c in caixas if c[0]],
                            motores=[m[0] for m in motores if m[0]])
 
