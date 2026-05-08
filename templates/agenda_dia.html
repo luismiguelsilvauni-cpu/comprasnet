@@ -92,14 +92,20 @@
       <!-- Serviço em curso -->
       <div class="form-group" id="servicoEmCursoDiv">
         <label>Serviço em curso (ou criar novo)</label>
-        <select id="rServicoId" class="input" onchange="onServicoChange()">
-          <option value="">➕ Criar novo serviço</option>
+        <div style="position:relative">
+        <select id="rServicoId" class="input" onchange="onServicoChange()" style="border-color:var(--border)">
+          <option value="" disabled selected>— Seleccione uma opção —</option>
+          <option value="novo">➕ Criar Novo Serviço</option>
+          <option value="" disabled style="color:var(--text-muted);font-size:10px">── Serviços em Curso ──</option>
           {% for sv in servicos_curso %}
           <option value="{{ sv.id }}" data-cliente="{{ sv.cliente.nome if sv.cliente else '' }}" data-emb="{{ sv.embarcacao_nome or '' }}" data-equip="{{ sv.equipamento or '' }}" data-local="{{ sv.local_servico or '' }}" data-tipo="{{ sv.tipo }}">
             {% if sv.numero %}#{{ sv.numero }} — {% endif %}{{ sv.data_inicio.strftime('%d/%m/%Y') if sv.data_inicio else '' }}{% if sv.cliente %} · {{ sv.cliente.nome }}{% endif %}{% if sv.embarcacao_nome %} · {{ sv.embarcacao_nome }}{% endif %}
           </option>
           {% endfor %}
         </select>
+        <div id="conflitosAviso" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:16px;cursor:help" title="">⚠️</div>
+        </div>
+        <div id="conflitosMsg" style="display:none;margin-top:4px;padding:6px 10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:6px;font-size:11px;color:#dc2626"></div>
       </div>
 
       <!-- Cliente -->
@@ -115,7 +121,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label>Embarcação / Equipamento</label>
-          <input type="text" id="rEmb" class="input" placeholder="Nome..." list="embList" autocomplete="off">
+          <input type="text" id="rEmb" class="input" placeholder="Nome..." list="embList" autocomplete="off" onblur="verificarConflitos(document.getElementById('rClienteId').value ? 'cli_'+document.getElementById('rClienteId').value : null, this.value.trim().toLowerCase() ? 'emb_'+this.value.trim().toLowerCase() : null)">
           <datalist id="embList">{% for e in emb_sugs %}<option value="{{ e }}">{% endfor %}</datalist>
         </div>
         <div class="form-group">
@@ -263,6 +269,35 @@
 var FID  = {{ func.id }};
 var DATA = '{{ data.isoformat() }}';
 var CLIENTES = {{ clientes|tojson }};
+var CONFLITOS = {{ conflitos_json|safe }};
+
+
+function verificarConflitos(cliKey, embKey) {
+  var aviso = document.getElementById('conflitosAviso');
+  var msg   = document.getElementById('conflitosMsg');
+  var sel   = document.getElementById('rServicoId');
+  var svs   = [];
+  if (cliKey && CONFLITOS[cliKey]) svs = svs.concat(CONFLITOS[cliKey]);
+  if (embKey && CONFLITOS[embKey]) {
+    CONFLITOS[embKey].forEach(function(s) {
+      if (!svs.find(function(x){ return x.id===s.id; })) svs.push(s);
+    });
+  }
+  if (svs.length > 0) {
+    var nomes = svs.map(function(s){ return (s.num ? '#'+s.num+' ' : '') + s.titulo; }).join(', ');
+    aviso.style.display = 'block';
+    aviso.title = 'Serviços em aberto: ' + nomes;
+    msg.style.display = 'block';
+    msg.innerHTML = '⚠️ Já existe(m) serviço(s) em aberto para este cliente/embarcação: <strong>' + nomes + '</strong>. Seleccione um serviço existente ou crie um novo.';
+    sel.style.borderColor = '#ef4444';
+    sel.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+  } else {
+    aviso.style.display = 'none';
+    msg.style.display = 'none';
+    sel.style.borderColor = '';
+    sel.style.boxShadow = '';
+  }
+}
 
 function setTipo(t) {
   document.getElementById('rTipo').value = t;
@@ -277,7 +312,10 @@ function setTipo(t) {
 function onServicoChange() {
   var sel = document.getElementById('rServicoId');
   var opt = sel.options[sel.selectedIndex];
-  if (!sel.value) return;
+  // Reset border
+  sel.style.borderColor = '';
+  sel.style.boxShadow = '';
+  if (sel.value === 'novo' || sel.value === '') return;
   if (opt.dataset.cliente) document.getElementById('rClienteInput').value = opt.dataset.cliente;
   if (opt.dataset.emb)     document.getElementById('rEmb').value = opt.dataset.emb;
   if (opt.dataset.equip)   document.getElementById('rEquip').value = opt.dataset.equip;
@@ -384,7 +422,7 @@ function getFormData() {
   return {
     funcionario_id: FID,
     data: DATA,
-    servico_id: document.getElementById('rServicoId').value || null,
+    servico_id: (document.getElementById('rServicoId').value === 'novo' || document.getElementById('rServicoId').value === '') ? null : document.getElementById('rServicoId').value,
     tipo: document.getElementById('rTipo').value,
     cliente_id: document.getElementById('rClienteId').value || null,
     embarcacao_nome: document.getElementById('rEmb').value.trim(),
@@ -453,7 +491,11 @@ function setEstado(e) {
 function abrirNovoRegisto() {
   document.getElementById('rEditId').value = '';
   document.getElementById('modalTitulo').textContent = '📋 Novo Trabalho — {{ data.strftime("%d/%m/%Y") }}';
-  document.getElementById('rServicoId').value = '';
+  document.getElementById('rServicoId').selectedIndex = 0;
+  document.getElementById('rServicoId').style.borderColor = '';
+  document.getElementById('rServicoId').style.boxShadow = '';
+  document.getElementById('conflitosAviso').style.display = 'none';
+  document.getElementById('conflitosMsg').style.display = 'none';
   document.getElementById('rClienteInput').value = '';
   document.getElementById('rClienteId').value = '';
   document.getElementById('rEmb').value = '';
@@ -529,6 +571,16 @@ function editarRegisto(rid) {
 
 function guardarRegisto() {
   var editId = document.getElementById('rEditId').value;
+  // Validate: must select a service
+  if (!editId) {
+    var svSel = document.getElementById('rServicoId').value;
+    if (!svSel) {
+      document.getElementById('rServicoId').style.borderColor = '#ef4444';
+      document.getElementById('rServicoId').style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+      alert('Por favor seleccione um serviço existente ou "Criar Novo Serviço".');
+      return;
+    }
+  }
   var data = getFormData();
   var url = editId ? '/agenda/registo/'+editId+'/editar' : '/agenda/registo/novo';
   var btn = document.getElementById('btnGuardar');

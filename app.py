@@ -2557,10 +2557,22 @@ def agenda_dia(fid, ano, mes, dia):
         AgendaServico.embarcacao_nome != ''
     ).distinct().limit(30).all()
     emb_sugs = [e[0] for e in emb_sugs if e[0]]
+    # Build conflict map: {cliente_id: [sv,...], embarcacao: [sv,...]}
+    import json as _json
+    conflitos = {}
+    for sv in servicos_curso:
+        if sv.cliente_id:
+            k = f'cli_{sv.cliente_id}'
+            conflitos.setdefault(k, []).append({'id': sv.id, 'num': sv.numero or '', 'titulo': sv.titulo})
+        if sv.embarcacao_nome:
+            k = f'emb_{sv.embarcacao_nome.lower().strip()}'
+            conflitos.setdefault(k, []).append({'id': sv.id, 'num': sv.numero or '', 'titulo': sv.titulo})
+    conflitos_json = _json.dumps(conflitos)
+
     return render_template('agenda_dia.html',
         func=func, data=data, registos=registos,
         servicos_curso=servicos_curso, clientes=clientes,
-        emb_sugs=emb_sugs)
+        emb_sugs=emb_sugs, conflitos_json=conflitos_json)
 
 @app.route('/agenda/registo/novo', methods=['POST'])
 @login_required
