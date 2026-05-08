@@ -21,6 +21,28 @@
 </div>
 
 
+<!-- Lightbox Foto Principal -->
+<div id="lightboxFoto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;align-items:center;justify-content:center;cursor:zoom-out" onclick="fecharLightbox()">
+  <div style="position:relative;max-width:95vw;max-height:95vh">
+    <img id="lightboxImg" src="" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <button onclick="fecharLightbox()" style="position:absolute;top:-16px;right:-16px;background:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center">✕</button>
+    <a id="lightboxDownload" href="" download style="position:absolute;bottom:-40px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.15);color:white;padding:6px 16px;border-radius:6px;font-size:12px;text-decoration:none;backdrop-filter:blur(4px)">⬇ Descarregar foto</a>
+  </div>
+</div>
+<script>
+function abrirFotoGrande(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightboxDownload').href = src;
+  document.getElementById('lightboxFoto').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function fecharLightbox() {
+  document.getElementById('lightboxFoto').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLightbox(); });
+</script>
+
 {% endblock %}
 
 {% block content %}
@@ -71,17 +93,18 @@
     <!-- Foto principal -->
     <div style="flex-shrink:0">
       <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Foto Principal</div>
-      <div id="fotoBox" style="width:220px;height:165px;border:2px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2);position:relative;cursor:pointer" onclick="document.getElementById('fotoInput').click()">
+      <div id="fotoBox" style="width:220px;height:165px;border:2px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2);position:relative;cursor:pointer">
         {% if foto_doc %}
-        <img id="fotoImg" src="{{ url_for('tecnico_doc_ver', did=foto_doc.id) }}?t={{ foto_doc.id }}" style="width:100%;height:100%;object-fit:cover">
+        <img id="fotoImg" src="{{ url_for('tecnico_doc_ver', did=foto_doc.id) }}?t={{ foto_doc.id }}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="abrirFotoGrande(this.src)" title="Clique para ampliar">
         {% else %}
         <div id="fotoPlaceholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-direction:column;gap:6px">
           <div style="font-size:40px">⚓</div>
-          <div style="font-size:11px">Clique para adicionar foto</div>
+          <div style="font-size:11px;cursor:pointer" onclick="document.getElementById('fotoInput').click()">Clique para adicionar foto</div>
         </div>
         {% endif %}
-        <div style="position:absolute;inset:0;background:rgba(0,0,0,.0);display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;opacity:0;transition:.2s" onmouseenter="this.style.opacity=1;this.style.background='rgba(0,0,0,.3)'" onmouseleave="this.style.opacity=0;this.style.background='rgba(0,0,0,.0)'">
-          <span style="background:rgba(0,0,0,.7);color:white;padding:4px 10px;border-radius:5px;font-size:11px">📷 Alterar foto</span>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.0);display:flex;align-items:flex-end;justify-content:center;gap:8px;padding-bottom:8px;opacity:0;transition:.2s" onmouseenter="this.style.opacity=1;this.style.background='rgba(0,0,0,.3)'" onmouseleave="this.style.opacity=0;this.style.background='rgba(0,0,0,.0)'">
+          {% if foto_doc %}<span onclick="abrirFotoGrande(document.getElementById('fotoImg').src)" style="background:rgba(0,0,0,.7);color:white;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer">🔍 Ver</span>{% endif %}
+          <span onclick="document.getElementById('fotoInput').click()" style="background:rgba(0,0,0,.7);color:white;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer">📷 Alterar</span>
         </div>
       </div>
       <input type="file" id="fotoInput" accept="image/*" style="display:none" onchange="uploadFotoPrincipal(this)">
