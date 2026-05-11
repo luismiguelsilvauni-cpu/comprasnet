@@ -22,7 +22,9 @@
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
         <span style="font-size:13px;font-weight:700;color:var(--accent)">{{ p.titulo }}</span>
-        <span style="font-size:10px;background:{{ estados[p.estado][1] if p.estado in estados else '#94a3b8' }};color:white;padding:2px 8px;border-radius:4px;font-weight:700">{{ estados[p.estado][0] if p.estado in estados else p.estado }}</span>
+        <span style="font-size:10px;background:{{ estados[p.estado][1] if p.estado in estados else '#94a3b8' }};color:white;padding:2px 8px;border-radius:4px;font-weight:700">
+          {{ estados[p.estado][0] if p.estado in estados else p.estado }}
+        </span>
         {% if p.prioridade == 'alta' %}<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-weight:700">🔥 Alta</span>{% endif %}
         {% if p.modulo %}<span style="font-size:10px;background:var(--surface2);color:var(--text-muted);padding:2px 8px;border-radius:4px">{{ p.modulo|title }}</span>{% endif %}
       </div>
@@ -36,7 +38,10 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
       {% if current_user.is_admin %}
-      <button onclick="abrirGerir({{ p.id }},'{{ p.estado }}','{{ (p.resposta_admin or '')|replace(\"'\",\"\\\\'\") }}')" class="btn btn-ghost btn-sm" style="font-size:10px">✏️ Gerir</button>
+      <button class="btn btn-ghost btn-sm gerir-btn" style="font-size:10px"
+        data-id="{{ p.id }}"
+        data-estado="{{ p.estado }}"
+        data-resp="{{ p.resposta_admin or '' }}">✏️ Gerir</button>
       {% endif %}
       {% if (current_user.is_admin or p.user_id == current_user.id) and p.estado == 'aberta' %}
       <button onclick="apagarProposta({{ p.id }})" class="btn btn-sm" style="font-size:10px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>
@@ -136,12 +141,18 @@
 </div>
 
 <script>
-function abrirGerir(id, estado, resposta) {
-  document.getElementById('formGerir').action = '/propostas/'+id+'/estado';
-  document.getElementById('gerirEstado').value = estado;
-  document.getElementById('gerirResposta').value = resposta;
-  document.getElementById('modalGerir').style.display = 'flex';
-}
+// Gerir buttons use data attributes to avoid JS escaping issues
+document.querySelectorAll('.gerir-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var id = this.dataset.id;
+    var estado = this.dataset.estado;
+    var resp = this.dataset.resp;
+    document.getElementById('formGerir').action = '/propostas/' + id + '/estado';
+    document.getElementById('gerirEstado').value = estado;
+    document.getElementById('gerirResposta').value = resp;
+    document.getElementById('modalGerir').style.display = 'flex';
+  });
+});
 function apagarProposta(id) {
   if (!confirm('Eliminar esta proposta?')) return;
   fetch('/propostas/'+id+'/apagar',{method:'POST'}).then(r=>r.json()).then(function(d){if(d.ok)location.reload();});
