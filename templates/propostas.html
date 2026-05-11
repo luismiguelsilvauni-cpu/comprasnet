@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Propostas de Melhoria · NavTech{% endblock %}
+{% block page_title %}💡 Propostas de Melhoria{% endblock %}
+{% block topbar_actions %}
+  <button onclick="document.getElementById('modalNova').style.display='flex'" class="btn btn-primary btn-sm">+ Nova Proposta</button>
+{% endblock %}
+{% block content %}
+<div class="card mb-16" style="padding:10px">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <a href="{{ url_for('propostas') }}" class="btn btn-sm {{ 'btn-primary' if not estado else 'btn-ghost' }}">Todas</a>
+    {% for k, (lbl, cor) in estados.items() %}
+    <a href="{{ url_for('propostas', estado=k) }}" class="btn btn-sm {{ 'btn-primary' if estado==k else 'btn-ghost' }}">{{ lbl }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if lista %}
+<div style="display:flex;flex-direction:column;gap:10px">
+{% for p in lista %}
+<div class="card" style="border-left:4px solid {{ estados[p.estado][1] if p.estado in estados else '#94a3b8' }}">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:700;color:var(--accent)">{{ p.titulo }}</span>
+        <span style="font-size:10px;background:{{ estados[p.estado][1] if p.estado in estados else '#94a3b8' }};color:white;padding:2px 8px;border-radius:4px;font-weight:700">{{ estados[p.estado][0] if p.estado in estados else p.estado }}</span>
+        {% if p.prioridade == 'alta' %}<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-weight:700">🔥 Alta</span>{% endif %}
+        {% if p.modulo %}<span style="font-size:10px;background:var(--surface2);color:var(--text-muted);padding:2px 8px;border-radius:4px">{{ p.modulo|title }}</span>{% endif %}
+      </div>
+      <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5;margin-bottom:8px">{{ p.descricao }}</div>
+      {% if p.resposta_admin %}
+      <div style="background:rgba(59,110,240,.06);border:1px solid rgba(59,110,240,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:6px">
+        <span style="font-weight:700;color:var(--accent)">💬 Resposta:</span> {{ p.resposta_admin }}
+      </div>
+      {% endif %}
+      <div style="font-size:11px;color:var(--text-muted)">Por <strong>{{ p.user.nome if p.user else '?' }}</strong> · {{ p.criado_em.strftime('%d/%m/%Y %H:%M') }}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+      {% if current_user.is_admin %}
+      <button onclick="abrirGerir({{ p.id }},'{{ p.estado }}','{{ (p.resposta_admin or '')|replace(\"'\",\"\\\\'\") }}')" class="btn btn-ghost btn-sm" style="font-size:10px">✏️ Gerir</button>
+      {% endif %}
+      {% if (current_user.is_admin or p.user_id == current_user.id) and p.estado == 'aberta' %}
+      <button onclick="apagarProposta({{ p.id }})" class="btn btn-sm" style="font-size:10px;background:rgba(239,68,68,.1);color:#ef4444;border:none">🗑</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:40px;margin-bottom:12px">💡</div>
+  <div style="font-size:15px;font-weight:600">Sem propostas ainda</div>
+  <div style="margin-top:6px;font-size:13px">Seja o primeiro a sugerir uma melhoria!</div>
+  <button onclick="document.getElementById('modalNova').style.display='flex'" class="btn btn-primary btn-sm" style="margin-top:14px">+ Nova Proposta</button>
+</div>
+{% endif %}
+
+<!-- Modal Nova Proposta -->
+<div id="modalNova" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="width:580px;max-height:90vh;overflow-y:auto;background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:12px 12px 0 0">
+      <span style="font-weight:700;color:var(--accent)">💡 Nova Proposta de Melhoria</span>
+      <button onclick="document.getElementById('modalNova').style.display='none'" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <form method="post" style="padding:18px">
+      <div style="background:rgba(59,110,240,.06);border:1px solid rgba(59,110,240,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-muted)">
+        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">📝 Exemplo de proposta bem descrita:</div>
+        <strong>Título:</strong> Exportar lista de clientes para Excel<br>
+        <strong>Descrição:</strong> No menu Clientes, adicionar botão "Exportar Excel" com nome, NIF, telefone e email de todos os clientes activos. Útil para comunicações em massa.<br>
+        <strong>Módulo:</strong> Gestão &nbsp;·&nbsp; <strong>Prioridade:</strong> Normal
+      </div>
+      <div class="form-group">
+        <label>Título <span style="color:#ef4444">*</span></label>
+        <input type="text" name="titulo" class="input" required placeholder="Ex: Exportar clientes para Excel" maxlength="200">
+      </div>
+      <div class="form-group">
+        <label>Descrição detalhada <span style="color:#ef4444">*</span></label>
+        <textarea name="descricao" class="input" rows="5" required placeholder="Descreva a funcionalidade pretendida, onde apareceria, como funcionaria..."></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label>Módulo</label>
+          <select name="modulo" class="input">
+            <option value="dashboard">Dashboard</option>
+            <option value="gestao">Gestão</option>
+            <option value="logistica">Logística</option>
+            <option value="tecnico">Técnico</option>
+            <option value="agenda">Agenda Digital</option>
+            <option value="admin">Administração</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Prioridade</label>
+          <select name="prioridade" class="input">
+            <option value="baixa">🟢 Baixa</option>
+            <option value="normal" selected>🟡 Normal</option>
+            <option value="alta">🔴 Alta</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button type="submit" class="btn btn-primary">💡 Submeter</button>
+        <button type="button" onclick="document.getElementById('modalNova').style.display='none'" class="btn btn-ghost">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Gerir (admin) -->
+<div id="modalGerir" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="width:440px;background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:12px 12px 0 0">
+      <span style="font-weight:700;color:var(--accent)">✏️ Gerir Proposta</span>
+      <button onclick="document.getElementById('modalGerir').style.display='none'" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <form id="formGerir" method="post" style="padding:18px">
+      <div class="form-group">
+        <label>Estado</label>
+        <select name="estado" id="gerirEstado" class="input">
+          {% for k, (lbl, cor) in estados.items() %}
+          <option value="{{ k }}">{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Resposta / Comentário</label>
+        <textarea name="resposta" id="gerirResposta" class="input" rows="3" placeholder="Comentário para o utilizador..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button type="submit" class="btn btn-primary">💾 Guardar</button>
+        <button type="button" onclick="document.getElementById('modalGerir').style.display='none'" class="btn btn-ghost">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function abrirGerir(id, estado, resposta) {
+  document.getElementById('formGerir').action = '/propostas/'+id+'/estado';
+  document.getElementById('gerirEstado').value = estado;
+  document.getElementById('gerirResposta').value = resposta;
+  document.getElementById('modalGerir').style.display = 'flex';
+}
+function apagarProposta(id) {
+  if (!confirm('Eliminar esta proposta?')) return;
+  fetch('/propostas/'+id+'/apagar',{method:'POST'}).then(r=>r.json()).then(function(d){if(d.ok)location.reload();});
+}
+document.getElementById('modalNova').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+document.getElementById('modalGerir').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+</script>
+{% endblock %}
