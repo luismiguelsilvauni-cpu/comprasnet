@@ -435,34 +435,52 @@
     </div>
 
     <div class="sidebar-bottom">
-        <div class="user-info">
-            <div class="avatar">{{ current_user.nome[0].upper() }}</div>
-            <div>
-                <div class="user-name">{{ current_user.nome }}</div>
-                <div class="user-role">{{ '🔑 Admin' if current_user.is_admin else current_user.departamento or 'Utilizador' }}</div>
+        <!-- User info compacto -->
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;margin-bottom:4px">
+            <div class="avatar" style="width:28px;height:28px;font-size:12px;flex-shrink:0">{{ current_user.nome[0].upper() }}</div>
+            <div style="min-width:0;flex:1">
+                <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ current_user.nome.split()[0] }}</div>
+                <div style="font-size:10px;color:var(--text-muted)">{{ '🔑 Admin' if current_user.is_admin else 'Utilizador' }}</div>
             </div>
         </div>
-        <a href="{{ url_for('chat_claude') }}" class="nav-item {% if request.endpoint == 'chat_claude' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">💬</span><span>Chat {% if cfg_ia and cfg_ia.provider == 'gemini' %}Gemini{% elif cfg_ia and cfg_ia.provider == 'lmstudio' %}LM Studio{% elif cfg_ia and cfg_ia.provider == 'ollama' %}Ollama{% elif cfg_ia and cfg_ia.provider == 'claude' %}Claude{% else %}IA{% endif %}</span>
-        </a>
-        <a href="{{ url_for('admin_update') }}" class="nav-item {% if request.endpoint == 'admin_update' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">⬆️</span><span>Actualizar Software</span>
-        </a>
-        <a href="{{ url_for('admin_health') }}" class="nav-item {% if request.endpoint == 'admin_health' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">🩺</span><span>Estado do Sistema</span>
-        </a>
-        {% if current_user.is_admin or pode_aceder('conectividade') %}
-        <a href="{{ url_for('conectividade') }}" class="nav-item {% if request.endpoint in ['conectividade','acesso_externo'] %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">🌐</span><span>Conectividade</span>
-        </a>
-        {% endif %}
-        <a href="{{ url_for('propostas') }}" class="nav-item {% if request.endpoint == 'propostas' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">💡</span><span>Propostas de Melhoria</span>
-        </a>
-        <a href="{{ url_for('roadmap') }}" class="nav-item {% if request.endpoint == 'roadmap' %}active{% endif %}" style="margin-bottom:4px">
-            <span class="icon">📋</span><span>Backlog</span><span id="backlog-badge" style="margin-left:auto;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(245,158,11,.2);color:#f59e0b;display:none"></span>
-        </a>
-        <a href="{{ url_for('logout') }}" class="logout-btn">
+
+        <!-- Mini links compactos -->
+        <div style="display:flex;flex-wrap:wrap;gap:2px;padding:0 6px;margin-bottom:4px">
+            <a href="{{ url_for('chat_claude') }}" title="Chat IA"
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'chat_claude' %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='{% if request.endpoint == 'chat_claude' %}var(--surface2){% endif %}'">
+                💬 <span>Chat IA</span>
+            </a>
+            <a href="{{ url_for('admin_update') }}" title="Actualizar Software"
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'admin_update' %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+                ⬆️ <span>Update</span>
+            </a>
+            <a href="{{ url_for('admin_health') }}" title="Estado do Sistema"
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'admin_health' %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+                🩺 <span>Sistema</span>
+            </a>
+            {% if current_user.is_admin or pode_aceder('conectividade') %}
+            <a href="{{ url_for('conectividade') }}" title="Conectividade"
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint in ['conectividade','acesso_externo'] %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+                🌐 <span>Rede</span>
+            </a>
+            {% endif %}
+            <a href="{{ url_for('propostas') }}" title="Propostas de Melhoria"
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'propostas' %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+                💡 <span>Propostas</span>
+            </a>
+            <a href="{{ url_for('roadmap') }}" title="Backlog"
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'roadmap' %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+                📋 <span>Backlog</span><span id="backlog-badge" style="margin-left:2px;background:rgba(245,158,11,.8);color:#000;border-radius:8px;font-size:9px;font-weight:700;padding:0 4px;display:none"></span>
+            </a>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="logout-btn" style="font-size:12px;padding:6px 12px">
             <span>⎋</span><span>Sair</span>
         </a>
     </div>
