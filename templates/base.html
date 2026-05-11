@@ -456,6 +456,9 @@
             <span class="icon">🌐</span><span>Conectividade</span>
         </a>
         {% endif %}
+        <a href="{{ url_for('propostas') }}" class="nav-item {% if request.endpoint == 'propostas' %}active{% endif %}" style="margin-bottom:4px">
+            <span class="icon">💡</span><span>Propostas de Melhoria</span>
+        </a>
         <a href="{{ url_for('roadmap') }}" class="nav-item {% if request.endpoint == 'roadmap' %}active{% endif %}" style="margin-bottom:4px">
             <span class="icon">📋</span><span>Backlog</span><span id="backlog-badge" style="margin-left:auto;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(245,158,11,.2);color:#f59e0b;display:none"></span>
         </a>

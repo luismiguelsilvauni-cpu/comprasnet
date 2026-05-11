@@ -4353,6 +4353,62 @@ def api_clientes():
         app.logger.warning(f"api_clientes PHC error: {e}")
     return jsonify([])
 
+# ══════════════════════════════════════════════════════════════════════
+# PROPOSTAS DE MELHORIA
+# ══════════════════════════════════════════════════════════════════════
+PROPOSTA_ESTADOS = {
+    'aberta':       ('💡 Aberta',       '#3b6ef0'),
+    'em_analise':   ('🔍 Em Análise',   '#f59e0b'),
+    'aceite':       ('✅ Aceite',       '#22c55e'),
+    'implementada': ('🚀 Implementada', '#8b5cf6'),
+    'rejeitada':    ('❌ Rejeitada',    '#ef4444'),
+}
+
+@app.route('/propostas', methods=['GET','POST'])
+@login_required
+def propostas():
+    if request.method == 'POST':
+        p = PropostaMelhoria(
+            titulo=request.form.get('titulo','').strip(),
+            descricao=request.form.get('descricao','').strip(),
+            modulo=request.form.get('modulo','outro'),
+            prioridade=request.form.get('prioridade','normal'),
+            user_id=current_user.id,
+        )
+        db.session.add(p)
+        db.session.commit()
+        flash('Proposta submetida ✅', 'success')
+        return redirect(url_for('propostas'))
+    estado = request.args.get('estado','')
+    query = PropostaMelhoria.query
+    if estado:
+        query = query.filter_by(estado=estado)
+    lista = query.order_by(PropostaMelhoria.criado_em.desc()).all()
+    return render_template('propostas.html', lista=lista, estados=PROPOSTA_ESTADOS, estado=estado)
+
+@app.route('/propostas/<int:pid>/estado', methods=['POST'])
+@login_required
+def proposta_estado(pid):
+    if not current_user.is_admin:
+        return jsonify({'ok': False})
+    p = PropostaMelhoria.query.get_or_404(pid)
+    p.estado = request.form.get('estado', p.estado)
+    p.resposta_admin = request.form.get('resposta','').strip() or p.resposta_admin
+    p.atualizado_em = datetime.now()
+    db.session.commit()
+    return redirect(url_for('propostas'))
+
+@app.route('/propostas/<int:pid>/apagar', methods=['POST'])
+@login_required
+def proposta_apagar(pid):
+    p = PropostaMelhoria.query.get_or_404(pid)
+    if not current_user.is_admin and p.user_id != current_user.id:
+        return jsonify({'ok': False})
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 @app.route('/roadmap')
 @login_required
 def roadmap():
