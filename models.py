@@ -931,3 +931,17 @@ class AgendaMaterial(db.Model):
     unidade     = db.Column(db.String(20), default='un')
     observacoes = db.Column(db.String(300))
     origem      = db.Column(db.String(10), default='manual')  # phc, manual
+
+class PropostaMelhoria(db.Model):
+    __tablename__ = 'propostas_melhoria'
+    id            = db.Column(db.Integer, primary_key=True)
+    titulo        = db.Column(db.String(200), nullable=False)
+    descricao     = db.Column(db.Text, nullable=False)
+    modulo        = db.Column(db.String(50))
+    prioridade    = db.Column(db.String(20), default='normal')
+    estado        = db.Column(db.String(20), default='aberta')
+    user_id       = db.Column(db.Integer, db.ForeignKey('users.id'))
+    resposta_admin= db.Column(db.Text)
+    criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    user          = db.relationship('User', backref='propostas')

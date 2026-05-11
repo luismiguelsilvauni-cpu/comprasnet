@@ -6,7 +6,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, EqIndComponenteMedia, AgendaServico, AgendaRegisto, AgendaMaterial, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, EqIndComponenteMedia, AgendaServico, AgendaRegisto, AgendaMaterial, PropostaMelhoria, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
 
 import time as _time_module
 app = Flask(__name__)
@@ -461,6 +461,7 @@ def artigos_pedidos_pdf():
         "recebido":         ("✅ Recebido",    "#22c55e"),
         "por_faturar":      ("🧾 Por Faturar", "#f97316"),
         "faturado":         ("💶 Faturado",    "#6366f1"),
+        "concluido":        ("✔️ Concluído",   "#22c55e"),
         "cancelado":        ("❌ Cancelado",   "#a855f7"),
     }
 
@@ -4884,6 +4885,7 @@ MENUS_DISPONIVEIS = [
     ('empresa',            '🏢 Empresa'),
     ('eq_industriais',     '⚙️ Equipamentos Industriais'),
     ('agenda',             '📅 Agenda Digital'),
+    ('propostas',          '💡 Propostas de Melhoria'),
     ('conectividade',      '🌐 Conectividade'),
     ('roadmap',            '🗺️ Roadmap'),
     ('changelog',          '📝 Changelog'),
