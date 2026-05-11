@@ -7716,11 +7716,14 @@ def modelo_pdf_editar(pid):
     nova_marca  = request.form.get('marca', '').strip()
     novo_modelo = request.form.get('modelo_codigo', '').strip()
     novas_refs  = request.form.get('outras_referencias', '').strip()
+    novo_tipo   = request.form.get('tipo_componente', '').strip()
     if novo_titulo:
         p.titulo = novo_titulo
     p.marca              = nova_marca or None
     p.modelo_codigo      = novo_modelo or p.modelo_codigo
     p.outras_referencias = novas_refs or None
+    if novo_tipo:
+        p.tipo_componente = novo_tipo
     db.session.commit()
     return redirect(request.referrer or url_for('biblioteca_modelos'))
 

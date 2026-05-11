@@ -151,6 +151,9 @@ function editarTipo(id, el) {
 
     <div class="edit-panel" id="pedit-{{ p.id }}">
       <form method="post" action="{{ url_for('modelo_pdf_editar', pid=p.id) }}">
+        <label>Tipo</label>
+        <input type="text" name="tipo_componente" value="{{ p.tipo_componente or '' }}" class="input"
+               list="tiposExistentes" autocomplete="off" placeholder="Ex: motor, caixa, geral...">
         <label>Título</label>
         <input type="text" name="titulo" value="{{ p.titulo }}" class="input"
                list="titulosList" autocomplete="off">
