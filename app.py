@@ -7645,6 +7645,17 @@ def tecnico_opcao_upload_factory(oid):
 
     return redirect(url_for('tecnico_detalhe', eid=o.equipamento_id))
 
+@app.route('/biblioteca/pdf/<int:pid>/editar-tipo', methods=['POST'])
+@login_required
+def biblioteca_editar_tipo(pid):
+    p = ModeloPDF.query.get_or_404(pid)
+    novo = request.form.get('tipo_componente','').strip()
+    if novo:
+        p.tipo_componente = novo
+        db.session.commit()
+    return jsonify({'ok': True, 'tipo': p.tipo_componente})
+
+
 @app.route('/biblioteca-factory')
 @login_required
 def biblioteca_factory():
