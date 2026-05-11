@@ -597,6 +597,7 @@ def api_dashboard_artigos_pedidos():
         .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
         .join(User, PedidoCompra.criado_por == User.id, isouter=True)
         .filter(PedidoCompra.estado.in_(["aberto","pedido","aprovado","pendente","em_analise"]))
+        .filter(LinhaPedido.status.notin_(["concluido","cancelado","faturado"]))
         .order_by(
             sa_case(
                 (LinhaPedido.status == "recebido", 2),
@@ -615,11 +616,19 @@ def api_dashboard_artigos_pedidos():
         "faturado":         ("💶 Faturado",    "#6366f1", "rgba(99,102,241,.15)"),
         "consultado":       ("🔍 Consultado",  "#0891b2", "rgba(8,145,178,.15)"),
         "cancelado":        ("❌ Cancelado",   "#a855f7", "rgba(168,85,247,.15)"),
+        "concluido":        ("✔️ Concluído",  "#22c55e", "rgba(34,197,94,.15)"),
     }
     rows = []
+    from datetime import date as _ddate, timedelta as _td
+    hoje_d = _ddate.today()
     for linha, pedido, user in artigos:
         s = linha.status or "nao_encomendado"
         lbl, col, bg = STATUS_INFO.get(s, STATUS_INFO["nao_encomendado"])
+        # Alert: por_faturar > 30 days
+        alerta_30d = False
+        if s == 'por_faturar' and hist and hist.data:
+            dias_em_faturar = (hoje_d - hist.data.date()).days if hasattr(hist.data, 'date') else 0
+            alerta_30d = dias_em_faturar > 30
         hist = LinhaPedidoHistorico.query.filter_by(linha_id=linha.id)            .order_by(LinhaPedidoHistorico.data.desc()).first()
         # Get cliente name - use direct query bypassing cache
         cliente_nome = "Stock"
@@ -757,9 +766,120 @@ def pedido_editar(pid):
 @login_required
 def pedidos():
     estado = request.args.get('estado','aberto') or 'aberto'
+    status_linha = request.args.get('status','')
+    q_filter = request.args.get('q','').strip()
     q = PedidoCompra.query
     if estado and estado != 'todos': q = q.filter_by(estado=estado)
-    return render_template('pedidos.html', pedidos=q.order_by(PedidoCompra.data_criacao.desc()).all(), estado_filtro=estado)
+    if status_linha:
+        q = q.join(LinhaPedido).filter(LinhaPedido.status == status_linha)
+    if q_filter:
+        q = q.filter(db.or_(
+            PedidoCompra.titulo.ilike(f'%{q_filter}%'),
+            PedidoCompra.descricao.ilike(f'%{q_filter}%'),
+        ))
+    pedidos_list = q.order_by(PedidoCompra.data_criacao.desc()).all()
+    # Status counts for filter badges
+    from sqlalchemy import func as _func
+    status_counts = dict(db.session.query(LinhaPedido.status, _func.count(LinhaPedido.id))
+        .join(PedidoCompra).filter(PedidoCompra.estado.in_(['aberto','pedido','aprovado','pendente','em_analise']))
+        .group_by(LinhaPedido.status).all())
+    return render_template('pedidos.html', pedidos=pedidos_list, estado_filtro=estado,
+        status_filtro=status_linha, q=q_filter, status_counts=status_counts)
+
+@app.route('/pedidos/<int:pid>/linha/<int:lid>/editar', methods=['POST'])
+@login_required
+def linha_editar(pid, lid):
+    l = LinhaPedido.query.filter_by(id=lid, pedido_id=pid).first_or_404()
+    data = request.get_json() or {}
+    if data.get('designacao'): l.designacao = data['designacao'].strip()
+    if data.get('referencia') is not None: l.referencia = data['referencia'].strip() or None
+    if data.get('quantidade') is not None:
+        try: l.quantidade = float(data['quantidade'])
+        except: pass
+    if data.get('fornecedor_nome') is not None: l.fornecedor_nome = data['fornecedor_nome'].strip() or None
+    if data.get('notas') is not None: l.notas = data['notas'].strip() or None
+    if data.get('cliente_id') is not None:
+        l.cliente_id = int(data['cliente_id']) if data['cliente_id'] else None
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/pedidos/<int:pid>/linha/<int:lid>/eliminar', methods=['POST'])
+@login_required
+def linha_eliminar(pid, lid):
+    l = LinhaPedido.query.filter_by(id=lid, pedido_id=pid).first_or_404()
+    db.session.delete(l)
+    # If no more lines, mark pedido as cancelado
+    remaining = LinhaPedido.query.filter_by(pedido_id=pid).count()
+    if remaining == 0:
+        p = PedidoCompra.query.get(pid)
+        if p: p.estado = 'cancelado'
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/pedidos/estatisticas')
+@login_required
+def pedidos_estatisticas():
+    from datetime import date as _d, timedelta as _td
+    from sqlalchemy import func as _func
+    hoje = _d.today()
+    mes_ini = hoje.replace(day=1)
+    ano_ini = hoje.replace(month=1, day=1)
+
+    # Status breakdown all time
+    status_counts = dict(db.session.query(LinhaPedido.status, _func.count(LinhaPedido.id))
+        .group_by(LinhaPedido.status).all())
+
+    # By month (last 6 months)
+    meses = []
+    for i in range(5, -1, -1):
+        m = hoje.month - i
+        a = hoje.year
+        while m <= 0: m += 12; a -= 1
+        ini = _d(a, m, 1)
+        import calendar as _cal
+        fim = _d(a, m, _cal.monthrange(a, m)[1])
+        n = LinhaPedido.query.join(PedidoCompra).filter(
+            PedidoCompra.data_criacao >= ini,
+            PedidoCompra.data_criacao <= fim
+        ).count()
+        meses.append({'label': f'{m:02d}/{a}', 'n': n})
+
+    # Top fornecedores
+    top_forn = db.session.query(
+        LinhaPedido.fornecedor_nome, _func.count(LinhaPedido.id).label('n')
+    ).filter(LinhaPedido.fornecedor_nome.isnot(None)
+    ).group_by(LinhaPedido.fornecedor_nome
+    ).order_by(db.text('n desc')).limit(10).all()
+
+    # Top clientes
+    top_cli = db.session.query(
+        Cliente.nome, _func.count(LinhaPedido.id).label('n')
+    ).join(LinhaPedido, LinhaPedido.cliente_id == Cliente.id
+    ).group_by(Cliente.nome
+    ).order_by(db.text('n desc')).limit(10).all()
+
+    # Avg days per status change (por_faturar > faturado)
+    total_artigos = LinhaPedido.query.count()
+    concluidos = LinhaPedido.query.filter_by(status='concluido').count()
+    em_curso = LinhaPedido.query.filter(LinhaPedido.status.in_(['nao_encomendado','consultado','pendente','encomendado','por_faturar'])).count()
+
+    # 30d alerts
+    alerta_30d = 0
+    for l in LinhaPedido.query.filter_by(status='por_faturar').all():
+        hist = LinhaPedidoHistorico.query.filter_by(linha_id=l.id, status_novo='por_faturar')            .order_by(LinhaPedidoHistorico.data.desc()).first()
+        if hist and hist.data and (hoje - hist.data.date()).days > 30:
+            alerta_30d += 1
+
+    import json as _json
+    chart_status = _json.dumps({'labels': list(status_counts.keys()), 'values': list(status_counts.values())})
+    chart_meses  = _json.dumps({'labels': [m['label'] for m in meses], 'values': [m['n'] for m in meses]})
+
+    return render_template('pedidos_estatisticas.html',
+        status_counts=status_counts, top_forn=top_forn, top_cli=top_cli,
+        total_artigos=total_artigos, concluidos=concluidos, em_curso=em_curso,
+        alerta_30d=alerta_30d, chart_status=chart_status, chart_meses=chart_meses)
+
 
 @app.route('/pedidos/novo', methods=['GET','POST'])
 @login_required

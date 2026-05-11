@@ -42,6 +42,38 @@ function mudarEstado(pid, novo) {
 {% endblock %}
 
 {% block content %}
+<!-- Status filter -->
+<div class="card mb-12" style="padding:10px">
+  <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:6px">Filtrar por estado do artigo</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <a href="{{ url_for('pedidos', estado=estado_filtro) }}" class="btn btn-sm {{ 'btn-primary' if not status_filtro else 'btn-ghost' }}" style="font-size:11px">Todos</a>
+    {% set STATUS_PILLS = [
+      ('nao_encomendado','🔴','Não Enc.','#ef4444'),
+      ('consultado','🔍','Consultado','#0891b2'),
+      ('pendente','⏳','Pendente','#f59e0b'),
+      ('encomendado','📦','Encomendado','#3b6ef0'),
+      ('por_faturar','🧾','Por Faturar','#f97316'),
+      ('faturado','💶','Faturado','#6366f1'),
+      ('concluido','✔️','Concluído','#22c55e'),
+    ] %}
+    {% for sk, icon, lbl, cor in STATUS_PILLS %}
+    {% set cnt = status_counts.get(sk, 0) %}
+    {% if cnt > 0 or status_filtro == sk %}
+    <a href="{{ url_for('pedidos', estado=estado_filtro, status=sk) }}"
+       style="font-size:11px;padding:3px 10px;border-radius:5px;text-decoration:none;font-weight:700;
+              background:{{ 'rgba(59,110,240,.15)' if status_filtro==sk else 'var(--surface2)' }};
+              color:{{ cor if status_filtro==sk else 'var(--text-muted)' }};
+              border:1px solid {{ cor if status_filtro==sk else 'transparent' }}">
+      {{ icon }} {{ lbl }} {% if cnt %}<span style="font-size:10px;opacity:.7">({{ cnt }})</span>{% endif %}
+    </a>
+    {% endif %}
+    {% endfor %}
+    {% if status_filtro %}
+    <a href="{{ url_for('pedidos', estado=estado_filtro) }}" class="btn btn-ghost btn-sm" style="font-size:11px;color:#ef4444">✕ Limpar</a>
+    {% endif %}
+  </div>
+</div>
+
 <div class="card mb-16" style="padding: 12px 20px;">
     <div class="flex items-center gap-8">
         <span style="font-size:12px; color:var(--text-muted); font-weight:600">FILTRAR:</span>

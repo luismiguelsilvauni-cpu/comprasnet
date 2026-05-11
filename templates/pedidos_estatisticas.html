@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Estatísticas Pedidos · NavTech{% endblock %}
+{% block page_title %}📊 Estatísticas — Pedidos de Compra{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('pedidos') }}" class="btn btn-ghost btn-sm">← Pedidos</a>
+{% endblock %}
+{% block content %}
+
+<!-- KPIs -->
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:24px;font-weight:800;color:var(--accent)">{{ total_artigos }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Total Artigos</div>
+  </div>
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:24px;font-weight:800;color:#3b6ef0">{{ em_curso }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Em Curso</div>
+  </div>
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:24px;font-weight:800;color:#22c55e">{{ concluidos }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Concluídos</div>
+  </div>
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:24px;font-weight:800;color:#f59e0b">{{ alerta_30d }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">⚠️ Por Faturar +30d</div>
+  </div>
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:24px;font-weight:800;color:#8b5cf6">{{ status_counts.get('por_faturar',0) }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Por Faturar</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+<!-- Status Chart -->
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📦 Artigos por Estado</div>
+  <div style="position:relative;height:240px">
+    <canvas id="chartStatus"></canvas>
+  </div>
+</div>
+
+<!-- Pedidos por mês -->
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📈 Artigos Lançados (últimos 6 meses)</div>
+  <div style="position:relative;height:240px">
+    <canvas id="chartMeses"></canvas>
+  </div>
+</div>
+
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+<!-- Top Fornecedores -->
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">🏭 Top Fornecedores</div>
+  {% if top_forn %}
+  {% set max_f = top_forn[0][1] %}
+  {% for nome, n in top_forn %}
+  <div style="margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">{{ nome }}</span>
+      <span style="font-weight:700;color:var(--accent);flex-shrink:0">{{ n }}</span>
+    </div>
+    <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+      <div style="height:100%;background:var(--accent);border-radius:3px;width:{{ (n/max_f*100)|int }}%"></div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Sem dados</div>
+  {% endif %}
+</div>
+
+<!-- Top Clientes -->
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">👥 Top Clientes / Destinos</div>
+  {% if top_cli %}
+  {% set max_c = top_cli[0][1] %}
+  {% for nome, n in top_cli %}
+  <div style="margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">{{ nome }}</span>
+      <span style="font-weight:700;color:#3b6ef0;flex-shrink:0">{{ n }}</span>
+    </div>
+    <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+      <div style="height:100%;background:#3b6ef0;border-radius:3px;width:{{ (n/max_c*100)|int }}%"></div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="color:var(--text-muted);font-size:12px;text-align:center;padding:20px">Sem dados</div>
+  {% endif %}
+</div>
+
+<!-- Estado detalhado -->
+<div class="card" style="grid-column:1/-1">
+  <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px">📋 Detalhe por Estado</div>
+  {% set STATUS_INFO = [
+    ('nao_encomendado','🔴 Não Encomendado','#ef4444'),
+    ('consultado','🔍 Consultado','#0891b2'),
+    ('pendente','⏳ Pendente','#f59e0b'),
+    ('encomendado','📦 Encomendado','#3b6ef0'),
+    ('por_faturar','🧾 Por Faturar','#f97316'),
+    ('faturado','💶 Faturado','#6366f1'),
+    ('concluido','✔️ Concluído','#22c55e'),
+    ('cancelado','❌ Cancelado','#a855f7'),
+  ] %}
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    {% for sk, lbl, cor in STATUS_INFO %}
+    {% set n = status_counts.get(sk, 0) %}
+    <a href="{{ url_for('pedidos', status=sk) }}" style="text-decoration:none">
+    <div style="padding:12px 16px;background:var(--surface2);border-radius:10px;border-left:4px solid {{ cor }};min-width:140px;transition:.15s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
+      <div style="font-size:22px;font-weight:800;color:{{ cor }}">{{ n }}</div>
+      <div style="font-size:11px;color:var(--text-muted)">{{ lbl }}</div>
+    </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+var sData = {{ chart_status|safe }};
+var mData = {{ chart_meses|safe }};
+
+var STATUS_COLORS = {
+  nao_encomendado:'#ef4444', consultado:'#0891b2', pendente:'#f59e0b',
+  encomendado:'#3b6ef0', por_faturar:'#f97316', faturado:'#6366f1',
+  concluido:'#22c55e', cancelado:'#a855f7', recebido:'#10b981'
+};
+var colors = sData.labels.map(function(l){ return STATUS_COLORS[l] || '#94a3b8'; });
+
+new Chart(document.getElementById('chartStatus'), {
+  type: 'doughnut',
+  data: { labels: sData.labels, datasets: [{ data: sData.values, backgroundColor: colors, borderWidth: 2 }] },
+  options: { responsive:true, maintainAspectRatio:false, plugins: { legend: { position:'right', labels:{font:{size:11}} } } }
+});
+
+new Chart(document.getElementById('chartMeses'), {
+  type: 'bar',
+  data: { labels: mData.labels, datasets: [{ label:'Artigos', data: mData.values, backgroundColor:'rgba(59,110,240,.8)', borderRadius:4 }] },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales: { y: { beginAtZero:true, ticks:{color:'var(--text-muted)'} }, x: { ticks:{color:'var(--text-muted)'} } } }
+});
+</script>
+{% endblock %}
