@@ -127,29 +127,22 @@ function mudarEstado(pid, novo) {
                     {% elif p.estado == 'aprovado' or p.estado == 'fechado' %}<span class="badge badge-green">✔️ Fechado</span>
                     {% elif p.estado == 'anulado' or p.estado == 'cancelado' %}<span class="badge badge-red">🚫 Anulado</span>
                     {% else %}<span class="badge badge-gray">{{ p.estado }}</span>{% endif %}
-                    {% set STATUS_CORES = {
-                      'nao_encomendado': ('#ef4444','🔴'),
-                      'consultado': ('#0891b2','🔍'),
-                      'encomendado': ('#3b6ef0','📦'),
-                      'recebido': ('#22c55e','✅'),
-                      'por_faturar': ('#f97316','🧾'),
-                      'faturado': ('#6366f1','💶'),
-                      'concluido': ('#22c55e','✔️'),
-                      'cancelado': ('#a855f7','❌'),
+                    {% set STATUS_INFO = {
+                      'nao_encomendado': ('#ef4444','🔴 Não Enc.'),
+                      'consultado':      ('#0891b2','🔍 Consultado'),
+                      'encomendado':     ('#3b6ef0','📦 Pedido'),
+                      'recebido':        ('#22c55e','✅ Recebido'),
+                      'por_faturar':     ('#f97316','🧾 Por Faturar'),
+                      'faturado':        ('#6366f1','💶 Faturado'),
+                      'concluido':       ('#22c55e','✔️ Concluído'),
+                      'cancelado':       ('#a855f7','❌ Cancelado'),
                     } %}
-                    {% set STATUS_LABELS = {
-                      'nao_encomendado': ('🔴','Não Enc.','#ef4444'),
-                      'consultado': ('🔍','Consultado','#0891b2'),
-                      'encomendado': ('📦','Pedido','#3b6ef0'),
-                      'recebido': ('✅','Recebido','#22c55e'),
-                      'por_faturar': ('🧾','Por Faturar','#f97316'),
-                      'faturado': ('💶','Faturado','#6366f1'),
-                      'concluido': ('✔️','Concluído','#22c55e'),
-                      'cancelado': ('❌','Cancelado','#a855f7'),
-                    } %}
+                    {% set sc = namespace(d={}) %}
+                    {% for linha in p.linhas %}{% set s = linha.status or 'nao_encomendado' %}{% endfor %}
                     {% for linha in p.linhas %}
-                    {% set icone, lbl, cor = STATUS_LABELS.get(linha.status or 'nao_encomendado', ('?','?','#94a3b8')) %}
-                    <span title="{{ linha.designacao or linha.referencia or '' }}" style="font-size:9px;padding:2px 6px;border-radius:3px;background:{{ cor }}20;color:{{ cor }};border:1px solid {{ cor }}40;white-space:nowrap;margin-bottom:2px;display:inline-block">{{ icone }} {{ lbl }}</span>
+                    {% set s = linha.status or 'nao_encomendado' %}
+                    {% set cor, lbl = STATUS_INFO.get(s, ('#94a3b8', s)) %}
+                    <span style="font-size:9px;padding:1px 6px;border-radius:3px;background:{{ cor }}20;color:{{ cor }};border:1px solid {{ cor }}40;white-space:nowrap">{{ lbl }}</span>
                     {% endfor %}
                     <select onchange="mudarEstado({{ p.id }},this.value);this.value=''" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);cursor:pointer">
                       <option value="">✏️</option>
