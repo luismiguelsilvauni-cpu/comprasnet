@@ -786,36 +786,6 @@ def pedidos():
     return render_template('pedidos.html', pedidos=pedidos_list, estado_filtro=estado,
         status_filtro=status_linha, q=q_filter, status_counts=status_counts)
 
-@app.route('/pedidos/<int:pid>/linha/<int:lid>/editar', methods=['POST'])
-@login_required
-def linha_editar(pid, lid):
-    l = LinhaPedido.query.filter_by(id=lid, pedido_id=pid).first_or_404()
-    data = request.get_json() or {}
-    if data.get('designacao'): l.designacao = data['designacao'].strip()
-    if data.get('referencia') is not None: l.referencia = data['referencia'].strip() or None
-    if data.get('quantidade') is not None:
-        try: l.quantidade = float(data['quantidade'])
-        except: pass
-    if data.get('fornecedor_nome') is not None: l.fornecedor_nome = data['fornecedor_nome'].strip() or None
-    if data.get('notas') is not None: l.notas = data['notas'].strip() or None
-    if data.get('cliente_id') is not None:
-        l.cliente_id = int(data['cliente_id']) if data['cliente_id'] else None
-    db.session.commit()
-    return jsonify({'ok': True})
-
-@app.route('/pedidos/<int:pid>/linha/<int:lid>/eliminar', methods=['POST'])
-@login_required
-def linha_eliminar(pid, lid):
-    l = LinhaPedido.query.filter_by(id=lid, pedido_id=pid).first_or_404()
-    db.session.delete(l)
-    # If no more lines, mark pedido as cancelado
-    remaining = LinhaPedido.query.filter_by(pedido_id=pid).count()
-    if remaining == 0:
-        p = PedidoCompra.query.get(pid)
-        if p: p.estado = 'cancelado'
-    db.session.commit()
-    return jsonify({'ok': True})
-
 
 @app.route('/pedidos/estatisticas')
 @login_required
