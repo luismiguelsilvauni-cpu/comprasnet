@@ -395,7 +395,7 @@ function syncBiblioteca() {
   var btn = document.getElementById('btnBibSync');
   var list = document.getElementById('bibSyncList');
   btn.disabled = true; btn.textContent = '⏳';
-  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+  fetch('/api/biblioteca/sync-embarcacao/{{ equipamento.id }}')
     .then(r=>r.json()).then(function(d) {
       btn.disabled = false; btn.textContent = '🔄 Sincronizar';
       if (!d.ok || !d.docs.length) {
@@ -480,7 +480,7 @@ function syncBiblioteca() {
   var btn = document.getElementById('btnBibSync');
   var list = document.getElementById('bibSyncList');
   btn.disabled = true; btn.textContent = '⏳';
-  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+  fetch('/api/biblioteca/sync-embarcacao/{{ equipamento.id }}')
     .then(r=>r.json()).then(function(d) {
       btn.disabled = false; btn.textContent = '🔄 Sincronizar';
       if (!d.ok || !d.docs.length) {
@@ -540,7 +540,7 @@ function syncBiblioteca() {
   var btn = document.getElementById('btnBibSync');
   var list = document.getElementById('bibSyncList');
   btn.disabled = true; btn.textContent = '⏳';
-  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+  fetch('/api/biblioteca/sync-embarcacao/{{ equipamento.id }}')
     .then(r=>r.json()).then(function(d) {
       btn.disabled = false; btn.textContent = '🔄 Sincronizar';
       if (!d.ok || !d.docs.length) {
@@ -586,7 +586,7 @@ function syncBiblioteca() {
   var btn = document.getElementById('btnBibSync');
   var list = document.getElementById('bibSyncList');
   btn.disabled = true; btn.textContent = '⏳';
-  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+  fetch('/api/biblioteca/sync-embarcacao/{{ equipamento.id }}')
     .then(r=>r.json()).then(function(d) {
       btn.disabled = false; btn.textContent = '🔄 Sincronizar';
       if (!d.ok || !d.docs.length) {
