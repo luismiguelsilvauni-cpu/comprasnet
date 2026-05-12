@@ -26,6 +26,7 @@ function mudarEstado(pid, novo) {
 </script>
 {% endblock %}
 {% block topbar_actions %}
+  <a href="{{ url_for('pedidos_estatisticas') }}" class="btn btn-ghost btn-sm">📊 Estatísticas</a>
     <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary">+ Novo Pedido</a>
 <script>
 function mudarEstado(pid, novo) {

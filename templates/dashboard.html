@@ -548,6 +548,14 @@ function carregarArtigosPedidos() {
         span.style.cssText = 'cursor:pointer;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:' + r.status_bg + ';color:' + r.status_color + ';border:1px solid ' + r.status_color + '40';
         span.onclick = (function(lid, pid, des, st, stk){ return function(){ dashAbrirStatus(lid, pid, des, st, stk); }; })(r.linha_id, r.pedido_id, r.designacao, r.status, r.is_stock);
         tdStatus.appendChild(span);
+        // 30-day alert for por_faturar
+        if (r.alerta_30d) {
+          var alert = document.createElement('span');
+          alert.textContent = '⚠️ +30d';
+          alert.title = 'Por Faturar há mais de 30 dias';
+          alert.style.cssText = 'margin-left:4px;font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;font-weight:700;cursor:help';
+          tdStatus.appendChild(alert);
+        }
         tr.appendChild(tdStatus);
         // Artigo cell
         var tdArt = document.createElement('td');

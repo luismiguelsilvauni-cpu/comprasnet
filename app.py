@@ -675,6 +675,7 @@ def api_dashboard_artigos_pedidos():
             "status_bg": bg,
             "dim": s in ["recebido","faturado","cancelado"],
             "alerta_faturar": bool(s == "por_faturar" and hist and (datetime.now() - hist.data).days >= 10),
+            "alerta_30d": bool(s == "por_faturar" and hist and (datetime.now() - hist.data).days > 30),
             "dias_por_faturar": int((datetime.now() - hist.data).days) if s == "por_faturar" and hist else 0,
             "data_status": hist.data.strftime("%d/%m/%Y %H:%M") if hist else "—",
             "alterado_por": hist.user_nome[:20] if hist else "—",
