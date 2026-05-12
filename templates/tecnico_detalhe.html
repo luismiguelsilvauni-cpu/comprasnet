@@ -382,53 +382,6 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
   {% set comp='motor' %}{% set comp_label='Motor Propulsor' %}
   {% include 'tecnico_doc_panel.html' %}
 
-<!-- Biblioteca Docs Sincronizados -->
-<div class="card mb-14" id="bibSyncCard">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div style="font-size:12px;font-weight:700;color:var(--accent)">📚 Documentação da Biblioteca (auto)</div>
-    <button onclick="syncBiblioteca()" class="btn btn-ghost btn-sm" style="font-size:10px" id="btnBibSync">🔄 Sincronizar</button>
-  </div>
-  <div id="bibSyncList" style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">A carregar...</div>
-</div>
-<script>
-function syncBiblioteca() {
-  var btn = document.getElementById('btnBibSync');
-  var list = document.getElementById('bibSyncList');
-  btn.disabled = true; btn.textContent = '⏳';
-  fetch('/api/biblioteca/sync-embarcacao/{{ equipamento.id }}')
-    .then(r=>r.json()).then(function(d) {
-      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
-      if (!d.ok || !d.docs.length) {
-        list.innerHTML = '<span style="color:var(--text-muted)">Sem documentos correspondentes na biblioteca</span>';
-        return;
-      }
-      list.innerHTML = d.docs.map(function(doc) {
-        var matchBadge = doc.match === 'exact'
-          ? '<span style="font-size:9px;background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:4px">✅ Exacto</span>'
-          : '<span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:4px" title="Confirme antes de usar">⚠️ Parcial</span>';
-        var matchInfo = doc.match === 'partial'
-          ? '<div style="font-size:10px;color:#92400e;margin-top:2px">Modelo do motor: <strong>' + doc.match_termo + '</strong> ≈ doc: <strong>' + doc.match_campo + '</strong></div>'
-          : '';
-        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
-          '<span style="font-size:16px;flex-shrink:0">📄</span>' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + doc.titulo + matchBadge + '</div>' +
-            '<div style="font-size:10px;color:var(--text-muted)">' + (doc.tipo||'') + (doc.marca?' · '+doc.marca:'') + (doc.modelo?' · '+doc.modelo:'') + '</div>' +
-            matchInfo +
-          '</div>' +
-          '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px;flex-shrink:0">👁 Ver</a>' +
-        '</div>';
-      }).join('');
-    }).catch(function(){
-      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
-      list.innerHTML = '<span style="color:#ef4444">Erro ao sincronizar</span>';
-    });
-}
-// Auto-sync on page load
-syncBiblioteca();
-</script>
-</div>
-
 <!-- Caixa · Info -->
 <div class="cpanel" id="cp-caixa-info">
   <!-- Fixed fields -->
@@ -494,53 +447,6 @@ syncBiblioteca();
 <div class="cpanel" id="cp-{{ ak }}-docs">
   {% set comp=ak %}{% set comp_label='Motor Auxiliar '+m.numero|string %}
   {% include 'tecnico_doc_panel.html' %}
-
-<!-- Biblioteca Docs Sincronizados -->
-<div class="card mb-14" id="bibSyncCard">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div style="font-size:12px;font-weight:700;color:var(--accent)">📚 Documentação da Biblioteca (auto)</div>
-    <button onclick="syncBiblioteca()" class="btn btn-ghost btn-sm" style="font-size:10px" id="btnBibSync">🔄 Sincronizar</button>
-  </div>
-  <div id="bibSyncList" style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">A carregar...</div>
-</div>
-<script>
-function syncBiblioteca() {
-  var btn = document.getElementById('btnBibSync');
-  var list = document.getElementById('bibSyncList');
-  btn.disabled = true; btn.textContent = '⏳';
-  fetch('/api/biblioteca/sync-embarcacao/{{ equipamento.id }}')
-    .then(r=>r.json()).then(function(d) {
-      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
-      if (!d.ok || !d.docs.length) {
-        list.innerHTML = '<span style="color:var(--text-muted)">Sem documentos correspondentes na biblioteca</span>';
-        return;
-      }
-      list.innerHTML = d.docs.map(function(doc) {
-        var matchBadge = doc.match === 'exact'
-          ? '<span style="font-size:9px;background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:4px">✅ Exacto</span>'
-          : '<span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:4px" title="Confirme antes de usar">⚠️ Parcial</span>';
-        var matchInfo = doc.match === 'partial'
-          ? '<div style="font-size:10px;color:#92400e;margin-top:2px">Modelo do motor: <strong>' + doc.match_termo + '</strong> ≈ doc: <strong>' + doc.match_campo + '</strong></div>'
-          : '';
-        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
-          '<span style="font-size:16px;flex-shrink:0">📄</span>' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + doc.titulo + matchBadge + '</div>' +
-            '<div style="font-size:10px;color:var(--text-muted)">' + (doc.tipo||'') + (doc.marca?' · '+doc.marca:'') + (doc.modelo?' · '+doc.modelo:'') + '</div>' +
-            matchInfo +
-          '</div>' +
-          '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px;flex-shrink:0">👁 Ver</a>' +
-        '</div>';
-      }).join('');
-    }).catch(function(){
-      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
-      list.innerHTML = '<span style="color:#ef4444">Erro ao sincronizar</span>';
-    });
-}
-// Auto-sync on page load
-syncBiblioteca();
-</script>
-</div>
 {% endfor %}
 
 <!-- Outros · Docs -->
