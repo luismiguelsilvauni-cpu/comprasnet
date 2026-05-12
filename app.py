@@ -2532,37 +2532,72 @@ def eq_industrial_foto(fname):
 @app.route('/api/biblioteca/sync-embarcacao/<int:fid>')
 @login_required
 def biblioteca_sync_embarcacao(fid):
-    """Find biblioteca PDFs matching motor/caixa models of this ficha tecnica."""
+    """Find biblioteca PDFs matching motor/caixa models — exact and partial."""
     ficha = FichaTecnica.query.get_or_404(fid)
     termos = []
     for comp in ficha.componentes:
-        if comp.modelo_motor: termos.append(comp.modelo_motor.strip())
-        if comp.modelo_caixa: termos.append(comp.modelo_caixa.strip())
-        if comp.marca_motor:  termos.append(comp.marca_motor.strip())
-        if comp.marca_caixa:  termos.append(comp.marca_caixa.strip())
-    
+        for campo in [comp.modelo_motor, comp.modelo_caixa, comp.marca_motor, comp.marca_caixa]:
+            if campo and len(campo.strip()) >= 3:
+                termos.append(campo.strip())
     if not termos:
         return jsonify({'ok': True, 'docs': []})
-    
-    # Search biblioteca for matching PDFs
+
     from sqlalchemy import or_
-    conditions = []
-    for t in set(termos):
-        if len(t) < 3: continue
-        conditions.append(ModeloPDF.titulo.ilike(f'%{t}%'))
-        conditions.append(ModeloPDF.modelo_codigo.ilike(f'%{t}%'))
-        conditions.append(ModeloPDF.outras_referencias.ilike(f'%{t}%'))
-    
-    if not conditions:
-        return jsonify({'ok': True, 'docs': []})
-    
-    docs = ModeloPDF.query.filter(or_(*conditions)).limit(20).all()
-    return jsonify({'ok': True, 'docs': [
-        {'id': d.id, 'titulo': d.titulo, 'tipo': d.tipo_componente,
-         'marca': d.marca or '', 'modelo': d.modelo_codigo or '',
-         'url': url_for('modelo_pdf_ver', pid=d.id)}
-        for d in docs
-    ]})
+    all_docs = ModeloPDF.query.all()
+    results = []
+    seen = set()
+
+    def _similarity(a, b):
+        """Return match type: exact, partial, none"""
+        a, b = a.lower(), b.lower()
+        if a == b: return 'exact'
+        if a in b or b in a: return 'partial'
+        # Check if first N chars match (prefix match)
+        n = min(len(a), len(b), 6)
+        if n >= 4 and a[:n] == b[:n]: return 'partial'
+        return None
+
+    for doc in all_docs:
+        doc_campos = [
+            doc.titulo or '',
+            doc.modelo_codigo or '',
+            doc.outras_referencias or '',
+        ]
+        best_match = None
+        match_termo = ''
+        match_campo = ''
+        for termo in set(termos):
+            for campo in doc_campos:
+                m = _similarity(termo, campo)
+                if m == 'exact':
+                    best_match = 'exact'
+                    match_termo = termo
+                    match_campo = campo
+                    break
+                elif m == 'partial' and best_match != 'exact':
+                    best_match = 'partial'
+                    match_termo = termo
+                    match_campo = campo
+            if best_match == 'exact':
+                break
+        if best_match and doc.id not in seen:
+            seen.add(doc.id)
+            results.append({
+                'id': doc.id,
+                'titulo': doc.titulo,
+                'tipo': doc.tipo_componente or '',
+                'marca': doc.marca or '',
+                'modelo': doc.modelo_codigo or '',
+                'match': best_match,
+                'match_termo': match_termo,
+                'match_campo': match_campo,
+                'url': url_for('modelo_pdf_ver', pid=doc.id),
+            })
+
+    # Sort: exact first
+    results.sort(key=lambda x: 0 if x['match'] == 'exact' else 1)
+    return jsonify({'ok': True, 'docs': results[:20]})
+
 
 
 # ══════════════════════════════════════════════════════════════════════
