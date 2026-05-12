@@ -766,26 +766,45 @@ def pedido_editar(pid):
 @app.route('/pedidos')
 @login_required
 def pedidos():
-    estado = request.args.get('estado','aberto') or 'aberto'
-    status_linha = request.args.get('status','')
+    # filtro_tab: em_analise, pedido, concluido, todos
+    filtro_tab = request.args.get('filtro_tab', 'em_analise')
     q_filter = request.args.get('q','').strip()
-    q = PedidoCompra.query
-    if estado and estado != 'todos': q = q.filter_by(estado=estado)
-    if status_linha:
-        q = q.join(LinhaPedido).filter(LinhaPedido.status == status_linha)
+
+    # Get all active pedidos
+    q = PedidoCompra.query.filter(
+        PedidoCompra.estado.notin_(['cancelado','arquivado','anulado'])
+    )
     if q_filter:
         q = q.filter(db.or_(
             PedidoCompra.titulo.ilike(f'%{q_filter}%'),
             PedidoCompra.descricao.ilike(f'%{q_filter}%'),
         ))
-    pedidos_list = q.order_by(PedidoCompra.data_criacao.desc()).all()
-    # Status counts for filter badges
-    from sqlalchemy import func as _func
-    status_counts = dict(db.session.query(LinhaPedido.status, _func.count(LinhaPedido.id))
-        .join(PedidoCompra).filter(PedidoCompra.estado.in_(['aberto','pedido','aprovado','pendente','em_analise']))
-        .group_by(LinhaPedido.status).all())
-    return render_template('pedidos.html', pedidos=pedidos_list, estado_filtro=estado,
-        status_filtro=status_linha, q=q_filter, status_counts=status_counts)
+    todos = q.order_by(PedidoCompra.data_criacao.desc()).all()
+
+    # Classify each pedido by its linhas statuses
+    def classify(p):
+        statuses = set(l.status or 'nao_encomendado' for l in p.linhas)
+        if not statuses: return 'em_analise'
+        if statuses <= {'concluido','faturado','cancelado'}: return 'concluido'
+        if any(s in statuses for s in ['encomendado','por_faturar','recebido','faturado']): return 'pedido'
+        return 'em_analise'  # nao_encomendado or consultado
+
+    # Count per tab
+    tab_counts = {'em_analise': 0, 'pedido': 0, 'concluido': 0, 'todos': len(todos)}
+    classified = []
+    for p in todos:
+        cls = classify(p)
+        tab_counts[cls] += 1
+        classified.append((p, cls))
+
+    # Filter
+    if filtro_tab == 'todos':
+        pedidos_list = todos
+    else:
+        pedidos_list = [p for p, cls in classified if cls == filtro_tab]
+
+    return render_template('pedidos.html', pedidos=pedidos_list,
+        filtro_tab=filtro_tab, tab_counts=tab_counts, q=q_filter)
 
 
 @app.route('/pedidos/estatisticas')
