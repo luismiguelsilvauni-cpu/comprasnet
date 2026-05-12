@@ -818,9 +818,9 @@ def pedidos_estatisticas():
 
     # Top fornecedores
     top_forn = db.session.query(
-        LinhaPedido.fornecedor_nome, _func.count(LinhaPedido.id).label('n')
-    ).filter(LinhaPedido.fornecedor_nome.isnot(None)
-    ).group_by(LinhaPedido.fornecedor_nome
+        LinhaPedido.fornecedor_hab, _func.count(LinhaPedido.id).label('n')
+    ).filter(LinhaPedido.fornecedor_hab.isnot(None), LinhaPedido.fornecedor_hab != ''
+    ).group_by(LinhaPedido.fornecedor_hab
     ).order_by(db.text('n desc')).limit(10).all()
 
     # Top clientes
