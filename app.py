@@ -2555,8 +2555,9 @@ def biblioteca_sync_embarcacao(fid):
     ficha = FichaTecnica.query.get_or_404(fid)
     # Use correct FichaTecnica field names
     termos = []
-    for campo in [ficha.motor_modelo, ficha.motor_marca, ficha.motor_serie,
-                  ficha.grupo_modelo, ficha.grupo_marca, ficha.grupo_designacao]:
+    for campo in [ficha.motor_modelo, ficha.motor_marca,
+                  ficha.grupo_modelo, ficha.grupo_marca]:
+        # Note: motor_serie excluded - serial numbers cause false matches
         if campo and len(campo.strip()) >= 3:
             termos.append(campo.strip())
     if not termos:
