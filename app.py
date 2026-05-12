@@ -8039,21 +8039,21 @@ def biblioteca_modelos():
         ModeloPDF.titulo
     ).all()
 
-    # Suggestions: unique titles, marcas, modelos already in DB
-    titulos_existentes = sorted(set(
-        p.titulo for p in ModeloPDF.query.with_entities(ModeloPDF.titulo).all() if p.titulo
-    ))
-    marcas_existentes = sorted(set(
-        p.marca for p in ModeloPDF.query.with_entities(ModeloPDF.marca).all() if p.marca
-    ))
+    from sqlalchemy import func as _fn
+    # Frequency-sorted suggestions (value, count) for datalists
+    titulos_freq = db.session.query(ModeloPDF.titulo, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.titulo.isnot(None)).group_by(ModeloPDF.titulo)        .order_by(db.text('n desc')).all()
+    tipos_freq = db.session.query(ModeloPDF.tipo_componente, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.tipo_componente.isnot(None), ModeloPDF.tipo_componente != '')        .group_by(ModeloPDF.tipo_componente).order_by(db.text('n desc')).all()
+    marcas_freq = db.session.query(ModeloPDF.marca, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.marca.isnot(None), ModeloPDF.marca != '')        .group_by(ModeloPDF.marca).order_by(db.text('n desc')).all()
+    modelos_freq = db.session.query(ModeloPDF.modelo_codigo, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.modelo_codigo.isnot(None), ModeloPDF.modelo_codigo != '')        .group_by(ModeloPDF.modelo_codigo).order_by(db.text('n desc')).limit(60).all()
+
     caixas = db.session.query(Equipamento.caixa_modelo).filter(
         Equipamento.caixa_modelo.isnot(None)).distinct().all()
     motores = db.session.query(Equipamento.motor_modelo).filter(
         Equipamento.motor_modelo.isnot(None)).distinct().all()
 
     return render_template('biblioteca_modelos.html', pdfs=pdfs, q=q,
-                           titulos_existentes=titulos_existentes,
-                           marcas_existentes=marcas_existentes,
+                           titulos_freq=titulos_freq, tipos_freq=tipos_freq,
+                           marcas_freq=marcas_freq, modelos_freq=modelos_freq,
                            caixas=[c[0] for c in caixas if c[0]],
                            motores=[m[0] for m in motores if m[0]])
 
