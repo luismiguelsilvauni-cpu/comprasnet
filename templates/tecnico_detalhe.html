@@ -381,6 +381,45 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
 <div class="cpanel" id="cp-motor-docs">
   {% set comp='motor' %}{% set comp_label='Motor Propulsor' %}
   {% include 'tecnico_doc_panel.html' %}
+
+<!-- Biblioteca Docs Sincronizados -->
+<div class="card mb-14" id="bibSyncCard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:var(--accent)">📚 Documentação da Biblioteca (auto)</div>
+    <button onclick="syncBiblioteca()" class="btn btn-ghost btn-sm" style="font-size:10px" id="btnBibSync">🔄 Sincronizar</button>
+  </div>
+  <div id="bibSyncList" style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">A carregar...</div>
+</div>
+<script>
+function syncBiblioteca() {
+  var btn = document.getElementById('btnBibSync');
+  var list = document.getElementById('bibSyncList');
+  btn.disabled = true; btn.textContent = '⏳';
+  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+    .then(r=>r.json()).then(function(d) {
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      if (!d.ok || !d.docs.length) {
+        list.innerHTML = '<span style="color:var(--text-muted)">Sem documentos correspondentes na biblioteca</span>';
+        return;
+      }
+      list.innerHTML = d.docs.map(function(doc) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<span style="font-size:16px">📄</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + doc.titulo + '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted)">' + (doc.tipo||'') + (doc.marca?' · '+doc.marca:'') + (doc.modelo?' · '+doc.modelo:'') + '</div>' +
+          '</div>' +
+          '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">👁 Ver</a>' +
+        '</div>';
+      }).join('');
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      list.innerHTML = '<span style="color:#ef4444">Erro ao sincronizar</span>';
+    });
+}
+// Auto-sync on page load
+syncBiblioteca();
+</script>
 </div>
 
 <!-- Caixa · Info -->
@@ -427,6 +466,45 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
 <div class="cpanel" id="cp-caixa-docs">
   {% set comp='caixa' %}{% set comp_label='Caixa Inv./Redutora' %}
   {% include 'tecnico_doc_panel.html' %}
+
+<!-- Biblioteca Docs Sincronizados -->
+<div class="card mb-14" id="bibSyncCard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:var(--accent)">📚 Documentação da Biblioteca (auto)</div>
+    <button onclick="syncBiblioteca()" class="btn btn-ghost btn-sm" style="font-size:10px" id="btnBibSync">🔄 Sincronizar</button>
+  </div>
+  <div id="bibSyncList" style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">A carregar...</div>
+</div>
+<script>
+function syncBiblioteca() {
+  var btn = document.getElementById('btnBibSync');
+  var list = document.getElementById('bibSyncList');
+  btn.disabled = true; btn.textContent = '⏳';
+  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+    .then(r=>r.json()).then(function(d) {
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      if (!d.ok || !d.docs.length) {
+        list.innerHTML = '<span style="color:var(--text-muted)">Sem documentos correspondentes na biblioteca</span>';
+        return;
+      }
+      list.innerHTML = d.docs.map(function(doc) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<span style="font-size:16px">📄</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + doc.titulo + '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted)">' + (doc.tipo||'') + (doc.marca?' · '+doc.marca:'') + (doc.modelo?' · '+doc.modelo:'') + '</div>' +
+          '</div>' +
+          '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">👁 Ver</a>' +
+        '</div>';
+      }).join('');
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      list.innerHTML = '<span style="color:#ef4444">Erro ao sincronizar</span>';
+    });
+}
+// Auto-sync on page load
+syncBiblioteca();
+</script>
 </div>
 
 <!-- Aux Info + Docs -->
@@ -448,6 +526,45 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
 <div class="cpanel" id="cp-{{ ak }}-docs">
   {% set comp=ak %}{% set comp_label='Motor Auxiliar '+m.numero|string %}
   {% include 'tecnico_doc_panel.html' %}
+
+<!-- Biblioteca Docs Sincronizados -->
+<div class="card mb-14" id="bibSyncCard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:var(--accent)">📚 Documentação da Biblioteca (auto)</div>
+    <button onclick="syncBiblioteca()" class="btn btn-ghost btn-sm" style="font-size:10px" id="btnBibSync">🔄 Sincronizar</button>
+  </div>
+  <div id="bibSyncList" style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">A carregar...</div>
+</div>
+<script>
+function syncBiblioteca() {
+  var btn = document.getElementById('btnBibSync');
+  var list = document.getElementById('bibSyncList');
+  btn.disabled = true; btn.textContent = '⏳';
+  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+    .then(r=>r.json()).then(function(d) {
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      if (!d.ok || !d.docs.length) {
+        list.innerHTML = '<span style="color:var(--text-muted)">Sem documentos correspondentes na biblioteca</span>';
+        return;
+      }
+      list.innerHTML = d.docs.map(function(doc) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<span style="font-size:16px">📄</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + doc.titulo + '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted)">' + (doc.tipo||'') + (doc.marca?' · '+doc.marca:'') + (doc.modelo?' · '+doc.modelo:'') + '</div>' +
+          '</div>' +
+          '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">👁 Ver</a>' +
+        '</div>';
+      }).join('');
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      list.innerHTML = '<span style="color:#ef4444">Erro ao sincronizar</span>';
+    });
+}
+// Auto-sync on page load
+syncBiblioteca();
+</script>
 </div>
 {% endfor %}
 
@@ -455,6 +572,45 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
 <div class="cpanel" id="cp-outros-docs">
   {% set comp='outros' %}{% set comp_label='Outros Documentos' %}
   {% include 'tecnico_doc_panel.html' %}
+
+<!-- Biblioteca Docs Sincronizados -->
+<div class="card mb-14" id="bibSyncCard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:var(--accent)">📚 Documentação da Biblioteca (auto)</div>
+    <button onclick="syncBiblioteca()" class="btn btn-ghost btn-sm" style="font-size:10px" id="btnBibSync">🔄 Sincronizar</button>
+  </div>
+  <div id="bibSyncList" style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">A carregar...</div>
+</div>
+<script>
+function syncBiblioteca() {
+  var btn = document.getElementById('btnBibSync');
+  var list = document.getElementById('bibSyncList');
+  btn.disabled = true; btn.textContent = '⏳';
+  fetch('/api/biblioteca/sync-embarcacao/{{ ficha.id }}')
+    .then(r=>r.json()).then(function(d) {
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      if (!d.ok || !d.docs.length) {
+        list.innerHTML = '<span style="color:var(--text-muted)">Sem documentos correspondentes na biblioteca</span>';
+        return;
+      }
+      list.innerHTML = d.docs.map(function(doc) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<span style="font-size:16px">📄</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + doc.titulo + '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted)">' + (doc.tipo||'') + (doc.marca?' · '+doc.marca:'') + (doc.modelo?' · '+doc.modelo:'') + '</div>' +
+          '</div>' +
+          '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">👁 Ver</a>' +
+        '</div>';
+      }).join('');
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      list.innerHTML = '<span style="color:#ef4444">Erro ao sincronizar</span>';
+    });
+}
+// Auto-sync on page load
+syncBiblioteca();
+</script>
 </div>
 
 <!-- Mgmt · Lista -->

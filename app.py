@@ -434,7 +434,7 @@ def artigos_pedidos_pdf():
     status_filtro = request.args.get('status','').strip()
 
     from sqlalchemy import case
-    STATUS_VISIVEIS = ['nao_encomendado', 'consultado', 'pendente', 'encomendado', 'por_faturar']
+    STATUS_VISIVEIS = ['nao_encomendado', 'consultado', 'encomendado', 'por_faturar']
     query = (db.session.query(LinhaPedido, PedidoCompra)
         .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
         .filter(PedidoCompra.estado.notin_(['cancelado','concluido','arquivado','rejeitado']))
@@ -2529,6 +2529,42 @@ def eq_industrial_foto(fname):
     return send_from_directory(EQ_IND_UPLOAD_DIR, fname)
 
 
+@app.route('/api/biblioteca/sync-embarcacao/<int:fid>')
+@login_required
+def biblioteca_sync_embarcacao(fid):
+    """Find biblioteca PDFs matching motor/caixa models of this ficha tecnica."""
+    ficha = FichaTecnica.query.get_or_404(fid)
+    termos = []
+    for comp in ficha.componentes:
+        if comp.modelo_motor: termos.append(comp.modelo_motor.strip())
+        if comp.modelo_caixa: termos.append(comp.modelo_caixa.strip())
+        if comp.marca_motor:  termos.append(comp.marca_motor.strip())
+        if comp.marca_caixa:  termos.append(comp.marca_caixa.strip())
+    
+    if not termos:
+        return jsonify({'ok': True, 'docs': []})
+    
+    # Search biblioteca for matching PDFs
+    from sqlalchemy import or_
+    conditions = []
+    for t in set(termos):
+        if len(t) < 3: continue
+        conditions.append(ModeloPDF.titulo.ilike(f'%{t}%'))
+        conditions.append(ModeloPDF.modelo_codigo.ilike(f'%{t}%'))
+        conditions.append(ModeloPDF.outras_referencias.ilike(f'%{t}%'))
+    
+    if not conditions:
+        return jsonify({'ok': True, 'docs': []})
+    
+    docs = ModeloPDF.query.filter(or_(*conditions)).limit(20).all()
+    return jsonify({'ok': True, 'docs': [
+        {'id': d.id, 'titulo': d.titulo, 'tipo': d.tipo_componente,
+         'marca': d.marca or '', 'modelo': d.modelo_codigo or '',
+         'url': url_for('modelo_pdf_ver', pid=d.id)}
+        for d in docs
+    ]})
+
+
 # ══════════════════════════════════════════════════════════════════════
 # MANUAIS EMBARCAÇÕES — Upload / Download / Listagem
 # ══════════════════════════════════════════════════════════════════════
@@ -4454,6 +4490,16 @@ PROPOSTA_ESTADOS = {
     'implementada': ('🚀 Implementada', '#8b5cf6'),
     'rejeitada':    ('❌ Rejeitada',    '#ef4444'),
 }
+
+@app.route('/admin/migrar-pendente', methods=['POST'])
+@login_required
+def migrar_pendente():
+    if not current_user.is_admin:
+        return jsonify({'ok': False})
+    n = LinhaPedido.query.filter_by(status='pendente').update({'status': 'encomendado'})
+    db.session.commit()
+    return jsonify({'ok': True, 'alterados': n})
+
 
 @app.route('/propostas', methods=['GET','POST'])
 @login_required
