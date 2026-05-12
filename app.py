@@ -2553,13 +2553,14 @@ def eq_industrial_foto(fname):
 def biblioteca_sync_embarcacao(fid):
     """Find biblioteca PDFs matching motor/caixa models — exact and partial."""
     ficha = FichaTecnica.query.get_or_404(fid)
+    # Use correct FichaTecnica field names
     termos = []
-    for comp in ficha.componentes:
-        for campo in [comp.modelo_motor, comp.modelo_caixa, comp.marca_motor, comp.marca_caixa]:
-            if campo and len(campo.strip()) >= 3:
-                termos.append(campo.strip())
+    for campo in [ficha.motor_modelo, ficha.motor_marca, ficha.motor_serie,
+                  ficha.grupo_modelo, ficha.grupo_marca, ficha.grupo_designacao]:
+        if campo and len(campo.strip()) >= 3:
+            termos.append(campo.strip())
     if not termos:
-        return jsonify({'ok': True, 'docs': []})
+        return jsonify({'ok': True, 'docs': [], 'debug': 'no termos found'})
 
     from sqlalchemy import or_
     all_docs = ModeloPDF.query.all()
