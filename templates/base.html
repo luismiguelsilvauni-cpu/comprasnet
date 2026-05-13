@@ -315,7 +315,7 @@
             </a>
             {% endif %}
             {% if pode_aceder('ferias') %}
-            <a href="{{ url_for('ausencias') }}" class="nav-item nav-sub {% if request.endpoint and ('ausencia' in request.endpoint or 'ferias' in request.endpoint) %}active{% endif %}">
+            <a href="/ausencias" class="nav-item nav-sub {% if request.endpoint and ('ausencia' in request.endpoint or 'ferias' in request.endpoint) %}active{% endif %}">
               <span class="icon">📅</span><span>Mapa Férias / Faltas</span>
             </a>
             {% endif %}
