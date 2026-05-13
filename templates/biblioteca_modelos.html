@@ -70,9 +70,9 @@ function editarTipo(id, el) {
           </datalist>
         </div>
         <div class="form-group" style="margin:0">
-          <label>Tipo</label>
-          <input type="text" name="tipo_componente" list="tiposExistentes" autocomplete="off" class="input" list="tiposList"
-                 placeholder="Tipo..." oninput="updateModelos(this.value)" autocomplete="off">
+          <label>Família</label>
+          <input type="text" name="tipo_componente" list="tiposList" autocomplete="off" class="input"
+                 placeholder="Ex: motor, caixa, geral..." oninput="updateModelos(this.value)">
           <datalist id="tiposList">
             {% for t, n in tipos_freq|default([]) %}<option value="{{ t }}">{{ t }} ({{ n }})</option>{% endfor %}
           </datalist>
@@ -143,7 +143,7 @@ function editarTipo(id, el) {
 
     <div class="edit-panel" id="pedit-{{ p.id }}">
       <form method="post" action="{{ url_for('modelo_pdf_editar', pid=p.id) }}">
-        <label>Tipo</label>
+        <label>Família</label>
         <input type="text" name="tipo_componente" value="{{ p.tipo_componente or '' }}" class="input"
                list="tiposExistentes" autocomplete="off" placeholder="Ex: motor, caixa, geral...">
         <label>Título</label>
