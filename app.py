@@ -405,6 +405,19 @@ def dashboard():
         ).order_by(EntradaEquipamento.data_status).all()
         entradas_estadia = len(entradas_estadia_list)
     except: entradas_estadia = 0; entradas_estadia_list = []
+
+    # Count artigos Por Faturar > 30 days
+    try:
+        from datetime import date as _dd, timedelta as _tdelta
+        _30d_ago = _dd.today() - _tdelta(days=30)
+        _linhas_pf = LinhaPedido.query.filter_by(status='por_faturar').all()
+        faturar_30d_count = 0
+        for _l in _linhas_pf:
+            _hist = LinhaPedidoHistorico.query.filter_by(linha_id=_l.id, status_novo='por_faturar')                .order_by(LinhaPedidoHistorico.data.desc()).first()
+            if _hist and _hist.data and _hist.data.date() < _30d_ago:
+                faturar_30d_count += 1
+    except: faturar_30d_count = 0
+
     return render_template('dashboard.html',
         faturar_30d_count=faturar_30d_count,
         entradas_estadia=entradas_estadia,
