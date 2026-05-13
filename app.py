@@ -406,6 +406,7 @@ def dashboard():
         entradas_estadia = len(entradas_estadia_list)
     except: entradas_estadia = 0; entradas_estadia_list = []
     return render_template('dashboard.html',
+        faturar_30d_count=faturar_30d_count,
         entradas_estadia=entradas_estadia,
         entradas_estadia_list=entradas_estadia_list,
         assist_alerta=assist_alerta,
@@ -679,6 +680,7 @@ def api_dashboard_artigos_pedidos():
             "dias_por_faturar": int((datetime.now() - hist.data).days) if s == "por_faturar" and hist else 0,
             "data_status": hist.data.strftime("%d/%m/%Y %H:%M") if hist else "—",
             "alterado_por": hist.user_nome[:20] if hist else "—",
+            "preco_custo": round(float(linha.preco_custo_ref), 2) if linha.preco_custo_ref else None,
         })
     return jsonify(rows)
 

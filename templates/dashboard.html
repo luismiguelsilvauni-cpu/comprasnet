@@ -11,6 +11,9 @@
   {% if entradas_estadia and entradas_estadia > 0 %}
   <a href="{{ url_for('entradas', status='orcamentado_estadia') }}" style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;text-decoration:none">⚠️ {{ entradas_estadia }} equip. em estadia</a>
   {% endif %}
+  {% if faturar_30d_count and faturar_30d_count > 0 %}
+  <a href="#artigos-pedidos" onclick="document.querySelector('[data-widget="artigos_pedidos"]')&&document.querySelector('[data-widget="artigos_pedidos"]').scrollIntoView()" style="background:rgba(249,115,22,.15);color:#f97316;border:1px solid rgba(249,115,22,.4);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;text-decoration:none">🧾 {{ faturar_30d_count }} artigo{{ 's' if faturar_30d_count > 1 else '' }} por faturar +30d</a>
+  {% endif %}
   <button onclick="atualizarDashboard()" class="btn btn-ghost btn-sm" title="Atualizar dados">🔄 Atualizar</button>
   <button onclick="resetarLayout()" class="btn btn-ghost btn-sm" style="color:var(--danger)">↺ Repor</button>
   <button onclick="toggleEdit()" class="btn btn-ghost btn-sm" id="btnEdit">✏️ Editar layout</button>
@@ -516,7 +519,7 @@ function carregarArtigosPedidos() {
       var tbl = document.createElement('table');
       tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px';
       var thead = '<thead style="position:sticky;top:0;background:var(--surface2);z-index:1"><tr>';
-      ['Estado','Artigo','Destino/Cliente','Fornecedor','Qtd','Data Pedido','Criado Por','Data Estado','Alterado Por',''].forEach(function(h){
+      ['Estado','Artigo','Destino/Cliente','Fornecedor','Qtd','Data Pedido','Criado Por','Data Estado','Último Preço',''].forEach(function(h){
         thead += '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)">' + h + '</th>';
       });
       thead += '</tr></thead>';
@@ -572,7 +575,7 @@ function carregarArtigosPedidos() {
         }
         tr.appendChild(tdArt);
         // Simple cells
-        [r.cliente, r.fornecedor, r.quantidade + ' ' + r.unidade, r.data_pedido, r.criado_por, r.data_status, r.alterado_por].forEach(function(txt, i) {
+        [r.cliente, r.fornecedor, r.quantidade + ' ' + r.unidade, r.data_pedido, r.criado_por, r.data_status, r.preco_custo ? r.preco_custo + ' €' : '—'].forEach(function(txt, i) {
           var td = document.createElement('td');
           td.style.cssText = 'padding:5px 8px;color:var(--text-muted)' + (i===2?';font-family:monospace':'') + (i===3||i===5?';white-space:nowrap':'') + (i===0||i===1?';font-weight:600;color:var(--text)':'');
           td.textContent = txt || '—';
