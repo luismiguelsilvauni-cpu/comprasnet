@@ -2548,6 +2548,57 @@ def eq_industrial_foto(fname):
     return send_from_directory(EQ_IND_UPLOAD_DIR, fname)
 
 
+@app.route('/api/biblioteca/sync-componente/<int:eid>/<comp>')
+@login_required
+def biblioteca_sync_componente(eid, comp):
+    """Sync biblioteca docs for a specific component (motor or caixa)."""
+    eq = Equipamento.query.get_or_404(eid)
+
+    if comp == 'motor':
+        termos = [t for t in [eq.motor_modelo, eq.motor_marca] if t and len(t.strip()) >= 3]
+    elif comp == 'caixa':
+        termos = [t for t in [eq.caixa_modelo] if t and len(t.strip()) >= 3]
+    else:
+        termos = [t for t in [eq.motor_modelo, eq.motor_marca, eq.caixa_modelo, eq.base_code] if t and len(t.strip()) >= 3]
+
+    if not termos:
+        return jsonify({'ok': True, 'docs': [], 'msg': 'Sem modelo definido para este componente'})
+
+    def _sim(a, b):
+        a, b = a.lower().strip(), b.lower().strip()
+        if not a or not b or len(a) < 3 or len(b) < 3: return None
+        if a == b: return 'exact'
+        if a in b or b in a:
+            ratio = min(len(a), len(b)) / max(len(a), len(b))
+            if ratio >= 0.6: return 'partial'
+        return None
+
+    all_docs = ModeloPDF.query.all()
+    results = []
+    seen = set()
+    for doc in all_docs:
+        campos_doc = [doc.titulo or '', doc.modelo_codigo or '', doc.outras_referencias or '']
+        best = None; mt = ''; mc = ''
+        for termo in set(termos):
+            for cd in campos_doc:
+                m = _sim(termo, cd)
+                if m == 'exact': best = 'exact'; mt = termo; mc = cd; break
+                elif m == 'partial' and best != 'exact': best = 'partial'; mt = termo; mc = cd
+            if best == 'exact': break
+        if best and doc.id not in seen:
+            seen.add(doc.id)
+            results.append({
+                'id': doc.id, 'titulo': doc.titulo,
+                'tipo': doc.tipo_componente or '', 'marca': doc.marca or '',
+                'modelo': doc.modelo_codigo or '', 'match': best,
+                'match_termo': mt, 'match_campo': mc,
+                'url': '/biblioteca/pdf/' + str(doc.id) + '/ver',
+                'download': '/biblioteca/pdf/' + str(doc.id) + '/download' if hasattr(doc, 'pdf_path') else '',
+            })
+    results.sort(key=lambda x: 0 if x['match'] == 'exact' else 1)
+    return jsonify({'ok': True, 'docs': results[:15], 'termos': termos})
+
+
 @app.route('/api/biblioteca/sync-embarcacao/<int:fid>')
 @login_required
 def biblioteca_sync_embarcacao(fid):
