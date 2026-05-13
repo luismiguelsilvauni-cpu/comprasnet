@@ -1827,18 +1827,6 @@ def apagar_utilizador(uid):
 
 # ── CHANGELOG ─────────────────────────────────────────────────────────────────
 
-@app.route('/changelog')
-@login_required
-def changelog():
-    try:
-        entries = ChangelogEntry.query.order_by(ChangelogEntry.criado_em.desc()).limit(100).all()
-    except Exception:
-        entries = []
-    return render_template('changelog.html', entries=entries)
-
-
-# ── EMAIL CONSULTA ─────────────────────────────────────────────────────────────
-
 @app.route('/api/email_consulta', methods=['POST'])
 @login_required
 def gerar_email_consulta():
