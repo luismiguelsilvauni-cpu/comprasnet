@@ -1,178 +1,78 @@
 {% extends "base.html" %}
-{% block title %}Pedidos de Compra · ComprasNet<script>
-function mudarEstado(pid, novo) {
-  if (!novo) return;
-  fetch('/pedidos/'+pid+'/estado', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({estado: novo})
-  }).then(r=>r.json()).then(d=>{
-    if (d.ok) location.reload();
-    else alert('Erro: '+d.error);
-  });
-}
-</script>
-{% endblock %}
-{% block page_title %}Pedidos de Compra<script>
-function mudarEstado(pid, novo) {
-  if (!novo) return;
-  fetch('/pedidos/'+pid+'/estado', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({estado: novo})
-  }).then(r=>r.json()).then(d=>{
-    if (d.ok) location.reload();
-    else alert('Erro: '+d.error);
-  });
-}
-</script>
-{% endblock %}
+{% block title %}Pedidos de Compra · NavTech{% endblock %}
+{% block page_title %}Pedidos de Compra{% endblock %}
 {% block topbar_actions %}
-    <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary">+ Novo Pedido</a>
-<script>
-function mudarEstado(pid, novo) {
-  if (!novo) return;
-  fetch('/pedidos/'+pid+'/estado', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({estado: novo})
-  }).then(r=>r.json()).then(d=>{
-    if (d.ok) location.reload();
-    else alert('Erro: '+d.error);
-  });
-}
-</script>
+  <a href="{{ url_for('pedidos_estatisticas') }}" class="btn btn-ghost btn-sm">Estatísticas</a>
+  <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
 {% endblock %}
-
 {% block content %}
-<!-- Status filter -->
-<div class="card mb-12" style="padding:10px">
-  <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:6px">Filtrar por estado do artigo</div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-    <a href="{{ url_for('pedidos', estado=estado_filtro) }}" class="btn btn-sm {{ 'btn-primary' if not status_filtro else 'btn-ghost' }}" style="font-size:11px">Todos</a>
-    {% set STATUS_PILLS = [
-      ('nao_encomendado','🔴','Não Enc.','#ef4444'),
-      ('consultado','🔍','Consultado','#0891b2'),
-      ('pendente','⏳','Pendente','#f59e0b'),
-      ('encomendado','📦','Encomendado','#3b6ef0'),
-      ('por_faturar','🧾','Por Faturar','#f97316'),
-      ('faturado','💶','Faturado','#6366f1'),
-      ('concluido','✔️','Concluído','#22c55e'),
-    ] %}
-    {% for sk, icon, lbl, cor in STATUS_PILLS %}
-    {% set cnt = status_counts.get(sk, 0) %}
-    {% if cnt > 0 or status_filtro == sk %}
-    <a href="{{ url_for('pedidos', estado=estado_filtro, status=sk) }}"
-       style="font-size:11px;padding:3px 10px;border-radius:5px;text-decoration:none;font-weight:700;
-              background:{{ 'rgba(59,110,240,.15)' if status_filtro==sk else 'var(--surface2)' }};
-              color:{{ cor if status_filtro==sk else 'var(--text-muted)' }};
-              border:1px solid {{ cor if status_filtro==sk else 'transparent' }}">
-      {{ icon }} {{ lbl }} {% if cnt %}<span style="font-size:10px;opacity:.7">({{ cnt }})</span>{% endif %}
+<div class="card mb-16" style="padding:10px">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <a href="{{ url_for('pedidos', filtro_tab='em_analise', q=q) }}"
+       style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;background:{{ 'rgba(239,68,68,.15)' if filtro_tab=='em_analise' else 'var(--surface2)' }};color:{{ '#ef4444' if filtro_tab=='em_analise' else 'var(--text-muted)' }};border:1px solid {{ 'rgba(239,68,68,.4)' if filtro_tab=='em_analise' else 'var(--border)' }}">
+      Em Analise ({{ tab_counts.em_analise }})
     </a>
-    {% endif %}
-    {% endfor %}
-    {% if status_filtro %}
-    <a href="{{ url_for('pedidos', estado=estado_filtro) }}" class="btn btn-ghost btn-sm" style="font-size:11px;color:#ef4444">✕ Limpar</a>
-    {% endif %}
+    <a href="{{ url_for('pedidos', filtro_tab='pedido', q=q) }}"
+       style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;background:{{ 'rgba(59,110,240,.15)' if filtro_tab=='pedido' else 'var(--surface2)' }};color:{{ '#3b6ef0' if filtro_tab=='pedido' else 'var(--text-muted)' }};border:1px solid {{ 'rgba(59,110,240,.4)' if filtro_tab=='pedido' else 'var(--border)' }}">
+      Pedido ({{ tab_counts.pedido }})
+    </a>
+    <a href="{{ url_for('pedidos', filtro_tab='concluido', q=q) }}"
+       style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;background:{{ 'rgba(34,197,94,.15)' if filtro_tab=='concluido' else 'var(--surface2)' }};color:{{ '#22c55e' if filtro_tab=='concluido' else 'var(--text-muted)' }};border:1px solid {{ 'rgba(34,197,94,.4)' if filtro_tab=='concluido' else 'var(--border)' }}">
+      Concluido ({{ tab_counts.concluido }})
+    </a>
+    <a href="{{ url_for('pedidos', filtro_tab='todos', q=q) }}"
+       style="padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;background:var(--surface2);color:var(--text-muted);border:1px solid var(--border)">
+      Todos ({{ tab_counts.todos }})
+    </a>
+    <form method="get" style="margin-left:auto;display:flex;gap:6px">
+      <input type="hidden" name="filtro_tab" value="{{ filtro_tab }}">
+      <input type="text" name="q" value="{{ q or '' }}" class="input" placeholder="Pesquisar..." style="width:180px">
+      <button type="submit" class="btn btn-ghost btn-sm">Filtrar</button>
+    </form>
   </div>
 </div>
-
-<div class="card mb-16" style="padding: 12px 20px;">
-    <div class="flex items-center gap-8">
-        <span style="font-size:12px; color:var(--text-muted); font-weight:600">FILTRAR:</span>
-        <a href="{{ url_for('pedidos', estado='todos') }}" class="badge {% if estado_filtro == 'todos' %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Todos</a>
-        <a href="{{ url_for('pedidos', estado='aberto') }}" class="badge {% if estado_filtro == 'aberto' or not estado_filtro %}badge-blue{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Abertos</a>
-        <a href="{{ url_for('pedidos', estado='em_analise') }}" class="badge {% if estado_filtro == 'em_analise' %}badge-yellow{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Em Análise</a>
-        <a href="{{ url_for('pedidos', estado='aprovado') }}" class="badge {% if estado_filtro == 'aprovado' %}badge-green{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Aprovados</a>
-        <a href="{{ url_for('pedidos', estado='cancelado') }}" class="badge {% if estado_filtro == 'cancelado' %}badge-red{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Cancelados</a>
-        <a href="{{ url_for('pedidos', estado='pedido') }}" class="badge {% if estado_filtro == 'pedido' %}badge-yellow{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Pedidos</a>
-        <a href="{{ url_for('pedidos', estado='fechado') }}" class="badge {% if estado_filtro == 'fechado' %}badge-green{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Fechados</a>
-        <a href="{{ url_for('pedidos', estado='anulado') }}" class="badge {% if estado_filtro == 'anulado' %}badge-red{% else %}badge-gray{% endif %}" style="cursor:pointer; text-decoration:none">Anulados</a>
-    </div>
+{% if pedidos %}
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-size:12px">
+  <thead>
+    <tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+      <th style="padding:8px 10px;text-align:left;color:var(--text-muted)">Nr</th>
+      <th style="padding:8px 10px;text-align:left;color:var(--text-muted)">Titulo</th>
+      <th style="padding:8px 10px;text-align:left;color:var(--text-muted)">Artigos</th>
+      <th style="padding:8px 10px;text-align:left;color:var(--text-muted)">Cliente</th>
+      <th style="padding:8px 10px;text-align:left;color:var(--text-muted)">Data</th>
+      <th style="padding:8px 10px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for p in pedidos %}
+  {% set STATUS_INFO = {'nao_encomendado':('#ef4444','Nao Enc.'),'consultado':('#0891b2','Consultado'),'encomendado':('#3b6ef0','Pedido'),'recebido':('#22c55e','Recebido'),'por_faturar':('#f97316','Por Faturar'),'faturado':('#6366f1','Faturado'),'concluido':('#22c55e','Concluido'),'cancelado':('#a855f7','Cancelado')} %}
+  <tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+    <td style="padding:8px 10px;font-weight:700;color:var(--accent)">PC-{{ '%04d' % p.id }}</td>
+    <td style="padding:8px 10px;max-width:200px">
+      <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.titulo }}</div>
+    </td>
+    <td style="padding:8px 10px">
+      <div style="display:flex;flex-wrap:wrap;gap:3px">
+        {% for linha in p.linhas %}
+        {% set s = linha.status or 'nao_encomendado' %}
+        {% set cor, lbl = STATUS_INFO.get(s, ('#94a3b8', s)) %}
+        <span style="font-size:9px;padding:1px 6px;border-radius:3px;background:{{ cor }}20;color:{{ cor }};border:1px solid {{ cor }}40">{{ lbl }}</span>
+        {% endfor %}
+      </div>
+    </td>
+    <td style="padding:8px 10px;color:var(--text-muted)">{{ p.cliente.nome if p.cliente else '-' }}</td>
+    <td style="padding:8px 10px;color:var(--text-muted)">{{ p.data_criacao.strftime('%d/%m/%Y') }}</td>
+    <td style="padding:8px 10px"><a href="{{ url_for('pedido_detalhe', pid=p.id) }}" class="btn btn-ghost btn-sm">Ver</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
 </div>
-
-<div class="card">
-    {% if pedidos %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Ref.</th>
-                    <th>Título</th>
-                    <th>Departamento</th>
-                    <th>Criado por</th>
-                    <th>Prioridade</th>
-                    <th>Estado</th>
-                    <th>Orçamentos</th>
-                    <th>Data</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for p in pedidos %}
-            <tr>
-                <td class="mono text-muted" style="font-size:12px">PC-{{ '%04d' % p.id }}</td>
-                <td style="font-weight:500">{{ p.titulo }}</td>
-                <td class="text-muted">{{ p.departamento or '—' }}</td>
-                <td class="text-muted">{{ p.criador.nome if p.criador else '—' }}</td>
-                <td>
-                    {% if p.prioridade == 'urgente' %}<span class="badge badge-red">🔴 Urgente</span>
-                    {% elif p.prioridade == 'alta' %}<span class="badge badge-yellow">🟡 Alta</span>
-                    {% elif p.prioridade == 'baixa' %}<span class="badge badge-gray">Baixa</span>
-                    {% else %}<span class="badge badge-blue">Normal</span>{% endif %}
-                </td>
-                <td>
-                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
-                    {% if p.estado == 'aberto' %}<span class="badge badge-blue">📂 Aberto</span>
-                    {% elif p.estado == 'pedido' %}<span class="badge badge-yellow">📤 Pedido</span>
-                    {% elif p.estado == 'em_analise' %}<span class="badge badge-yellow">Em análise</span>
-                    {% elif p.estado == 'aprovado' or p.estado == 'fechado' %}<span class="badge badge-green">✔️ Fechado</span>
-                    {% elif p.estado == 'anulado' or p.estado == 'cancelado' %}<span class="badge badge-red">🚫 Anulado</span>
-                    {% else %}<span class="badge badge-gray">{{ p.estado }}</span>{% endif %}
-                    <select onchange="mudarEstado({{ p.id }},this.value);this.value=''" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);cursor:pointer">
-                      <option value="">✏️</option>
-                      <option value="aberto">📂 Aberto</option>
-                      <option value="pedido">📤 Pedido</option>
-                      <option value="fechado">✔️ Fechado</option>
-                      <option value="anulado">🚫 Anulado</option>
-                    </select>
-                    </div>
-                </td>
-                <td>
-                    {% set n = p.orcamentos|length %}
-                    <div class="flex items-center gap-8">
-                        <span class="mono" style="font-size:12px">{{ n }}/3</span>
-                        <div class="progress-bar" style="width:60px">
-                            <div class="progress-fill" style="width:{{ (n/3*100)|int }}%"></div>
-                        </div>
-                    </div>
-                </td>
-                <td style="font-size:12px;color:var(--text-muted)">{{ p.cliente.nome if p.cliente else "—" }}</td>
-                <td class="text-muted" style="font-size:12px">{{ p.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
-                <td><a href="{{ url_for('pedido_detalhe', pid=p.id) }}" class="btn btn-ghost btn-sm">Ver →</a></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div style="text-align:center; padding: 64px; color: var(--text-muted);">
-        <div style="font-size:40px; margin-bottom:16px">📭</div>
-        <div style="font-size:15px; margin-bottom:8px">Nenhum pedido encontrado</div>
-        <div style="font-size:13px">{% if estado_filtro %}Tente mudar o filtro.{% else %}Crie o primeiro pedido de compra.{% endif %}</div>
-        {% if not estado_filtro %}
-        <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary" style="margin-top:20px; display:inline-flex">+ Novo Pedido</a>
-        {% endif %}
-    </div>
-    {% endif %}
+{% else %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:36px;margin-bottom:10px">No pedidos</div>
+  <a href="{{ url_for('novo_pedido') }}" class="btn btn-primary btn-sm">+ Novo Pedido</a>
 </div>
-<script>
-function mudarEstado(pid, novo) {
-  if (!novo) return;
-  fetch('/pedidos/'+pid+'/estado', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({estado: novo})
-  }).then(r=>r.json()).then(d=>{
-    if (d.ok) location.reload();
-    else alert('Erro: '+d.error);
-  });
-}
-</script>
+{% endif %}
 {% endblock %}

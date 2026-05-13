@@ -66,7 +66,7 @@ function editarTipo(id, el) {
           <input type="text" name="titulo" required class="input" list="titulosList"
                  placeholder="Ex: Manual de Serviço..." autocomplete="off">
           <datalist id="titulosList">
-            {% for t in titulos_existentes %}<option value="{{ t }}">{% endfor %}
+            {% for t, n in titulos_freq|default([]) %}<option value="{{ t }}">{{ t }} ({{ n }})</option>{% endfor %}
           </datalist>
         </div>
         <div class="form-group" style="margin:0">
@@ -74,12 +74,7 @@ function editarTipo(id, el) {
           <input type="text" name="tipo_componente" list="tiposExistentes" autocomplete="off" class="input" list="tiposList"
                  placeholder="Tipo..." oninput="updateModelos(this.value)" autocomplete="off">
           <datalist id="tiposList">
-            <option value="motor">Motor</option>
-            <option value="caixa">Caixa Red./Inv.</option>
-            <option value="factory_code">Factory Code</option>
-            <option value="aux">Motor Auxiliar</option>
-            <option value="outros">Outros</option>
-            <option value="geral">Geral</option>
+            {% for t, n in tipos_freq|default([]) %}<option value="{{ t }}">{{ t }} ({{ n }})</option>{% endfor %}
           </datalist>
         </div>
       </div>
@@ -89,19 +84,16 @@ function editarTipo(id, el) {
           <input type="text" name="marca" class="input" list="marcasList"
                  placeholder="Ex: IVECO, CUMMINS..." autocomplete="off">
           <datalist id="marcasList">
-            {% for m in marcas_existentes %}<option value="{{ m }}">{% endfor %}
-            <option value="IVECO"><option value="CUMMINS"><option value="DEUTZ">
-            <option value="JOHN DEERE"><option value="VOLVO PENTA"><option value="CATERPILLAR">
-            <option value="SCANIA"><option value="MAN"><option value="MTU">
-            <option value="ZF"><option value="TWIN DISC"><option value="CAPITOL">
-            <option value="WARNER"><option value="YANMAR"><option value="BAUDOUIN">
+            {% for m, n in marcas_freq|default([]) %}<option value="{{ m }}">{{ m }} ({{ n }})</option>{% endfor %}
           </datalist>
         </div>
         <div class="form-group" style="margin:0">
           <label>Modelo / Código</label>
           <input type="text" name="modelo_codigo" class="input" list="modelosList"
                  placeholder="Ex: TM170, D13K..." autocomplete="off">
-          <datalist id="modelosList"></datalist>
+          <datalist id="modelosList">
+            {% for m, n in modelos_freq|default([]) %}<option value="{{ m }}">{{ m }} ({{ n }})</option>{% endfor %}
+          </datalist>
         </div>
         <div class="form-group" style="margin:0">
           <label>Outras Referências</label>

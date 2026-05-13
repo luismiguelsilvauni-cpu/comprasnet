@@ -43,6 +43,48 @@ function fecharLightbox() {
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLightbox(); });
 </script>
 
+<script>
+function syncComponente(eid, comp, targetId) {
+  var btn = document.getElementById('btn-sync-' + comp);
+  var list = document.getElementById('sync-list-' + comp);
+  if (!btn || !list) return;
+  btn.disabled = true; btn.innerHTML = '⏳';
+  fetch('/api/biblioteca/sync-componente/' + eid + '/' + comp)
+    .then(r=>r.json()).then(function(d) {
+      btn.disabled = false; btn.innerHTML = '🔄 Sincronizar Biblioteca';
+      if (!d.ok || !d.docs || !d.docs.length) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:6px">Sem documentos semelhantes na biblioteca' + (d.msg ? ' — ' + d.msg : '') + '</div>';
+        return;
+      }
+      list.innerHTML = d.docs.map(function(doc) {
+        var badge = doc.match === 'exact'
+          ? '<span style="font-size:9px;background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:3px;font-weight:700">✅ Exacto</span>'
+          : '<span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-weight:700" title="Verifique antes de usar">⚠️ Parcial</span>';
+        var warning = doc.match === 'partial'
+          ? '<div style="font-size:10px;color:#92400e;margin-top:2px">Modelo ficha: <strong>' + doc.match_termo + '</strong> ≈ biblioteca: <strong>' + doc.match_campo + '</strong> — confirme antes de usar</div>'
+          : '';
+        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+          '<span style="font-size:15px;flex-shrink:0">📄</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+              '<span style="font-weight:600;font-size:12px">' + doc.titulo + '</span>' + badge +
+            '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted);margin-top:1px">' + [doc.tipo, doc.marca, doc.modelo].filter(Boolean).join(' · ') + '</div>' +
+            warning +
+          '</div>' +
+          '<div style="display:flex;gap:4px;flex-shrink:0">' +
+            '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">👁</a>' +
+            '<a href="' + doc.url + '" download class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" title="Descarregar">⬇</a>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }).catch(function(e) {
+      btn.disabled = false; btn.innerHTML = '🔄 Sincronizar Biblioteca';
+      list.innerHTML = '<div style="font-size:11px;color:#ef4444;padding:6px">Erro ao sincronizar</div>';
+    });
+}
+</script>
+
 {% endblock %}
 
 {% block content %}
@@ -381,7 +423,17 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
 <div class="cpanel" id="cp-motor-docs">
   {% set comp='motor' %}{% set comp_label='Motor Propulsor' %}
   {% include 'tecnico_doc_panel.html' %}
+
+<!-- Sync Motor Biblioteca -->
+<div class="card mb-10" style="border:1px dashed var(--border)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div style="font-size:11px;font-weight:700;color:var(--accent)">📚 Documentos semelhantes na Biblioteca PDF</div>
+    <button id="btn-sync-motor" onclick="syncComponente({{ equipamento.id }}, 'motor')"
+            class="btn btn-ghost btn-sm" style="font-size:10px">🔄 Sincronizar Biblioteca</button>
+  </div>
+  <div id="sync-list-motor" style="font-size:11px;color:var(--text-muted)">Clique em Sincronizar para pesquisar documentos correspondentes ao modelo do motor.</div>
 </div>
+
 
 <!-- Caixa · Info -->
 <div class="cpanel" id="cp-caixa-info">
@@ -427,7 +479,18 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
 <div class="cpanel" id="cp-caixa-docs">
   {% set comp='caixa' %}{% set comp_label='Caixa Inv./Redutora' %}
   {% include 'tecnico_doc_panel.html' %}
+
+<!-- Sync Caixa Biblioteca -->
+<div class="card mb-10" style="border:1px dashed var(--border)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div style="font-size:11px;font-weight:700;color:var(--accent)">📚 Documentos semelhantes na Biblioteca PDF</div>
+    <button id="btn-sync-caixa" onclick="syncComponente({{ equipamento.id }}, 'caixa')"
+            class="btn btn-ghost btn-sm" style="font-size:10px">🔄 Sincronizar Biblioteca</button>
+  </div>
+  <div id="sync-list-caixa" style="font-size:11px;color:var(--text-muted)">Clique em Sincronizar para pesquisar documentos correspondentes ao modelo da caixa.</div>
 </div>
+
+
 
 <!-- Aux Info + Docs -->
 {% for m in motores_aux %}
@@ -448,13 +511,58 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLig
 <div class="cpanel" id="cp-{{ ak }}-docs">
   {% set comp=ak %}{% set comp_label='Motor Auxiliar '+m.numero|string %}
   {% include 'tecnico_doc_panel.html' %}
-</div>
 {% endfor %}
 
 <!-- Outros · Docs -->
 <div class="cpanel" id="cp-outros-docs">
   {% set comp='outros' %}{% set comp_label='Outros Documentos' %}
   {% include 'tecnico_doc_panel.html' %}
+
+<!-- Biblioteca Docs Sincronizados -->
+<div class="card mb-14" id="bibSyncCard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:var(--accent)">📚 Documentação da Biblioteca (auto)</div>
+    <button onclick="syncBiblioteca()" class="btn btn-ghost btn-sm" style="font-size:10px" id="btnBibSync">🔄 Sincronizar</button>
+  </div>
+  <div id="bibSyncList" style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">A carregar...</div>
+</div>
+<script>
+function syncBiblioteca() {
+  var btn = document.getElementById('btnBibSync');
+  var list = document.getElementById('bibSyncList');
+  btn.disabled = true; btn.textContent = '⏳';
+  fetch('/api/biblioteca/sync-embarcacao/{{ equipamento.id }}')
+    .then(r=>r.json()).then(function(d) {
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      if (!d.ok || !d.docs.length) {
+        list.innerHTML = '<span style="color:var(--text-muted)">Sem documentos correspondentes na biblioteca</span>';
+        return;
+      }
+      list.innerHTML = d.docs.map(function(doc) {
+        var matchBadge = doc.match === 'exact'
+          ? '<span style="font-size:9px;background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:4px">✅ Exacto</span>'
+          : '<span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:4px" title="Confirme antes de usar">⚠️ Parcial</span>';
+        var matchInfo = doc.match === 'partial'
+          ? '<div style="font-size:10px;color:#92400e;margin-top:2px">Modelo do motor: <strong>' + doc.match_termo + '</strong> ≈ doc: <strong>' + doc.match_campo + '</strong></div>'
+          : '';
+        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+          '<span style="font-size:16px;flex-shrink:0">📄</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + doc.titulo + matchBadge + '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted)">' + (doc.tipo||'') + (doc.marca?' · '+doc.marca:'') + (doc.modelo?' · '+doc.modelo:'') + '</div>' +
+            matchInfo +
+          '</div>' +
+          '<a href="' + doc.url + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px;flex-shrink:0">👁 Ver</a>' +
+        '</div>';
+      }).join('');
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar';
+      list.innerHTML = '<span style="color:#ef4444">Erro ao sincronizar</span>';
+    });
+}
+// Auto-sync on page load
+syncBiblioteca();
+</script>
 </div>
 
 <!-- Mgmt · Lista -->

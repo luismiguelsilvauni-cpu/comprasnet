@@ -405,7 +405,21 @@ def dashboard():
         ).order_by(EntradaEquipamento.data_status).all()
         entradas_estadia = len(entradas_estadia_list)
     except: entradas_estadia = 0; entradas_estadia_list = []
+
+    # Count artigos Por Faturar > 30 days
+    try:
+        from datetime import date as _dd, timedelta as _tdelta
+        _30d_ago = _dd.today() - _tdelta(days=30)
+        _linhas_pf = LinhaPedido.query.filter_by(status='por_faturar').all()
+        faturar_30d_count = 0
+        for _l in _linhas_pf:
+            _hist = LinhaPedidoHistorico.query.filter_by(linha_id=_l.id, status_novo='por_faturar')                .order_by(LinhaPedidoHistorico.data.desc()).first()
+            if _hist and _hist.data and _hist.data.date() < _30d_ago:
+                faturar_30d_count += 1
+    except: faturar_30d_count = 0
+
     return render_template('dashboard.html',
+        faturar_30d_count=faturar_30d_count,
         entradas_estadia=entradas_estadia,
         entradas_estadia_list=entradas_estadia_list,
         assist_alerta=assist_alerta,
@@ -434,7 +448,7 @@ def artigos_pedidos_pdf():
     status_filtro = request.args.get('status','').strip()
 
     from sqlalchemy import case
-    STATUS_VISIVEIS = ['nao_encomendado', 'consultado', 'pendente', 'encomendado', 'por_faturar']
+    STATUS_VISIVEIS = ['nao_encomendado', 'consultado', 'encomendado', 'por_faturar']
     query = (db.session.query(LinhaPedido, PedidoCompra)
         .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
         .filter(PedidoCompra.estado.notin_(['cancelado','concluido','arquivado','rejeitado']))
@@ -675,9 +689,11 @@ def api_dashboard_artigos_pedidos():
             "status_bg": bg,
             "dim": s in ["recebido","faturado","cancelado"],
             "alerta_faturar": bool(s == "por_faturar" and hist and (datetime.now() - hist.data).days >= 10),
+            "alerta_30d": bool(s == "por_faturar" and hist and (datetime.now() - hist.data).days > 30),
             "dias_por_faturar": int((datetime.now() - hist.data).days) if s == "por_faturar" and hist else 0,
             "data_status": hist.data.strftime("%d/%m/%Y %H:%M") if hist else "—",
             "alterado_por": hist.user_nome[:20] if hist else "—",
+            "preco_custo": next((round(float(a.ultimo_preco_entrada),2) for a in [ArtigoPHC.query.filter_by(referencia=linha.referencia).first()] if a and a.ultimo_preco_entrada), round(float(linha.preco_custo_ref),2) if linha.preco_custo_ref else None),
         })
     return jsonify(rows)
 
@@ -765,26 +781,45 @@ def pedido_editar(pid):
 @app.route('/pedidos')
 @login_required
 def pedidos():
-    estado = request.args.get('estado','aberto') or 'aberto'
-    status_linha = request.args.get('status','')
+    # filtro_tab: em_analise, pedido, concluido, todos
+    filtro_tab = request.args.get('filtro_tab', 'em_analise')
     q_filter = request.args.get('q','').strip()
-    q = PedidoCompra.query
-    if estado and estado != 'todos': q = q.filter_by(estado=estado)
-    if status_linha:
-        q = q.join(LinhaPedido).filter(LinhaPedido.status == status_linha)
+
+    # Get all active pedidos
+    q = PedidoCompra.query.filter(
+        PedidoCompra.estado.notin_(['cancelado','arquivado','anulado'])
+    )
     if q_filter:
         q = q.filter(db.or_(
             PedidoCompra.titulo.ilike(f'%{q_filter}%'),
             PedidoCompra.descricao.ilike(f'%{q_filter}%'),
         ))
-    pedidos_list = q.order_by(PedidoCompra.data_criacao.desc()).all()
-    # Status counts for filter badges
-    from sqlalchemy import func as _func
-    status_counts = dict(db.session.query(LinhaPedido.status, _func.count(LinhaPedido.id))
-        .join(PedidoCompra).filter(PedidoCompra.estado.in_(['aberto','pedido','aprovado','pendente','em_analise']))
-        .group_by(LinhaPedido.status).all())
-    return render_template('pedidos.html', pedidos=pedidos_list, estado_filtro=estado,
-        status_filtro=status_linha, q=q_filter, status_counts=status_counts)
+    todos = q.order_by(PedidoCompra.data_criacao.desc()).all()
+
+    # Classify each pedido by its linhas statuses
+    def classify(p):
+        statuses = set(l.status or 'nao_encomendado' for l in p.linhas)
+        if not statuses: return 'em_analise'
+        if statuses <= {'concluido','faturado','cancelado'}: return 'concluido'
+        if any(s in statuses for s in ['encomendado','por_faturar','recebido','faturado']): return 'pedido'
+        return 'em_analise'  # nao_encomendado or consultado
+
+    # Count per tab
+    tab_counts = {'em_analise': 0, 'pedido': 0, 'concluido': 0, 'todos': len(todos)}
+    classified = []
+    for p in todos:
+        cls = classify(p)
+        tab_counts[cls] += 1
+        classified.append((p, cls))
+
+    # Filter
+    if filtro_tab == 'todos':
+        pedidos_list = todos
+    else:
+        pedidos_list = [p for p, cls in classified if cls == filtro_tab]
+
+    return render_template('pedidos.html', pedidos=pedidos_list,
+        filtro_tab=filtro_tab, tab_counts=tab_counts, q=q_filter)
 
 
 @app.route('/pedidos/estatisticas')
@@ -817,9 +852,9 @@ def pedidos_estatisticas():
 
     # Top fornecedores
     top_forn = db.session.query(
-        LinhaPedido.fornecedor_nome, _func.count(LinhaPedido.id).label('n')
-    ).filter(LinhaPedido.fornecedor_nome.isnot(None)
-    ).group_by(LinhaPedido.fornecedor_nome
+        LinhaPedido.fornecedor_hab, _func.count(LinhaPedido.id).label('n')
+    ).filter(LinhaPedido.fornecedor_hab.isnot(None), LinhaPedido.fornecedor_hab != ''
+    ).group_by(LinhaPedido.fornecedor_hab
     ).order_by(db.text('n desc')).limit(10).all()
 
     # Top clientes
@@ -2526,6 +2561,130 @@ def eq_industrial_doc_apagar(did):
 @login_required
 def eq_industrial_foto(fname):
     return send_from_directory(EQ_IND_UPLOAD_DIR, fname)
+
+
+@app.route('/api/biblioteca/sync-componente/<int:eid>/<comp>')
+@login_required
+def biblioteca_sync_componente(eid, comp):
+    """Sync biblioteca docs for a specific component (motor or caixa)."""
+    eq = Equipamento.query.get_or_404(eid)
+
+    if comp == 'motor':
+        termos = [t for t in [eq.motor_modelo, eq.motor_marca] if t and len(t.strip()) >= 3]
+    elif comp == 'caixa':
+        termos = [t for t in [eq.caixa_modelo] if t and len(t.strip()) >= 3]
+    else:
+        termos = [t for t in [eq.motor_modelo, eq.motor_marca, eq.caixa_modelo, eq.base_code] if t and len(t.strip()) >= 3]
+
+    if not termos:
+        return jsonify({'ok': True, 'docs': [], 'msg': 'Sem modelo definido para este componente'})
+
+    def _sim(a, b):
+        a, b = a.lower().strip(), b.lower().strip()
+        if not a or not b or len(a) < 3 or len(b) < 3: return None
+        if a == b: return 'exact'
+        if a in b or b in a:
+            ratio = min(len(a), len(b)) / max(len(a), len(b))
+            if ratio >= 0.6: return 'partial'
+        return None
+
+    all_docs = ModeloPDF.query.all()
+    results = []
+    seen = set()
+    for doc in all_docs:
+        campos_doc = [doc.titulo or '', doc.modelo_codigo or '', doc.outras_referencias or '']
+        best = None; mt = ''; mc = ''
+        for termo in set(termos):
+            for cd in campos_doc:
+                m = _sim(termo, cd)
+                if m == 'exact': best = 'exact'; mt = termo; mc = cd; break
+                elif m == 'partial' and best != 'exact': best = 'partial'; mt = termo; mc = cd
+            if best == 'exact': break
+        if best and doc.id not in seen:
+            seen.add(doc.id)
+            results.append({
+                'id': doc.id, 'titulo': doc.titulo,
+                'tipo': doc.tipo_componente or '', 'marca': doc.marca or '',
+                'modelo': doc.modelo_codigo or '', 'match': best,
+                'match_termo': mt, 'match_campo': mc,
+                'url': '/modelo-pdf/' + str(doc.id) + '/ver',
+                'download': '/biblioteca/pdf/' + str(doc.id) + '/download' if hasattr(doc, 'pdf_path') else '',
+            })
+    results.sort(key=lambda x: 0 if x['match'] == 'exact' else 1)
+    return jsonify({'ok': True, 'docs': results[:15], 'termos': termos})
+
+
+@app.route('/api/biblioteca/sync-embarcacao/<int:fid>')
+@login_required
+def biblioteca_sync_embarcacao(fid):
+    """Find biblioteca PDFs matching motor/caixa models — exact and partial."""
+    ficha = FichaTecnica.query.get_or_404(fid)
+    # Use correct FichaTecnica field names
+    termos = []
+    for campo in [ficha.motor_modelo, ficha.motor_marca,
+                  ficha.grupo_modelo, ficha.grupo_marca]:
+        # Note: motor_serie excluded - serial numbers cause false matches
+        if campo and len(campo.strip()) >= 3:
+            termos.append(campo.strip())
+    if not termos:
+        return jsonify({'ok': True, 'docs': [], 'debug': 'no termos found'})
+
+    from sqlalchemy import or_
+    all_docs = ModeloPDF.query.all()
+    results = []
+    seen = set()
+
+    def _similarity(a, b):
+        """Return match type: exact, partial, none"""
+        a, b = a.lower(), b.lower()
+        if a == b: return 'exact'
+        if a in b or b in a: return 'partial'
+        # Check if first N chars match (prefix match)
+        n = min(len(a), len(b), 6)
+        if n >= 4 and a[:n] == b[:n]: return 'partial'
+        return None
+
+    for doc in all_docs:
+        doc_campos = [
+            doc.titulo or '',
+            doc.modelo_codigo or '',
+            doc.outras_referencias or '',
+        ]
+        best_match = None
+        match_termo = ''
+        match_campo = ''
+        for termo in set(termos):
+            for campo in doc_campos:
+                m = _similarity(termo, campo)
+                if m == 'exact':
+                    best_match = 'exact'
+                    match_termo = termo
+                    match_campo = campo
+                    break
+                elif m == 'partial' and best_match != 'exact':
+                    best_match = 'partial'
+                    match_termo = termo
+                    match_campo = campo
+            if best_match == 'exact':
+                break
+        if best_match and doc.id not in seen:
+            seen.add(doc.id)
+            results.append({
+                'id': doc.id,
+                'titulo': doc.titulo,
+                'tipo': doc.tipo_componente or '',
+                'marca': doc.marca or '',
+                'modelo': doc.modelo_codigo or '',
+                'match': best_match,
+                'match_termo': match_termo,
+                'match_campo': match_campo,
+                'url': url_for('modelo_pdf_ver', pid=doc.id),
+            })
+
+    # Sort: exact first
+    results.sort(key=lambda x: 0 if x['match'] == 'exact' else 1)
+    return jsonify({'ok': True, 'docs': results[:20]})
+
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -4453,6 +4612,16 @@ PROPOSTA_ESTADOS = {
     'implementada': ('🚀 Implementada', '#8b5cf6'),
     'rejeitada':    ('❌ Rejeitada',    '#ef4444'),
 }
+
+@app.route('/admin/migrar-pendente', methods=['POST'])
+@login_required
+def migrar_pendente():
+    if not current_user.is_admin:
+        return jsonify({'ok': False})
+    n = LinhaPedido.query.filter_by(status='pendente').update({'status': 'encomendado'})
+    db.session.commit()
+    return jsonify({'ok': True, 'alterados': n})
+
 
 @app.route('/propostas', methods=['GET','POST'])
 @login_required
@@ -7936,21 +8105,21 @@ def biblioteca_modelos():
         ModeloPDF.titulo
     ).all()
 
-    # Suggestions: unique titles, marcas, modelos already in DB
-    titulos_existentes = sorted(set(
-        p.titulo for p in ModeloPDF.query.with_entities(ModeloPDF.titulo).all() if p.titulo
-    ))
-    marcas_existentes = sorted(set(
-        p.marca for p in ModeloPDF.query.with_entities(ModeloPDF.marca).all() if p.marca
-    ))
+    from sqlalchemy import func as _fn
+    # Frequency-sorted suggestions (value, count) for datalists
+    titulos_freq = db.session.query(ModeloPDF.titulo, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.titulo.isnot(None)).group_by(ModeloPDF.titulo)        .order_by(db.text('n desc')).all()
+    tipos_freq = db.session.query(ModeloPDF.tipo_componente, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.tipo_componente.isnot(None), ModeloPDF.tipo_componente != '')        .group_by(ModeloPDF.tipo_componente).order_by(db.text('n desc')).all()
+    marcas_freq = db.session.query(ModeloPDF.marca, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.marca.isnot(None), ModeloPDF.marca != '')        .group_by(ModeloPDF.marca).order_by(db.text('n desc')).all()
+    modelos_freq = db.session.query(ModeloPDF.modelo_codigo, _fn.count(ModeloPDF.id).label('n'))        .filter(ModeloPDF.modelo_codigo.isnot(None), ModeloPDF.modelo_codigo != '')        .group_by(ModeloPDF.modelo_codigo).order_by(db.text('n desc')).limit(60).all()
+
     caixas = db.session.query(Equipamento.caixa_modelo).filter(
         Equipamento.caixa_modelo.isnot(None)).distinct().all()
     motores = db.session.query(Equipamento.motor_modelo).filter(
         Equipamento.motor_modelo.isnot(None)).distinct().all()
 
     return render_template('biblioteca_modelos.html', pdfs=pdfs, q=q,
-                           titulos_existentes=titulos_existentes,
-                           marcas_existentes=marcas_existentes,
+                           titulos_freq=titulos_freq, tipos_freq=tipos_freq,
+                           marcas_freq=marcas_freq, modelos_freq=modelos_freq,
                            caixas=[c[0] for c in caixas if c[0]],
                            motores=[m[0] for m in motores if m[0]])
 
