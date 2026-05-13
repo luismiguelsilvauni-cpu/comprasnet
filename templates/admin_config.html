@@ -240,8 +240,8 @@ function regenerarIcons() {
   </label>
 
   <!-- Estado dos últimos backups -->
-  {% set ultimo_auto   = backups | selectattr('tipo','eq','auto')   | list | first %}
-  {% set ultimo_manual = backups | selectattr('tipo','eq','manual') | list | first %}
+  {% set ultimo_auto   = backups | selectattr('tipo','equalto','auto')   | list | first %}
+  {% set ultimo_manual = backups | selectattr('tipo','equalto','manual') | list | first %}
   <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
     <!-- Último automático -->
     <div style="padding:10px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
