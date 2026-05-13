@@ -2592,7 +2592,7 @@ def biblioteca_sync_componente(eid, comp):
                 'tipo': doc.tipo_componente or '', 'marca': doc.marca or '',
                 'modelo': doc.modelo_codigo or '', 'match': best,
                 'match_termo': mt, 'match_campo': mc,
-                'url': '/biblioteca/pdf/' + str(doc.id) + '/ver',
+                'url': '/modelo-pdf/' + str(doc.id) + '/ver',
                 'download': '/biblioteca/pdf/' + str(doc.id) + '/download' if hasattr(doc, 'pdf_path') else '',
             })
     results.sort(key=lambda x: 0 if x['match'] == 'exact' else 1)
