@@ -5,8 +5,8 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#1e3a5f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,6 +14,10 @@
   <meta name="apple-mobile-web-app-title" content="{{ cfg_geral.empresa_nome if cfg_geral else 'ComprasNet' }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ComprasNet{% endblock %}</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
@@ -311,7 +315,7 @@
             </a>
             {% endif %}
             {% if pode_aceder('ferias') %}
-            <a href="/ausencias" class="nav-item nav-sub {% if request.endpoint and ('ausencia' in request.endpoint or 'ferias' in request.endpoint) %}active{% endif %}">
+            <a href="{{ url_for('ausencias') }}" class="nav-item nav-sub {% if request.endpoint and ('ausencia' in request.endpoint or 'ferias' in request.endpoint) %}active{% endif %}">
               <span class="icon">📅</span><span>Mapa Férias / Faltas</span>
             </a>
             {% endif %}
@@ -470,9 +474,9 @@
                 💡 <span>Propostas</span>
             </a>
             <a href="{{ url_for('changelog') }}" title="Changelog"
-               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px"
-               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-                &#128336; <span>Changelog</span>
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'changelog' %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='{% if request.endpoint == 'changelog' %}var(--surface2){% endif %}'">
+                🕐 <span>Changelog</span>
             </a>
             <a href="{{ url_for('roadmap') }}" title="Backlog"
                style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'roadmap' %}background:var(--surface2);color:var(--accent);{% endif %}"
@@ -762,11 +766,5 @@ setInterval(atualizarStatus, 30000);
 })();
 </script>
 
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
-    .catch(e => console.warn('SW register failed', e));
-}
-</script>
 </body>
 </html>

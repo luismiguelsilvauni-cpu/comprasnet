@@ -1,7 +1,18 @@
-const CACHE = 'comprasnet-v5';
+const CACHE = 'comprasnet-v4';
+const PRECACHE = [
+  '/icon-192.png',
+  '/icon-512.png', 
+  '/icon-maskable-192.png',
+  '/icon-maskable-512.png',
+  '/favicon.ico',
+];
 
 self.addEventListener('install', e => {
-  e.waitUntil(self.skipWaiting());
+  e.waitUntil(
+    caches.open(CACHE).then(c =>
+      Promise.allSettled(PRECACHE.map(url => c.add(url).catch(()=>null)))
+    ).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
@@ -20,12 +31,26 @@ self.addEventListener('message', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // Icons and manifest: always network — never cache so regen takes effect immediately
-  if (url.pathname.match(/\.(png|ico)$/) || url.pathname === '/manifest.json') {
-    return; // let browser handle normally
+  // Serve icons from cache
+  if (url.pathname.match(/\.(png|ico)$/)) {
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(resp => {
+          if (resp.ok) {
+            const clone = resp.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return resp;
+        });
+      })
+    );
+    return;
   }
-  // Navigation: network first, no fallback needed for a LAN app
+  // For navigation: network first
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).catch(() => caches.match('/dashboard')));
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match('/dashboard'))
+    );
   }
 });

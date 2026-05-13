@@ -1,0 +1,339 @@
+import sys
+sys.path.insert(0, '.')
+from app import app, db
+from sqlalchemy import text, inspect as sa_inspect
+
+with app.app_context():
+    uri = app.config.get('SQLALCHEMY_DATABASE_URI','')
+    print("BD:", uri)
+    
+    db.create_all()
+    print("db.create_all() OK")
+    
+    insp = sa_inspect(db.engine)
+    tables = insp.get_table_names()
+    
+    # Add columns to equipamento if missing
+    if 'equipamento' in tables:
+        existing = [c['name'] for c in insp.get_columns('equipamento')]
+        new_cols = [
+            ('cliente_nome','TEXT'),('embarcacao','TEXT'),
+            ('motor_modelo','TEXT'),('motor_potencia','TEXT'),
+            ('caixa_modelo','TEXT'),('caixa_ratio','TEXT'),('caixa_serial','TEXT'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in new_cols:
+                if col not in existing:
+                    conn.execute(text(f"ALTER TABLE equipamento ADD COLUMN {col} {typ}"))
+                    print(f"OK: equipamento.{col} adicionado")
+                else:
+                    print(f"OK: {col} ja existe")
+
+    # Add notas to backlog_item if missing
+    if 'backlog_item' in tables:
+        bl_cols = [c['name'] for c in insp.get_columns('backlog_item')]
+        if 'notas' not in bl_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE backlog_item ADD COLUMN notas TEXT DEFAULT ''"))
+            print("OK: backlog_item.notas adicionado")
+
+    # Check all required tables
+    required = [
+        'equipamento', 'equipamento_opcao', 'equipamento_consumivel',
+        'equipamento_motor_aux', 'equipamento_documento',
+        'changelog_entry', 'backlog_item',
+        'factory_code_pdf', 'modelo_pdf',
+    ]
+    for tbl in required:
+        if tbl in tables:
+            print(f"OK: {tbl} existe")
+        else:
+            print(f"CRIADO: {tbl}")
+
+    print("Concluido. Reinicie o servidor.")
+
+    # Add tipo_motor to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        if 'tipo_motor' not in eq_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE equipamento ADD COLUMN tipo_motor TEXT DEFAULT 'principal'"))
+            print("OK: equipamento.tipo_motor adicionado")
+        else:
+            print("OK: tipo_motor ja existe")
+
+    # Populate ModeloPDF library from existing EquipamentoDocumento records
+    try:
+        docs = db.session.execute(text("""
+            SELECT ed.id, ed.componente, ed.titulo, ed.pdf_filename, ed.pdf_path,
+                   e.caixa_modelo, e.motor_modelo
+            FROM equipamento_documento ed
+            JOIN equipamento e ON e.id = ed.equipamento_id
+        """)).fetchall()
+        added_lib = 0
+        for d in docs:
+            comp, titulo, fname, fpath, caixa_m, motor_m = d[1], d[2], d[3], d[4], d[5], d[6]
+            tipo_comp = None
+            modelo_val = None
+            if comp == 'caixa' and caixa_m:
+                tipo_comp, modelo_val = 'caixa', caixa_m.strip()
+            elif comp == 'motor' and motor_m:
+                tipo_comp, modelo_val = 'motor', motor_m.strip()
+            if tipo_comp and modelo_val and titulo and fpath:
+                exists = db.session.execute(text(
+                    "SELECT id FROM modelo_pdf WHERE tipo_componente=:t AND modelo_codigo=:m AND titulo=:ti"
+                ), {'t': tipo_comp, 'm': modelo_val, 'ti': titulo}).fetchone()
+                if not exists:
+                    db.session.execute(text(
+                        "INSERT INTO modelo_pdf (tipo_componente, modelo_codigo, titulo, pdf_filename, pdf_path, criado_em) VALUES (:t,:m,:ti,:fn,:fp, datetime('now'))"
+                    ), {'t': tipo_comp, 'm': modelo_val, 'ti': titulo, 'fn': fname, 'fp': fpath})
+                    added_lib += 1
+        db.session.commit()
+        if added_lib:
+            print(f"OK: {added_lib} documentos existentes adicionados à biblioteca partilhada")
+        else:
+            print("OK: biblioteca partilhada ja actualizada")
+    except Exception as ex:
+        print(f"Biblioteca: {ex}")
+
+    # Add thumb_path to modelo_pdf
+    if 'modelo_pdf' in insp.get_table_names():
+        mp_cols = [c['name'] for c in insp.get_columns('modelo_pdf')]
+        if 'thumb_path' not in mp_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE modelo_pdf ADD COLUMN thumb_path TEXT"))
+            print("OK: modelo_pdf.thumb_path adicionado")
+
+    # Add ativo column to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        if 'ativo' not in eq_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE equipamento ADD COLUMN ativo BOOLEAN DEFAULT 1"))
+            print("OK: equipamento.ativo adicionado")
+        else:
+            print("OK: ativo ja existe")
+
+    # Add new motor fields to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        new_cols = [
+            ('manufacturing_date', 'TEXT'),
+            ('base_engine_pt', 'TEXT'),
+            ('base_engine_eng', 'TEXT'),
+            ('fuel_system_pt', 'TEXT'),
+            ('fuel_system_eng', 'TEXT'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in new_cols:
+                if col not in eq_cols:
+                    conn.execute(text(f"ALTER TABLE equipamento ADD COLUMN {col} {typ}"))
+                    print(f"OK: equipamento.{col} adicionado")
+
+    # Create campo_tecnico_modelo table
+    if 'campo_tecnico_modelo' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela campo_tecnico_modelo criada")
+    else:
+        print("OK: campo_tecnico_modelo ja existe")
+
+    # Add pdf fields to campo_tecnico_modelo
+    if 'campo_tecnico_modelo' in insp.get_table_names():
+        ct_cols = [c['name'] for c in insp.get_columns('campo_tecnico_modelo')]
+        for col in ['pdf_filename', 'pdf_path']:
+            if col not in ct_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE campo_tecnico_modelo ADD COLUMN {col} TEXT"))
+                print(f"OK: campo_tecnico_modelo.{col} adicionado")
+
+    # Add catalogo to equipamento
+    if 'equipamento' in insp.get_table_names():
+        eq_cols = [c['name'] for c in insp.get_columns('equipamento')]
+        if 'catalogo' not in eq_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE equipamento ADD COLUMN catalogo TEXT"))
+            print("OK: equipamento.catalogo adicionado")
+        else:
+            print("OK: catalogo ja existe")
+
+    # Create perfil table
+    if 'perfil' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela perfil criada")
+    else:
+        print("OK: perfil ja existe")
+
+    # Create registo_pendente table
+    if 'registo_pendente' not in insp.get_table_names():
+        db.create_all()
+        print("OK: tabela registo_pendente criada")
+    else:
+        print("OK: registo_pendente ja existe")
+
+    # Add SMTP fields to config_geral
+    if 'config_geral' in insp.get_table_names():
+        cg_cols = [c['name'] for c in insp.get_columns('config_geral')]
+        smtp_cols = [
+            ('smtp_host', 'TEXT'),
+            ('smtp_port', 'INTEGER'),
+            ('smtp_user', 'TEXT'),
+            ('smtp_pass', 'TEXT'),
+            ('smtp_from', 'TEXT'),
+            ('smtp_tls',  'INTEGER'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in smtp_cols:
+                if col not in cg_cols:
+                    conn.execute(text(f"ALTER TABLE config_geral ADD COLUMN {col} {typ}"))
+                    print(f"OK: config_geral.{col} adicionado")
+
+    # Add email and must_change_password to users table
+    if 'users' in insp.get_table_names():
+        u_cols = [c['name'] for c in insp.get_columns('users')]
+        for col, typ in [('email','TEXT'), ('must_change_password','INTEGER')]:
+            if col not in u_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {typ} DEFAULT 0"))
+                print(f"OK: users.{col} adicionado")
+
+    # Create funcionario tables
+    for tbl in ['funcionario','funcionario_documento','funcionario_formacao']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: tabela {tbl} criada")
+        else:
+            print(f"OK: {tbl} ja existe")
+
+    # Add new funcionario fields
+    if 'funcionario' in insp.get_table_names():
+        fc = [c['name'] for c in insp.get_columns('funcionario')]
+        new_fc = [
+            ('data_admissao','DATE'),('filiacao_pai','TEXT'),('filiacao_mae','TEXT'),
+            ('situacao_militar','TEXT'),('estado_civil','TEXT'),('conjuge','TEXT'),
+            ('titulares_rendimento','INTEGER'),('num_dependentes','INTEGER'),
+            ('natural_freguesia','TEXT'),('natural_concelho','TEXT'),
+            ('socio_numero','TEXT'),('sindicato','TEXT'),('carta_conducao','INTEGER'),
+            ('obs','TEXT'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in new_fc:
+                if col not in fc:
+                    conn.execute(text(f"ALTER TABLE funcionario ADD COLUMN {col} {typ}"))
+                    print(f"OK: funcionario.{col}")
+
+    # Create new tables
+    for tbl in ['funcionario_situacao_prof','funcionario_falta']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: {tbl} criado")
+
+    # Create salary tables
+    for tbl in ['tabela_irs','doc_contabilistico','recibo_salario']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: {tbl} criado")
+        else:
+            print(f"OK: {tbl} existe")
+
+    # Add new fields to recibo_salario
+    if 'recibo_salario' in insp.get_table_names():
+        rs_cols = [c['name'] for c in insp.get_columns('recibo_salario')]
+        new_rs = [
+            ('vencimento_base_rht','NUMERIC'),('vencimento_base_g','NUMERIC'),
+            ('sub_refeicao_dias','NUMERIC'),('sub_refeicao_vdia','NUMERIC'),
+            ('horas_extra_rht','NUMERIC'),('faltas_dias','NUMERIC'),
+            ('faltas_horas','NUMERIC'),('irs_taxa','NUMERIC'),
+            ('irs_base','NUMERIC'),('seg_social_taxa','NUMERIC'),
+            ('seg_social_base','NUMERIC'),
+        ]
+        with db.engine.begin() as conn:
+            for col, typ in new_rs:
+                if col not in rs_cols:
+                    conn.execute(text(f"ALTER TABLE recibo_salario ADD COLUMN {col} {typ} DEFAULT 0"))
+                    print(f"OK: recibo_salario.{col}")
+
+    # Add irs_parcela_abater and irs_taxa_efetiva to recibo_salario
+    if 'recibo_salario' in insp.get_table_names():
+        rs_cols = [c['name'] for c in insp.get_columns('recibo_salario')]
+        for col, typ in [('irs_parcela_abater','NUMERIC'),('irs_taxa_efetiva','NUMERIC')]:
+            if col not in rs_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE recibo_salario ADD COLUMN {col} {typ} DEFAULT 0"))
+                print(f"OK: recibo_salario.{col}")
+
+    # Garantir campos IRS na recibo_salario
+    if 'recibo_salario' in insp.get_table_names():
+        rs_cols = [c['name'] for c in insp.get_columns('recibo_salario')]
+        for col, typ in [
+            ('irs_parcela_abater','NUMERIC'),
+            ('irs_taxa_efetiva','NUMERIC'),
+            ('vencimento_base_rht','NUMERIC'),
+            ('vencimento_base_g','NUMERIC'),
+            ('sub_refeicao_dias','NUMERIC'),
+            ('sub_refeicao_vdia','NUMERIC'),
+            ('horas_extra_rht','NUMERIC'),
+            ('faltas_dias','NUMERIC'),
+            ('faltas_horas','NUMERIC'),
+            ('irs_taxa','NUMERIC'),
+            ('irs_base','NUMERIC'),
+            ('seg_social_taxa','NUMERIC'),
+            ('seg_social_base','NUMERIC'),
+        ]:
+            if col not in rs_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE recibo_salario ADD COLUMN {col} {typ} DEFAULT 0"))
+                print(f"OK: recibo_salario.{col} adicionado")
+            else:
+                print(f"OK: {col} ja existe")
+
+    # Add cliente_id to pedidos_compra
+    if 'pedidos_compra' in insp.get_table_names():
+        pc_cols = [c['name'] for c in insp.get_columns('pedidos_compra')]
+        if 'cliente_id' not in pc_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE pedidos_compra ADD COLUMN cliente_id INTEGER"))
+            print("OK: pedidos_compra.cliente_id adicionado")
+
+    # Add cliente_id to linhas_pedido
+    if 'linhas_pedido' in insp.get_table_names():
+        lp_cols = [c['name'] for c in insp.get_columns('linhas_pedido')]
+        if 'cliente_id' not in lp_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE linhas_pedido ADD COLUMN cliente_id INTEGER"))
+            print("OK: linhas_pedido.cliente_id adicionado")
+
+    # Add status to linhas_pedido
+    if 'linhas_pedido' in insp.get_table_names():
+        lp_cols = [c['name'] for c in insp.get_columns('linhas_pedido')]
+        for col, typ, default in [('status','VARCHAR(30)','nao_encomendado'),('cliente_id','INTEGER','NULL')]:
+            if col not in lp_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE linhas_pedido ADD COLUMN {col} {typ}"))
+                print(f"OK: linhas_pedido.{col} adicionado")
+
+    # Create linha_pedido_historico table
+    if 'linha_pedido_historico' not in insp.get_table_names():
+        db.create_all()
+        print("OK: linha_pedido_historico criada")
+
+    # Create partilha_ficheiros table
+    if 'partilha_ficheiros' not in insp.get_table_names():
+        db.create_all()
+        print("OK: partilha_ficheiros criada")
+
+    # Create entradas tables
+    for tbl in ['entradas_equipamento','entrada_historico']:
+        if tbl not in insp.get_table_names():
+            db.create_all()
+            print(f"OK: {tbl} criada")
+
+# Add salarios_pin to config_geral
+import sqlite3, os as _os
+_db = _os.path.join(_os.path.dirname(__file__), 'instance', 'compras.db')
+_conn = sqlite3.connect(_db)
+_cur = _conn.cursor()
+_cols = [r[1] for r in _cur.execute("PRAGMA table_info(config_geral)").fetchall()]
+if 'salarios_pin' not in _cols:
+    _cur.execute("ALTER TABLE config_geral ADD COLUMN salarios_pin VARCHAR(10) DEFAULT ''")
+    print("OK: config_geral.salarios_pin")
+_conn.commit(); _conn.close()

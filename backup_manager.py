@@ -99,8 +99,7 @@ def fazer_backup(app, cfg=None) -> tuple:
             try:
                 os.makedirs(dest_path, exist_ok=True)
                 dest_file = os.path.join(dest_path, filename)
-                shutil.copy(db_path, dest_file)
-                os.utime(dest_file, None)  # set mtime=now so cleanup doesn't delete it immediately
+                shutil.copy2(db_path, dest_file)
                 size_kb = os.path.getsize(dest_file) // 1024
                 results.append(f"✅ {dest_type}: {dest_path} ({size_kb} KB)")
                 _cleanup_old_backups(dest_path, cfg.backup_manter_dias if cfg else 30)
@@ -135,18 +134,29 @@ def listar_backups(app, cfg=None) -> list:
         backups = []
         if os.path.isdir(local):
             for fname in sorted(os.listdir(local), reverse=True):
-                if fname.startswith('comprasnet_backup_') and fname.endswith('.db'):
-                    fpath = os.path.join(local, fname)
-                    try:
-                        stat = os.stat(fpath)
-                        backups.append({
-                            'nome': fname,
-                            'caminho': fpath,
-                            'tamanho': stat.st_size // 1024,
-                            'data': datetime.fromtimestamp(stat.st_mtime).strftime('%d/%m/%Y %H:%M'),
-                        })
-                    except Exception:
-                        pass
+                if not fname.startswith('comprasnet_backup_'):
+                    continue
+                if fname.endswith('.db'):
+                    tipo = 'auto'
+                elif fname.endswith('.zip'):
+                    tipo = 'manual'
+                else:
+                    continue
+                fpath = os.path.join(local, fname)
+                try:
+                    stat = os.stat(fpath)
+                    size_kb = stat.st_size // 1024
+                    size_str = f'{size_kb / 1024:.1f} MB' if size_kb >= 1024 else f'{size_kb} KB'
+                    backups.append({
+                        'nome': fname,
+                        'caminho': fpath,
+                        'tamanho': size_kb,
+                        'tamanho_str': size_str,
+                        'data': datetime.fromtimestamp(stat.st_mtime).strftime('%d/%m/%Y %H:%M'),
+                        'tipo': tipo,
+                    })
+                except Exception:
+                    pass
         return backups
 
 

@@ -151,7 +151,7 @@ def favicon():
 
 @app.route('/icon-<int:size>.png')
 def pwa_icon(size):
-    valid = [72, 96, 128, 144, 152, 180, 192, 384, 512]
+    valid = [72, 96, 128, 144, 152, 192, 384, 512]
     if size not in valid:
         size = 192
     fname = f'icon-{size}.png'
@@ -168,18 +168,6 @@ def backup_manual():
     from backup_manager import fazer_backup_completo
     cfg = ConfigGeral.query.first()
     ok, msg = fazer_backup_completo(app, cfg)
-    return jsonify({'ok': ok, 'msg': msg})
-
-
-@app.route('/admin/testar-backup', methods=['POST'])
-@login_required
-def admin_testar_backup():
-    """Force the automatic backup to run immediately (for testing)."""
-    if not current_user.is_admin:
-        return jsonify({'ok': False, 'error': 'Sem permissão'})
-    from backup_manager import fazer_backup
-    cfg = ConfigGeral.query.first()
-    ok, msg = fazer_backup(app, cfg)
     return jsonify({'ok': ok, 'msg': msg})
 
 
@@ -232,11 +220,9 @@ def _regenerar_pwa_icons():
     if not os.path.exists(logo_path):
         return False
     try:
-        import time as _t
         from PIL import Image
         logo = Image.open(logo_path).convert('RGBA')
         static_dir = os.path.join(app.root_path, 'static')
-        # Regular icons: logo centred on navy, 75% of canvas
         for size in [72, 96, 128, 144, 152, 180, 192, 384, 512]:
             canvas = Image.new('RGBA', (size, size), '#1e3a5f')
             thumb = logo.copy()
@@ -246,24 +232,11 @@ def _regenerar_pwa_icons():
             oy = (size - thumb.height) // 2
             canvas.paste(thumb, (ox, oy), thumb)
             canvas.save(os.path.join(static_dir, f'icon-{size}.png'), 'PNG')
-        # Maskable icons: logo fills 90% of canvas (safe-zone friendly)
-        for size in [192, 512]:
-            canvas = Image.new('RGBA', (size, size), '#1e3a5f')
-            thumb = logo.copy()
-            max_dim = int(size * 0.90)
-            thumb.thumbnail((max_dim, max_dim), Image.LANCZOS)
-            ox = (size - thumb.width) // 2
-            oy = (size - thumb.height) // 2
-            canvas.paste(thumb, (ox, oy), thumb)
-            canvas.save(os.path.join(static_dir, f'icon-maskable-{size}.png'), 'PNG')
-        # Favicon
+        # favicon
         i32 = Image.new('RGBA', (32, 32), '#1e3a5f')
         thumb = logo.copy(); thumb.thumbnail((24,24), Image.LANCZOS)
         i32.paste(thumb, ((32-thumb.width)//2,(32-thumb.height)//2), thumb)
         i32.save(os.path.join(static_dir, 'favicon.ico'), format='ICO', sizes=[(16,16),(32,32)])
-        # Write version so SW can bust its cache
-        with open(os.path.join(static_dir, 'pwa_version.txt'), 'w') as f:
-            f.write(str(int(_t.time())))
         return True
     except Exception as e:
         print(f"Icon regen error: {e}")
@@ -281,9 +254,7 @@ def pwa_icon_maskable(size):
 @app.route('/apple-touch-icon.png')
 @app.route('/apple-touch-icon-precomposed.png')
 def apple_touch_icon():
-    resp = send_from_directory(os.path.join(app.root_path, 'static'), 'icon-180.png')
-    resp.headers['Cache-Control'] = 'no-cache'
-    return resp
+    return pwa_icon(180)
 
 @app.route('/manifest.json')
 def pwa_manifest():
@@ -315,8 +286,7 @@ def pwa_manifest():
             {"src": base + "/icon-maskable-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ]
     }
-    from flask import Response as _Resp
-    resp = _Resp(json.dumps(manifest), mimetype='application/manifest+json')
+    resp = Response(json.dumps(manifest), mimetype='application/manifest+json')
     resp.headers['Cache-Control'] = 'no-cache'
     return resp
 
@@ -10106,9 +10076,6 @@ def init_db():
 
 if __name__ == '__main__':
     init_db()
-    from backup_manager import iniciar_scheduler
-    iniciar_scheduler(app)
-    threading.Thread(target=_regenerar_pwa_icons_auto, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=False)
 # cache bust Tue Apr  7 15:34:00 UTC 2026
 
