@@ -4668,6 +4668,63 @@ def proposta_apagar(pid):
     return jsonify({'ok': True})
 
 
+# ══════════════════════════════════════════════════════════════════════
+# CHANGELOG / LINHA DO TEMPO
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/changelog')
+@login_required
+def changelog():
+    import subprocess
+    from collections import defaultdict
+    try:
+        result = subprocess.run(
+            ['git', 'log', '--format=%ad|%H|%s', '--date=short'],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        lines = result.stdout.strip().split('\n')
+    except: lines = []
+
+    def categorize(msg):
+        m = msg.lower()
+        if any(x in m for x in ['agenda','servico','registo','falta','horas extra']): return ('📅', 'Agenda Digital', '#3b6ef0')
+        if any(x in m for x in ['pedido','artigo','fornecedor','compra','faturar','preco']): return ('🛒', 'Pedidos de Compra', '#f59e0b')
+        if any(x in m for x in ['biblioteca','pdf','manual','sync biblioteca']): return ('📚', 'Biblioteca PDF', '#8b5cf6')
+        if any(x in m for x in ['dashboard','badge','alerta','widget']): return ('📊', 'Dashboard', '#22c55e')
+        if any(x in m for x in ['salario','recibo','ferias','ausencia','mapa','rh','funcionario']): return ('👔', 'RH / Salários', '#f97316')
+        if any(x in m for x in ['embarcacao','motor','caixa','equipamento','ficha','tecnico']): return ('⚓', 'Base Dados Embarcações', '#0891b2')
+        if any(x in m for x in ['empresa','documento','cert']): return ('🏢', 'Empresa', '#6366f1')
+        if any(x in m for x in ['backup','pwa','sidebar','menu','perfil','utilizador','login','sistema']): return ('⚙️', 'Sistema', '#64748b')
+        if any(x in m for x in ['proposta','backlog','roadmap']): return ('💡', 'Backlog / Propostas', '#ec4899')
+        if any(x in m for x in ['cliente','gestao','fornecedor']): return ('👥', 'Gestão', '#10b981')
+        return ('🔧', 'Geral', '#94a3b8')
+
+    entries = []
+    for line in lines:
+        parts = line.split('|', 2)
+        if len(parts) != 3: continue
+        date, sha, msg = parts
+        tipo = 'feat' if msg.startswith('feat:') else 'fix' if msg.startswith('fix:') else None
+        if not tipo: continue
+        desc = msg.replace('feat: ','').replace('fix: ','').strip()
+        icon, cat, color = categorize(desc)
+        entries.append({'date': date, 'sha': sha[:7], 'desc': desc, 'tipo': tipo, 'icon': icon, 'cat': cat, 'color': color})
+
+    # Group by date descending
+    by_date = defaultdict(list)
+    for e in entries:
+        by_date[e['date']].append(e)
+    dates_sorted = sorted(by_date.keys(), reverse=True)
+
+    total_feat = sum(1 for e in entries if e['tipo'] == 'feat')
+    total_fix = sum(1 for e in entries if e['tipo'] == 'fix')
+
+    return render_template('changelog.html',
+        by_date=by_date, dates_sorted=dates_sorted,
+        total_feat=total_feat, total_fix=total_fix,
+        total=len(entries))
+
+
 @app.route('/roadmap')
 @login_required
 def roadmap():

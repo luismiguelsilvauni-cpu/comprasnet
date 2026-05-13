@@ -1,228 +1,71 @@
 {% extends "base.html" %}
-{% block title %}Actualizações · ComprasNet{% endblock %}
-
-{% block page_title %}Versions{% endblock %}
-
+{% block title %}Changelog · NavTech{% endblock %}
+{% block page_title %}📋 Linha do Tempo — Actualizações NavTech{% endblock %}
 {% block topbar_actions %}
-  <span style="font-size:12px;color:var(--text-muted)">Actualizado automaticamente a cada deploy</span>
+  <a href="{{ url_for('roadmap') }}" class="btn btn-ghost btn-sm">📌 Backlog</a>
 {% endblock %}
-
 {% block content %}
-<div style="max-width:780px">
 
-{% if entries %}
-<div style="margin-bottom:28px">
-  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:10px">
-    Registo automatico de deploys
-    <span style="flex:1;height:1px;background:var(--border);display:block"></span>
+<!-- KPIs -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;max-width:500px">
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:26px;font-weight:800;color:var(--accent)">{{ total }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Total actualizações</div>
   </div>
-  {% for e in entries %}
-  <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
-    <div style="min-width:90px;font-size:11px;font-family:monospace;color:var(--text-muted);padding-top:2px">{{ e.criado_em.strftime('%d/%m/%Y') }}</div>
-    <div>
-      <span style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;margin-right:8px;
-        background:{% if e.tipo=='feat' %}rgba(34,197,94,.15){% elif e.tipo=='fix' %}rgba(239,68,68,.15){% else %}rgba(156,163,175,.15){% endif %};
-        color:{% if e.tipo=='feat' %}#22c55e{% elif e.tipo=='fix' %}#ef4444{% else %}var(--text-muted){% endif %}">
-        {{ e.tipo|upper }}
-      </span>
-      <span style="font-size:13px;color:var(--text)">{{ e.descricao }}</span>
-      <div style="font-size:11px;color:var(--text-muted);font-family:monospace;margin-top:2px">v{{ e.versao }}</div>
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:26px;font-weight:800;color:#22c55e">{{ total_feat }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Novas funcionalidades</div>
+  </div>
+  <div class="card" style="text-align:center;padding:12px">
+    <div style="font-size:26px;font-weight:800;color:#f59e0b">{{ total_fix }}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Correcções</div>
+  </div>
+</div>
+
+<!-- Timeline -->
+<div style="position:relative">
+  <!-- Vertical line -->
+  <div style="position:absolute;left:110px;top:0;bottom:0;width:2px;background:var(--border);z-index:0"></div>
+
+  {% for date in dates_sorted %}
+  {% set day_entries = by_date[date] %}
+  <div style="display:flex;gap:0;margin-bottom:24px;position:relative">
+
+    <!-- Date label -->
+    <div style="width:100px;flex-shrink:0;text-align:right;padding-right:16px;padding-top:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent)">{{ date[8:] }}/{{ date[5:7] }}</div>
+      <div style="font-size:10px;color:var(--text-muted)">{{ date[:4] }}</div>
+    </div>
+
+    <!-- Dot -->
+    <div style="width:20px;flex-shrink:0;display:flex;justify-content:center;padding-top:6px;z-index:1">
+      <div style="width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)"></div>
+    </div>
+
+    <!-- Cards -->
+    <div style="flex:1;padding-left:16px">
+      {% for e in day_entries %}
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;border-radius:8px;margin-bottom:4px;
+                  background:{% if e.tipo=='feat' %}rgba(59,110,240,.06){% else %}var(--surface2){% endif %};
+                  border-left:3px solid {% if e.tipo=='feat' %}{{ e.color }}{% else %}#94a3b8{% endif %}">
+        <span style="font-size:14px;flex-shrink:0">{{ e.icon }}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:var(--text);line-height:1.4">{{ e.desc }}</div>
+          <div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap">
+            <span style="font-size:9px;padding:1px 6px;border-radius:3px;
+                         background:{{ e.color }}20;color:{{ e.color }};font-weight:700">{{ e.cat }}</span>
+            {% if e.tipo == 'feat' %}
+            <span style="font-size:9px;padding:1px 6px;border-radius:3px;background:#dcfce7;color:#16a34a;font-weight:700">✨ Nova funcionalidade</span>
+            {% else %}
+            <span style="font-size:9px;padding:1px 6px;border-radius:3px;background:#fef3c7;color:#92400e;font-weight:700">🔧 Correcção</span>
+            {% endif %}
+            <span style="font-size:9px;color:var(--text-muted);font-family:monospace">{{ e.sha }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </div>
   {% endfor %}
-</div>
-{% endif %}
-
-
-
-<div class="card mb-16" style="background:var(--surface2);border-style:dashed">
-  <div style="display:flex;align-items:center;gap:12px">
-    <div style="font-size:28px">📦</div>
-    <div>
-      <div style="font-weight:700;font-size:15px">ComprasNet</div>
-      <div style="font-size:12px;color:var(--text-muted)">Sistema de Gestão de Compras e Orçamentos · Integração PHC CS</div>
-    </div>
-    <div style="margin-left:auto;text-align:right">
-      <div class="badge badge-green" style="font-size:12px">v1.8 — Atual</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Mar 2026</div>
-    </div>
-  </div>
-</div>
-
-{% set versoes = [
-  {
-    'versao': '1.8',
-    'data': 'Março 2026',
-    'titulo': 'Fornecedores habituais e email de consulta',
-    'tipo': 'feat',
-    'novidades': [
-      'Popup de fornecedores habituais ao seleccionar artigo PHC num pedido',
-      'Geração automática de texto de email de consulta de orçamento',
-      'Email inclui lista de artigos com referência, designação e quantidade',
-      'Cópia de texto para área de transferência com um clique',
-    ]
-  },
-  {
-    'versao': '1.7',
-    'data': 'Março 2026',
-    'titulo': 'Motor de Reposição de Stock',
-    'tipo': 'feat',
-    'novidades': [
-      'Análise de movimentos PHC por artigo (tabela mo)',
-      'Cálculo de consumo médio diário/semanal/mensal',
-      'Stock de segurança dinâmico com fator configurável',
-      'Ponto de reorder (ROP) automático',
-      'EOQ — quantidade económica de encomenda',
-      'Índice de sazonalidade por mês',
-      'Classificação de rotatividade (alta/média/baixa/parado)',
-      'Métricas globais e por artigo editáveis pelo utilizador',
-      'Geração directa de pedido de compra a partir das sugestões',
-    ]
-  },
-  {
-    'versao': '1.6',
-    'data': 'Março 2026',
-    'titulo': 'Comparação linha-a-linha e Aliases Inteligentes',
-    'tipo': 'feat',
-    'novidades': [
-      'Página de comparação de orçamentos linha-a-linha por artigo PHC',
-      'Motor de correspondência automática (alias_matcher) com 3 níveis de confiança',
-      'Correspondência exacta por alias manual (confiança 1.0)',
-      'Correspondência por referência do fornecedor (confiança 0.95)',
-      'Correspondência fuzzy por texto (confiança 0.5–0.8)',
-      'Associação manual de linhas de orçamento a artigos PHC',
-      'Aprendizagem — aliases ficam guardados para uso automático futuro',
-      'Tabela de aliases com gestão (criar/apagar)',
-      'Coluna "melhor preço" destacada automaticamente',
-    ]
-  },
-  {
-    'versao': '1.5',
-    'data': 'Março 2026',
-    'titulo': 'Pré-visualização de PDF',
-    'tipo': 'feat',
-    'novidades': [
-      'Botão "Ver" abre PDF em modal dentro do ComprasNet',
-      'Botão "↗ Tab" abre PDF em nova tab do browser',
-      'Funciona sem instalar software adicional',
-    ]
-  },
-  {
-    'versao': '1.4',
-    'data': 'Março 2026',
-    'titulo': 'Importação automática de backup PHC (.bak)',
-    'tipo': 'feat',
-    'novidades': [
-      'Upload de ficheiro .bak do PHC CS pelo browser',
-      'Restauro automático no SQL Server Express local via RESTORE DATABASE T-SQL',
-      'Leitura dos ficheiros lógicos do backup (RESTORE FILELISTONLY)',
-      'Verificação automática que a BD restaurada é PHC CS válida',
-      'Sincronização imediata após restauro',
-      'Verificação de conectividade SQL Server em tempo real',
-      'Guia de instalação SQL Server Express integrado na página',
-    ]
-  },
-  {
-    'versao': '1.3',
-    'data': 'Março 2026',
-    'titulo': 'Provedor de IA configurável',
-    'tipo': 'feat',
-    'novidades': [
-      'Suporte para LM Studio (local, gratuito, Windows)',
-      'Suporte para Ollama (local, gratuito, CLI)',
-      'Suporte para Claude API (nuvem, Anthropic)',
-      'Troca de provedor sem reiniciar o servidor',
-      'Teste de ligação e teste de extracção de PDF em tempo real',
-      'Modelos recomendados por hardware (Qwen 2.5 7B, Mistral 7B, Phi 3.5 Mini)',
-      'Guia de instalação LM Studio integrado',
-    ]
-  },
-  {
-    'versao': '1.2',
-    'data': 'Março 2026',
-    'titulo': 'Integração PHC CS — Artigos e Fornecedores',
-    'tipo': 'feat',
-    'novidades': [
-      'Ligação só-leitura ao SQL Server Express local com BD PHC restaurada',
-      'Sincronização de artigos (tabela st): referência, designação, stock, preços, unidade, família',
-      'Sincronização de fornecedores (tabela ec): nome, NIF, contactos',
-      'Histórico de compras por artigo (tabelas lc + ft)',
-      'Pesquisa live de artigos PHC no formulário de pedido de compra',
-      'Popup com stock actual, preço custo e preço ponderado ao seleccionar artigo',
-      'Histórico das últimas compras do artigo com preço e fornecedor',
-      'Pedido de compra multi-artigo com snapshot dos dados PHC',
-      'Sincronização manual e automática agendada',
-    ]
-  },
-  {
-    'versao': '1.1',
-    'data': 'Março 2026',
-    'titulo': 'Sistema de migrações e actualizações',
-    'tipo': 'infra',
-    'novidades': [
-      'Integração Flask-Migrate / Alembic para versionamento da base de dados',
-      'Migrações incrementais — dados preservados em cada actualização',
-      'Script atualizar.bat com backup automático antes de cada migração',
-      'Restauro automático em caso de erro na migração',
-      'Repositório Git privado no GitHub como fonte da verdade',
-      'Fluxo de actualização: git apply patch.diff + atualizar.bat',
-    ]
-  },
-  {
-    'versao': '1.0',
-    'data': 'Março 2026',
-    'titulo': 'Versão inicial — Base do sistema',
-    'tipo': 'feat',
-    'novidades': [
-      'Autenticação com login individual por utilizador',
-      'Perfis Admin e Utilizador com controlo de acesso',
-      'Dashboard com KPIs: pedidos abertos, aprovados, orçamentos carregados',
-      'Pedidos de Compra com título, departamento, prioridade e estado',
-      'Estados do pedido: Aberto → Em análise → Aprovado / Cancelado',
-      'Upload de até 3 PDFs de orçamento por pedido',
-      'Extracção automática de PDF por IA: empresa, NIF, totais, IVA, descontos, linhas',
-      'Comparação visual dos 3 orçamentos com destaque do melhor preço',
-      'Aprovação de pedido com selecção do fornecedor vencedor',
-      'Download do PDF original sempre disponível',
-      'Gestão de utilizadores pelo admin',
-      'Interface multi-posto — todos os PCs da rede acedem via browser',
-      'Base de dados SQLite local (sem servidor de BD necessário)',
-    ]
-  },
-] %}
-
-{% for v in versoes %}
-<div class="card mb-12">
-  <div style="display:flex;align-items:flex-start;gap:16px">
-
-    <!-- Version badge -->
-    <div style="flex-shrink:0;text-align:center;min-width:56px">
-      <div style="font-size:11px;font-weight:700;font-family:monospace;background:{% if v.tipo=='feat' %}var(--accent-glow);color:var(--accent){% elif v.tipo=='fix' %}rgba(239,68,68,.1);color:var(--danger){% else %}var(--surface2);color:var(--text-muted){% endif %};padding:4px 8px;border-radius:6px;border:1px solid {% if v.tipo=='feat' %}rgba(59,110,240,.3){% elif v.tipo=='fix' %}rgba(239,68,68,.2){% else %}var(--border){% endif %}">
-        v{{ v.versao }}
-      </div>
-      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">{{ v.data }}</div>
-    </div>
-
-    <!-- Content -->
-    <div style="flex:1">
-      <div style="font-weight:600;font-size:14px;margin-bottom:10px">
-        {% if v.tipo=='feat' %}✨{% elif v.tipo=='fix' %}🔧{% else %}🏗️{% endif %}
-        {{ v.titulo }}
-      </div>
-      <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px">
-        {% for item in v.novidades %}
-        <li style="font-size:13px;color:var(--text-muted);line-height:1.4">{{ item }}</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
-</div>
-{% endfor %}
-
-<div style="text-align:center;padding:20px;font-size:12px;color:var(--text-dim)">
-  ComprasNet · Desenvolvido com Flask + SQLite + PHC CS Integration<br>
-  Repositório: <a href="https://github.com/luismiguelsilvauni-cpu/comprasnet" target="_blank" style="color:var(--accent)">github.com/luismiguelsilvauni-cpu/comprasnet</a>
-</div>
-
 </div>
 {% endblock %}
