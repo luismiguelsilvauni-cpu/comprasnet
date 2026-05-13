@@ -5,7 +5,7 @@ function editarTipo(id, el) {
   var atual = el.textContent.trim();
   var input = document.createElement('input');
   input.type = 'text'; input.value = atual;
-  input.setAttribute('list', 'tiposExistentes');
+  input.setAttribute('list', 'familiaList');
   input.style.cssText = 'font-size:inherit;border:1px solid var(--accent);border-radius:4px;padding:2px 6px;width:150px;background:var(--surface);color:var(--text)';
   el.replaceWith(input); input.focus(); input.select();
   function salvar() {
@@ -70,10 +70,10 @@ function editarTipo(id, el) {
           </datalist>
         </div>
         <div class="form-group" style="margin:0">
-          <label>Tipo</label>
-          <input type="text" name="tipo_componente" list="tiposExistentes" autocomplete="off" class="input" list="tiposList"
+          <label>Familia</label>
+          <input type="text" name="tipo_componente" list="familiaList" autocomplete="off" class="input"
                  placeholder="Tipo..." oninput="updateModelos(this.value)" autocomplete="off">
-          <datalist id="tiposList">
+          <datalist id="familiaList">
             {% for t, n in tipos_freq|default([]) %}<option value="{{ t }}">{{ t }} ({{ n }})</option>{% endfor %}
           </datalist>
         </div>
@@ -110,7 +110,7 @@ function editarTipo(id, el) {
         <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
       </div>
     </form>
-<datalist id="tiposExistentes">{% for t in tipos_existentes %}<option value="{{ t }}">{% endfor %}</datalist>
+<datalist id="familiaList">{% for t in tipos_existentes %}<option value="{{ t }}">{% endfor %}</datalist>
   </div>
 </div>
 
@@ -143,7 +143,7 @@ function editarTipo(id, el) {
 
     <div class="edit-panel" id="pedit-{{ p.id }}">
       <form method="post" action="{{ url_for('modelo_pdf_editar', pid=p.id) }}">
-        <label>Tipo</label>
+        <label>Familia</label>
         <input type="text" name="tipo_componente" value="{{ p.tipo_componente or '' }}" class="input"
                list="tiposExistentes" autocomplete="off" placeholder="Ex: motor, caixa, geral...">
         <label>Título</label>

@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
   <link rel="icon" href="/static/favicon.ico">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1e3a5f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -116,5 +116,11 @@
         Integrado com <span>PHC CS</span> · Rede Local
     </div>
 </div>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+    .catch(e => console.warn('SW register failed', e));
+}
+</script>
 </body>
 </html>

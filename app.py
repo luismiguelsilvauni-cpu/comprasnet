@@ -151,7 +151,7 @@ def favicon():
 
 @app.route('/icon-<int:size>.png')
 def pwa_icon(size):
-    valid = [72, 96, 128, 144, 152, 192, 384, 512]
+    valid = [72, 96, 128, 144, 152, 180, 192, 384, 512]
     if size not in valid:
         size = 192
     fname = f'icon-{size}.png'
@@ -220,9 +220,11 @@ def _regenerar_pwa_icons():
     if not os.path.exists(logo_path):
         return False
     try:
+        import time as _t
         from PIL import Image
         logo = Image.open(logo_path).convert('RGBA')
         static_dir = os.path.join(app.root_path, 'static')
+        # Regular icons: logo centred on navy, 75% of canvas
         for size in [72, 96, 128, 144, 152, 180, 192, 384, 512]:
             canvas = Image.new('RGBA', (size, size), '#1e3a5f')
             thumb = logo.copy()
@@ -232,11 +234,24 @@ def _regenerar_pwa_icons():
             oy = (size - thumb.height) // 2
             canvas.paste(thumb, (ox, oy), thumb)
             canvas.save(os.path.join(static_dir, f'icon-{size}.png'), 'PNG')
-        # favicon
+        # Maskable icons: logo fills 90% of canvas (safe-zone friendly)
+        for size in [192, 512]:
+            canvas = Image.new('RGBA', (size, size), '#1e3a5f')
+            thumb = logo.copy()
+            max_dim = int(size * 0.90)
+            thumb.thumbnail((max_dim, max_dim), Image.LANCZOS)
+            ox = (size - thumb.width) // 2
+            oy = (size - thumb.height) // 2
+            canvas.paste(thumb, (ox, oy), thumb)
+            canvas.save(os.path.join(static_dir, f'icon-maskable-{size}.png'), 'PNG')
+        # Favicon
         i32 = Image.new('RGBA', (32, 32), '#1e3a5f')
         thumb = logo.copy(); thumb.thumbnail((24,24), Image.LANCZOS)
         i32.paste(thumb, ((32-thumb.width)//2,(32-thumb.height)//2), thumb)
         i32.save(os.path.join(static_dir, 'favicon.ico'), format='ICO', sizes=[(16,16),(32,32)])
+        # Write version so SW can bust its cache
+        with open(os.path.join(static_dir, 'pwa_version.txt'), 'w') as f:
+            f.write(str(int(_t.time())))
         return True
     except Exception as e:
         print(f"Icon regen error: {e}")
@@ -254,7 +269,9 @@ def pwa_icon_maskable(size):
 @app.route('/apple-touch-icon.png')
 @app.route('/apple-touch-icon-precomposed.png')
 def apple_touch_icon():
-    return pwa_icon(180)
+    resp = send_from_directory(os.path.join(app.root_path, 'static'), 'icon-180.png')
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
 
 @app.route('/manifest.json')
 def pwa_manifest():
@@ -286,7 +303,8 @@ def pwa_manifest():
             {"src": base + "/icon-maskable-512.png?v=" + v, "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ]
     }
-    resp = Response(json.dumps(manifest), mimetype='application/manifest+json')
+    from flask import Response as _Resp
+    resp = _Resp(json.dumps(manifest), mimetype='application/manifest+json')
     resp.headers['Cache-Control'] = 'no-cache'
     return resp
 
@@ -1826,18 +1844,6 @@ def apagar_utilizador(uid):
 # ── INIT ──────────────────────────────────────────────────────────────────────
 
 # ── CHANGELOG ─────────────────────────────────────────────────────────────────
-
-@app.route('/changelog')
-@login_required
-def changelog():
-    try:
-        entries = ChangelogEntry.query.order_by(ChangelogEntry.criado_em.desc()).limit(100).all()
-    except Exception:
-        entries = []
-    return render_template('changelog.html', entries=entries)
-
-
-# ── EMAIL CONSULTA ─────────────────────────────────────────────────────────────
 
 @app.route('/api/email_consulta', methods=['POST'])
 @login_required
@@ -4666,6 +4672,63 @@ def proposta_apagar(pid):
     db.session.delete(p)
     db.session.commit()
     return jsonify({'ok': True})
+
+
+# ══════════════════════════════════════════════════════════════════════
+# CHANGELOG / LINHA DO TEMPO
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/changelog')
+@login_required
+def changelog():
+    import subprocess
+    from collections import defaultdict
+    try:
+        result = subprocess.run(
+            ['git', 'log', '--format=%ad|%H|%s', '--date=short'],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        lines = result.stdout.strip().split('\n')
+    except: lines = []
+
+    def categorize(msg):
+        m = msg.lower()
+        if any(x in m for x in ['agenda','servico','registo','falta','horas extra']): return ('📅', 'Agenda Digital', '#3b6ef0')
+        if any(x in m for x in ['pedido','artigo','fornecedor','compra','faturar','preco']): return ('🛒', 'Pedidos de Compra', '#f59e0b')
+        if any(x in m for x in ['biblioteca','pdf','manual','sync biblioteca']): return ('📚', 'Biblioteca PDF', '#8b5cf6')
+        if any(x in m for x in ['dashboard','badge','alerta','widget']): return ('📊', 'Dashboard', '#22c55e')
+        if any(x in m for x in ['salario','recibo','ferias','ausencia','mapa','rh','funcionario']): return ('👔', 'RH / Salários', '#f97316')
+        if any(x in m for x in ['embarcacao','motor','caixa','equipamento','ficha','tecnico']): return ('⚓', 'Base Dados Embarcações', '#0891b2')
+        if any(x in m for x in ['empresa','documento','cert']): return ('🏢', 'Empresa', '#6366f1')
+        if any(x in m for x in ['backup','pwa','sidebar','menu','perfil','utilizador','login','sistema']): return ('⚙️', 'Sistema', '#64748b')
+        if any(x in m for x in ['proposta','backlog','roadmap']): return ('💡', 'Backlog / Propostas', '#ec4899')
+        if any(x in m for x in ['cliente','gestao','fornecedor']): return ('👥', 'Gestão', '#10b981')
+        return ('🔧', 'Geral', '#94a3b8')
+
+    entries = []
+    for line in lines:
+        parts = line.split('|', 2)
+        if len(parts) != 3: continue
+        date, sha, msg = parts
+        tipo = 'feat' if msg.startswith('feat:') else 'fix' if msg.startswith('fix:') else None
+        if not tipo: continue
+        desc = msg.replace('feat: ','').replace('fix: ','').strip()
+        icon, cat, color = categorize(desc)
+        entries.append({'date': date, 'sha': sha[:7], 'desc': desc, 'tipo': tipo, 'icon': icon, 'cat': cat, 'color': color})
+
+    # Group by date descending
+    by_date = defaultdict(list)
+    for e in entries:
+        by_date[e['date']].append(e)
+    dates_sorted = sorted(by_date.keys(), reverse=True)
+
+    total_feat = sum(1 for e in entries if e['tipo'] == 'feat')
+    total_fix = sum(1 for e in entries if e['tipo'] == 'fix')
+
+    return render_template('changelog.html',
+        by_date=by_date, dates_sorted=dates_sorted,
+        total_feat=total_feat, total_fix=total_fix,
+        total=len(entries))
 
 
 @app.route('/roadmap')
