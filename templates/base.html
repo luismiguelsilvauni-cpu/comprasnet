@@ -473,6 +473,11 @@
                onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
                 💡 <span>Propostas</span>
             </a>
+            <a href="{{ url_for('changelog') }}" title="Changelog"
+               style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'changelog' %}background:var(--surface2);color:var(--accent);{% endif %}"
+               onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='{% if request.endpoint == 'changelog' %}var(--surface2){% endif %}'">
+                🕐 <span>Changelog</span>
+            </a>
             <a href="{{ url_for('roadmap') }}" title="Backlog"
                style="font-size:10px;padding:3px 6px;border-radius:5px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:3px;{% if request.endpoint == 'roadmap' %}background:var(--surface2);color:var(--accent);{% endif %}"
                onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
