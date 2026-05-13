@@ -99,7 +99,8 @@ def fazer_backup(app, cfg=None) -> tuple:
             try:
                 os.makedirs(dest_path, exist_ok=True)
                 dest_file = os.path.join(dest_path, filename)
-                shutil.copy2(db_path, dest_file)
+                shutil.copy(db_path, dest_file)
+                os.utime(dest_file, None)  # set mtime=now so cleanup doesn't delete it immediately
                 size_kb = os.path.getsize(dest_file) // 1024
                 results.append(f"✅ {dest_type}: {dest_path} ({size_kb} KB)")
                 _cleanup_old_backups(dest_path, cfg.backup_manter_dias if cfg else 30)

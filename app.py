@@ -171,6 +171,18 @@ def backup_manual():
     return jsonify({'ok': ok, 'msg': msg})
 
 
+@app.route('/admin/testar-backup', methods=['POST'])
+@login_required
+def admin_testar_backup():
+    """Force the automatic backup to run immediately (for testing)."""
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'Sem permissão'})
+    from backup_manager import fazer_backup
+    cfg = ConfigGeral.query.first()
+    ok, msg = fazer_backup(app, cfg)
+    return jsonify({'ok': ok, 'msg': msg})
+
+
 @app.route('/admin/regenerar-icons', methods=['POST'])
 @login_required
 def admin_regenerar_icons():
@@ -10094,6 +10106,9 @@ def init_db():
 
 if __name__ == '__main__':
     init_db()
+    from backup_manager import iniciar_scheduler
+    iniciar_scheduler(app)
+    threading.Thread(target=_regenerar_pwa_icons_auto, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=False)
 # cache bust Tue Apr  7 15:34:00 UTC 2026
 
