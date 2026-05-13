@@ -2116,8 +2116,8 @@ def admin_config():
                 db.session.rollback()
                 flash(f'Erro ao guardar: {e}', 'error')
         elif action == 'backup':
-            from backup_manager import fazer_backup
-            ok, msg = fazer_backup(app, cfg)
+            from backup_manager import fazer_backup_completo
+            ok, msg = fazer_backup_completo(app, cfg)
             flash(msg, 'success' if ok else 'error')
         return redirect(url_for('admin_config'))
 

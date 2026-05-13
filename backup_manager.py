@@ -23,7 +23,7 @@ def _cleanup_old_backups(path: str, manter_dias: int):
         return
     cutoff = datetime.now() - timedelta(days=manter_dias)
     for fname in os.listdir(path):
-        if fname.startswith('comprasnet_backup_') and fname.endswith('.db'):
+        if fname.startswith('comprasnet_backup_') and (fname.endswith('.db') or fname.endswith('.zip')):
             fpath = os.path.join(path, fname)
             try:
                 if datetime.fromtimestamp(os.path.getmtime(fpath)) < cutoff:
@@ -181,7 +181,7 @@ def _scheduler_loop(app, get_cfg_fn):
                     if diff < 120 and _last_backup_check != today_str:
                         logger.info("A executar backup automático agendado...")
                         _last_backup_check = today_str
-                        fazer_backup(app, cfg)
+                        fazer_backup_completo(app, cfg)
                 else:
                     pass
         except Exception as e:
