@@ -136,12 +136,16 @@ def listar_backups(app, cfg=None) -> list:
             for fname in sorted(os.listdir(local), reverse=True):
                 if not fname.startswith('comprasnet_backup_'):
                     continue
-                if fname.endswith('.db'):
-                    tipo = 'auto'
-                elif fname.endswith('.zip'):
-                    tipo = 'manual'
-                else:
+                if not (fname.endswith('.zip') or fname.endswith('.db')):
                     continue
+                if '_auto_' in fname:
+                    tipo = 'auto'
+                elif '_manual_' in fname:
+                    tipo = 'manual'
+                elif fname.endswith('.db'):
+                    tipo = 'auto'   # legacy .db files were always auto
+                else:
+                    tipo = 'manual'
                 fpath = os.path.join(local, fname)
                 try:
                     stat = os.stat(fpath)
@@ -181,7 +185,7 @@ def _scheduler_loop(app, get_cfg_fn):
                     if diff < 120 and _last_backup_check != today_str:
                         logger.info("A executar backup automático agendado...")
                         _last_backup_check = today_str
-                        fazer_backup_completo(app, cfg)
+                        fazer_backup_completo(app, cfg, tipo='auto')
                 else:
                     pass
         except Exception as e:
@@ -211,10 +215,10 @@ def parar_scheduler():
     _stop_event.set()
 
 
-def fazer_backup_completo(app, cfg=None) -> tuple:
+def fazer_backup_completo(app, cfg=None, tipo='manual') -> tuple:
     """
     Full backup: SQLite DB + uploads folder → ZIP archive.
-    Includes: database, uploaded PDFs, photos, manuals, embarcacoes files.
+    tipo: 'manual' or 'auto' — included in filename so listing can distinguish them.
     """
     import zipfile
     with app.app_context():
@@ -227,7 +231,7 @@ def fazer_backup_completo(app, cfg=None) -> tuple:
             return False, "Base de dados não encontrada."
 
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        zip_name = f"comprasnet_backup_{ts}.zip"
+        zip_name = f"comprasnet_backup_{tipo}_{ts}.zip"
 
         local = (cfg.backup_local_path or 'backups').strip() if cfg else 'backups'
         if not os.path.isabs(local):
