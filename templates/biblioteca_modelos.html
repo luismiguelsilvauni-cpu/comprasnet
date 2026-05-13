@@ -73,7 +73,7 @@ function editarTipo(id, el) {
           <label>Família</label>
           <input type="text" name="tipo_componente" list="tiposList" autocomplete="off" class="input"
                  placeholder="Ex: motor, caixa, geral..." oninput="updateModelos(this.value)">
-          <datalist id="tiposList">
+          <datalist id="familiaList">
             {% for t, n in tipos_freq|default([]) %}<option value="{{ t }}">{{ t }} ({{ n }})</option>{% endfor %}
           </datalist>
         </div>
@@ -110,7 +110,7 @@ function editarTipo(id, el) {
         <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
       </div>
     </form>
-<datalist id="tiposExistentes">{% for t in tipos_existentes %}<option value="{{ t }}">{% endfor %}</datalist>
+<datalist id="familiaList">{% for t in tipos_existentes %}<option value="{{ t }}">{% endfor %}</datalist>
   </div>
 </div>
 
