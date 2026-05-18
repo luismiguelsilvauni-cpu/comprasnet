@@ -4659,6 +4659,118 @@ def proposta_apagar(pid):
 # ══════════════════════════════════════════════════════════════════════
 # CHANGELOG / LINHA DO TEMPO
 # ══════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# MOBILE / PWA ROUTES
+# ══════════════════════════════════════════════════════════════════════
+def is_mobile_ua():
+    ua = request.headers.get('User-Agent','').lower()
+    return any(x in ua for x in ['iphone','android','ipad','mobile','tablet'])
+
+@app.route('/mobile/')
+@app.route('/mobile')
+@login_required
+def mobile_home():
+    from datetime import date as _d
+    hoje = _d.today()
+    pedidos_abertos = LinhaPedido.query.filter(
+        LinhaPedido.status.in_(['nao_encomendado','consultado'])
+    ).count()
+    por_faturar = LinhaPedido.query.filter_by(status='por_faturar').count()
+    servicos_curso = AgendaServico.query.filter_by(estado='em_curso').count()
+    registos_hoje = AgendaRegisto.query.filter(AgendaRegisto.data == hoje).count()
+    return render_template('mobile/home.html',
+        pedidos_abertos=pedidos_abertos, por_faturar=por_faturar,
+        servicos_curso=servicos_curso, registos_hoje=registos_hoje)
+
+@app.route('/mobile/fotografar')
+@login_required
+def mobile_foto():
+    clientes = [{'id':c.id,'nome':c.nome} for c in Cliente.query.order_by(Cliente.nome).all()]
+    return render_template('mobile/fotografar.html', clientes=clientes)
+
+@app.route('/mobile/api/guardar-foto', methods=['POST'])
+@login_required
+def mobile_guardar_foto():
+    import uuid
+    foto = request.files.get('foto')
+    if not foto:
+        return jsonify({'ok':False,'error':'Sem foto'})
+    cliente_id = request.form.get('cliente_id') or None
+    emb = request.form.get('embarcacao','').strip()
+    comp = request.form.get('componente','geral')
+    nota = request.form.get('nota','').strip()
+    ext = foto.filename.rsplit('.',1)[-1].lower() if '.' in foto.filename else 'jpg'
+    fname = f"mobile_{current_user.id}_{uuid.uuid4().hex[:8]}.{ext}"
+    uploads_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+    fpath = os.path.join(uploads_dir, fname)
+    foto.save(fpath)
+    # Log to database
+    try:
+        from datetime import datetime as _dt
+        # Store as nota in agenda or as documento
+        db.session.execute(db.text(
+            "INSERT INTO mobile_fotos (user_id, cliente_id, embarcacao, componente, nota, ficheiro, criado_em) "
+            "VALUES (:uid,:cid,:emb,:comp,:nota,:fname,:now)"
+        ), {'uid':current_user.id,'cid':cliente_id,'emb':emb,'comp':comp,'nota':nota,'fname':fname,'now':_dt.now()})
+        db.session.commit()
+    except: pass
+    return jsonify({'ok':True,'ficheiro':fname})
+
+@app.route('/mobile/pesquisar')
+@login_required
+def mobile_pesquisar():
+    return render_template('mobile/pesquisar.html')
+
+@app.route('/mobile/api/artigos')
+@login_required
+def mobile_api_artigos():
+    q = request.args.get('q','').strip()
+    if len(q) < 2:
+        return jsonify({'artigos':[]})
+    artigos = ArtigoPHC.query.filter(db.or_(
+        ArtigoPHC.referencia.ilike(f'%{q}%'),
+        ArtigoPHC.designacao.ilike(f'%{q}%'),
+    )).limit(20).all()
+    return jsonify({'artigos':[{
+        'ref': a.referencia, 'nome': a.designacao or '',
+        'stock': round(float(a.stock_atual or 0),1),
+        'unidade': a.unidade or 'un',
+        'custo': round(float(a.ultimo_preco_entrada or a.preco_custo or 0),2),
+        'pvp': round(float(a.pvp or 0),2),
+        'fornecedor': None,
+    } for a in artigos]})
+
+@app.route('/mobile/agenda')
+@login_required
+def mobile_agenda():
+    from datetime import date as _d, timedelta as _td
+    data_str = request.args.get('data')
+    hoje = _d.fromisoformat(data_str) if data_str else _d.today()
+    ontem = hoje - _td(days=1)
+    servicos = AgendaServico.query.filter_by(estado='em_curso').order_by(AgendaServico.data_inicio.desc()).limit(10).all()
+    return render_template('mobile/agenda.html', hoje=hoje, ontem=ontem, servicos=servicos)
+
+@app.route('/mobile/pedidos')
+@login_required
+def mobile_pedidos():
+    from datetime import date as _d, timedelta as _td
+    artigos_raw = (db.session.query(LinhaPedido, PedidoCompra)
+        .join(PedidoCompra, LinhaPedido.pedido_id == PedidoCompra.id)
+        .filter(PedidoCompra.estado.in_(['aberto','pedido','aprovado','pendente','em_analise']))
+        .filter(LinhaPedido.status.notin_(['concluido','cancelado','faturado']))
+        .order_by(LinhaPedido.status)
+        .limit(50).all())
+    hoje = _d.today()
+    artigos = []
+    for l, p in artigos_raw:
+        hist = LinhaPedidoHistorico.query.filter_by(linha_id=l.id, status_novo='por_faturar')            .order_by(LinhaPedidoHistorico.data.desc()).first()
+        alerta_30d = bool(l.status=='por_faturar' and hist and hist.data and (hoje-hist.data.date()).days>30)
+        artigos.append({'referencia':l.referencia,'designacao':l.designacao,'status':l.status,
+            'quantidade':l.quantidade,'pedido_id':p.id,'fornecedor':l.fornecedor_hab,'alerta_30d':alerta_30d})
+    return render_template('mobile/pedidos.html', artigos=artigos)
+
+
 @app.route('/changelog')
 @login_required
 def changelog():

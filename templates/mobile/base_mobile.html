@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <title>{% block title %}NavTech UCN{% endblock %}</title>
+  <style>
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #334155;
+      --border:   #334155;
+      --text:     #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent:   #3b82f6;
+      --accent2:  #1d4ed8;
+      --green:    #22c55e;
+      --orange:   #f97316;
+      --red:      #ef4444;
+      --nav-h:    64px;
+      --header-h: 56px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; padding-bottom: var(--nav-h); }
+
+    /* Header */
+    .m-header {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 16px; gap: 12px; z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .m-header-title { font-size: 17px; font-weight: 700; color: var(--text); flex: 1; }
+    .m-header-sub { font-size: 12px; color: var(--text-muted); }
+    .m-back { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--surface2); color: var(--text); text-decoration: none; font-size: 18px; flex-shrink: 0; }
+
+    /* Main content */
+    .m-content { padding: calc(var(--header-h) + 12px) 14px 14px; min-height: 100vh; }
+
+    /* Bottom nav */
+    .m-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-h);
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; z-index: 100; backdrop-filter: blur(10px);
+    }
+    .m-nav a {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; text-decoration: none; color: var(--text-muted); font-size: 10px; font-weight: 600;
+      transition: color .15s; padding: 8px 0;
+    }
+    .m-nav a.active, .m-nav a:active { color: var(--accent); }
+    .m-nav a .icon { font-size: 22px; line-height: 1; }
+
+    /* Cards */
+    .m-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+    .m-card-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+
+    /* Inputs */
+    .m-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px; color: var(--text); font-size: 16px;
+      outline: none; -webkit-appearance: none;
+    }
+    .m-input:focus { border-color: var(--accent); }
+    .m-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; display: block; }
+
+    /* Buttons */
+    .m-btn {
+      width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 16px;
+      font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: 10px; transition: opacity .15s; -webkit-appearance: none;
+    }
+    .m-btn:active { opacity: .7; }
+    .m-btn-primary { background: var(--accent); color: white; }
+    .m-btn-secondary { background: var(--surface2); color: var(--text); }
+    .m-btn-success { background: var(--green); color: white; }
+    .m-btn-danger { background: var(--red); color: white; }
+    .m-btn-sm { padding: 10px 16px; font-size: 14px; width: auto; border-radius: 8px; }
+
+    /* Badge */
+    .m-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+
+    /* List items */
+    .m-list-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+    .m-list-item:last-child { border-bottom: none; }
+    .m-list-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+
+    /* Search bar */
+    .m-search { position: relative; margin-bottom: 14px; }
+    .m-search input { padding-left: 42px; }
+    .m-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-muted); }
+
+    /* Grid */
+    .m-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .m-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+
+    /* KPI tile */
+    .m-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 12px; text-align: center; }
+    .m-kpi-value { font-size: 24px; font-weight: 800; color: var(--accent); }
+    .m-kpi-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 3px; }
+
+    /* Toast */
+    #m-toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; z-index: 9999; display: none; box-shadow: 0 4px 20px rgba(0,0,0,.4); border: 1px solid var(--border); }
+
+    /* Spinner */
+    .m-spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 20px auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Safe area for notched phones */
+    @supports (padding: max(0px)) {
+      .m-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+      body { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- Header -->
+<div class="m-header">
+  {% block header_left %}
+  <div style="width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:white;flex-shrink:0">U</div>
+  {% endblock %}
+  <div style="flex:1;min-width:0">
+    <div class="m-header-title">{% block header_title %}NavTech{% endblock %}</div>
+    {% block header_sub %}<div class="m-header-sub">UCN · {{ current_user.nome.split()[0] if current_user else '' }}</div>{% endblock %}
+  </div>
+  {% block header_right %}{% endblock %}
+</div>
+
+<!-- Content -->
+<div class="m-content">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div style="background:{% if cat=='success' %}rgba(34,197,94,.15){% else %}rgba(239,68,68,.15){% endif %};border:1px solid {% if cat=='success' %}rgba(34,197,94,.3){% else %}rgba(239,68,68,.3){% endif %};border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:12px">{{ msg }}</div>
+  {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+
+<!-- Bottom Nav -->
+<nav class="m-nav">
+  <a href="{{ url_for('mobile_home') }}" class="{% if request.endpoint == 'mobile_home' %}active{% endif %}">
+    <span class="icon">🏠</span><span>Início</span>
+  </a>
+  <a href="{{ url_for('mobile_foto') }}" class="{% if request.endpoint == 'mobile_foto' %}active{% endif %}">
+    <span class="icon">📷</span><span>Foto</span>
+  </a>
+  <a href="{{ url_for('mobile_pesquisar') }}" class="{% if request.endpoint == 'mobile_pesquisar' %}active{% endif %}">
+    <span class="icon">🔍</span><span>Artigos</span>
+  </a>
+  <a href="{{ url_for('mobile_agenda') }}" class="{% if request.endpoint == 'mobile_agenda' %}active{% endif %}">
+    <span class="icon">📅</span><span>Agenda</span>
+  </a>
+  <a href="{{ url_for('mobile_pedidos') }}" class="{% if request.endpoint == 'mobile_pedidos' %}active{% endif %}">
+    <span class="icon">🛒</span><span>Pedidos</span>
+  </a>
+</nav>
+
+<!-- Toast -->
+<div id="m-toast"></div>
+
+<script>
+function showToast(msg, ms=2500) {
+  var t = document.getElementById('m-toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(function(){ t.style.display = 'none'; }, ms);
+}
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

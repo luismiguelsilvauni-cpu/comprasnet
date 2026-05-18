@@ -1,0 +1,118 @@
+{% extends "mobile/base_mobile.html" %}
+{% block title %}Fotografar · NavTech{% endblock %}
+{% block header_title %}📷 Fotografar{% endblock %}
+
+{% block content %}
+<div class="m-card">
+  <div class="m-card-title">1. Seleccionar destino</div>
+
+  <label class="m-label">Cliente</label>
+  <input type="text" id="cliInput" class="m-input" placeholder="Pesquisar cliente..." autocomplete="off" oninput="searchCli(this.value)" style="margin-bottom:10px">
+  <input type="hidden" id="cliId">
+  <div id="cliDrop" style="display:none;background:var(--surface2);border-radius:10px;margin-bottom:10px;overflow:hidden;max-height:180px;overflow-y:auto"></div>
+
+  <label class="m-label" style="margin-top:6px">Embarcação / Equipamento</label>
+  <input type="text" id="embInput" class="m-input" placeholder="Nome da embarcação..." style="margin-bottom:10px">
+
+  <label class="m-label" style="margin-top:6px">Componente</label>
+  <select id="compSelect" class="m-input" style="margin-bottom:14px">
+    <option value="geral">Geral</option>
+    <option value="motor">Motor Propulsor</option>
+    <option value="caixa">Caixa Redutora</option>
+    <option value="exterior">Exterior</option>
+    <option value="interior">Interior</option>
+    <option value="avaria">Avaria / Dano</option>
+  </select>
+</div>
+
+<div class="m-card">
+  <div class="m-card-title">2. Adicionar foto</div>
+
+  <!-- Camera input -->
+  <input type="file" id="fotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(this)">
+  <input type="file" id="galeriaInput" accept="image/*" style="display:none" onchange="previewFoto(this)">
+
+  <div id="preview" style="display:none;margin-bottom:12px">
+    <img id="previewImg" style="width:100%;border-radius:10px;max-height:300px;object-fit:cover">
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <button class="m-btn m-btn-primary" onclick="document.getElementById('fotoInput').click()">
+      📷 Câmara
+    </button>
+    <button class="m-btn m-btn-secondary" onclick="document.getElementById('galeriaInput').click()">
+      🖼 Galeria
+    </button>
+  </div>
+
+  <label class="m-label">Nota / Descrição</label>
+  <input type="text" id="notaInput" class="m-input" placeholder="Ex: Avaria na bomba de óleo..." style="margin-bottom:14px">
+</div>
+
+<button class="m-btn m-btn-success" id="btnGuardar" onclick="guardarFoto()" style="display:none">
+  ✅ Guardar no Servidor
+</button>
+
+<script>
+var CLIENTES = {{ clientes|tojson }};
+var fotoFile = null;
+
+function searchCli(q) {
+  var drop = document.getElementById('cliDrop');
+  if (!q || q.length < 2) { drop.style.display='none'; return; }
+  var matches = CLIENTES.filter(c => c.nome.toLowerCase().includes(q.toLowerCase())).slice(0,6);
+  if (!matches.length) { drop.style.display='none'; return; }
+  drop.innerHTML = matches.map(c =>
+    '<div onclick="selCli('+c.id+\',\'+JSON.stringify(c.nome)+')" style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:14px;cursor:pointer">'+c.nome+'</div>'
+  ).join('');
+  drop.style.display = 'block';
+}
+function selCli(id, nome) {
+  document.getElementById('cliInput').value = nome;
+  document.getElementById('cliId').value = id;
+  document.getElementById('cliDrop').style.display = 'none';
+}
+function previewFoto(input) {
+  if (!input.files || !input.files[0]) return;
+  fotoFile = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('preview').style.display = 'block';
+    document.getElementById('btnGuardar').style.display = 'flex';
+  };
+  reader.readAsDataURL(fotoFile);
+}
+function guardarFoto() {
+  var cliId = document.getElementById('cliId').value;
+  var emb = document.getElementById('embInput').value.trim();
+  var comp = document.getElementById('compSelect').value;
+  var nota = document.getElementById('notaInput').value.trim();
+  if (!fotoFile) { showToast('⚠️ Seleccione uma foto'); return; }
+  var btn = document.getElementById('btnGuardar');
+  btn.textContent = '⏳ A enviar...'; btn.disabled = true;
+  var fd = new FormData();
+  fd.append('foto', fotoFile);
+  fd.append('cliente_id', cliId);
+  fd.append('embarcacao', emb);
+  fd.append('componente', comp);
+  fd.append('nota', nota);
+  fetch('/mobile/api/guardar-foto', {method:'POST', body:fd})
+    .then(r=>r.json()).then(function(d) {
+      if (d.ok) {
+        showToast('✅ Foto guardada!');
+        document.getElementById('preview').style.display='none';
+        document.getElementById('notaInput').value='';
+        fotoFile = null;
+        btn.innerHTML = '✅ Guardar no Servidor';
+        btn.style.display = 'none';
+        btn.disabled = false;
+      } else {
+        showToast('❌ Erro: '+d.error);
+        btn.innerHTML = '✅ Guardar no Servidor';
+        btn.disabled = false;
+      }
+    });
+}
+</script>
+{% endblock %}

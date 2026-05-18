@@ -1,0 +1,64 @@
+{% extends "mobile/base_mobile.html" %}
+{% block title %}Pesquisar · NavTech{% endblock %}
+{% block header_title %}🔍 Artigos{% endblock %}
+
+{% block content %}
+<div class="m-search">
+  <span class="m-search-icon">🔍</span>
+  <input type="text" id="searchInput" class="m-input" placeholder="Referência ou designação..." oninput="pesquisar(this.value)" autocomplete="off">
+</div>
+
+<div id="resultados">
+  <div style="text-align:center;padding:40px;color:var(--text-muted)">
+    <div style="font-size:40px;margin-bottom:10px">🔍</div>
+    <div>Pesquise por referência ou nome do artigo</div>
+  </div>
+</div>
+
+<script>
+var timer = null;
+function pesquisar(q) {
+  clearTimeout(timer);
+  if (q.length < 2) {
+    document.getElementById('resultados').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:10px">🔍</div><div>Pesquise por referência ou nome do artigo</div></div>';
+    return;
+  }
+  document.getElementById('resultados').innerHTML = '<div class="m-spinner"></div>';
+  timer = setTimeout(function() {
+    fetch('/mobile/api/artigos?q='+encodeURIComponent(q))
+      .then(r=>r.json()).then(function(d) {
+        if (!d.artigos || !d.artigos.length) {
+          document.getElementById('resultados').innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted)">Sem resultados para "'+q+'"</div>';
+          return;
+        }
+        document.getElementById('resultados').innerHTML = d.artigos.map(function(a) {
+          var stockColor = a.stock > 0 ? 'var(--green)' : 'var(--red)';
+          return '<div class="m-card" style="padding:14px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+              '<div>' +
+                '<div style="font-size:11px;color:var(--text-muted);font-family:monospace">'+a.ref+'</div>' +
+                '<div style="font-size:14px;font-weight:700;margin-top:2px">'+a.nome+'</div>' +
+              '</div>' +
+              '<div style="text-align:right;flex-shrink:0">' +
+                '<div style="font-size:18px;font-weight:800;color:'+stockColor+'">'+a.stock+'</div>' +
+                '<div style="font-size:10px;color:var(--text-muted)">'+a.unidade+'</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">' +
+              '<div style="background:var(--surface2);border-radius:8px;padding:8px;text-align:center">' +
+                '<div style="font-size:13px;font-weight:700;color:var(--accent)">'+(a.custo ? a.custo.toFixed(2)+'€' : '—')+'</div>' +
+                '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Último custo</div>' +
+              '</div>' +
+              '<div style="background:var(--surface2);border-radius:8px;padding:8px;text-align:center">' +
+                '<div style="font-size:13px;font-weight:700;color:var(--orange)">'+(a.pvp ? a.pvp.toFixed(2)+'€' : '—')+'</div>' +
+                '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">PVP</div>' +
+              '</div>' +
+            '</div>' +
+            (a.fornecedor ? '<div style="margin-top:8px;font-size:11px;color:var(--text-muted)">🏭 '+a.fornecedor+'</div>' : '') +
+          '</div>';
+        }).join('');
+      });
+  }, 400);
+}
+</script>
+{% endblock %}

@@ -1,46 +1,51 @@
-{% extends "mobile/base.html" %}
-{% block title %}Pedidos · ComprasNet{% endblock %}
-{% block topbar %}<div class="topbar-title">📋 Pedidos de Compra</div>{% endblock %}
-{% block content %}
-<!-- Filter tabs -->
-<div style="display:flex;gap:8px;padding:12px 16px;overflow-x:auto">
-  {% for e, label in [('','Todos'),('aberto','Abertos'),('em_analise','Em análise'),('aprovado','Aprovados')] %}
-  <a href="/mobile/pedidos{% if e %}?estado={{ e }}{% endif %}"
-     style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;
-            {% if estado==e %}background:var(--accent);color:white{% else %}background:var(--surface2);color:var(--muted){% endif %}">
-    {{ label }}
-  </a>
-  {% endfor %}
-</div>
+{% extends "mobile/base_mobile.html" %}
+{% block title %}Pedidos · NavTech{% endblock %}
+{% block header_title %}🛒 Pedidos{% endblock %}
 
-{% if not pedidos %}
-<div class="empty">
-  <div class="empty-icon">📭</div>
-  <div class="empty-text">Sem pedidos</div>
-  <div class="empty-sub">Nenhum pedido encontrado</div>
-</div>
-{% else %}
-<div class="card">
-{% for p in pedidos %}
-<a href="/pedidos/{{ p.id }}" class="card-item" style="text-decoration:none;color:var(--text)">
-  <div class="card-item-text">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-      <span class="mono" style="font-size:11px;color:var(--muted)">PC-{{ '%04d'%p.id }}</span>
-      {% if p.estado=='aberto' %}<span class="badge badge-blue" style="font-size:9px">Aberto</span>
-      {% elif p.estado=='em_analise' %}<span class="badge badge-yellow" style="font-size:9px">Em análise</span>
-      {% elif p.estado=='aprovado' %}<span class="badge badge-green" style="font-size:9px">Aprovado</span>
-      {% else %}<span class="badge" style="font-size:9px;background:var(--surface2);color:var(--muted)">{{ p.estado }}</span>{% endif %}
+{% block content %}
+{% set STATUS_INFO = {
+  'nao_encomendado': ('#ef4444','🔴'),
+  'consultado': ('#0891b2','🔍'),
+  'encomendado': ('#3b6ef0','📦'),
+  'recebido': ('#22c55e','✅'),
+  'por_faturar': ('#f97316','🧾'),
+  'faturado': ('#6366f1','💶'),
+  'concluido': ('#22c55e','✔️'),
+  'cancelado': ('#a855f7','❌'),
+} %}
+
+{% if artigos %}
+{% for a in artigos %}
+<div class="m-card" style="border-left:3px solid {{ STATUS_INFO.get(a.status or 'nao_encomendado', ('#94a3b8','?'))[0] }}">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;color:var(--text-muted);font-family:monospace">{{ a.referencia or '—' }}</div>
+      <div style="font-size:14px;font-weight:700;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.designacao }}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">PC-{{ '%04d'|format(a.pedido_id) }}</div>
     </div>
-    <div class="card-item-title">{{ p.titulo }}</div>
-    <div class="card-item-sub">
-      {{ p.data_criacao.strftime('%d/%m/%Y') }} ·
-      {{ p.linhas|length }} artigo(s) ·
-      {{ p.orcamentos|length }}/3 orç.
-    </div>
+    {% set cor, icon = STATUS_INFO.get(a.status or 'nao_encomendado', ('#94a3b8','?')) %}
+    <span style="font-size:10px;padding:4px 10px;border-radius:8px;background:{{ cor }}20;color:{{ cor }};font-weight:700;flex-shrink:0;white-space:nowrap">{{ icon }} {{ a.status|replace('_',' ')|title if a.status else 'Não Enc.' }}</span>
   </div>
-  <span class="card-item-right">›</span>
-</a>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <div style="flex:1;text-align:center;background:var(--surface2);border-radius:8px;padding:8px">
+      <div style="font-size:14px;font-weight:700">{{ a.quantidade }}</div>
+      <div style="font-size:9px;color:var(--text-muted)">QTD</div>
+    </div>
+    {% if a.fornecedor %}
+    <div style="flex:2;background:var(--surface2);border-radius:8px;padding:8px;display:flex;align-items:center">
+      <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏭 {{ a.fornecedor }}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% if a.alerta_30d %}
+  <div style="margin-top:8px;padding:6px 10px;background:rgba(249,115,22,.1);border-radius:6px;font-size:11px;color:var(--orange)">⚠️ Por faturar há mais de 30 dias</div>
+  {% endif %}
+</div>
 {% endfor %}
+{% else %}
+<div class="m-card" style="text-align:center;padding:30px">
+  <div style="font-size:36px;margin-bottom:10px">✅</div>
+  <div style="color:var(--text-muted)">Sem artigos pendentes</div>
 </div>
 {% endif %}
 {% endblock %}
