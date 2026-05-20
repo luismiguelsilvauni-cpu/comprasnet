@@ -1,109 +1,65 @@
-{% extends "mobile/base.html" %}
-{% block title %}ComprasNet Mobile{% endblock %}
+{% extends "mobile/base_mobile.html" %}
+{% block title %}Início · NavTech{% endblock %}
+{% block header_title %}NavTech UCN{% endblock %}
 
 {% block content %}
-<!-- Welcome -->
-<div style="padding:20px 16px 8px">
-  <div style="font-size:22px;font-weight:700">Olá, {{ current_user.nome.split()[0] }} 👋</div>
-  <div style="font-size:13px;color:var(--muted);margin-top:4px">{{ now().strftime('%A, %d de %B') if now else '' }}</div>
-</div>
-
-<!-- KPIs -->
-<div class="kpi-grid">
-  <div class="kpi">
-    <div class="kpi-value">{{ total_artigos }}</div>
-    <div class="kpi-label">Artigos PHC</div>
+<!-- KPIs rápidos -->
+<div class="m-grid-2" style="margin-bottom:16px">
+  <div class="m-kpi" style="border-left:3px solid var(--red)">
+    <div class="m-kpi-value" style="color:var(--red)">{{ pedidos_abertos }}</div>
+    <div class="m-kpi-label">Artigos p/ encomendar</div>
   </div>
-  <div class="kpi" style="border-color:rgba(245,158,11,.3)">
-    <div class="kpi-value" style="color:var(--warning)">{{ pedidos_abertos }}</div>
-    <div class="kpi-label">Pedidos Abertos</div>
+  <div class="m-kpi" style="border-left:3px solid var(--orange)">
+    <div class="m-kpi-value" style="color:var(--orange)">{{ por_faturar }}</div>
+    <div class="m-kpi-label">Por faturar</div>
   </div>
-  <div class="kpi">
-    <div class="kpi-value" style="color:var(--success)">{{ total_clientes }}</div>
-    <div class="kpi-label">Clientes</div>
+  <div class="m-kpi" style="border-left:3px solid #3b6ef0">
+    <div class="m-kpi-value" style="color:#3b6ef0">{{ servicos_curso }}</div>
+    <div class="m-kpi-label">Serviços em curso</div>
+  </div>
+  <div class="m-kpi" style="border-left:3px solid var(--green)">
+    <div class="m-kpi-value" style="color:var(--green)">{{ registos_hoje }}</div>
+    <div class="m-kpi-label">Registos hoje</div>
   </div>
 </div>
 
-<!-- Quick search -->
-<div class="section-header">Pesquisa Rápida</div>
-<div class="search-bar">
-  <input type="text" id="quickSearch" placeholder="Referência ou designação..."
-         oninput="pesquisarRapido(this.value)" autocomplete="off">
+<!-- Acções rápidas -->
+<div class="m-card">
+  <div class="m-card-title">⚡ Acções Rápidas</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <a href="{{ url_for('mobile_foto') }}" style="text-decoration:none">
+      <div style="background:var(--surface2);border-radius:12px;padding:18px 14px;text-align:center">
+        <div style="font-size:32px;margin-bottom:6px">📷</div>
+        <div style="font-size:13px;font-weight:700">Fotografar</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Catalogar imagens</div>
+      </div>
+    </a>
+    <a href="{{ url_for('mobile_pesquisar') }}" style="text-decoration:none">
+      <div style="background:var(--surface2);border-radius:12px;padding:18px 14px;text-align:center">
+        <div style="font-size:32px;margin-bottom:6px">🔍</div>
+        <div style="font-size:13px;font-weight:700">Pesquisar</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Artigos e stock</div>
+      </div>
+    </a>
+    <a href="{{ url_for('mobile_agenda') }}" style="text-decoration:none">
+      <div style="background:var(--surface2);border-radius:12px;padding:18px 14px;text-align:center">
+        <div style="font-size:32px;margin-bottom:6px">📅</div>
+        <div style="font-size:13px;font-weight:700">Agenda</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Serviços do dia</div>
+      </div>
+    </a>
+    <a href="{{ url_for('mobile_pedidos') }}" style="text-decoration:none">
+      <div style="background:var(--surface2);border-radius:12px;padding:18px 14px;text-align:center">
+        <div style="font-size:32px;margin-bottom:6px">🛒</div>
+        <div style="font-size:13px;font-weight:700">Pedidos</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Compras em curso</div>
+      </div>
+    </a>
+  </div>
 </div>
-<div id="quickResults"></div>
 
-<!-- Quick actions -->
-<div class="section-header">Acções Rápidas</div>
-<div class="card">
-  <a href="/mobile/artigos" class="card-item" style="text-decoration:none;color:var(--text)">
-    <span class="card-item-icon">📦</span>
-    <div class="card-item-text">
-      <div class="card-item-title">Pesquisar Artigos</div>
-      <div class="card-item-sub">Stock, PVP, preço de custo</div>
-    </div>
-    <span class="card-item-right">›</span>
-  </a>
-  <a href="/mobile/pedidos" class="card-item" style="text-decoration:none;color:var(--text)">
-    <span class="card-item-icon">📋</span>
-    <div class="card-item-text">
-      <div class="card-item-title">Pedidos de Compra</div>
-      <div class="card-item-sub">{{ pedidos_abertos }} em aberto</div>
-    </div>
-    <span class="card-item-right">›</span>
-  </a>
-  <a href="/mobile/clientes" class="card-item" style="text-decoration:none;color:var(--text)">
-    <span class="card-item-icon">👥</span>
-    <div class="card-item-text">
-      <div class="card-item-title">Clientes</div>
-      <div class="card-item-sub">Fichas e embarcações</div>
-    </div>
-    <span class="card-item-right">›</span>
-  </a>
-  <a href="/mobile/chat" class="card-item" style="text-decoration:none;color:var(--text)">
-    <span class="card-item-icon">🤖</span>
-    <div class="card-item-text">
-      <div class="card-item-title">Chat Claude</div>
-      <div class="card-item-sub">Assistente técnico</div>
-    </div>
-    <span class="card-item-right">›</span>
-  </a>
-  <a href="/" class="card-item" style="text-decoration:none;color:var(--muted)">
-    <span class="card-item-icon">🖥️</span>
-    <div class="card-item-text">
-      <div class="card-item-title">Versão Desktop</div>
-      <div class="card-item-sub">Interface completa</div>
-    </div>
-    <span class="card-item-right">›</span>
-  </a>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-let searchTimer = null;
-function pesquisarRapido(q) {
-  clearTimeout(searchTimer);
-  const box = document.getElementById('quickResults');
-  if (q.length < 2) { box.innerHTML = ''; return; }
-  searchTimer = setTimeout(() => {
-    fetch('/api/artigos?q=' + encodeURIComponent(q))
-      .then(r=>r.json()).then(data => {
-        if (!data.length) { box.innerHTML = '<div style="padding:12px 16px;color:var(--muted);font-size:13px">Sem resultados</div>'; return; }
-        box.innerHTML = '<div class="card">' + data.slice(0,5).map(a => `
-          <a href="/mobile/artigos/${encodeURIComponent(a.referencia)}"
-             class="card-item" style="text-decoration:none;color:var(--text)">
-            <span class="card-item-icon">📦</span>
-            <div class="card-item-text">
-              <div class="card-item-title mono" style="font-size:13px">${a.referencia}</div>
-              <div class="card-item-sub">${a.designacao || ''}</div>
-            </div>
-            <div style="text-align:right;flex-shrink:0">
-              <div class="mono" style="font-size:13px;${a.stock_atual<=0?'color:var(--danger)':a.stock_atual<5?'color:var(--warning)':'color:var(--success)'}">${a.stock_atual.toFixed(2)}</div>
-              <div style="font-size:10px;color:var(--muted)">${a.unidade}</div>
-            </div>
-          </a>`).join('') + '</div>';
-      });
-  }, 300);
-}
-</script>
+<!-- Acesso versão completa -->
+<a href="{{ url_for('dashboard') }}" style="display:block;text-align:center;padding:14px;background:var(--surface2);border-radius:12px;text-decoration:none;color:var(--text-muted);font-size:13px">
+  🖥 Ver versão completa
+</a>
 {% endblock %}

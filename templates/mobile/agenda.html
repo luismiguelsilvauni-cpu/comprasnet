@@ -1,0 +1,48 @@
+{% extends "mobile/base_mobile.html" %}
+{% block title %}Agenda · NavTech{% endblock %}
+{% block header_title %}📅 Agenda{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  <div style="font-size:14px;font-weight:700">{{ hoje.strftime('%A, %d de %B') }}</div>
+  <a href="{{ url_for('mobile_agenda', data=ontem.isoformat()) }}" style="padding:6px 12px;background:var(--surface2);border-radius:8px;text-decoration:none;font-size:12px;color:var(--text-muted)">← Ontem</a>
+</div>
+
+{% if servicos %}
+{% for sv in servicos %}
+<div class="m-card" style="border-left:3px solid {% if sv.estado=='concluido' %}var(--green){% else %}var(--accent){% endif %}">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between">
+    <div style="flex:1;min-width:0">
+      {% if sv.numero %}<div style="font-size:10px;color:var(--text-muted)">Serviço #{{ sv.numero }}</div>{% endif %}
+      <div style="font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sv.titulo }}</div>
+      {% if sv.cliente %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px">👥 {{ sv.cliente.nome }}</div>{% endif %}
+      {% if sv.embarcacao_nome %}<div style="font-size:12px;color:var(--text-muted)">⚓ {{ sv.embarcacao_nome }}</div>{% endif %}
+    </div>
+    <span style="font-size:10px;padding:3px 8px;border-radius:6px;background:{% if sv.estado=='concluido' %}rgba(34,197,94,.15){% else %}rgba(59,130,246,.15){% endif %};color:{% if sv.estado=='concluido' %}var(--green){% else %}var(--accent){% endif %};flex-shrink:0;margin-left:8px;font-weight:700">
+      {% if sv.estado=='concluido' %}✅ Concluído{% else %}🔵 Em Curso{% endif %}
+    </span>
+  </div>
+  <!-- Registos do dia -->
+  {% set regs_dia = sv.registos|selectattr('data', 'eq', hoje)|list if sv.registos else [] %}
+  {% if regs_dia %}
+  <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+    {% for r in regs_dia %}
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0">
+      <span style="color:var(--text-muted)">{{ r.funcionario.nome.split()[0] if r.funcionario else '?' }}</span>
+      <span style="font-weight:700;color:var(--accent)">{{ '%.1f'|format(r.horas or 0) }}h</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <a href="{{ url_for('agenda_funcionario', fid=current_user.id) }}" style="display:block;margin-top:10px;text-align:center;padding:10px;background:var(--surface2);border-radius:8px;text-decoration:none;font-size:13px;color:var(--text-muted)">
+    Ver agenda completa →
+  </a>
+</div>
+{% endfor %}
+{% else %}
+<div class="m-card" style="text-align:center;padding:30px">
+  <div style="font-size:36px;margin-bottom:10px">📅</div>
+  <div style="color:var(--text-muted)">Sem serviços hoje</div>
+</div>
+{% endif %}
+{% endblock %}
