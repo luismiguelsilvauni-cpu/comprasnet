@@ -352,3 +352,71 @@ def get_vendas_cliente(config, cl_no: int, q: str = '') -> list:
     except Exception as e:
         logger.error(f"Erro vendas cliente {cl_no}: {e}")
         return []
+
+
+def get_ordens_fabrico(config, tipo=None, fechada=None, q=None, limit=500):
+    """Get Ordens de Fabrico and Folhas de Obra from PHC bo table.
+    tipo: 'OF' | 'FO' | None (ambos)
+    fechada: True | False | None (ambos)
+    q: pesquisa por cliente ou número
+    """
+    try:
+        conn = get_phc_connection(config)
+        cur = conn.cursor()
+
+        where = ["bo.nmdos IN ('Ordem de Fabrico', 'Folha de Obra')"]
+        params = []
+
+        if tipo == 'OF':
+            where.append("bo.nmdos = 'Ordem de Fabrico'")
+        elif tipo == 'FO':
+            where.append("bo.nmdos = 'Folha de Obra'")
+
+        if fechada is True:
+            where.append("bo.fechada = 1")
+        elif fechada is False:
+            where.append("bo.fechada = 0")
+
+        if q:
+            where.append("(bo.nome LIKE ? OR CAST(bo.obrano AS VARCHAR) LIKE ?)")
+            like = f'%{q}%'
+            params.extend([like, like])
+
+        sql = f"""
+            SELECT TOP {limit}
+                bo.bostamp,
+                bo.nmdos,
+                bo.obrano,
+                bo.dataobra,
+                LTRIM(RTRIM(bo.nome))   AS nome,
+                bo.fechada,
+                bo.datafecho,
+                bo.obs,
+                ISNULL(bo.etotal, 0)    AS etotal
+            FROM bo
+            WHERE {' AND '.join(where)}
+            ORDER BY bo.dataobra DESC, bo.obrano DESC
+        """
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        conn.close()
+
+        result = []
+        for r in rows:
+            df = r[6]
+            result.append({
+                'stamp':      str(r[0] or '').strip(),
+                'tipo':       str(r[1] or '').strip(),
+                'numero':     int(r[2] or 0),
+                'data':       r[3].strftime('%d/%m/%Y') if r[3] else '',
+                'data_iso':   r[3].strftime('%Y-%m-%d') if r[3] else '',
+                'cliente':    str(r[4] or '').strip(),
+                'fechada':    bool(r[5]),
+                'data_fecho': df.strftime('%d/%m/%Y') if df and df.year > 1900 else '',
+                'obs':        str(r[7] or '').strip(),
+                'total':      float(r[8] or 0),
+            })
+        return result, None
+    except Exception as e:
+        logger.error(f"Erro ordens_fabrico: {e}")
+        return [], str(e)

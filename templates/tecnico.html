@@ -98,7 +98,14 @@ th.desc::after { content:' ↓';color:var(--accent) }
           </button>
         </td>
         <td>{{ e.cliente_nome or '—' }}</td>
-        <td style="font-weight:600;color:var(--accent)">{{ e.embarcacao or '—' }}</td>
+        <td style="font-weight:600;color:var(--accent)">
+          {{ e.embarcacao or '—' }}
+          {% if e.documentos|selectattr('componente','eq','foto_principal')|list %}
+          <span title="Tem foto principal" style="font-size:12px;margin-left:4px;opacity:.85">📷</span>
+          {% else %}
+          <span title="Sem foto principal" style="font-size:12px;margin-left:4px;opacity:.2;text-decoration:line-through">📷</span>
+          {% endif %}
+        </td>
         <td>{{ e.motor_modelo or '—' }}</td>
         <td>{{ e.motor_potencia or '—' }}</td>
         <td class="mono" style="color:#f59e0b">

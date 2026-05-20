@@ -180,9 +180,10 @@ def _scheduler_loop(app, get_cfg_fn):
                     today_target = now.replace(hour=h, minute=m, second=0, microsecond=0)
                     today_str = now.strftime('%Y-%m-%d')
 
-                    # Run if we're within 2 minutes of target and haven't run today
-                    diff = abs((now - today_target).total_seconds())
-                    if diff < 120 and _last_backup_check != today_str:
+                    # Run if we're within 5 minutes AFTER target and haven't run today
+                    # (positive only: now >= target, up to 5 min after)
+                    diff = (now - today_target).total_seconds()
+                    if 0 <= diff < 300 and _last_backup_check != today_str:
                         logger.info("A executar backup automático agendado...")
                         _last_backup_check = today_str
                         fazer_backup_completo(app, cfg, tipo='auto')

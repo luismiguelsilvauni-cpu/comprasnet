@@ -1,0 +1,426 @@
+{% extends 'base.html' %}
+{% block title %}{{ marca.nome }} · Consultas{% endblock %}
+{% block content %}
+
+{% set LINGUA_FLAGS = {'pt':'🇵🇹','en':'🇬🇧','fr':'🇫🇷','es':'🇪🇸'} %}
+{% set LINGUA_NAMES = {'pt':'PT','en':'EN','fr':'FR','es':'ES'} %}
+
+<style>
+.fornecedores-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 18px;
+    margin-top: 16px;
+}
+.forn-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;
+}
+.forn-card.suggestion {
+    border-color: rgba(245,158,11,.35);
+    background: rgba(245,158,11,.03);
+}
+.suggestion-banner {
+    background: rgba(245,158,11,.1); border-bottom: 1px solid rgba(245,158,11,.2);
+    padding: 6px 14px; font-size: 11px; color: var(--warning);
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.suggestion-banner strong { color: var(--text); }
+.forn-header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 12px;
+}
+.forn-avatar {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: var(--accent-glow); border: 1px solid rgba(59,110,240,.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 800; color: var(--accent);
+    font-family:'DM Mono',monospace; flex-shrink: 0;
+}
+.forn-avatar.sug { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.3); color: var(--warning); }
+.forn-info { flex: 1; min-width: 0; }
+.forn-nome { font-size: 14px; font-weight: 700; color: var(--text); }
+.forn-sub  { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.forn-body { padding: 12px 16px; flex: 1; }
+.stars-row { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+.stars-label { font-size:11px; color:var(--text-muted); width:115px; flex-shrink:0; }
+.stars { display:flex; gap:2px; }
+.star { font-size:13px; color:var(--border); }
+.star.on { color:var(--gold); }
+.star.interactive { cursor:pointer; transition:color .1s; }
+.star-val { font-size:11px; color:var(--text-muted); margin-left:3px; }
+.rating-wrap {
+    background: var(--surface2); border-top: 1px solid var(--border); padding: 12px 16px;
+}
+.rating-wrap summary {
+    font-size:12px; font-weight:600; color:var(--text-muted);
+    cursor:pointer; list-style:none; user-select:none;
+}
+.rating-wrap summary::-webkit-details-marker { display:none; }
+.rating-wrap summary::before { content:'▸ '; }
+details[open] summary::before { content:'▾ '; }
+.email-panel {
+    border-top: 1px solid var(--border); padding: 14px 16px;
+    background: rgba(59,110,240,.02);
+}
+.email-result {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 14px; font-size: 12px; line-height: 1.7; white-space: pre-wrap;
+    font-family:'DM Mono',monospace; max-height: 280px; overflow-y: auto;
+    margin-top: 10px; color: var(--text);
+}
+.copy-btn {
+    display:inline-flex; align-items:center; gap:5px; padding:5px 12px;
+    border-radius:6px; font-size:12px; font-weight:600;
+    border:1px solid var(--border); background:var(--surface2); color:var(--text-muted);
+    cursor:pointer; transition:all .15s; margin-top:6px;
+}
+.copy-btn:hover { background:var(--accent); color:white; border-color:var(--accent); }
+.spinner {
+    display:none; width:13px; height:13px;
+    border:2px solid var(--border); border-top-color:var(--accent);
+    border-radius:50%; animation:spin .7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.chip-sub {
+    padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600;
+    background:rgba(59,110,240,.1); color:var(--accent);
+    border:1px solid rgba(59,110,240,.2);
+}
+.chip-contact {
+    padding:2px 7px; border-radius:20px; font-size:11px;
+    background:var(--surface2); border:1px solid var(--border); color:var(--text-muted);
+}
+.section-divider {
+    display:flex; align-items:center; gap:12px; margin:28px 0 16px;
+}
+.section-divider::before, .section-divider::after {
+    content:''; flex:1; height:1px; background:rgba(245,158,11,.25);
+}
+.section-divider span {
+    font-size:12px; font-weight:700; color:var(--warning);
+    white-space:nowrap; padding:4px 12px;
+    background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.2);
+    border-radius:20px;
+}
+</style>
+
+{# ═══════════════════════════════════════════════════════════════════════
+   MACRO — renders one supplier card (main or cross-brand suggestion)
+   ═══════════════════════════════════════════════════════════════════════ #}
+{% macro card_fornecedor(forn, is_suggestion=false, via_sub='', via_marca='') %}
+
+{% set avs = forn.avaliacoes %}
+{% set n_av = avs | length %}
+{% set vel_vals = avs | map(attribute='velocidade') | select | list %}
+{% set pre_vals = avs | map(attribute='preco')       | select | list %}
+{% set qua_vals = avs | map(attribute='qualidade')   | select | list %}
+{% set fib_vals = avs | map(attribute='fiabilidade') | select | list %}
+{% set avg_vel = (vel_vals|sum / vel_vals|length) if vel_vals else 0 %}
+{% set avg_pre = (pre_vals|sum / pre_vals|length) if pre_vals else 0 %}
+{% set avg_qua = (qua_vals|sum / qua_vals|length) if qua_vals else 0 %}
+{% set avg_fib = (fib_vals|sum / fib_vals|length) if fib_vals else 0 %}
+{% set minha_av = avs | selectattr('user_id','equalto',current_user.id) | list | first %}
+{% set subs = (forn.sub_marcas or '').split(',') | map('trim') | select | list %}
+
+<div class="forn-card {{ 'suggestion' if is_suggestion else '' }}">
+
+    {# Cross-brand banner #}
+    {% if is_suggestion %}
+    <div class="suggestion-banner">
+        🔗 Sub-marca correspondente: <strong>{{ via_sub }}</strong>
+        &nbsp;·&nbsp; Registado em: <a href="{{ url_for('consultas_marca', id=forn.marca_id) }}"
+            style="color:var(--warning);font-weight:700;text-decoration:none">{{ via_marca }}</a>
+    </div>
+    {% endif %}
+
+    {# Header #}
+    <div class="forn-header">
+        <div class="forn-avatar {{ 'sug' if is_suggestion else '' }}">{{ forn.nome[0].upper() }}</div>
+        <div class="forn-info">
+            <div class="forn-nome">{{ forn.nome }}</div>
+            {% if forn.pais %}<div class="forn-sub">📍 {{ forn.pais }}</div>{% endif %}
+            {% if forn.contactos %}
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">
+                {% for c in forn.contactos %}
+                <span class="chip-contact">
+                    {{ LINGUA_FLAGS.get(c.lingua,'🌐') }} {{ c.nome }}{% if c.cargo %} · {{ c.cargo }}{% endif %}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
+            <a href="{{ url_for('consultas_editar_fornecedor', id=forn.id) }}"
+               class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 8px">✏️</a>
+            <form method="POST" action="{{ url_for('consultas_apagar_fornecedor', id=forn.id) }}"
+                  onsubmit="return confirm('Apagar este fornecedor?')">
+                <button type="submit" class="btn btn-danger btn-sm" style="font-size:11px;padding:4px 8px">🗑</button>
+            </form>
+        </div>
+    </div>
+
+    {# Body: sub-brands + notes + ratings #}
+    <div class="forn-body">
+        {% if subs %}
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
+            {% for sub in subs %}
+            <span class="chip-sub">{{ sub }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if forn.observacoes %}
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">{{ forn.observacoes }}</p>
+        {% endif %}
+        {% if n_av > 0 %}
+        {% for label, val in [('Velocidade resp.', avg_vel),('Preço', avg_pre),('Qualidade', avg_qua),('Fiabilidade', avg_fib)] %}
+        {% if val > 0 %}
+        <div class="stars-row">
+            <span class="stars-label">{{ label }}</span>
+            <div class="stars">
+                {% for i in range(1,6) %}<span class="star {% if i <= val|round %}on{% endif %}">★</span>{% endfor %}
+            </div>
+            <span class="star-val">{{ "%.1f"|format(val) }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            {{ n_av }} avaliação{{ '' if n_av==1 else 'ões' }}
+        </div>
+        {% else %}
+        <div style="font-size:12px;color:var(--text-muted)">Sem avaliações ainda.</div>
+        {% endif %}
+    </div>
+
+    {# Rating form #}
+    <div class="rating-wrap">
+        <details>
+            <summary>{{ '✏️ Alterar avaliação' if minha_av else '⭐ Avaliar' }}</summary>
+            <form method="POST" action="{{ url_for('consultas_avaliar_fornecedor', id=forn.id) }}"
+                  style="margin-top:10px">
+                {% for campo, label in [('velocidade','Velocidade resp.'),('preco','Preço'),('qualidade','Qualidade'),('fiabilidade','Fiabilidade')] %}
+                {% set cur = minha_av[campo] if minha_av else 0 %}
+                <div class="stars-row" style="margin-bottom:7px">
+                    <span class="stars-label" style="font-size:12px">{{ label }}</span>
+                    <div class="stars" data-campo="{{ campo }}" data-fid="{{ forn.id }}">
+                        {% for i in range(1,6) %}
+                        <span class="star interactive {% if i <= cur %}on{% endif %}" data-val="{{ i }}">★</span>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="{{ campo }}" id="iv_{{ forn.id }}_{{ campo }}" value="{{ cur }}">
+                </div>
+                {% endfor %}
+                <div style="margin-top:6px">
+                    <label style="font-size:12px">Comentário</label>
+                    <textarea name="comentario" rows="2" style="margin-top:4px;font-size:12px">{{ minha_av.comentario if minha_av else '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">Guardar</button>
+            </form>
+        </details>
+    </div>
+
+    {# Email generator #}
+    <div class="email-panel">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">📧 Gerar Email de Consulta</div>
+        {% if forn.contactos %}
+        <div style="margin-bottom:10px">
+            <label style="font-size:11px;color:var(--text-muted);font-weight:500">Contacto destinatário</label>
+            <select id="csel_{{ forn.id }}" style="font-size:12px;margin-top:3px"
+                    onchange="atualizarEmail({{ forn.id }})">
+                {% for c in forn.contactos %}
+                <option value="{{ c.id }}" data-email="{{ c.email or '' }}" data-nome="{{ c.nome }}">
+                    {{ LINGUA_FLAGS.get(c.lingua,'🌐') }} {{ c.nome }}{% if c.cargo %} — {{ c.cargo }}{% endif %} ({{ LINGUA_NAMES.get(c.lingua,c.lingua) }})
+                </option>
+                {% endfor %}
+            </select>
+            <div id="cemail_row_{{ forn.id }}"
+                 style="display:{% if forn.contactos[0].email %}flex{% else %}none{% endif %};align-items:center;gap:6px;margin-top:6px">
+                <span style="font-size:12px;color:var(--text-muted)">✉</span>
+                <span id="cemail_val_{{ forn.id }}"
+                      style="font-size:12px;color:var(--text);font-family:'DM Mono',monospace">{{ forn.contactos[0].email or '' }}</span>
+                <button type="button" onclick="copiarEmailContacto({{ forn.id }})"
+                        style="padding:2px 8px;border-radius:5px;font-size:11px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);cursor:pointer">📋</button>
+            </div>
+        </div>
+        {% else %}
+        <div style="font-size:12px;color:var(--warning);margin-bottom:8px">
+            ⚠ Sem contactos. <a href="{{ url_for('consultas_editar_fornecedor', id=forn.id) }}" style="color:var(--accent)">Adicionar</a>
+        </div>
+        {% endif %}
+        <textarea id="prompt_{{ forn.id }}" rows="3"
+                  placeholder="Descreva em português o que pretende consultar…"
+                  style="font-size:12px;margin-bottom:8px"></textarea>
+        <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="gerarEmail({{ forn.id }})"
+                    {% if not forn.contactos %}disabled{% endif %}>
+                <span class="spinner" id="spin_{{ forn.id }}"></span>
+                ✨ Gerar
+            </button>
+            <span id="err_{{ forn.id }}" style="font-size:12px;color:var(--danger);display:none"></span>
+        </div>
+        <div id="result_{{ forn.id }}" style="display:none">
+            <div class="email-result" id="emailtxt_{{ forn.id }}"></div>
+            <button class="copy-btn" onclick="copiarEmail({{ forn.id }})">📋 Copiar Email</button>
+        </div>
+    </div>
+
+</div>
+{% endmacro %}
+
+{# ═══════════════════════════════════════════════════════ PAGE ═══════════════ #}
+
+<div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+        <a href="{{ url_for('consultas') }}" class="btn btn-ghost btn-sm">← Marcas</a>
+        <div style="display:flex;align-items:center;gap:10px">
+            {% if marca.logo_path %}
+            <img src="/uploads/{{ marca.logo_path }}" alt="{{ marca.nome }}"
+                 style="height:28px;max-width:80px;object-fit:contain;border-radius:5px">
+            {% else %}
+            <div style="width:28px;height:28px;border-radius:7px;background:var(--accent-glow);border:1px solid rgba(59,110,240,.3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--accent)">{{ marca.nome[0].upper() }}</div>
+            {% endif %}
+            <span class="page-title">{{ marca.nome }}</span>
+            {% if sugestoes %}
+            <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.1);color:var(--warning);border:1px solid rgba(245,158,11,.2)">
+                +{{ sugestoes|length }} sub-marca{{ '' if sugestoes|length==1 else 's' }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="topbar-actions">
+        <a href="{{ url_for('consultas_editar_marca', id=marca.id) }}" class="btn btn-ghost btn-sm">✏️ Marca</a>
+        <a href="{{ url_for('consultas_novo_fornecedor') }}?marca_id={{ marca.id }}" class="btn btn-primary">+ Fornecedor</a>
+    </div>
+</div>
+
+<div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="flash flash-{{ 'success' if cat=='success' else 'error' }}" style="margin-bottom:16px">
+        {{ '✓' if cat=='success' else '✕' }} {{ msg }}
+    </div>
+    {% endfor %}
+    {% endwith %}
+
+    {% if marca.descricao %}
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:8px">{{ marca.descricao }}</p>
+    {% endif %}
+
+    {# ── Main suppliers ── #}
+    {% if marca.fornecedores %}
+    <div class="fornecedores-grid">
+        {% for forn in marca.fornecedores %}
+        {{ card_fornecedor(forn) }}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px 20px;color:var(--text-muted)">
+        <div style="font-size:36px;margin-bottom:10px;opacity:.4">🏭</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Nenhum fornecedor directo</div>
+        <a href="{{ url_for('consultas_novo_fornecedor') }}?marca_id={{ marca.id }}" class="btn btn-primary">+ Adicionar Fornecedor</a>
+    </div>
+    {% endif %}
+
+    {# ── Cross-brand suggestions ── #}
+    {% if sugestoes %}
+    <div class="section-divider">
+        <span>🔗 Fornecedores de outras marcas com sub-marca relacionada a "{{ marca.nome }}"</span>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+        Estes fornecedores estão registados noutra marca principal, mas têm "{{ marca.nome }}" (ou variante) nas suas sub-marcas.
+        O sistema usou correspondência fuzzy — pode incluir grafias alternativas como <em>ITT Jabasco ≈ Jabsco</em>.
+    </p>
+    <div class="fornecedores-grid">
+        {% for s in sugestoes %}
+        {{ card_fornecedor(s.fornecedor, is_suggestion=true, via_sub=s.via_sub, via_marca=s.fornecedor.marca.nome) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+/* ── Star rating interaction ── */
+document.querySelectorAll('.stars[data-campo]').forEach(container => {
+    const campo = container.dataset.campo;
+    const fid   = container.dataset.fid;
+    const inp   = document.getElementById('iv_' + fid + '_' + campo);
+    const stars = Array.from(container.querySelectorAll('.star'));
+    stars.forEach((star, i) => {
+        star.addEventListener('mouseenter', () =>
+            stars.forEach((s, j) => s.classList.toggle('on', j <= i)));
+        star.addEventListener('mouseleave', () => {
+            const v = parseInt(inp.value) || 0;
+            stars.forEach((s, j) => s.classList.toggle('on', j < v));
+        });
+        star.addEventListener('click', () => {
+            inp.value = i + 1;
+            stars.forEach((s, j) => s.classList.toggle('on', j <= i));
+        });
+    });
+});
+
+/* ── Contact email display ── */
+function atualizarEmail(fornId) {
+    const sel = document.getElementById('csel_' + fornId);
+    const opt = sel.options[sel.selectedIndex];
+    const email = opt.dataset.email || '';
+    const row = document.getElementById('cemail_row_' + fornId);
+    const val = document.getElementById('cemail_val_' + fornId);
+    if (row) {
+        if (email) { val.textContent = email; row.style.display = 'flex'; }
+        else row.style.display = 'none';
+    }
+}
+
+function copiarEmailContacto(fornId) {
+    const email = document.getElementById('cemail_val_' + fornId).textContent;
+    navigator.clipboard.writeText(email).then(() => {
+        const btn = event.currentTarget;
+        btn.textContent = '✓';
+        setTimeout(() => btn.textContent = '📋', 1500);
+    });
+}
+
+/* ── Email generation ── */
+async function gerarEmail(fornId) {
+    const prompt = document.getElementById('prompt_' + fornId).value.trim();
+    if (!prompt) { alert('Escreva o que pretende consultar.'); return; }
+    const sel = document.getElementById('csel_' + fornId);
+    const contactoId = sel ? sel.value : null;
+    const spin = document.getElementById('spin_' + fornId);
+    const err  = document.getElementById('err_'  + fornId);
+    const res  = document.getElementById('result_' + fornId);
+    spin.style.display = 'block';
+    err.style.display  = 'none';
+    res.style.display  = 'none';
+    try {
+        const resp = await fetch('/consultas/gerar-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, contacto_id: contactoId })
+        });
+        const data = await resp.json();
+        if (data.error) {
+            err.textContent = '⚠ ' + data.error; err.style.display = 'inline';
+        } else {
+            document.getElementById('emailtxt_' + fornId).textContent = data.email;
+            res.style.display = 'block';
+        }
+    } catch(e) {
+        err.textContent = '⚠ Erro de ligação.'; err.style.display = 'inline';
+    } finally {
+        spin.style.display = 'none';
+    }
+}
+
+function copiarEmail(fornId) {
+    const txt = document.getElementById('emailtxt_' + fornId).textContent;
+    navigator.clipboard.writeText(txt).then(() => {
+        const btn = event.currentTarget;
+        btn.textContent = '✓ Copiado!';
+        setTimeout(() => btn.textContent = '📋 Copiar Email', 2000);
+    });
+}
+</script>
+{% endblock %}

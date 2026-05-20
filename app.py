@@ -1,4 +1,5 @@
-import os, json, threading
+import os, json, threading, uuid, re
+from difflib import SequenceMatcher
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -6,7 +7,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
-from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, EqIndComponenteMedia, AgendaServico, AgendaRegisto, AgendaMaterial, PropostaMelhoria, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento
+from models import db, User, EmpresaDocumento, EmpresaInfo, EquipamentoIndustrial, EqIndComponente, EqIndDocumento, EqIndComponenteMedia, AgendaServico, AgendaRegisto, AgendaMaterial, PropostaMelhoria, FichaTecnica, FichaComponente, FichaDocumento, FeriasPeriodo, FeriasFeriado, UserSession, AusenciaRegisto, AusenciaSaldoAnual, EmpresaFecho, TIPOS_AUSENCIA, PeriodoSalarial, HoraExtra, ConfigHorario, PedidoCompra, LinhaPedido, Orcamento, ItemOrcamento, ArtigoPHC, AliasArtigo, FornecedorPHC, ConfigPHC, ConfigIA, ConfigReposicao, PendingMatch, Cliente, Embarcacao, ComponenteEmbarcacao, ConfigGeral, NotaArtigo, EventoCalendario, EntradaEquipamento, EntradaHistorico, EntradaDocumento, Assistencia, AssistenciaHistorico, AssistenciaDocumento, MarcaConsulta, FornecedorConsulta, ContactoFornecedorConsulta, AvaliacaoFornecedorConsulta
 
 import time as _time_module
 app = Flask(__name__)
@@ -24,6 +25,14 @@ os.makedirs(app.config['BAK_FOLDER'], exist_ok=True)
 
 db.init_app(app)
 migrate = Migrate(app, db)
+
+with app.app_context():
+    try:
+        from sqlalchemy import text as _sa_text
+        db.session.execute(_sa_text("ALTER TABLE fornecedores_consulta ADD COLUMN sub_marcas TEXT DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Por favor faça login para aceder.'
@@ -418,6 +427,45 @@ def dashboard():
                 faturar_30d_count += 1
     except: faturar_30d_count = 0
 
+    # Get backup info
+    try:
+        from backup_manager import listar_backups
+        backups = listar_backups(app)
+        ultimo_backup = None
+        if backups:
+            ultimo_backup = backups[0]  # Most recent is first (sorted reverse=True)
+    except: ultimo_backup = None
+
+    # Get PHC .bak file date — scan configured folder or bak_uploads fallback
+    try:
+        from datetime import datetime as _dtm
+        _cfg_phc = ConfigPHC.query.first()
+        _phc_folder = (_cfg_phc.phc_bak_folder or '').strip() if _cfg_phc else ''
+        if not _phc_folder:
+            _phc_folder = app.config['BAK_FOLDER']
+        _bak_files = []
+        if os.path.isdir(_phc_folder):
+            for _f in os.listdir(_phc_folder):
+                if _f.lower().endswith('.bak'):
+                    _fp = os.path.join(_phc_folder, _f)
+                    try:
+                        _bak_files.append((_fp, os.stat(_fp)))
+                    except Exception:
+                        pass
+        if _bak_files:
+            _bak_files.sort(key=lambda x: x[1].st_mtime, reverse=True)
+            _fp, _stat = _bak_files[0]
+            _kb = _stat.st_size // 1024
+            phc_backup_info = {
+                'nome': os.path.basename(_fp),
+                'data': _dtm.fromtimestamp(_stat.st_mtime).strftime('%d/%m/%Y %H:%M'),
+                'tamanho_str': f'{_kb / 1024:.1f} MB' if _kb >= 1024 else f'{_kb} KB',
+            }
+        else:
+            phc_backup_info = None
+    except Exception:
+        phc_backup_info = None
+
     return render_template('dashboard.html',
         faturar_30d_count=faturar_30d_count,
         entradas_estadia=entradas_estadia,
@@ -434,6 +482,8 @@ def dashboard():
         pedidos_recentes=pedidos_recentes,
         artigos_stock_baixo=artigos_stock_baixo,
         artigos_pedidos=artigos_pedidos,
+        ultimo_backup=ultimo_backup,
+        phc_backup_info=phc_backup_info,
     )
 
 
@@ -1719,6 +1769,30 @@ def check_sqlserver():
 
 # ── PHC CONFIG & SYNC ─────────────────────────────────────────────────────────
 
+@app.route('/gestao/ordens-fabrico')
+@login_required
+def ordens_fabrico():
+    from phc_sync import get_ordens_fabrico
+    cfg_phc = ConfigPHC.query.first()
+    tipo   = request.args.get('tipo', '')
+    estado = request.args.get('estado', '')
+    q      = request.args.get('q', '').strip()
+    fechada = None
+    if estado == 'aberta':  fechada = False
+    elif estado == 'fechada': fechada = True
+    docs, erro = [], None
+    if cfg_phc and cfg_phc.ultima_sync:
+        docs, erro = get_ordens_fabrico(cfg_phc,
+            tipo=tipo or None, fechada=fechada, q=q or None)
+    elif not cfg_phc:
+        erro = 'PHC não configurado. Configure em Admin → Integração PHC.'
+    else:
+        erro = 'Sincronização PHC ainda não efectuada. Execute em Admin → Integração PHC.'
+    return render_template('ordens_fabrico.html',
+        docs=docs, erro=erro, tipo=tipo, estado=estado, q=q,
+        cfg_phc=cfg_phc)
+
+
 @app.route('/admin/phc', methods=['GET','POST'])
 @login_required
 def admin_phc():
@@ -1738,6 +1812,7 @@ def admin_phc():
             if pw: cfg.password = pw
             cfg.sync_auto = request.form.get('sync_auto') == 'on'
             cfg.sync_hora = request.form.get('sync_hora','06:00')
+            cfg.phc_bak_folder = request.form.get('phc_bak_folder','').strip() or None
             if not cfg.id: db.session.add(cfg)
             db.session.commit()
             flash('Configuração guardada.','success')
@@ -4719,6 +4794,13 @@ def roadmap():
     return render_template('roadmap.html')
 
 
+@app.route('/documentacao')
+@app.route('/documentacao/<secao>')
+@login_required
+def documentacao(secao=None):
+    return render_template('documentacao.html', secao=secao)
+
+
 class ChangelogEntry(db.Model):
     __tablename__ = 'changelog_entry'
     id          = db.Column(db.Integer, primary_key=True)
@@ -6978,158 +7060,783 @@ def inventario():
     return render_template('inventario.html')
 
 
-@app.route('/api/inventario/kpis')
+@app.route('/api/inventario/exclusoes', methods=['GET'])
 @login_required
-def api_inventario_kpis():
-    """Calculate inventory KPIs from PHC data."""
+def api_inventario_exclusoes():
+    from models import InventarioExclusao
+    exs = InventarioExclusao.query.order_by(InventarioExclusao.referencia).all()
+    return jsonify([{
+        'ref': e.referencia,
+        'tipo': e.tipo or 'total',
+        'motivo': e.motivo or ''
+    } for e in exs])
+
+
+@app.route('/api/inventario/exclusao/<ref>', methods=['POST', 'DELETE'])
+@login_required
+def api_inventario_exclusao(ref):
+    from models import InventarioExclusao
+    ref = ref.strip().upper()
+    ex = InventarioExclusao.query.filter_by(referencia=ref).first()
+
+    if request.method == 'DELETE':
+        if ex:
+            db.session.delete(ex)
+            db.session.commit()
+        return jsonify({'ok': True, 'excluido': False, 'tipo': None})
+
+    # POST — set or cycle through states: none → total → segmentos → none
+    body   = request.get_json() or {}
+    novo_tipo = body.get('tipo', 'total')   # 'total' | 'segmentos'
+    motivo = body.get('motivo', '')
+
+    if ex:
+        if ex.tipo == novo_tipo:
+            # Same type → remove exclusion
+            db.session.delete(ex)
+            db.session.commit()
+            return jsonify({'ok': True, 'excluido': False, 'tipo': None})
+        else:
+            # Different type → update
+            ex.tipo = novo_tipo
+            ex.motivo = motivo or ex.motivo
+            db.session.commit()
+            return jsonify({'ok': True, 'excluido': True, 'tipo': novo_tipo})
+
+    db.session.add(InventarioExclusao(referencia=ref, tipo=novo_tipo, motivo=motivo))
+    db.session.commit()
+    return jsonify({'ok': True, 'excluido': True, 'tipo': novo_tipo})
+
+
+@app.route('/api/inventario/historico')
+@login_required
+def api_inventario_historico():
+    """Yearly aggregates from sl for stock evolution and margin charts (last 5 years)."""
     try:
         cfg_phc = ConfigPHC.query.first()
         if not cfg_phc:
-            return jsonify({'error': 'PHC nao configurado'}), 400
+            return jsonify({'error': 'PHC não configurado'}), 400
+        from models import InventarioExclusao
+        from phc_sync import get_phc_connection
+        excl = {e.referencia.upper() for e in InventarioExclusao.query.filter_by(tipo='total').all()}
+        conn = get_phc_connection(cfg_phc)
+        cur = conn.cursor()
+        # Yearly: revenue (sales exits at sale price) and purchase cost
+        cur.execute("""
+            SELECT
+                YEAR(sl.datalc) AS ano,
+                SUM(CASE WHEN (RTRIM(ISNULL(sl.fistamp,''))<>'' OR sl.cmdesc LIKE 'N/Factura%'
+                               OR sl.cmdesc LIKE 'V/Factura%' OR sl.cmdesc LIKE 'V/Venda%')
+                         THEN ISNULL(sl.ett,0) ELSE 0 END) AS receita_anual,
+                SUM(CASE WHEN (RTRIM(ISNULL(sl.fistamp,''))<>'' OR sl.cmdesc LIKE 'N/Factura%'
+                               OR sl.cmdesc LIKE 'V/Factura%' OR sl.cmdesc LIKE 'V/Venda%')
+                         THEN sl.qtt ELSE 0 END)           AS qty_vendida,
+                SUM(CASE WHEN (sl.cmdesc='Compra' OR RTRIM(ISNULL(sl.fnstamp,''))<>'')
+                         THEN ISNULL(sl.ett,0) ELSE 0 END) AS custo_comprado,
+                SUM(CASE WHEN (sl.cmdesc='Compra' OR RTRIM(ISNULL(sl.fnstamp,''))<>'')
+                         THEN sl.qtt ELSE 0 END)           AS qty_comprada,
+                SUM(CASE WHEN (RTRIM(ISNULL(sl.bistamp,''))<>'' OR sl.cmdesc LIKE 'Consu%'
+                               OR sl.cmdesc LIKE 'S.%')
+                         THEN sl.qtt ELSE 0 END)           AS qty_producao
+            FROM sl
+            WHERE sl.datalc >= DATEADD(year,-5,GETDATE())
+              AND sl.ref IS NOT NULL AND RTRIM(sl.ref)<>''
+            GROUP BY YEAR(sl.datalc)
+            ORDER BY ano
+        """)
+        historico = []
+        for r in cur.fetchall():
+            rec = float(r[1] or 0)
+            cmp = float(r[3] or 0)
+            margem = ((rec - (float(r[2] or 0) * (cmp / max(float(r[4] or 1), 1)))) / rec * 100) if rec > 0 else 0
+            historico.append({
+                'ano': int(r[0]),
+                'receita': round(rec, 0),
+                'custo_comprado': round(cmp, 0),
+                'qty_vendida': round(float(r[2] or 0), 1),
+                'qty_comprada': round(float(r[4] or 0), 1),
+                'qty_producao': round(float(r[5] or 0), 1),
+                'lucro': round(rec - cmp, 0),
+            })
+        conn.close()
+        return jsonify(historico)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/inventario/busca')
+@login_required
+def api_inventario_busca():
+    """Search articles in PHC st table by ref or design."""
+    q = request.args.get('q', '').strip()
+    if not q or len(q) < 2:
+        return jsonify([])
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if not cfg_phc:
+            return jsonify({'error': 'PHC não configurado'}), 400
+        from phc_sync import get_phc_connection
+        conn = get_phc_connection(cfg_phc)
+        cur = conn.cursor()
+        like = f'%{q}%'
+        cur.execute("""
+            SELECT TOP 30
+                RTRIM(st.ref), LTRIM(RTRIM(st.design)),
+                ISNULL(st.stock,0), ISNULL(st.epcpond,0), ISNULL(st.epcusto,0),
+                ISNULL(st.epv1,0), ISNULL(st.familia,''), ISNULL(st.unidade,'un'),
+                ISNULL(st.inactivo,0)
+            FROM st
+            WHERE ISNULL(st.inactivo,0)=0
+              AND st.ref IS NOT NULL AND st.ref <> ''
+              AND (st.ref LIKE ? OR st.design LIKE ?)
+            ORDER BY
+                CASE WHEN st.ref LIKE ? THEN 0 ELSE 1 END,
+                st.ref
+        """, like, like, f'{q}%')
+        rows = cur.fetchall()
+        conn.close()
+        return jsonify([{
+            'ref':     (r[0] or '').strip(),
+            'design':  (r[1] or '').strip(),
+            'stock':   float(r[2] or 0),
+            'epcpond': float(r[3] or 0),
+            'epcusto': float(r[4] or 0),
+            'pvp':     float(r[5] or 0),
+            'familia': (r[6] or '').strip(),
+            'unidade': (r[7] or '').strip(),
+        } for r in rows])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/inventario/artigo/<path:ref>')
+@login_required
+def api_inventario_artigo(ref):
+    """Full article detail: all sl movements, metrics, charts data, clients, suppliers."""
+    from datetime import datetime as _dt
+    ref = ref.strip()
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if not cfg_phc:
+            return jsonify({'error': 'PHC não configurado'}), 400
         from phc_sync import get_phc_connection
         conn = get_phc_connection(cfg_phc)
         cur = conn.cursor()
 
-        # --- Base stock data ---
+        # ── Article master data ───────────────────────────────────────────
         cur.execute("""
-            SELECT st.ref, st.design, ISNULL(st.stock,0) AS stock,
-                   ISNULL(st.epcusto,0) AS custo, ISNULL(st.epcpond,0) AS custo_pond,
-                   ISNULL(st.epv1,0) AS pvp, ISNULL(st.familia,'') AS familia,
+            SELECT RTRIM(st.ref), LTRIM(RTRIM(st.design)),
+                   ISNULL(st.stock,0), ISNULL(st.epcpond,0), ISNULL(st.epcusto,0),
+                   ISNULL(st.epv1,0), ISNULL(st.familia,''), ISNULL(st.unidade,'un'),
+                   ISNULL(st.tabiva,23)
+            FROM st WHERE RTRIM(st.ref) = ?
+        """, ref)
+        art = cur.fetchone()
+        if not art:
+            return jsonify({'error': f'Artigo {ref} não encontrado na BD PHC'}), 404
+
+        # ── All movements from sl ─────────────────────────────────────────
+        cur.execute("""
+            SELECT sl.datalc, sl.cmdesc, sl.qtt, sl.evu, sl.ett, sl.epcpond,
+                   LTRIM(RTRIM(ISNULL(sl.nome,''))),
+                   LTRIM(RTRIM(ISNULL(sl.adoc,''))),
+                   RTRIM(ISNULL(sl.fnstamp,'')),
+                   RTRIM(ISNULL(sl.fistamp,'')),
+                   RTRIM(ISNULL(sl.bistamp,''))
+            FROM sl
+            WHERE RTRIM(sl.ref) = ?
+            ORDER BY sl.datalc, sl.lno
+        """, ref)
+        sl_rows_raw = cur.fetchall()
+
+        # Re-sort: within the same date, put entries BEFORE exits so the running
+        # balance never artificially goes negative (PHC records same-day buy+sell
+        # in insertion order, not chronological economic order).
+        _dt_min = _dt.min
+        def _sl_sort(r):
+            d = r[0] if r[0] else _dt_min
+            fn, fi, bi = (r[8] or '').strip(), (r[9] or '').strip(), (r[10] or '').strip()
+            cmd = (r[1] or '').strip()
+            is_exit = 1 if (
+                bool(fi) or bool(bi) or
+                cmd.startswith('N/Factura') or cmd.startswith('V/Factura') or
+                cmd.startswith('V/Venda') or cmd.startswith('Resumo') or
+                cmd.startswith('Consu') or cmd.startswith('S.') or
+                cmd.startswith('Troca S') or cmd.startswith('Oferta C')
+            ) else 0
+            return (d, is_exit)
+        sl_rows = sorted(sl_rows_raw, key=_sl_sort)
+
+        allow_negative = ref.upper().startswith('NS')
+
+        # ── Clients (from sale movements) ─────────────────────────────────
+        cur.execute("""
+            SELECT LTRIM(RTRIM(sl.nome)), COUNT(*) AS cnt,
+                   SUM(sl.qtt) AS qty, SUM(ISNULL(sl.ett,0)) AS val
+            FROM sl
+            WHERE RTRIM(sl.ref)=?
+              AND (RTRIM(ISNULL(sl.fistamp,''))<>''
+                   OR sl.cmdesc LIKE 'N/Factura%' OR sl.cmdesc LIKE 'V/Factura%'
+                   OR sl.cmdesc LIKE 'V/Venda%')
+              AND sl.nome IS NOT NULL AND LTRIM(RTRIM(sl.nome))<>''
+            GROUP BY LTRIM(RTRIM(sl.nome))
+            ORDER BY qty DESC
+        """, ref)
+        clientes = [{'nome': r[0], 'transacoes': int(r[1] or 0),
+                     'qty': float(r[2] or 0), 'valor': round(float(r[3] or 0), 2)}
+                    for r in cur.fetchall()]
+
+        # ── Suppliers (from purchase movements) ───────────────────────────
+        cur.execute("""
+            SELECT LTRIM(RTRIM(sl.nome)), COUNT(*) AS cnt,
+                   SUM(sl.qtt) AS qty, SUM(ISNULL(sl.ett,0)) AS val
+            FROM sl
+            WHERE RTRIM(sl.ref)=?
+              AND (sl.cmdesc='Compra' OR RTRIM(ISNULL(sl.fnstamp,''))<>'')
+              AND sl.nome IS NOT NULL AND LTRIM(RTRIM(sl.nome))<>''
+            GROUP BY LTRIM(RTRIM(sl.nome))
+            ORDER BY qty DESC
+        """, ref)
+        fornecedores = [{'nome': r[0], 'compras': int(r[1] or 0),
+                         'qty': float(r[2] or 0), 'valor': round(float(r[3] or 0), 2)}
+                        for r in cur.fetchall()]
+
+        # ── Monthly consumption last 36 months (exits only) ───────────────
+        cur.execute("""
+            SELECT FORMAT(sl.datalc,'yyyy-MM') AS mes,
+                   SUM(sl.qtt) AS qty_saida
+            FROM sl
+            WHERE RTRIM(sl.ref)=?
+              AND sl.datalc >= DATEADD(month,-36,GETDATE())
+              AND sl.qtt > 0
+              AND (RTRIM(ISNULL(sl.fistamp,''))<>'' OR RTRIM(ISNULL(sl.bistamp,''))<>''
+                   OR sl.cmdesc LIKE 'N/Factura%' OR sl.cmdesc LIKE 'V/Factura%'
+                   OR sl.cmdesc LIKE 'V/Venda%'   OR sl.cmdesc LIKE 'Consu%'
+                   OR sl.cmdesc LIKE 'S.%'         OR sl.cmdesc LIKE 'Resumo%')
+            GROUP BY FORMAT(sl.datalc,'yyyy-MM')
+            ORDER BY mes
+        """, ref)
+        consumo_mensal_raw = {r[0]: float(r[1] or 0) for r in cur.fetchall()}
+
+        conn.close()
+
+        # ── Classify movements + build charts data ────────────────────────
+        movimentos = []
+        saldo = 0.0
+        h_custo = []    # {data, evu, epcpond}
+        h_saldo = []    # {data, saldo}
+        h_margem = []   # {data, margem, pvp, custo}
+
+        for r in sl_rows:
+            data    = r[0].strftime('%Y-%m-%d') if r[0] else None
+            cmdesc  = (r[1] or '').strip()
+            qtt     = float(r[2] or 0)
+            evu     = float(r[3] or 0)
+            ett     = float(r[4] or 0)
+            epcpond_mov = float(r[5] or 0)
+            nome    = r[6]
+            adoc    = r[7]
+            fnstamp = r[8]
+            fistamp = r[9]
+            bistamp = r[10]
+
+            is_entry = bool(fnstamp) or cmdesc == 'Compra' or cmdesc.startswith('Stock') or cmdesc.startswith('E.')
+            is_sale  = bool(fistamp) or cmdesc.startswith('N/Factura') or cmdesc.startswith('V/Factura') or cmdesc.startswith('V/Venda') or cmdesc.startswith('Resumo')
+            is_prod  = bool(bistamp) or cmdesc.startswith('Consu') or cmdesc.startswith('S.')
+
+            if is_entry:
+                direcao = 'entrada'; tipo_label = 'Compra'; saldo += qtt
+            elif is_sale:
+                direcao = 'saida'; tipo_label = 'Venda'; saldo -= qtt
+            elif is_prod:
+                direcao = 'saida'; tipo_label = 'Saída Produção'; saldo -= qtt
+            else:
+                direcao = 'saida' if qtt > 0 else 'entrada'
+                tipo_label = cmdesc
+                saldo -= qtt if direcao == 'saida' else -qtt
+
+            saldo_display = saldo if allow_negative else max(0.0, saldo)
+
+            movimentos.append({
+                'data': data, 'tipo': tipo_label, 'direcao': direcao,
+                'qty': round(qtt, 3), 'preco_unit': round(evu, 4),
+                'total': round(ett, 2), 'custo_pond': round(epcpond_mov, 4),
+                'entidade': nome, 'doc': adoc, 'saldo': round(saldo_display, 3),
+            })
+
+            if data:
+                h_saldo.append({'data': data, 'saldo': round(saldo_display, 3)})
+                if is_entry and evu > 0:
+                    h_custo.append({'data': data, 'evu': round(evu, 2), 'epcpond': round(epcpond_mov, 2)})
+                if is_sale and evu > 0 and epcpond_mov > 0:
+                    margem = (evu - epcpond_mov) / evu * 100
+                    h_margem.append({'data': data, 'margem': round(margem, 1),
+                                     'pvp': round(evu, 2), 'custo': round(epcpond_mov, 2)})
+
+        # ── Aggregate metrics ─────────────────────────────────────────────
+        ent  = [m for m in movimentos if m['direcao'] == 'entrada']
+        sv   = [m for m in movimentos if m['tipo'] == 'Venda']
+        sp   = [m for m in movimentos if m['tipo'] == 'Saída Produção']
+
+        qty_ent  = sum(m['qty'] for m in ent)
+        qty_sv   = sum(m['qty'] for m in sv)
+        qty_sp   = sum(m['qty'] for m in sp)
+        val_ent  = sum(m['total'] for m in ent)
+        rec_v    = sum(m['total'] for m in sv)
+        val_sp   = sum(m['total'] for m in sp)
+        rec_tot  = rec_v + val_sp
+        lucro    = rec_tot - val_ent
+
+        stock     = float(art[2])
+        epcpond   = float(art[3])
+        epcusto   = float(art[4])
+        pvp       = float(art[5])
+        ult_custo = (ent[-1]['preco_unit'] if ent else 0) or epcpond or epcusto
+        capital   = max(0, stock) * ult_custo
+        margem_p  = (pvp - ult_custo) / pvp * 100 if pvp > 0 and ult_custo > 0 else 0
+        payback   = rec_tot / val_ent if val_ent > 0 else 0
+        sell_th   = (qty_sv + qty_sp) / qty_ent if qty_ent > 0 else 0
+        roi       = lucro / val_ent * 100 if val_ent > 0 else 0
+        rotacao   = qty_sv / max(stock, 0.001) if stock > 0 and qty_sv > 0 else 0
+
+        last_sale_date = next((m['data'] for m in reversed(movimentos) if m['tipo'] == 'Venda'), None)
+        dias_sem  = (_dt.now() - _dt.strptime(last_sale_date, '%Y-%m-%d')).days if last_sale_date else None
+
+        # ── Consumption analysis: fill gaps for all 36 months ────────────
+        from datetime import date as _date
+        hoje = _date.today()
+        consumo_36m = []
+        for i in range(35, -1, -1):
+            mes_dt = _date(hoje.year if hoje.month > i % 12 else hoje.year - 1,
+                           ((hoje.month - 1 - i) % 12) + 1, 1)
+            # Simpler: subtract months
+            m = hoje.month - i
+            y = hoje.year + (m - 1) // 12
+            m = ((m - 1) % 12) + 1
+            key = f'{y:04d}-{m:02d}'
+            consumo_36m.append({'mes': key, 'qty': consumo_mensal_raw.get(key, 0)})
+
+        consumo_36m_vals = [c['qty'] for c in consumo_36m]
+        consumo_12m_vals = consumo_36m_vals[-12:]
+        consumo_24m_vals = consumo_36m_vals[-24:-12]
+
+        avg_mensal_12m = sum(consumo_12m_vals) / 12
+        avg_mensal_24m = sum(consumo_24m_vals) / 12
+        avg_mensal_36m = sum(consumo_36m_vals) / 36
+        total_anual_1  = sum(consumo_12m_vals)
+        total_anual_2  = sum(consumo_24m_vals)
+        total_anual_3  = sum(consumo_36m_vals[:12])
+
+        # Trend: compare last 12m avg vs previous 12m avg
+        tendencia_pct = ((avg_mensal_12m / avg_mensal_24m) - 1) * 100 if avg_mensal_24m > 0 else 0
+
+        # ── Stock recommendation (annual-based + dynamic safety margin) ──────
+        import math as _math
+        consumo_anual = avg_mensal_12m * 12
+
+        # Lead time (months of stock to cover reorder lead time)
+        # High rotation → shorter lead time window needed
+        rotacao_anual = (qty_saida_venda / max(stock, 0.001)) if stock > 0 and qty_saida_venda > 0 else (qty_saida_venda / 1)
+        if rotacao_anual >= 6:    lead_time_meses = 1.0
+        elif rotacao_anual >= 2:  lead_time_meses = 1.5
+        elif rotacao_anual >= 0.5: lead_time_meses = 2.0
+        else:                      lead_time_meses = 2.5
+
+        # Safety stock % of annual consumption
+        # High cost → less safety stock (minimise capital tied up)
+        # High rotation → more safety stock (demand more volatile)
+        if ult_custo >= 1000:     safety_pct = 0.05
+        elif ult_custo >= 500:    safety_pct = 0.08
+        elif ult_custo >= 100:    safety_pct = 0.12
+        elif ult_custo >= 20:     safety_pct = 0.18
+        else:                     safety_pct = 0.25
+        if rotacao_anual >= 6:    safety_pct = min(safety_pct * 1.5, 0.35)
+        elif rotacao_anual < 0.5: safety_pct *= 0.6  # reduce safety for very slow movers
+
+        stock_lead_time = avg_mensal_12m * lead_time_meses
+        stock_safety    = consumo_anual * safety_pct
+        stock_proposto  = _math.ceil(stock_lead_time + stock_safety) if avg_mensal_12m > 0 else 0
+
+        # Alerts
+        alert_excesso = stock > stock_proposto * 1.5 and avg_mensal_12m > 0
+        alert_falta   = stock < _math.ceil(stock_safety) and avg_mensal_12m > 0
+        meses_cobertura_atual = (stock / avg_mensal_12m) if avg_mensal_12m > 0 else None
+
+        consumo_analise = {
+            'consumo_36m': consumo_36m,
+            'avg_mensal_12m': round(avg_mensal_12m, 3),
+            'avg_mensal_24m': round(avg_mensal_24m, 3),
+            'avg_mensal_36m': round(avg_mensal_36m, 3),
+            'total_ano1': round(total_anual_1, 2),
+            'total_ano2': round(total_anual_2, 2),
+            'total_ano3': round(total_anual_3, 2),
+            'tendencia_pct': round(tendencia_pct, 1),
+            'stock_proposto': stock_proposto,
+            'stock_lead_time': _math.ceil(stock_lead_time * 10) / 10,
+            'stock_safety': _math.ceil(stock_safety * 10) / 10,
+            'lead_time_meses': lead_time_meses,
+            'safety_pct': round(safety_pct * 100, 1),
+            'consumo_anual': round(consumo_anual, 2),
+            'rotacao_anual': round(rotacao_anual, 2),
+            'meses_cobertura_atual': round(meses_cobertura_atual, 1) if meses_cobertura_atual is not None else None,
+            'alert_excesso': alert_excesso,
+            'alert_falta': alert_falta,
+        }
+
+        return jsonify({
+            'ref': art[0], 'design': art[1], 'stock': stock,
+            'familia': (art[6] or '').strip(), 'unidade': (art[7] or '').strip(),
+            'metricas': {
+                'ult_custo': round(ult_custo, 4), 'epcpond': round(epcpond, 4),
+                'pvp': round(pvp, 4), 'margem_pct': round(margem_p, 1),
+                'capital_empatado': round(capital, 2),
+                'qty_entrada': round(qty_ent, 2), 'qty_saida_venda': round(qty_sv, 2),
+                'qty_saida_producao': round(qty_sp, 2),
+                'valor_entrada': round(val_ent, 2), 'receita_venda': round(rec_v, 2),
+                'valor_saida_producao': round(val_sp, 2),
+                'total_recuperado': round(rec_tot, 2), 'lucro_acumulado': round(lucro, 2),
+                'payback': round(payback, 3), 'sell_through': round(sell_th, 3),
+                'roi': round(roi, 1), 'rotacao_anual': round(rotacao, 2),
+                'n_clientes': len(clientes), 'n_fornecedores': len(fornecedores),
+                'dias_sem_venda': dias_sem, 'n_movimentos': len(movimentos),
+            },
+            'movimentos': movimentos,
+            'h_custo':  h_custo,
+            'h_margem': h_margem,
+            'h_saldo':  h_saldo,
+            'clientes':     clientes[:30],
+            'fornecedores': fornecedores[:10],
+            'consumo': consumo_analise,
+        })
+    except Exception as e:
+        import traceback
+        app.logger.error(f"inventario artigo {ref}: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/inventario/kpis')
+@login_required
+def api_inventario_kpis():
+    """Calculate inventory KPIs from PHC data with full financial metrics."""
+    from datetime import datetime as _dt
+    try:
+        cfg_phc = ConfigPHC.query.first()
+        if not cfg_phc:
+            return jsonify({'error': 'PHC não configurado'}), 400
+
+        from models import InventarioExclusao
+        from phc_sync import get_phc_connection
+        _exs = InventarioExclusao.query.all()
+        # total: excluded from KPIs + segments
+        excluidas_total    = {e.referencia.upper() for e in _exs if (e.tipo or 'total') == 'total'}
+        # segmentos: kept in KPIs but excluded from segment analysis / top lists
+        excluidas_segmentos = {e.referencia.upper() for e in _exs if (e.tipo or 'total') == 'segmentos'}
+        excluidas = excluidas_total  # backward-compat alias
+
+        conn = get_phc_connection(cfg_phc)
+        cur = conn.cursor()
+
+        # --- Base stock (all active articles) ---
+        cur.execute("""
+            SELECT st.ref, st.design, ISNULL(st.stock,0),
+                   ISNULL(st.epcpond,0) AS epcpond,
+                   ISNULL(st.epcusto,0) AS epcusto,
+                   ISNULL(st.epv1,0)   AS pvp,
+                   ISNULL(st.familia,'') AS familia,
                    ISNULL(st.unidade,'un') AS unidade
             FROM st
             WHERE ISNULL(st.inactivo,0)=0 AND st.ref IS NOT NULL AND st.ref <> ''
         """)
-        artigos = cur.fetchall()
+        artigos_raw = cur.fetchall()
 
-        # --- Sales last 12 months ---
+        # --- Último preço de custo real por artigo (sl — evu da compra mais recente) ---
+        # sl.evu é o preço unitário em euros na data do movimento; para compras é o preço
+        # real pago. Usa ROW_NUMBER() para obter apenas o registo mais recente por artigo.
         cur.execute("""
-            SELECT fi.ref, SUM(fi.qtt) AS total_vendido,
-                   SUM(fi.qtt * ISNULL(fi.epv,0)) AS total_faturado,
-                   COUNT(DISTINCT ft.ftstamp) AS num_facturas,
-                   MAX(ft.fdata) AS ultima_venda
-            FROM fi
-            INNER JOIN ft ON ft.ftstamp = fi.ftstamp
-            WHERE ft.tipodoc = 1 AND ft.anulado = 0
-              AND ft.fdata >= DATEADD(month, -12, GETDATE())
-              AND fi.qtt > 0
+            SELECT ref, evu
+            FROM (
+                SELECT RTRIM(sl.ref) AS ref, sl.evu,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY RTRIM(sl.ref)
+                           ORDER BY sl.datalc DESC, sl.lno DESC
+                       ) AS rn
+                FROM sl
+                WHERE sl.qtt > 0
+                  AND (sl.cmdesc = 'Compra'
+                       OR RTRIM(ISNULL(sl.fnstamp,'')) <> '')
+                  AND sl.evu > 0
+            ) t
+            WHERE rn = 1
+        """)
+        ultimo_preco_sl = {}
+        for r in cur.fetchall():
+            ref_r = (r[0] or '').strip()
+            if ref_r and r[1]:
+                ultimo_preco_sl[ref_r] = float(r[1])
+
+        # --- Sales last 12 months (fi/ft — actual sale prices for ABC/12m metrics) ---
+        cur.execute("""
+            SELECT fi.ref,
+                   SUM(fi.qtt)                       AS vendido_12m,
+                   SUM(fi.qtt * ISNULL(fi.epv,0))    AS faturado_12m,
+                   COUNT(DISTINCT ft.ftstamp)         AS num_facturas,
+                   MAX(ft.fdata)                      AS ultima_venda
+            FROM fi INNER JOIN ft ON ft.ftstamp=fi.ftstamp
+            WHERE ft.tipodoc=1 AND ft.anulado=0
+              AND ft.fdata >= DATEADD(month,-12,GETDATE()) AND fi.qtt>0
             GROUP BY fi.ref
         """)
-        vendas = {r[0].strip(): {
-            'vendido': float(r[1] or 0),
-            'faturado': float(r[2] or 0),
-            'facturas': int(r[3] or 0),
-            'ultima_venda': r[4].strftime('%Y-%m-%d') if r[4] else None
-        } for r in cur.fetchall()}
+        vendas_12m = {}
+        for r in cur.fetchall():
+            vendas_12m[(r[0] or '').strip()] = {
+                'vendido': float(r[1] or 0), 'faturado': float(r[2] or 0),
+                'facturas': int(r[3] or 0),
+                'ultima_venda': r[4].strftime('%Y-%m-%d') if r[4] else None}
 
-        # --- Purchases last 12 months ---
+        # --- All-time movements from sl (Stock Ledger / Extrato) ---
+        # sl contains ALL stock movements with direction determined by cmdesc:
+        #   ENTRIES: Compra, Stock inicial, E.% (E.Producao), fnstamp <> ''
+        #   EXITS-SALE: N/Factura%, V/Factura%, V/Venda%, Resumo%, fistamp <> ''
+        #     → sl.vu/ett = sale price (revenue)
+        #   EXITS-PRODUCTION: Consu%, S.%, bistamp <> '' (Saida Producao, Consumo Interno)
+        #     → sl.vu/ett = weighted cost (capital consumed)
+        # qtt is ALWAYS POSITIVE; direction = cmdesc type
         cur.execute("""
-            SELECT RTRIM(fn.ref), SUM(fn.qtt) AS total_comprado,
-                   0 AS total_compras
-            FROM fn
-            INNER JOIN fo ON fo.fostamp = fn.fostamp
-            WHERE fo.data >= DATEADD(month, -12, GETDATE())
-              AND fn.qtt > 0
-            GROUP BY RTRIM(fn.ref)
+            SELECT
+                RTRIM(sl.ref),
+                SUM(CASE WHEN RTRIM(ISNULL(sl.fnstamp,''))<>'' OR sl.cmdesc='Compra' OR sl.cmdesc LIKE 'Stock%' OR sl.cmdesc LIKE 'E.%' OR sl.cmdesc LIKE 'Troca E%' THEN sl.qtt ELSE 0 END),
+                SUM(CASE WHEN RTRIM(ISNULL(sl.fnstamp,''))<>'' OR sl.cmdesc='Compra' OR sl.cmdesc LIKE 'Stock%' OR sl.cmdesc LIKE 'E.%' THEN ISNULL(sl.ett,0) ELSE 0 END),
+                SUM(CASE WHEN RTRIM(ISNULL(sl.fistamp,''))<>'' OR sl.cmdesc LIKE 'N/Factura%' OR sl.cmdesc LIKE 'V/Factura%' OR sl.cmdesc LIKE 'V/Venda%' OR sl.cmdesc LIKE 'Resumo%' THEN sl.qtt ELSE 0 END),
+                SUM(CASE WHEN RTRIM(ISNULL(sl.fistamp,''))<>'' OR sl.cmdesc LIKE 'N/Factura%' OR sl.cmdesc LIKE 'V/Factura%' OR sl.cmdesc LIKE 'V/Venda%' OR sl.cmdesc LIKE 'Resumo%' THEN ISNULL(sl.ett,0) ELSE 0 END),
+                SUM(CASE WHEN RTRIM(ISNULL(sl.bistamp,''))<>'' OR sl.cmdesc LIKE 'Consu%' OR sl.cmdesc LIKE 'S.%' OR sl.cmdesc LIKE 'Troca S%' OR sl.cmdesc LIKE 'Oferta C%' THEN sl.qtt ELSE 0 END),
+                SUM(CASE WHEN RTRIM(ISNULL(sl.bistamp,''))<>'' OR sl.cmdesc LIKE 'Consu%' OR sl.cmdesc LIKE 'S.%' THEN ISNULL(sl.ett,0) ELSE 0 END),
+                MAX(CASE WHEN RTRIM(ISNULL(sl.fistamp,''))<>'' OR sl.cmdesc LIKE 'N/Factura%' OR sl.cmdesc LIKE 'V/Factura%' OR sl.cmdesc LIKE 'V/Venda%' THEN sl.datalc ELSE NULL END)
+            FROM sl
+            WHERE sl.ref IS NOT NULL AND RTRIM(sl.ref) <> ''
+            GROUP BY RTRIM(sl.ref)
         """)
-        compras = {r[0]: {'comprado': float(r[1] or 0), 'valor_compras': float(r[2] or 0)}
-                   for r in cur.fetchall()}
+        movimentos = {}
+        for r in cur.fetchall():
+            ref_sl = (r[0] or '').strip()
+            movimentos[ref_sl] = {
+                'qty_entrada':          float(r[1] or 0),
+                'valor_entrada':        float(r[2] or 0),
+                'qty_saida_venda':      float(r[3] or 0),
+                'receita_venda':        float(r[4] or 0),
+                'qty_saida_producao':   float(r[5] or 0),
+                'valor_saida_producao': float(r[6] or 0),
+                'ultima_venda_sl':      r[7].strftime('%Y-%m-%d') if r[7] else None,
+            }
 
         conn.close()
 
-        # --- Calculate metrics per article ---
+        # --- Build per-article metrics ---
+        _now = _dt.now()
         items = []
-        total_valor_custo = 0
-        total_valor_pvp = 0
-        total_margem = 0
-        sem_movimento = 0
-        stock_negativo = 0
-        total_artigos = 0
+        excluidos_lista = []
 
-        for r in artigos:
-            ref = (r[0] or '').strip()
+        for r in artigos_raw:
+            ref    = (r[0] or '').strip()
             design = (r[1] or '').strip()
-            stock = float(r[2])
-            custo = float(r[3]) or float(r[4])  # epcusto or epcpond
-            pvp = float(r[5])
+            stock   = float(r[2])
+            epcpond = float(r[3])
+            epcusto = float(r[4])
+            # Último preço de custo real: evu da compra mais recente em sl
+            # Fallback: epcpond (custo ponderado) → epcusto
+            custo   = ultimo_preco_sl.get(ref, 0) or epcpond or epcusto
+            pvp     = float(r[5])
             familia = (r[6] or '').strip()
+            ref_up   = ref.upper()
+            excluido_total     = ref_up in excluidas_total
+            excluido_segmentos = ref_up in excluidas_segmentos
+            excluido = excluido_total  # kept for backward-compat in item dict
 
-            v = vendas.get(ref, {})
-            c = compras.get(ref, {})
+            v12  = vendas_12m.get(ref, {})
+            mov  = movimentos.get(ref, {})
 
-            vendido_12m = v.get('vendido', 0)
-            faturado_12m = v.get('faturado', 0)
-            ultima_venda = v.get('ultima_venda')
+            vendido_12m  = v12.get('vendido', 0)
+            faturado_12m = v12.get('faturado', 0)
 
-            valor_stock_custo = stock * custo
-            valor_stock_pvp = stock * pvp
-            margem_pct = ((pvp - custo) / pvp * 100) if pvp > 0 else 0
-            margem_valor = (pvp - custo) * vendido_12m if vendido_12m > 0 else 0
+            # From sl movements (complete history)
+            qty_entrada          = mov.get('qty_entrada', 0)
+            valor_entrada        = mov.get('valor_entrada', 0) or (qty_entrada * custo)
+            qty_saida_venda      = mov.get('qty_saida_venda', 0)
+            receita_venda        = mov.get('receita_venda', 0)
+            qty_saida_producao   = mov.get('qty_saida_producao', 0)
+            valor_saida_producao = mov.get('valor_saida_producao', 0)
+            ultima_venda_sl      = mov.get('ultima_venda_sl')
 
-            # Days without movement
+            # Use 12m data for ultima_venda if more recent, else sl
+            ultima_venda_12m = v12.get('ultima_venda')
+            if ultima_venda_12m and ultima_venda_sl:
+                ultima_venda = ultima_venda_12m if ultima_venda_12m > ultima_venda_sl else ultima_venda_sl
+            else:
+                ultima_venda = ultima_venda_12m or ultima_venda_sl
+
+            # Total saída (all exits)
+            qty_saida_total = qty_saida_venda + qty_saida_producao
+
+            # Total recovered = revenue from sales + cost of stock used in production
+            total_recuperado = receita_venda + valor_saida_producao
+
+            # Payback = what we got back / what we spent
+            payback = (total_recuperado / valor_entrada) if valor_entrada > 0 else (1.0 if total_recuperado > 0 else 0)
+
+            # Lucro acumulado = total recuperado - total investido
+            lucro_acumulado = total_recuperado - valor_entrada
+
+            # ROI = lucro / investimento
+            roi = (lucro_acumulado / valor_entrada * 100) if valor_entrada > 0 else 0
+
+            # Sell-through = qty saída total / qty entrada (all-time)
+            sell_through = (qty_saida_total / qty_entrada) if qty_entrada > 0 else (1.0 if qty_saida_total > 0 else 0)
+
+            # Core calcs
+            capital_empatado = max(0, stock) * custo
+            valor_pvp        = max(0, stock) * pvp
+            margem_pct       = ((pvp - custo) / pvp * 100) if pvp > 0 else 0
+            margem_12m       = (pvp - custo) * vendido_12m if vendido_12m > 0 else 0
+
+            # Days without sale
             dias_sem_venda = None
             if ultima_venda:
-                from datetime import datetime
-                dias_sem_venda = (datetime.now() - datetime.strptime(ultima_venda, '%Y-%m-%d')).days
+                try:
+                    dias_sem_venda = (_now - _dt.strptime(ultima_venda, '%Y-%m-%d')).days
+                except Exception:
+                    pass
 
-            total_valor_custo += max(0, valor_stock_custo)
-            total_valor_pvp += max(0, valor_stock_pvp)
-            total_margem += margem_valor
-            total_artigos += 1
+            # Stock rotation (annualised) = qty sold 12m / avg stock
+            rotacao = (vendido_12m / max(stock, 0.001)) if vendido_12m > 0 and stock > 0 else 0
 
-            if stock < 0: stock_negativo += 1
-            if not ultima_venda or (dias_sem_venda and dias_sem_venda > 180): sem_movimento += 1
+            # GMROI contribution
+            gmroi_item = (margem_12m / capital_empatado * 100) if capital_empatado > 0 else 0
 
-            items.append({
-                'ref': ref,
-                'design': design,
-                'stock': stock,
-                'custo': custo,
-                'pvp': pvp,
-                'familia': familia,
-                'valor_custo': valor_stock_custo,
-                'valor_pvp': valor_stock_pvp,
+            item = {
+                'ref': ref, 'design': design, 'stock': stock, 'custo': custo,
+                'pvp': pvp, 'familia': familia,
+                'excluido': excluido_total,
+                'excluido_segmentos': excluido_segmentos,
+                # Stock values
+                'capital_empatado': round(capital_empatado, 2),
+                'valor_pvp': round(valor_pvp, 2),
+                # Margins
                 'margem_pct': round(margem_pct, 1),
+                'margem_12m': round(margem_12m, 2),
+                # 12m sales (from fi/ft — actual sale prices)
                 'vendido_12m': vendido_12m,
                 'faturado_12m': faturado_12m,
-                'margem_valor': round(margem_valor, 2),
+                'num_facturas': v12.get('facturas', 0),
                 'ultima_venda': ultima_venda,
                 'dias_sem_venda': dias_sem_venda,
-                'num_facturas': v.get('facturas', 0),
-            })
+                # All-time movements from sl (complete history incl. production)
+                'qty_entrada':          round(qty_entrada, 2),
+                'valor_entrada':        round(valor_entrada, 2),
+                'qty_saida_venda':      round(qty_saida_venda, 2),
+                'receita_venda':        round(receita_venda, 2),
+                'qty_saida_producao':   round(qty_saida_producao, 2),
+                'valor_saida_producao': round(valor_saida_producao, 2),
+                'qty_saida_total':      round(qty_saida_total, 2),
+                'total_recuperado':     round(total_recuperado, 2),
+                'lucro_acumulado':      round(lucro_acumulado, 2),
+                # Derived KPIs
+                'sell_through': round(min(sell_through, 9.99), 3),
+                'payback':      round(min(payback, 99.9), 3),
+                'roi':          round(roi, 1),
+                'rotacao':      round(rotacao, 2),
+                'gmroi_item':   round(gmroi_item, 1),
+            }
 
-        # --- ABC Classification by revenue ---
-        items_com_venda = sorted([i for i in items if i['faturado_12m'] > 0],
-                                  key=lambda x: x['faturado_12m'], reverse=True)
-        total_fat = sum(i['faturado_12m'] for i in items_com_venda)
-        acum = 0
-        abc_counts = {'A': 0, 'B': 0, 'C': 0}
-        for item in items_com_venda:
-            acum += item['faturado_12m']
-            pct = acum / total_fat if total_fat else 0
-            if pct <= 0.7:
-                item['abc'] = 'A'
-                abc_counts['A'] += 1
-            elif pct <= 0.9:
-                item['abc'] = 'B'
-                abc_counts['B'] += 1
+            if excluido_total:
+                excluidos_lista.append(item)
             else:
-                item['abc'] = 'C'
-                abc_counts['C'] += 1
-        for item in items:
-            if 'abc' not in item:
-                item['abc'] = '-'
+                items.append(item)
+                # excluido_segmentos items stay in KPI aggregates but not in segment lists
 
-        # --- GMROI ---
-        gmroi = (total_margem / total_valor_custo * 100) if total_valor_custo > 0 else 0
+        # ── Aggregate KPIs — all non-total-excluded items ────────────────────
+        total_capital      = sum(i['capital_empatado'] for i in items)
+        total_valor_pvp    = sum(i['valor_pvp'] for i in items)
+        total_margem_12m   = sum(i['margem_12m'] for i in items)
+        total_receita_all  = sum(i['receita_venda'] for i in items)
+        total_entrada      = sum(i['valor_entrada'] for i in items)
+        total_recuperado   = sum(i['total_recuperado'] for i in items)
+        total_lucro        = sum(i['lucro_acumulado'] for i in items)
+        sem_movimento      = sum(1 for i in items if not i['ultima_venda'] or (i['dias_sem_venda'] and i['dias_sem_venda'] > 180))
+        stock_negativo     = sum(1 for i in items if i['stock'] < 0)
+        gmroi              = (total_margem_12m / total_capital * 100) if total_capital > 0 else 0
+        payback_global     = (total_recuperado / total_entrada) if total_entrada > 0 else 0
+        qty_entrada_total  = sum(i['qty_entrada'] for i in items)
+        qty_saida_total_g  = sum(i['qty_saida_total'] for i in items)
 
-        # --- Top performers ---
-        def rot(x): return (x['stock'] / (x['vendido_12m']/12)) if x['vendido_12m'] > 0 else 0
-        top_faturacao = sorted(items, key=lambda x: x['faturado_12m'], reverse=True)[:10]
-        top_margem    = sorted([a for a in items if a['margem_valor'] > 0], key=lambda x: x['margem_valor'], reverse=True)[:10]
-        sem_vendas    = sorted([a for a in items if a['vendido_12m'] == 0 and a['stock'] > 0], key=lambda x: x['valor_custo'], reverse=True)[:10]
-        excesso       = sorted([a for a in items if a['vendido_12m'] > 0 and a['stock'] > 0], key=rot, reverse=True)[:10]
+        # ── ABC ──────────────────────────────────────────────────────────────
+        items_fat = sorted([i for i in items if i['faturado_12m'] > 0],
+                            key=lambda x: x['faturado_12m'], reverse=True)
+        total_fat = sum(i['faturado_12m'] for i in items_fat)
+        acum = 0; abc_counts = {'A': 0, 'B': 0, 'C': 0}
+        for it in items_fat:
+            acum += it['faturado_12m']
+            pct = acum / total_fat if total_fat else 0
+            it['abc'] = 'A' if pct <= 0.7 else ('B' if pct <= 0.9 else 'C')
+            abc_counts[it['abc']] += 1
+        for it in items:
+            if 'abc' not in it: it['abc'] = '-'
 
-        # --- Alerts ---
+        # ── Segmentos — excludes both total-excluded AND segmentos-excluded ──────
+        # items_seg: pool for all segment analysis (no excluded_segmentos either)
+        items_seg = [i for i in items if not i.get('excluido_segmentos')]
+
+        def _f(src_items, key, rev=True, n=15, extra_filter=None):
+            src = [i for i in src_items if extra_filter(i)] if extra_filter else src_items
+            return sorted(src, key=lambda x: x[key], reverse=rev)[:n]
+
+        # Winner score: rewards margin €, volume, rotation and sell-through together.
+        # Selling 30× with moderate margin beats selling once with 90% margin.
+        def _winner_score(i):
+            m12  = max(i['margem_12m'], 0)           # € margin last 12m
+            rot  = min(i['rotacao'], 20)              # stock rotation (capped)
+            nf   = min(i['num_facturas'], 50)         # number of invoices (capped)
+            st   = min(max(i['sell_through'], 0), 1)  # sell-through 0–1
+            lucro= max(i['lucro_acumulado'], 0)       # all-time profit
+            # Composite: margin × rotation bonus × transaction frequency × sell-through
+            return (m12 * (1 + rot / 5) * (1 + nf / 10) * max(st, 0.1)
+                    + lucro * 0.15)                  # small weight on all-time profit
+
+        # All segment lists use items_seg (excludes both tipos of exclusion)
+        top_winners = sorted(
+            [i for i in items_seg if i['margem_12m'] > 0 and i['qty_saida_total'] > 0],
+            key=_winner_score, reverse=True
+        )[:15]
+        for i in top_winners:
+            i['winner_score'] = round(_winner_score(i), 2)
+        top_faturacao = _f(items_seg, 'faturado_12m')
+        top_margem    = _f(items_seg, 'margem_12m', extra_filter=lambda i: i['margem_12m'] > 0)
+        alta_rotacao  = _f(items_seg, 'rotacao', extra_filter=lambda i: i['rotacao'] > 0 and i['stock'] > 0)
+        dead_stock    = _f(items_seg, 'capital_empatado', n=50,
+                           extra_filter=lambda i: i['stock'] > 0 and (not i['ultima_venda'] or (i['dias_sem_venda'] and i['dias_sem_venda'] > 365)))
+        excesso_stock = _f(items_seg, 'capital_empatado', n=50,
+                           extra_filter=lambda i: i['stock'] > 0 and i['rotacao'] > 0 and (i['stock'] / (i['vendido_12m']/12 or 0.001)) > 12 if i['vendido_12m'] > 0 else i['stock'] > 0 and not i['ultima_venda'])
+        baixa_margem  = _f(items_seg, 'faturado_12m',
+                           extra_filter=lambda i: 0 < i['margem_pct'] < 20 and i['vendido_12m'] > 0)
+
+        # Cumulative totals for PDF
+        dead_stock_capital_total   = sum(i['capital_empatado'] for i in dead_stock)
+        excesso_stock_capital_total = sum(i['capital_empatado'] for i in excesso_stock)
+        # For excess: capital beyond recommended stock (2 months avg)
+        excesso_stock_valor_excedente = sum(
+            max(0, i['capital_empatado'] - i['custo'] * (i['vendido_12m'] / 6))
+            for i in excesso_stock if i['vendido_12m'] > 0
+        )
+
+        # ── Top Flops — also uses items_seg ──────────────────────────────────
+        top_flops = sorted(
+            [i for i in items_seg if (
+                (i['payback'] < 1 and i['valor_entrada'] > 0) or
+                (i['stock'] > 0 and i['qty_saida_total'] == 0 and i['valor_entrada'] > 0)
+            )],
+            key=lambda x: x['capital_empatado'], reverse=True
+        )[:50]
+        top_flops_capital_total = sum(i['capital_empatado'] for i in top_flops)
+
+        # ── Alerts ────────────────────────────────────────────────────────────
         alertas = []
         for i in items:
             if i['stock'] < 0:
@@ -7139,40 +7846,80 @@ def api_inventario_kpis():
             elif i['margem_pct'] < 0 and i['vendido_12m'] > 0:
                 alertas.append({'tipo': 'margem_neg', 'ref': i['ref'], 'design': i['design'][:50], 'valor': i['margem_pct']})
 
-        # --- Families breakdown ---
+        # ── Families ─────────────────────────────────────────────────────────
         familias = {}
         for i in items:
-            f = i['familia'] or 'Sem familia'
+            f = i['familia'] or 'Sem família'
             if f not in familias:
-                familias[f] = {'artigos': 0, 'valor_custo': 0, 'faturado': 0}
+                familias[f] = {'artigos': 0, 'capital': 0, 'faturado': 0}
             familias[f]['artigos'] += 1
-            familias[f]['valor_custo'] += max(0, i['valor_custo'])
+            familias[f]['capital'] += i['capital_empatado']
             familias[f]['faturado'] += i['faturado_12m']
         top_familias = sorted(familias.items(), key=lambda x: x[1]['faturado'], reverse=True)[:8]
 
+        def _slim(lst, fields=None):
+            if fields is None:
+                fields = ['ref','design','stock','custo','pvp','familia','abc',
+                          'capital_empatado','valor_pvp','margem_pct','margem_12m',
+                          'vendido_12m','faturado_12m','ultima_venda','dias_sem_venda',
+                          'qty_entrada','valor_entrada','qty_saida_venda','receita_venda',
+                          'qty_saida_producao','valor_saida_producao','qty_saida_total',
+                          'total_recuperado','lucro_acumulado',
+                          'sell_through','payback','roi','rotacao','excluido',
+                          'winner_score']
+            return [{k: i[k] for k in fields if k in i} for i in lst]
+
         return jsonify({
             'kpis': {
-                'total_artigos': total_artigos,
-                'artigos_com_stock': len([i for i in items if i['stock'] > 0]),
-                'artigos_sem_stock': len([i for i in items if i['stock'] <= 0]),
-                'stock_negativo': stock_negativo,
+                'total_artigos':    len(items),
+                'artigos_excluidos': len(excluidos_lista),
+                'artigos_com_stock': sum(1 for i in items if i['stock'] > 0),
+                'artigos_sem_stock': sum(1 for i in items if i['stock'] <= 0),
+                'stock_negativo':    stock_negativo,
                 'sem_movimento_180d': sem_movimento,
-                'valor_stock_custo': round(total_valor_custo, 2),
-                'valor_stock_pvp': round(total_valor_pvp, 2),
-                'margem_total': round(total_margem, 2),
-                'gmroi': round(gmroi, 1),
-                'faturacao_12m': round(sum(i['faturado_12m'] for i in items), 2),
+                'capital_empatado':  round(total_capital, 2),
+                'valor_stock_pvp':   round(total_valor_pvp, 2),
+                'margem_total_12m':  round(total_margem_12m, 2),
+                'faturacao_12m':     round(sum(i['faturado_12m'] for i in items), 2),
+                'receita_total_all':  round(total_receita_all, 2),
+                'valor_entrada_all':  round(total_entrada, 2),
+                'total_recuperado':   round(total_recuperado, 2),
+                'lucro_acumulado':    round(total_lucro, 2),
+                'gmroi':              round(gmroi, 1),
+                'payback_global':     round(payback_global, 3),
+                'sell_through_global': round(
+                    qty_saida_total_g / max(qty_entrada_total, 1), 3),
+                'n_flops': len(top_flops),
+                'n_dead_stock': len(dead_stock),
+                'capital_dead_stock': round(dead_stock_capital_total, 2),
+                'n_top_flops': len(top_flops),
+                'capital_top_flops': round(top_flops_capital_total, 2),
+                'n_excesso_stock': len(excesso_stock),
+                'capital_excesso': round(excesso_stock_capital_total, 2),
+                'capital_excedente': round(excesso_stock_valor_excedente, 2),
+                'pct_dead_stock': round(
+                    sum(i['capital_empatado'] for i in dead_stock) / total_capital * 100
+                    if total_capital > 0 else 0, 1),
             },
             'abc': abc_counts,
             'alertas': alertas[:20],
-            'top_faturacao': top_faturacao,
-            'top_margem': top_margem,
-            'sem_vendas': sem_vendas,
+            'top_faturacao': _slim(top_faturacao),
+            'top_margem':    _slim(top_margem),
+            'top_winners':   _slim(top_winners),
+            'alta_rotacao':  _slim(alta_rotacao),
+            'dead_stock':    _slim(dead_stock),
+            'excesso_stock': _slim(excesso_stock),
+            'baixa_margem':  _slim(baixa_margem),
+            'top_flops':     _slim(top_flops),
             'familias': [{'familia': k, **v} for k, v in top_familias],
+            'excluidos': [{'ref': i['ref'], 'design': i['design'], 'tipo': 'total'} for i in excluidos_lista],
+            'excluidos_segmentos': [{'ref': i['ref'], 'design': i['design'], 'tipo': 'segmentos'}
+                                    for i in items if i.get('excluido_segmentos')],
         })
 
     except Exception as e:
-        app.logger.error(f"inventario KPIs error: {e}")
+        import traceback
+        app.logger.error(f"inventario KPIs error: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -7263,6 +8010,8 @@ def tecnico_novo():
         )
         db.session.add(e)
         db.session.commit()
+        _tecnico_sincronizar_fotos(e.id)
+        db.session.commit()
         return redirect(url_for('tecnico_detalhe', eid=e.id))
     return render_template('tecnico_form.html', equipamento=None)
 
@@ -7280,6 +8029,8 @@ def tecnico_detalhe(eid):
 def tecnico_editar(eid):
     e = Equipamento.query.get_or_404(eid)
     if request.method == 'POST':
+        _old_cliente = e.cliente_nome
+        _old_emb     = e.embarcacao
         e.cliente_nome      = request.form.get('cliente_nome','').strip()
         e.embarcacao        = request.form.get('embarcacao','').strip()
         e.motor_marca       = request.form.get('motor_marca','').strip()
@@ -7304,6 +8055,10 @@ def tecnico_editar(eid):
         e.fuel_system_eng   = request.form.get('fuel_system_eng','').strip()
         e.notas             = request.form.get('notas','').strip()
         db.session.commit()
+        # Re-sync photos if vessel changed
+        if e.cliente_nome != _old_cliente or e.embarcacao != _old_emb:
+            _tecnico_sincronizar_fotos(eid)
+            db.session.commit()
         return redirect(url_for('tecnico_detalhe', eid=eid))
     return render_template('tecnico_form.html', equipamento=e)
 
@@ -7852,13 +8607,46 @@ def tecnico_doc_download(did):
 def tecnico_doc_apagar(did):
     d = EquipamentoDocumento.query.get_or_404(did)
     eid = d.equipamento_id
-    try:
-        path = os.path.join(UPLOAD_TECNICO, d.pdf_path)
-        if os.path.exists(path): os.remove(path)
-    except Exception: pass
-    db.session.delete(d)
+    if d.componente in ('foto_galeria', 'foto_principal') and d.pdf_path:
+        # Delete all shared records pointing to the same file
+        shared = EquipamentoDocumento.query.filter_by(pdf_path=d.pdf_path).all()
+        for sd in shared:
+            db.session.delete(sd)
+        try:
+            fpath = os.path.join(UPLOAD_TECNICO, d.pdf_path)
+            if os.path.exists(fpath): os.remove(fpath)
+        except Exception: pass
+    else:
+        try:
+            fpath = os.path.join(UPLOAD_TECNICO, d.pdf_path)
+            if os.path.exists(fpath): os.remove(fpath)
+        except Exception: pass
+        db.session.delete(d)
     db.session.commit()
-    return redirect(url_for('tecnico_detalhe', eid=eid))
+    return jsonify({'ok': True})
+
+
+@app.route('/tecnico/<int:eid>/foto-principal/apagar', methods=['POST'])
+@login_required
+def tecnico_foto_principal_apagar(eid):
+    siblings = _tecnico_siblings(eid)
+    all_ids = [eid] + [s.id for s in siblings]
+    docs = EquipamentoDocumento.query.filter(
+        EquipamentoDocumento.equipamento_id.in_(all_ids),
+        EquipamentoDocumento.componente == 'foto_principal'
+    ).all()
+    paths = {d.pdf_path for d in docs if d.pdf_path}
+    for d in docs:
+        db.session.delete(d)
+    for p in paths:
+        try:
+            fpath = os.path.join(UPLOAD_TECNICO, p)
+            if os.path.exists(fpath):
+                os.remove(fpath)
+        except Exception:
+            pass
+    db.session.commit()
+    return jsonify({'ok': True})
 
 
 # ── BIBLIOTECA DE FACTORY CODE PDFs ─────────────────────────────────────────
@@ -8223,14 +9011,96 @@ def extrair_factory_code(filename):
             break
     return code, catalog
 
+def _tecnico_siblings(eid):
+    """Return list of Equipamento with same (cliente_nome, embarcacao), excluding eid."""
+    e = Equipamento.query.get(eid)
+    if not e or not e.cliente_nome or not e.embarcacao:
+        return []
+    return Equipamento.query.filter(
+        Equipamento.id != eid,
+        Equipamento.cliente_nome == e.cliente_nome,
+        Equipamento.embarcacao == e.embarcacao
+    ).all()
+
+
+def _tecnico_sincronizar_fotos(eid):
+    """Ensure equipment eid has all shared photos from its vessel siblings.
+    Adds missing records and removes records from old vessel.
+    All shared foto docs use the same pdf_path (single file on disk).
+    """
+    e = Equipamento.query.get(eid)
+    if not e:
+        return
+    siblings = _tecnico_siblings(eid)
+    foto_componentes = ('foto_principal', 'foto_galeria')
+
+    if not e.cliente_nome or not e.embarcacao:
+        # No vessel info — remove any inherited shared photos
+        own_docs = EquipamentoDocumento.query.filter(
+            EquipamentoDocumento.equipamento_id == eid,
+            EquipamentoDocumento.componente.in_(foto_componentes)
+        ).all()
+        for d in own_docs:
+            # Only remove if another equipment also has this path (it was shared/inherited)
+            other = EquipamentoDocumento.query.filter(
+                EquipamentoDocumento.pdf_path == d.pdf_path,
+                EquipamentoDocumento.id != d.id
+            ).first()
+            if other:
+                db.session.delete(d)
+        return
+
+    # Collect all pdf_paths that belong to the current vessel group
+    sibling_paths = {}  # pdf_path -> first doc found (as template)
+    for sib in siblings:
+        for doc in EquipamentoDocumento.query.filter(
+            EquipamentoDocumento.equipamento_id == sib.id,
+            EquipamentoDocumento.componente.in_(foto_componentes)
+        ).all():
+            if doc.pdf_path not in sibling_paths:
+                sibling_paths[doc.pdf_path] = doc
+
+    # Get existing foto docs for this equipment
+    own_docs = {d.pdf_path: d for d in EquipamentoDocumento.query.filter(
+        EquipamentoDocumento.equipamento_id == eid,
+        EquipamentoDocumento.componente.in_(foto_componentes)
+    ).all()}
+
+    # Add missing sibling photos to this equipment
+    for path, tmpl in sibling_paths.items():
+        if path not in own_docs:
+            db.session.add(EquipamentoDocumento(
+                equipamento_id=eid,
+                componente=tmpl.componente,
+                titulo=tmpl.titulo,
+                pdf_filename=tmpl.pdf_filename,
+                pdf_path=path
+            ))
+
+    # Remove docs from this equipment that are NOT in the current vessel group
+    # but ARE shared with some other equipment (meaning they came from a different vessel)
+    current_paths = set(sibling_paths.keys()) | set(own_docs.keys())
+    for path, doc in own_docs.items():
+        if path in sibling_paths:
+            continue  # belongs to current vessel ✓
+        # Check if another equipment has this path (shared from old vessel)
+        other = EquipamentoDocumento.query.filter(
+            EquipamentoDocumento.pdf_path == path,
+            EquipamentoDocumento.id != doc.id
+        ).first()
+        if other:
+            # Inherited from old vessel — remove from this equipment
+            db.session.delete(doc)
+
+
 @app.route('/tecnico/<int:eid>/foto-galeria', methods=['POST'])
 @login_required
 def tecnico_foto_galeria(eid):
-    Equipamento.query.get_or_404(eid)
+    e = Equipamento.query.get_or_404(eid)
     f = request.files.get('foto')
     if not f or not f.filename:
         return jsonify({'ok': False, 'error': 'Sem ficheiro'})
-    import uuid, mimetypes
+    import uuid
     ext = os.path.splitext(f.filename)[1].lower()
     nome = f'galeria_{eid}_{uuid.uuid4().hex[:8]}{ext}'
     ensure_upload_dir()
@@ -8238,7 +9108,13 @@ def tecnico_foto_galeria(eid):
     doc = EquipamentoDocumento(
         equipamento_id=eid, componente='foto_galeria',
         titulo=f.filename, pdf_filename=f.filename, pdf_path=nome)
-    db.session.add(doc); db.session.commit()
+    db.session.add(doc)
+    # Share with siblings (same cliente_nome + embarcacao)
+    for sib in _tecnico_siblings(eid):
+        db.session.add(EquipamentoDocumento(
+            equipamento_id=sib.id, componente='foto_galeria',
+            titulo=f.filename, pdf_filename=f.filename, pdf_path=nome))
+    db.session.commit()
     return jsonify({'ok': True, 'id': doc.id,
         'url': '/tecnico/documento/' + str(doc.id) + '/ver',
         'nome': doc.pdf_filename})
@@ -8256,16 +9132,28 @@ def tecnico_foto(eid):
     nome = f'foto_{eid}_{uuid.uuid4().hex[:8]}{ext}'
     ensure_upload_dir()
     f.save(os.path.join(UPLOAD_TECNICO, nome))
-    # Remove old principal photo doc
-    old = EquipamentoDocumento.query.filter_by(equipamento_id=eid, componente='foto_principal').first()
-    if old:
-        try: os.remove(os.path.join(UPLOAD_TECNICO, old.pdf_path or ''))
+    siblings = _tecnico_siblings(eid)
+    all_ids = [eid] + [s.id for s in siblings]
+    # Remove old principal photo for this vessel group
+    old_docs = EquipamentoDocumento.query.filter(
+        EquipamentoDocumento.equipamento_id.in_(all_ids),
+        EquipamentoDocumento.componente == 'foto_principal'
+    ).all()
+    old_paths = {d.pdf_path for d in old_docs if d.pdf_path}
+    for d in old_docs:
+        db.session.delete(d)
+    for p in old_paths:
+        try: os.remove(os.path.join(UPLOAD_TECNICO, p))
         except: pass
-        db.session.delete(old)
+    # Create new doc for this equipment and all siblings
     doc = EquipamentoDocumento(
         equipamento_id=eid, componente='foto_principal',
         titulo='Foto Principal', pdf_filename=f.filename, pdf_path=nome)
     db.session.add(doc)
+    for sib in siblings:
+        db.session.add(EquipamentoDocumento(
+            equipamento_id=sib.id, componente='foto_principal',
+            titulo='Foto Principal', pdf_filename=f.filename, pdf_path=nome))
     db.session.commit()
     return jsonify({'ok': True, 'url': '/tecnico/documento/' + str(doc.id) + '/ver'})
 
@@ -11439,4 +12327,271 @@ def ausencias_exportar():
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment;filename=ausencias_{ano}.csv'}
     )
+
+
+# \u2500\u2500 CONSULTAS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+def _norm(s):
+    """Lowercase, keep only alphanumeric \u2014 for fuzzy comparison."""
+    return re.sub(r'[^a-z0-9]', '', s.lower())
+
+def _tokens_match(a, b, threshold=0.82):
+    """True if any significant token of 'a' fuzzy-matches any token of 'b'.
+    Handles typos like JABASCO\u2248Jabsco and partial names like ITT JABASCO\u2248Jabsco."""
+    for ta in (t for t in (_norm(w) for w in a.split()) if len(t) >= 3):
+        for tb in (t for t in (_norm(w) for w in b.split()) if len(t) >= 3):
+            # Substring containment (handles "Jabsco" inside "ITT Jabasco Pumps")
+            if ta in tb or tb in ta:
+                return True
+            # Fuzzy ratio for typos (JABASCO \u2248 JABSCO)
+            if len(ta) >= 4 and len(tb) >= 4:
+                if SequenceMatcher(None, ta, tb).ratio() >= threshold:
+                    return True
+    return False
+
+def _sugestoes_cruzadas(marca_nome, exclude_marca_id=None):
+    """Find suppliers from other brands whose sub_marcas fuzzy-match marca_nome.
+    Returns list of {'fornecedor': obj, 'via_sub': matched_text}."""
+    resultado = []
+    q = FornecedorConsulta.query
+    if exclude_marca_id:
+        q = q.filter(FornecedorConsulta.marca_id != exclude_marca_id)
+    for forn in q.all():
+        for sub in (forn.sub_marcas or '').split(','):
+            sub = sub.strip()
+            if sub and _tokens_match(marca_nome, sub):
+                resultado.append({'fornecedor': forn, 'via_sub': sub})
+                break
+    return resultado
+
+def _guardar_contactos_consulta(fornecedor_id):
+    nomes   = request.form.getlist('c_nome')
+    emails  = request.form.getlist('c_email')
+    cargos  = request.form.getlist('c_cargo')
+    linguas = request.form.getlist('c_lingua')
+    ContactoFornecedorConsulta.query.filter_by(fornecedor_id=fornecedor_id).delete()
+    for i, nome in enumerate(nomes):
+        if nome.strip():
+            db.session.add(ContactoFornecedorConsulta(
+                fornecedor_id=fornecedor_id,
+                nome=nome.strip(),
+                email=emails[i].strip() if i < len(emails) else '',
+                cargo=cargos[i].strip() if i < len(cargos) else '',
+                lingua=linguas[i] if i < len(linguas) else 'en',
+                ordem=i,
+            ))
+
+
+@app.route('/consultas')
+@login_required
+def consultas():
+    q = request.args.get('q', '').strip()
+    marcas = MarcaConsulta.query.order_by(MarcaConsulta.nome).all()
+    resultados = None
+    if q:
+        ql = q.lower()
+        resultados = []
+        for forn in FornecedorConsulta.query.all():
+            exact = (ql in forn.nome.lower() or
+                     ql in (forn.pais or '').lower() or
+                     ql in (forn.sub_marcas or '').lower() or
+                     ql in forn.marca.nome.lower() or
+                     any(ql in c.nome.lower() or ql in (c.email or '').lower()
+                         for c in forn.contactos))
+            # Fuzzy sub-brand match — catches typos and partial names
+            fuzzy_sub = not exact and any(
+                _tokens_match(q, s.strip())
+                for s in (forn.sub_marcas or '').split(',') if s.strip()
+            )
+            if exact or fuzzy_sub:
+                resultados.append(forn)
+    return render_template('consultas.html', marcas=marcas, resultados=resultados, q=q)
+
+
+@app.route('/consultas/marca/nova', methods=['GET', 'POST'])
+@login_required
+def consultas_nova_marca():
+    if request.method == 'POST':
+        nome = request.form.get('nome', '').strip()
+        if not nome:
+            flash('O nome \u00e9 obrigat\u00f3rio.', 'error')
+            return render_template('consultas_marca_form.html', marca=None)
+        logo_path = None
+        f = request.files.get('logo')
+        if f and f.filename:
+            ext = os.path.splitext(secure_filename(f.filename))[1].lower()
+            fname = f'marca_consulta_{uuid.uuid4().hex[:8]}{ext}'
+            f.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
+            logo_path = fname
+        marca = MarcaConsulta(nome=nome,
+                               descricao=request.form.get('descricao', '').strip(),
+                               logo_path=logo_path)
+        db.session.add(marca)
+        db.session.commit()
+        flash('Marca criada com sucesso.', 'success')
+        return redirect(url_for('consultas'))
+    return render_template('consultas_marca_form.html', marca=None)
+
+
+@app.route('/consultas/marca/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def consultas_editar_marca(id):
+    marca = MarcaConsulta.query.get_or_404(id)
+    if request.method == 'POST':
+        marca.nome = request.form.get('nome', '').strip()
+        marca.descricao = request.form.get('descricao', '').strip()
+        f = request.files.get('logo')
+        if f and f.filename:
+            ext = os.path.splitext(secure_filename(f.filename))[1].lower()
+            fname = f'marca_consulta_{uuid.uuid4().hex[:8]}{ext}'
+            f.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
+            marca.logo_path = fname
+        db.session.commit()
+        flash('Marca actualizada.', 'success')
+        return redirect(url_for('consultas'))
+    return render_template('consultas_marca_form.html', marca=marca)
+
+
+@app.route('/consultas/marca/<int:id>/apagar', methods=['POST'])
+@login_required
+def consultas_apagar_marca(id):
+    marca = MarcaConsulta.query.get_or_404(id)
+    db.session.delete(marca)
+    db.session.commit()
+    flash('Marca apagada.', 'success')
+    return redirect(url_for('consultas'))
+
+
+@app.route('/consultas/marca/<int:id>')
+@login_required
+def consultas_marca(id):
+    marca = MarcaConsulta.query.get_or_404(id)
+    sugestoes = _sugestoes_cruzadas(marca.nome, exclude_marca_id=id)
+    return render_template('consultas_marca.html', marca=marca, sugestoes=sugestoes)
+
+
+@app.route('/consultas/fornecedor/novo', methods=['GET', 'POST'])
+@login_required
+def consultas_novo_fornecedor():
+    marcas = MarcaConsulta.query.order_by(MarcaConsulta.nome).all()
+    marca_id = request.args.get('marca_id', type=int)
+    if request.method == 'POST':
+        forn = FornecedorConsulta(
+            marca_id=request.form.get('marca_id', type=int),
+            nome=request.form.get('nome', '').strip(),
+            pais=request.form.get('pais', '').strip(),
+            sub_marcas=request.form.get('sub_marcas', '').strip(),
+            observacoes=request.form.get('observacoes', '').strip(),
+        )
+        db.session.add(forn)
+        db.session.flush()
+        _guardar_contactos_consulta(forn.id)
+        db.session.commit()
+        flash('Fornecedor adicionado.', 'success')
+        return redirect(url_for('consultas_marca', id=forn.marca_id))
+    return render_template('consultas_fornecedor_form.html',
+                           fornecedor=None, marcas=marcas, marca_id=marca_id)
+
+
+@app.route('/consultas/fornecedor/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def consultas_editar_fornecedor(id):
+    forn = FornecedorConsulta.query.get_or_404(id)
+    marcas = MarcaConsulta.query.order_by(MarcaConsulta.nome).all()
+    if request.method == 'POST':
+        forn.marca_id = request.form.get('marca_id', type=int)
+        forn.nome = request.form.get('nome', '').strip()
+        forn.pais = request.form.get('pais', '').strip()
+        forn.sub_marcas = request.form.get('sub_marcas', '').strip()
+        forn.observacoes = request.form.get('observacoes', '').strip()
+        _guardar_contactos_consulta(forn.id)
+        db.session.commit()
+        flash('Fornecedor actualizado.', 'success')
+        return redirect(url_for('consultas_marca', id=forn.marca_id))
+    return render_template('consultas_fornecedor_form.html',
+                           fornecedor=forn, marcas=marcas, marca_id=forn.marca_id)
+
+
+@app.route('/consultas/fornecedor/<int:id>/apagar', methods=['POST'])
+@login_required
+def consultas_apagar_fornecedor(id):
+    forn = FornecedorConsulta.query.get_or_404(id)
+    marca_id = forn.marca_id
+    db.session.delete(forn)
+    db.session.commit()
+    flash('Fornecedor apagado.', 'success')
+    return redirect(url_for('consultas_marca', id=marca_id))
+
+
+@app.route('/consultas/fornecedor/<int:id>/avaliar', methods=['POST'])
+@login_required
+def consultas_avaliar_fornecedor(id):
+    forn = FornecedorConsulta.query.get_or_404(id)
+    AvaliacaoFornecedorConsulta.query.filter_by(
+        fornecedor_id=id, user_id=current_user.id).delete()
+    av = AvaliacaoFornecedorConsulta(
+        fornecedor_id=id,
+        user_id=current_user.id,
+        velocidade=int(request.form.get('velocidade') or 0),
+        preco=int(request.form.get('preco') or 0),
+        qualidade=int(request.form.get('qualidade') or 0),
+        fiabilidade=int(request.form.get('fiabilidade') or 0),
+        comentario=request.form.get('comentario', '').strip(),
+    )
+    db.session.add(av)
+    db.session.commit()
+    flash('Avalia\u00e7\u00e3o guardada.', 'success')
+    return redirect(url_for('consultas_marca', id=forn.marca_id))
+
+
+@app.route('/consultas/pesquisar-submarcas', methods=['POST'])
+@login_required
+def consultas_pesquisar_submarcas():
+    from ai_provider import search_company_brands
+    data = request.get_json() or {}
+    nome = data.get('nome', '').strip()
+    if not nome:
+        return jsonify({'error': 'Introduza primeiro o nome da empresa.'}), 400
+    cfg_ia = ConfigIA.query.first()
+    resultado, erro = search_company_brands(cfg_ia, nome)
+    if erro:
+        return jsonify({'error': erro}), 400
+    if resultado:
+        resultado = nome + ', ' + resultado
+    return jsonify({'submarcas': resultado})
+
+
+@app.route('/consultas/gerar-email', methods=['POST'])
+@login_required
+def consultas_gerar_email():
+    from ai_provider import generate_inquiry_email
+    data = request.get_json() or {}
+    cfg_ia = ConfigIA.query.first()
+    cfg_geral_obj = ConfigGeral.query.first()
+    empresa_nome = cfg_geral_obj.empresa_nome if cfg_geral_obj and cfg_geral_obj.empresa_nome else 'NavTech'
+
+    contacto_id = data.get('contacto_id')
+    if contacto_id:
+        c = ContactoFornecedorConsulta.query.get(int(contacto_id))
+        if not c:
+            return jsonify({'error': 'Contacto n\u00e3o encontrado.'}), 404
+        contacto_nome = c.nome
+        lingua = c.lingua
+        fornecedor_nome = c.fornecedor.nome
+    else:
+        contacto_nome = data.get('contacto_nome', '')
+        lingua = data.get('lingua', 'en')
+        fornecedor_nome = data.get('fornecedor_nome', '')
+
+    texto, erro = generate_inquiry_email(
+        cfg=cfg_ia,
+        prompt_utilizador=data.get('prompt', ''),
+        fornecedor_nome=fornecedor_nome,
+        contacto_nome=contacto_nome,
+        lingua=lingua,
+        empresa_nome=empresa_nome,
+    )
+    if erro:
+        return jsonify({'error': erro}), 400
+    return jsonify({'email': texto})
 

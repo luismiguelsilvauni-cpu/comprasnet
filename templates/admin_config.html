@@ -187,9 +187,9 @@ function regenerarIcons() {
   </div>
   <div id="backupManualMsg" style="display:none;font-size:12px;padding:8px;border-radius:6px;margin-bottom:10px"></div>
 
-  <!-- Pasta local -->
+  <!-- Pasta local (1ª localização) -->
   <div class="form-group">
-    <label>📁 Pasta Local</label>
+    <label>📁 1ª Localização — Servidor Local</label>
     <div style="display:flex;gap:6px;align-items:center">
       <input type="text" name="backup_local_path" id="backupLocalPath"
         value="{{ cfg.backup_local_path or 'backups' }}"
@@ -203,18 +203,19 @@ function regenerarIcons() {
     <div id="testeLocal" style="font-size:11px;margin-top:4px;display:none"></div>
   </div>
 
-  <!-- Pasta de rede -->
+  <!-- 2ª localização (rede, PEN, USB) -->
   <div class="form-group">
-    <label>🌐 Pasta de Rede (opcional)</label>
+    <label>💾 2ª Localização — PEN / USB / Rede (opcional)</label>
     <div style="display:flex;gap:6px;align-items:center">
       <input type="text" name="backup_rede_path" id="backupRedePath"
         value="{{ cfg.backup_rede_path or '' }}"
-        placeholder="\\servidor\partilha\ComprasNet"
+        placeholder="E:\Backups  ou  \\NAS\ComprasNet"
         style="flex:1;font-family:monospace;font-size:12px">
       <button type="button" onclick="testarPasta('rede')" class="btn btn-ghost btn-sm" style="white-space:nowrap">🔍 Testar</button>
     </div>
     <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-      Caminho UNC (ex: <code>\\NAS\Backups</code>) ou mapeado (ex: <code>Z:\Backups</code>)
+      PEN/disco externo (ex: <code>E:\Backups</code>), letra de rede mapeada (ex: <code>Z:\Backups</code>) ou UNC (ex: <code>\\NAS\Backups</code>).
+      O backup é copiado automaticamente para ambas as localizações.
     </div>
     <div id="testeRede" style="font-size:11px;margin-top:4px;display:none"></div>
   </div>

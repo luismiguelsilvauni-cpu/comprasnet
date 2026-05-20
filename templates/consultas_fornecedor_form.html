@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar Fornecedor' if fornecedor else 'Novo Fornecedor' }} · Consultas{% endblock %}
+{% block content %}
+<style>
+.contacto-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 120px 32px;
+    gap: 8px;
+    align-items: end;
+    padding: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+.contacto-row input, .contacto-row select {
+    margin-bottom: 0;
+}
+.btn-remove-contacto {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    border: 1px solid rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.08);
+    color: var(--danger);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    padding: 0;
+}
+.btn-remove-contacto:hover { background: rgba(239,68,68,0.2); }
+.contacto-col-label {
+    font-size: 11px; color: var(--text-muted); font-weight: 500;
+    margin-bottom: 4px; display: block;
+}
+</style>
+
+<div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+        {% if fornecedor %}
+        <a href="{{ url_for('consultas_marca', id=fornecedor.marca_id) }}" class="btn btn-ghost btn-sm">← {{ fornecedor.marca.nome }}</a>
+        {% elif marca_id %}
+        <a href="{{ url_for('consultas_marca', id=marca_id) }}" class="btn btn-ghost btn-sm">← Voltar</a>
+        {% else %}
+        <a href="{{ url_for('consultas') }}" class="btn btn-ghost btn-sm">← Consultas</a>
+        {% endif %}
+        <span class="page-title">{{ '✏️ Editar Fornecedor' if fornecedor else '+ Novo Fornecedor' }}</span>
+    </div>
+</div>
+
+<div class="content">
+    <div style="max-width:720px">
+        <form method="POST">
+
+            <!-- Dados gerais -->
+            <div class="card" style="margin-bottom:16px">
+                <div class="card-title">Dados da Empresa</div>
+
+                <div class="form-group">
+                    <label>Marca *</label>
+                    <select name="marca_id" required>
+                        <option value="">-- Seleccione --</option>
+                        {% for m in marcas %}
+                        <option value="{{ m.id }}"
+                            {% if (fornecedor and fornecedor.marca_id == m.id) or (not fornecedor and marca_id and marca_id == m.id) %}selected{% endif %}>
+                            {{ m.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Nome da Empresa *</label>
+                        <input type="text" name="nome"
+                               value="{{ fornecedor.nome if fornecedor else '' }}"
+                               placeholder="Ex: Scanpart AB" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label>País / Localização</label>
+                        <input type="text" name="pais"
+                               value="{{ fornecedor.pais if fornecedor else '' }}"
+                               placeholder="Ex: Suécia">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                        <label style="margin-bottom:0">Sub-marcas / Referências</label>
+                        <button type="button" id="btn-ia-sub"
+                                onclick="pesquisarSubMarcasIA()"
+                                class="btn btn-ghost btn-sm"
+                                style="font-size:11px;padding:4px 10px;display:flex;align-items:center;gap:5px">
+                            <span id="ia-sub-spinner"
+                                  style="display:none;width:11px;height:11px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>
+                            🤖 Pesquisar com IA
+                        </button>
+                    </div>
+                    <input type="text" name="sub_marcas" id="campo_sub_marcas"
+                           value="{{ fornecedor.sub_marcas if fornecedor else '' }}"
+                           placeholder="Ex: Volvo IPS, Volvo D6, Volvo D4 (separar por vírgula)">
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5">
+                        A IA irá pesquisar: Nome da Empresa, marcas/brands e produtos (separados por vírgulas).
+                    </div>
+                    <div id="ia-sub-erro" style="display:none;font-size:11px;color:var(--danger);margin-top:4px"></div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0">
+                    <label>Observações</label>
+                    <textarea name="observacoes" rows="2"
+                              placeholder="Ex: Distribuidor oficial, mínimo de encomenda 500€">{{ fornecedor.observacoes if fornecedor else '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Contactos -->
+            <div class="card" style="margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                    <div class="card-title" style="margin-bottom:0">Contactos</div>
+                    <button type="button" onclick="adicionarContacto()" class="btn btn-ghost btn-sm">+ Adicionar Contacto</button>
+                </div>
+
+                <!-- Column headers -->
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 120px 32px;gap:8px;padding:0 10px;margin-bottom:4px">
+                    <span class="contacto-col-label">Nome *</span>
+                    <span class="contacto-col-label">Email</span>
+                    <span class="contacto-col-label">Cargo</span>
+                    <span class="contacto-col-label">Língua</span>
+                    <span></span>
+                </div>
+
+                <div id="contactos-lista">
+                    {% if fornecedor and fornecedor.contactos %}
+                        {% for c in fornecedor.contactos %}
+                        <div class="contacto-row">
+                            <input type="text" name="c_nome" value="{{ c.nome }}" placeholder="Nome" required>
+                            <input type="email" name="c_email" value="{{ c.email or '' }}" placeholder="email@empresa.com">
+                            <input type="text" name="c_cargo" value="{{ c.cargo or '' }}" placeholder="Ex: Commercial">
+                            <select name="c_lingua">
+                                {% for code, flag, lbl in [('pt','🇵🇹','Português'),('en','🇬🇧','English'),('fr','🇫🇷','Français'),('es','🇪🇸','Español')] %}
+                                <option value="{{ code }}" {% if c.lingua == code %}selected{% endif %}>{{ flag }} {{ lbl }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn-remove-contacto" onclick="removerContacto(this)" title="Remover">×</button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <!-- One blank row by default -->
+                        <div class="contacto-row">
+                            <input type="text" name="c_nome" placeholder="Nome" required>
+                            <input type="email" name="c_email" placeholder="email@empresa.com">
+                            <input type="text" name="c_cargo" placeholder="Ex: Commercial">
+                            <select name="c_lingua">
+                                <option value="pt">🇵🇹 Português</option>
+                                <option value="en" selected>🇬🇧 English</option>
+                                <option value="fr">🇫🇷 Français</option>
+                                <option value="es">🇪🇸 Español</option>
+                            </select>
+                            <button type="button" class="btn-remove-contacto" onclick="removerContacto(this)" title="Remover">×</button>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div id="sem-contactos" style="display:none;text-align:center;padding:16px;color:var(--text-muted);font-size:13px">
+                    Nenhum contacto. Clique em "Adicionar Contacto".
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px">
+                <button type="submit" class="btn btn-primary">
+                    {{ '💾 Guardar' if fornecedor else '+ Adicionar Fornecedor' }}
+                </button>
+                {% if fornecedor %}
+                <a href="{{ url_for('consultas_marca', id=fornecedor.marca_id) }}" class="btn btn-ghost">Cancelar</a>
+                {% else %}
+                <a href="{{ url_for('consultas') }}" class="btn btn-ghost">Cancelar</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const LINGUA_OPTIONS = `
+    <option value="pt">🇵🇹 Português</option>
+    <option value="en" selected>🇬🇧 English</option>
+    <option value="fr">🇫🇷 Français</option>
+    <option value="es">🇪🇸 Español</option>`;
+
+function adicionarContacto() {
+    const row = document.createElement('div');
+    row.className = 'contacto-row';
+    row.innerHTML = `
+        <input type="text" name="c_nome" placeholder="Nome" required>
+        <input type="email" name="c_email" placeholder="email@empresa.com">
+        <input type="text" name="c_cargo" placeholder="Ex: Commercial">
+        <select name="c_lingua">${LINGUA_OPTIONS}</select>
+        <button type="button" class="btn-remove-contacto" onclick="removerContacto(this)" title="Remover">×</button>`;
+    document.getElementById('contactos-lista').appendChild(row);
+    row.querySelector('input[name="c_nome"]').focus();
+    verificarSemContactos();
+}
+
+function removerContacto(btn) {
+    btn.closest('.contacto-row').remove();
+    verificarSemContactos();
+}
+
+function verificarSemContactos() {
+    const lista = document.getElementById('contactos-lista');
+    const aviso = document.getElementById('sem-contactos');
+    aviso.style.display = lista.children.length === 0 ? 'block' : 'none';
+}
+
+verificarSemContactos();
+
+/* ── IA Sub-marcas search ── */
+async function pesquisarSubMarcasIA() {
+    const nomeInput = document.querySelector('input[name="nome"]');
+    const nome = nomeInput ? nomeInput.value.trim() : '';
+    if (!nome) {
+        nomeInput && nomeInput.focus();
+        document.getElementById('ia-sub-erro').textContent = 'Introduza primeiro o nome da empresa.';
+        document.getElementById('ia-sub-erro').style.display = 'block';
+        return;
+    }
+    const btn     = document.getElementById('btn-ia-sub');
+    const spinner = document.getElementById('ia-sub-spinner');
+    const erro    = document.getElementById('ia-sub-erro');
+    const campo   = document.getElementById('campo_sub_marcas');
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    erro.style.display = 'none';
+
+    try {
+        const resp = await fetch('/consultas/pesquisar-submarcas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome })
+        });
+        const data = await resp.json();
+        if (data.error) {
+            erro.textContent = '⚠ ' + data.error;
+            erro.style.display = 'block';
+        } else if (data.submarcas) {
+            // Merge with existing value (avoid duplicates)
+            const existente = campo.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            const novas = data.submarcas.split(',').map(s => s.trim()).filter(Boolean);
+            const merged = [...new Set([...campo.value.split(',').map(s=>s.trim()).filter(Boolean),
+                                        ...novas.filter(n => !existente.includes(n.toLowerCase()))])];
+            campo.value = merged.join(', ');
+            campo.style.borderColor = 'var(--success)';
+            setTimeout(() => campo.style.borderColor = '', 2000);
+        } else {
+            erro.textContent = 'A IA não encontrou marcas para esta empresa.';
+            erro.style.display = 'block';
+        }
+    } catch(e) {
+        erro.textContent = '⚠ Erro de ligação com a IA.';
+        erro.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

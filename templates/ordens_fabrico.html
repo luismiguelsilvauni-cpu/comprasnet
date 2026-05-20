@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Ordens & Folhas de Fabrico · ComprasNet{% endblock %}
+{% block page_title %}Ordens e Folhas de Fabrico{% endblock %}
+
+{% block topbar_actions %}
+  <button onclick="window.print()" class="btn btn-ghost btn-sm" title="Imprimir lista">🖨 Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<style>
+@media print {
+  .no-print { display:none!important; }
+  .topbar, .sidebar, .sidebar-bottom { display:none!important; }
+  .main { margin-left:0!important; }
+  body { background:#fff!important; color:#000!important; }
+  .card { border:1px solid #ccc!important; box-shadow:none!important; }
+  th, td { color:#000!important; border-color:#ccc!important; }
+  .semaforo { font-size:14px!important; }
+}
+.filtros { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.filtros input, .filtros select {
+  padding:7px 10px; background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; font-size:13px; color:var(--text);
+}
+.filtros input { flex:1; min-width:200px; }
+.semaforo { font-size:16px; }
+.badge-tipo {
+  font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px;
+  text-transform:uppercase; letter-spacing:.5px;
+}
+.badge-of { background:rgba(59,110,240,.15); color:var(--accent); }
+.badge-fo { background:rgba(245,158,11,.12); color:#f59e0b; }
+.row-aberta td { background:transparent; }
+.row-fechada td { opacity:.7; }
+#detalhesModal {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.8);
+  z-index:9999; align-items:center; justify-content:center;
+}
+#detalhesModal.open { display:flex; }
+.modal-box {
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:28px; width:540px; max-width:95vw; max-height:85vh; overflow-y:auto;
+}
+.modal-field { margin-bottom:10px; }
+.modal-field label { font-size:10px; font-weight:700; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:.5px; display:block; margin-bottom:2px; }
+.modal-field span { font-size:13px; color:var(--text); }
+</style>
+
+<!-- Filtros -->
+<form method="GET" class="filtros no-print">
+  <input type="text" name="q" value="{{ q }}" placeholder="🔍 Pesquisar cliente ou número...">
+  <select name="tipo">
+    <option value="" {% if not tipo %}selected{% endif %}>Todos os tipos</option>
+    <option value="OF" {% if tipo=='OF' %}selected{% endif %}>Ordens de Fabrico</option>
+    <option value="FO" {% if tipo=='FO' %}selected{% endif %}>Folhas de Obra</option>
+  </select>
+  <select name="estado">
+    <option value="" {% if not estado %}selected{% endif %}>Todos os estados</option>
+    <option value="aberta"  {% if estado=='aberta'  %}selected{% endif %}>🟢 Abertas</option>
+    <option value="fechada" {% if estado=='fechada' %}selected{% endif %}>🔴 Fechadas</option>
+  </select>
+  <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+  {% if q or tipo or estado %}
+  <a href="{{ url_for('ordens_fabrico') }}" class="btn btn-ghost btn-sm">✕ Limpar</a>
+  {% endif %}
+</form>
+
+{% if erro %}
+<div class="card" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05);padding:20px;text-align:center;color:var(--danger)">
+  ⚠️ {{ erro }}
+  {% if not cfg_phc or not cfg_phc.ultima_sync %}
+  <div style="margin-top:10px">
+    <a href="{{ url_for('admin_phc') }}" class="btn btn-primary btn-sm">Configurar PHC →</a>
+  </div>
+  {% endif %}
+</div>
+{% elif not docs %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">
+  <div style="font-size:40px;margin-bottom:12px">📋</div>
+  <div style="font-weight:600">Nenhum documento encontrado</div>
+  {% if q or tipo or estado %}
+  <div style="margin-top:6px;font-size:13px">Experimente alterar os filtros</div>
+  {% endif %}
+</div>
+{% else %}
+
+<!-- Contadores rápidos -->
+<div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap" class="no-print">
+  {% set n_of = docs|selectattr('tipo','equalto','Ordem de Fabrico')|list|length %}
+  {% set n_fo = docs|selectattr('tipo','equalto','Folha de Obra')|list|length %}
+  {% set n_ab = docs|selectattr('fechada','equalto',false)|list|length %}
+  {% set n_fe = docs|selectattr('fechada','equalto',true)|list|length %}
+  <span style="font-size:12px;color:var(--text-muted)">
+    <strong style="color:var(--text)">{{ docs|length }}</strong> documento(s) —
+    <span class="badge-tipo badge-of">OF {{ n_of }}</span>
+    <span class="badge-tipo badge-fo" style="margin-left:4px">Folha {{ n_fo }}</span>
+    &nbsp;·&nbsp; 🟢 {{ n_ab }} abertas &nbsp; 🔴 {{ n_fe }} fechadas
+  </span>
+</div>
+
+<div class="card" style="padding:0;overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px" id="tabelaOF">
+    <thead>
+      <tr>
+        <th style="padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;cursor:pointer" onclick="sortOF(0)">Nº ⇅</th>
+        <th style="padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Tipo</th>
+        <th style="padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;cursor:pointer" onclick="sortOF(2)">Data ⇅</th>
+        <th style="padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;cursor:pointer" onclick="sortOF(3)">Cliente ⇅</th>
+        <th style="padding:10px 14px;text-align:center;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Estado</th>
+        <th style="padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Data Fecho</th>
+        <th style="padding:10px 14px;text-align:right;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px" class="no-print">Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for d in docs %}
+    <tr class="{{ 'row-aberta' if not d.fechada else 'row-fechada' }}"
+        style="border-bottom:1px solid var(--border)"
+        onmouseenter="this.style.background='var(--surface2)'"
+        onmouseleave="this.style.background=''">
+      <td style="padding:10px 14px;font-family:'DM Mono',monospace;font-weight:700;color:var(--accent)">{{ d.numero }}</td>
+      <td style="padding:10px 14px">
+        {% if d.tipo == 'Ordem de Fabrico' %}
+        <span class="badge-tipo badge-of">OF</span>
+        {% else %}
+        <span class="badge-tipo badge-fo">Folha</span>
+        {% endif %}
+      </td>
+      <td style="padding:10px 14px;white-space:nowrap">{{ d.data }}</td>
+      <td style="padding:10px 14px;font-weight:500">{{ d.cliente }}</td>
+      <td style="padding:10px 14px;text-align:center">
+        {% if not d.fechada %}
+        <span class="semaforo" title="Aberta">🟢</span>
+        <span style="font-size:11px;color:var(--success);font-weight:600"> Aberta</span>
+        {% else %}
+        <span class="semaforo" title="Fechada">🔴</span>
+        <span style="font-size:11px;color:var(--danger);font-weight:600"> Fechada</span>
+        {% endif %}
+      </td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--text-muted)">{{ d.data_fecho or '—' }}</td>
+      <td style="padding:10px 14px;text-align:right;white-space:nowrap" class="no-print">
+        <button onclick="verDetalhe({{ loop.index0 }})"
+                class="btn btn-ghost btn-sm" style="font-size:11px">👁 Ver</button>
+        <button onclick="imprimirDoc({{ loop.index0 }})"
+                class="btn btn-ghost btn-sm" style="font-size:11px">🖨</button>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Modal de detalhe -->
+<div id="detalhesModal" onclick="if(event.target===this)fecharModal()">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="font-size:16px;font-weight:700" id="modalTitulo">Detalhe</div>
+      <button onclick="fecharModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted)">×</button>
+    </div>
+    <div id="modalConteudo"></div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+      <button onclick="imprimirModalDoc()" class="btn btn-ghost btn-sm">🖨 Imprimir</button>
+      <button onclick="fecharModal()" class="btn btn-ghost btn-sm">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _docs = {{ docs | tojson }};
+var _sortDir = {};
+
+function verDetalhe(i) {
+  var d = _docs[i];
+  document.getElementById('modalTitulo').textContent =
+    (d.tipo === 'Ordem de Fabrico' ? 'Ordem de Fabrico' : 'Folha de Obra') + ' Nº ' + d.numero;
+  var estado = d.fechada
+    ? '<span style="color:#ef4444;font-weight:700">🔴 Fechada</span>'
+    : '<span style="color:#22c55e;font-weight:700">🟢 Aberta</span>';
+  document.getElementById('modalConteudo').innerHTML =
+    field('Nº Documento', d.numero) +
+    field('Tipo', d.tipo) +
+    field('Data', d.data) +
+    field('Cliente', d.cliente) +
+    field('Estado', estado) +
+    (d.data_fecho ? field('Data de Fecho', d.data_fecho) : '') +
+    (d.obs ? field('Observações', d.obs) : '') +
+    (d.total > 0 ? field('Total (€)', d.total.toFixed(2)) : '');
+  document.getElementById('detalhesModal').classList.add('open');
+}
+
+function field(lbl, val) {
+  return '<div class="modal-field"><label>' + lbl + '</label><span>' + val + '</span></div>';
+}
+
+function fecharModal() {
+  document.getElementById('detalhesModal').classList.remove('open');
+}
+
+var _printIdx = null;
+function imprimirDoc(i) {
+  _printIdx = i;
+  verDetalhe(i);
+  setTimeout(function() {
+    var w = window.open('', '_blank', 'width=600,height=700');
+    var d = _docs[i];
+    w.document.write('<html><head><title>'+d.tipo+' '+d.numero+'</title>');
+    w.document.write('<style>body{font-family:Arial,sans-serif;padding:30px;color:#000} h2{border-bottom:2px solid #000;padding-bottom:8px} table{width:100%;border-collapse:collapse} td{padding:8px 0;border-bottom:1px solid #eee;vertical-align:top} td:first-child{font-weight:600;width:160px;color:#555}</style></head><body>');
+    w.document.write('<h2>'+ d.tipo +' Nº '+ d.numero +'</h2><table>');
+    w.document.write('<tr><td>Nº Documento</td><td>'+ d.numero +'</td></tr>');
+    w.document.write('<tr><td>Tipo</td><td>'+ d.tipo +'</td></tr>');
+    w.document.write('<tr><td>Data</td><td>'+ d.data +'</td></tr>');
+    w.document.write('<tr><td>Cliente</td><td>'+ d.cliente +'</td></tr>');
+    w.document.write('<tr><td>Estado</td><td>'+ (d.fechada ? '🔴 Fechada' : '🟢 Aberta') +'</td></tr>');
+    if (d.data_fecho) w.document.write('<tr><td>Data de Fecho</td><td>'+ d.data_fecho +'</td></tr>');
+    if (d.obs) w.document.write('<tr><td>Observações</td><td>'+ d.obs +'</td></tr>');
+    if (d.total > 0) w.document.write('<tr><td>Total (€)</td><td>'+ d.total.toFixed(2) +'</td></tr>');
+    w.document.write('</table></body></html>');
+    w.document.close();
+    w.focus();
+    w.print();
+  }, 100);
+}
+
+function imprimirModalDoc() {
+  window.print();
+}
+
+function sortOF(col) {
+  var tbody = document.querySelector('#tabelaOF tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  var dir = _sortDir[col] === 'asc' ? 'desc' : 'asc';
+  _sortDir = {}; _sortDir[col] = dir;
+  rows.sort(function(a, b) {
+    var av = a.cells[col] ? a.cells[col].textContent.trim() : '';
+    var bv = b.cells[col] ? b.cells[col].textContent.trim() : '';
+    var cmp = av.localeCompare(bv, 'pt', {sensitivity:'base', numeric:true});
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  rows.forEach(function(r){ tbody.appendChild(r); });
+}
+</script>
+{% endblock %}

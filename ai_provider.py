@@ -288,6 +288,156 @@ def test_provider(cfg) -> tuple:
     return False, "Provedor inválido."
 
 
+def _call_openai_compat_text(base_url: str, model: str, system: str, user_msg: str,
+                             timeout: int = 60) -> tuple:
+    payload = json.dumps({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user_msg}
+        ],
+        "temperature": 0.7, "max_tokens": 1500, "stream": False
+    }).encode()
+    url = base_url.rstrip("/") + "/v1/chat/completions"
+    req = urllib.request.Request(url, data=payload,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+        return data["choices"][0]["message"]["content"].strip(), None
+    except urllib.error.URLError as e:
+        return None, f"Não foi possível ligar ao servidor de IA em {base_url} — {e.reason}"
+    except Exception as e:
+        return None, f"Erro inesperado: {e}"
+
+
+def _call_claude_text(cfg, system: str, user_msg: str) -> tuple:
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=cfg.claude_api_key or '')
+        msg = client.messages.create(
+            model="claude-sonnet-4-20250514", max_tokens=1500,
+            system=system,
+            messages=[{"role": "user", "content": user_msg}])
+        return msg.content[0].text.strip(), None
+    except ImportError:
+        return None, "Biblioteca anthropic não instalada."
+    except Exception as e:
+        return None, f"Erro Claude API: {e}"
+
+
+def _call_gemini_text(cfg, system: str, user_msg: str) -> tuple:
+    api_key = cfg.gemini_api_key or ""
+    if not api_key:
+        return None, "Chave API Gemini não configurada."
+    model = cfg.gemini_model or "gemini-2.0-flash"
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        prompt = system + "\n\n" + user_msg
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1500}
+        }).encode()
+        req = urllib.request.Request(url, data=payload,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip(), None
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        if "API_KEY_INVALID" in body:
+            return None, "Chave API Gemini inválida."
+        return None, f"Erro Gemini HTTP {e.code}: {body[:200]}"
+    except Exception as e:
+        return None, f"Erro Gemini: {e}"
+
+
+def _call_text(cfg, system: str, user_msg: str) -> tuple:
+    """Generic text generation using configured AI provider. Returns (text, error)."""
+    if not cfg:
+        return None, "Sem configuração de IA."
+    provider = getattr(cfg, 'provider', 'lmstudio')
+    if provider in ("lmstudio", "ollama"):
+        return _call_openai_compat_text(
+            f"http://{cfg.lm_host}:{cfg.lm_port}", cfg.lm_model, system, user_msg)
+    elif provider == "claude":
+        return _call_claude_text(cfg, system, user_msg)
+    elif provider == "gemini":
+        return _call_gemini_text(cfg, system, user_msg)
+    return None, f"Provedor desconhecido: {provider}"
+
+
+def search_company_brands(cfg, company_name: str) -> tuple:
+    """Ask AI what brands/products a company represents. Returns (brands_csv, error)."""
+    system = ("You are a knowledgeable assistant specialising in industrial, marine, "
+              "and commercial suppliers worldwide. "
+              "When given a company name, provide the company name, main brands and product lines "
+              "they manufacture, represent, or distribute. "
+              "Reply ONLY with comma-separated values — no explanations, "
+              "no full sentences, no numbering.")
+
+    user_msg = (f"For the company: {company_name}\n\n"
+                f"Reply with ONLY the company name, followed by brands and product lines, "
+                f"all separated by commas. "
+                f"Format: Company Name, Brand1, Brand2, Product1, Product2, etc.\n"
+                f"Example: Scanpart AB, Volvo, Jabsco, marine engines, pumps, filtration systems. "
+                f"If you have no information about this company, reply with the company name only.")
+
+    text, err = _call_text(cfg, system, user_msg)
+    if err:
+        return None, err
+    # Clean up: remove quotes, extra spaces, empty tokens
+    brands = ', '.join(
+        b.strip().strip('"\'') for b in text.replace('\n', ',').split(',')
+        if b.strip().strip('"\'')
+    )
+    return brands, None
+
+
+def generate_inquiry_email(cfg, prompt_utilizador: str, fornecedor_nome: str,
+                           contacto_nome: str, lingua: str, empresa_nome: str) -> tuple:
+    """Generate a short, direct inquiry email. Returns (email_text, error)."""
+    _linguas = {
+        'pt': ('português europeu', 'Bom dia', 'Melhores cumprimentos'),
+        'en': ('English',           'Good morning', 'Best regards'),
+        'fr': ('français',          'Bonjour',       'Cordialement'),
+        'es': ('español',           'Buenos días',   'Un cordial saludo'),
+    }
+    lang_label, saudacao, despedida = _linguas.get(lingua, _linguas['en'])
+    primeiro_nome = contacto_nome.split()[0] if contacto_nome else ''
+    abertura = f"{saudacao} {primeiro_nome}," if primeiro_nome else f"{saudacao},"
+
+    system = ("És um assistente de comunicação empresarial. "
+              "Rediges emails de consulta comercial curtos, directos e profissionais. "
+              "Responde APENAS com o texto do email — sem explicações, sem markdown, sem ```.")
+
+    user_msg = f"""Escreve um email de consulta comercial em {lang_label}.
+
+REGRAS OBRIGATÓRIAS:
+- Começa exactamente com "{abertura}"
+- Vai directo ao assunto — sem apresentar a empresa nem contextualizar quem somos
+- Corpo de 2 a 4 frases, claro e profissional
+- Termina com "{despedida},"
+- NÃO incluir nome, cargo, empresa, telefone nem qualquer assinatura (o utilizador adiciona manualmente)
+
+Empresa destinatária: {fornecedor_nome}
+
+O utilizador pretende consultar:
+{prompt_utilizador}
+
+Formato de saída:
+Assunto: [assunto em {lang_label}]
+
+{abertura}
+
+[corpo]
+
+{despedida},"""
+
+    return _call_text(cfg, system, user_msg)
+
+
 RECOMMENDED_MODELS = {
     "gemini": [
         {"id": "gemini-2.0-flash", "label": "Gemini 2.0 Flash (Recomendado — Gratuito)",

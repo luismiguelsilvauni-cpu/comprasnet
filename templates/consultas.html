@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% block title %}Consultas{% endblock %}
+{% block content %}
+<style>
+/* Search bar */
+.search-wrap {
+    display: flex; gap: 8px; margin-bottom: 24px;
+}
+.search-wrap input[type="text"] {
+    flex: 1; font-size: 14px; padding: 10px 14px;
+    border-radius: 8px;
+}
+.search-wrap button {
+    padding: 10px 18px; white-space: nowrap;
+}
+.search-clear {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-muted); text-decoration: none;
+    padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface2); white-space: nowrap; align-self: center;
+}
+.search-clear:hover { color: var(--danger); border-color: rgba(239,68,68,.3); }
+
+/* Brand grid */
+.marcas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 16px;
+}
+.marca-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 22px 14px 18px;
+    text-align: center; text-decoration: none; color: var(--text);
+    transition: all 0.2s; position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    cursor: pointer;
+}
+.marca-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+.marca-badge {
+    width: 72px; height: 72px; border-radius: 14px;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.marca-badge img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+.marca-inicial { font-size: 26px; font-weight: 800; color: var(--accent); font-family: 'DM Mono', monospace; }
+.marca-nome { font-size: 14px; font-weight: 700; }
+.marca-count { font-size: 11px; color: var(--text-muted); }
+.marca-actions {
+    position: absolute; top: 8px; right: 8px;
+    display: flex; gap: 4px; opacity: 0; transition: opacity .15s;
+}
+.marca-card:hover .marca-actions { opacity: 1; }
+.btn-icon {
+    width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-muted); font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; text-decoration: none; transition: all .15s;
+}
+.btn-icon:hover { background: var(--accent); color: white; border-color: var(--accent); }
+.btn-icon.danger:hover { background: var(--danger); border-color: var(--danger); }
+
+/* Search results */
+.resultados-lista { display: flex; flex-direction: column; gap: 10px; }
+.resultado-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 14px;
+    transition: border-color .15s;
+}
+.resultado-card:hover { border-color: var(--border-light); }
+.res-marca-badge {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
+}
+.res-marca-badge img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+.res-marca-inicial { font-size: 18px; font-weight: 800; color: var(--accent); font-family:'DM Mono',monospace; }
+.res-body { flex: 1; min-width: 0; }
+.res-nome { font-size: 14px; font-weight: 700; color: var(--text); }
+.res-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 8px; }
+.sub-chip {
+    padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    background: rgba(59,110,240,.1); color: var(--accent);
+    border: 1px solid rgba(59,110,240,.2);
+}
+.contact-chip-small {
+    padding: 2px 7px; border-radius: 20px; font-size: 11px;
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);
+}
+.no-results {
+    text-align:center; padding:48px 20px; color:var(--text-muted);
+}
+</style>
+
+<div class="topbar">
+    <span class="page-title">🔍 Consultas a Fornecedores</span>
+    <div class="topbar-actions">
+        <a href="{{ url_for('consultas_nova_marca') }}" class="btn btn-primary">+ Nova Marca</a>
+    </div>
+</div>
+
+<div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="flash flash-{{ 'success' if cat == 'success' else 'error' }}" style="margin-bottom:16px">
+        {{ '✓' if cat == 'success' else '✕' }} {{ msg }}
+    </div>
+    {% endfor %}
+    {% endwith %}
+
+    <!-- Search bar -->
+    <form method="GET" action="{{ url_for('consultas') }}" class="search-wrap">
+        <input type="text" name="q" value="{{ q }}"
+               placeholder="Pesquisar fornecedor, marca, sub-marca, país, contacto…"
+               autofocus="{{ 'autofocus' if q else '' }}">
+        <button type="submit" class="btn btn-primary">🔍 Pesquisar</button>
+        {% if q %}
+        <a href="{{ url_for('consultas') }}" class="search-clear">✕ Limpar</a>
+        {% endif %}
+    </form>
+
+    {% if q is not none and resultados is not none %}
+    <!-- Search results -->
+    <div style="margin-bottom:14px;font-size:13px;color:var(--text-muted)">
+        {% if resultados %}
+        <strong style="color:var(--text)">{{ resultados|length }}</strong> resultado{{ '' if resultados|length==1 else 's' }} para "<strong style="color:var(--accent)">{{ q }}</strong>"
+        {% else %}
+        Sem resultados para "<strong>{{ q }}</strong>"
+        {% endif %}
+    </div>
+
+    {% if resultados %}
+    <div class="resultados-lista">
+        {% for forn in resultados %}
+        {% set LINGUA_FLAGS = {'pt':'🇵🇹','en':'🇬🇧','fr':'🇫🇷','es':'🇪🇸'} %}
+        <div class="resultado-card">
+            <!-- Brand mini badge -->
+            <a href="{{ url_for('consultas_marca', id=forn.marca.id) }}" style="text-decoration:none">
+                <div class="res-marca-badge">
+                    {% if forn.marca.logo_path %}
+                    <img src="/uploads/{{ forn.marca.logo_path }}" alt="{{ forn.marca.nome }}">
+                    {% else %}
+                    <span class="res-marca-inicial">{{ forn.marca.nome[0].upper() }}</span>
+                    {% endif %}
+                </div>
+            </a>
+
+            <div class="res-body">
+                <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+                    <span class="res-nome">{{ forn.nome }}</span>
+                    <span style="font-size:11px;color:var(--text-muted)">via
+                        <a href="{{ url_for('consultas_marca', id=forn.marca.id) }}"
+                           style="color:var(--accent);text-decoration:none">{{ forn.marca.nome }}</a>
+                    </span>
+                </div>
+                <div class="res-meta">
+                    {% if forn.pais %}<span>📍 {{ forn.pais }}</span>{% endif %}
+                    {% for sub in (forn.sub_marcas or '').split(',') if sub.strip() %}
+                    <span class="sub-chip">{{ sub.strip() }}</span>
+                    {% endfor %}
+                </div>
+                {% if forn.contactos %}
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">
+                    {% for c in forn.contactos %}
+                    <span class="contact-chip-small">
+                        {{ LINGUA_FLAGS.get(c.lingua,'🌐') }} {{ c.nome }}{% if c.cargo %} · {{ c.cargo }}{% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <a href="{{ url_for('consultas_marca', id=forn.marca.id) }}"
+               class="btn btn-ghost btn-sm" style="flex-shrink:0">Ver →</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-results">
+        <div style="font-size:36px;opacity:.3;margin-bottom:12px">🔍</div>
+        <div>Nenhum fornecedor encontrado para "<strong>{{ q }}</strong>"</div>
+        <div style="margin-top:6px;font-size:12px">Experimente pesquisar pelo nome da marca principal ou sub-marca.</div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Brand grid (normal view) -->
+    {% if marcas %}
+    <div class="marcas-grid">
+        {% for marca in marcas %}
+        <div class="marca-card" onclick="window.location='{{ url_for('consultas_marca', id=marca.id) }}'">
+            <div class="marca-actions" onclick="event.stopPropagation()">
+                <a href="{{ url_for('consultas_editar_marca', id=marca.id) }}" class="btn-icon" title="Editar">✏️</a>
+                <form method="POST" action="{{ url_for('consultas_apagar_marca', id=marca.id) }}"
+                      onsubmit="return confirm('Apagar marca e todos os seus fornecedores?')">
+                    <button type="submit" class="btn-icon danger" title="Apagar">🗑</button>
+                </form>
+            </div>
+            <div class="marca-badge">
+                {% if marca.logo_path %}
+                <img src="/uploads/{{ marca.logo_path }}" alt="{{ marca.nome }}">
+                {% else %}
+                <span class="marca-inicial">{{ marca.nome[0].upper() }}</span>
+                {% endif %}
+            </div>
+            <div>
+                <div class="marca-nome">{{ marca.nome }}</div>
+                {% set n = marca.fornecedores | length %}
+                <div class="marca-count">{{ n }} fornecedor{{ '' if n==1 else 'es' }}</div>
+                {% if marca.descricao %}
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.4">
+                    {{ marca.descricao[:55] }}{% if marca.descricao|length > 55 %}…{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:60px 20px;color:var(--text-muted)">
+        <div style="font-size:44px;margin-bottom:14px;opacity:.35">🔍</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">Nenhuma marca criada</div>
+        <div style="margin-bottom:20px">Crie marcas e associe fornecedores para gerar emails de consulta com IA.</div>
+        <a href="{{ url_for('consultas_nova_marca') }}" class="btn btn-primary">+ Criar primeira marca</a>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

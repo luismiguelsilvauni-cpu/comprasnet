@@ -53,6 +53,16 @@
         <input type="time" name="sync_hora" value="{{ cfg.sync_hora or '06:00' }}">
       </div>
     </div>
+    <div class="form-group">
+      <label>📂 Pasta dos Backups PHC</label>
+      <input type="text" name="phc_bak_folder"
+             value="{{ cfg.phc_bak_folder or '' }}"
+             placeholder="C:\Users\User\Desktop\backup_PHC"
+             style="font-family:monospace;font-size:12px">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Pasta onde ficam os ficheiros <code>.bak</code> do PHC — o mais recente aparece no Dashboard.
+      </div>
+    </div>
     <div style="display:flex;justify-content:flex-end">
       <button type="submit" class="btn btn-primary">💾 Guardar</button>
     </div>

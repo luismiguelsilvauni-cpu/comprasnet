@@ -34,6 +34,18 @@ class ArtigoPHC(db.Model):
     ultima_sync           = db.Column(db.DateTime)
     aliases               = db.relationship('AliasArtigo', backref='artigo', lazy=True, cascade='all, delete-orphan')
 
+class InventarioExclusao(db.Model):
+    """Articles excluded from inventory analysis.
+    tipo='total'     → excluded from KPIs + segment analysis + top flops
+    tipo='segmentos' → kept in KPIs but excluded from segment analysis + top flops
+    """
+    __tablename__ = 'inventario_exclusoes'
+    id         = db.Column(db.Integer, primary_key=True)
+    referencia = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    tipo       = db.Column(db.String(20), default='total')  # 'total' | 'segmentos'
+    motivo     = db.Column(db.String(200), default='')
+    criado_em  = db.Column(db.DateTime, default=datetime.utcnow)
+
 class AliasArtigo(db.Model):
     """Maps supplier descriptions to PHC articles. Learned over time."""
     __tablename__ = 'aliases_artigo'
@@ -80,6 +92,7 @@ class ConfigPHC(db.Model):
     sync_auto    = db.Column(db.Boolean, default=False)
     sync_hora    = db.Column(db.String(5), default='06:00')
     driver       = db.Column(db.String(100), default='ODBC Driver 17 for SQL Server')
+    phc_bak_folder = db.Column(db.String(500))
 
 class PedidoCompra(db.Model):
     __tablename__ = 'pedidos_compra'
@@ -945,3 +958,57 @@ class PropostaMelhoria(db.Model):
     criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow)
     user          = db.relationship('User', backref='propostas')
+
+# ══════════════════════════════════════════════════════════════════════
+# MÓDULO CONSULTAS A FORNECEDORES
+# ══════════════════════════════════════════════════════════════════════
+
+class MarcaConsulta(db.Model):
+    __tablename__ = 'marcas_consulta'
+    id           = db.Column(db.Integer, primary_key=True)
+    nome         = db.Column(db.String(200), nullable=False)
+    logo_path    = db.Column(db.String(300))
+    descricao    = db.Column(db.Text)
+    criado_em    = db.Column(db.DateTime, default=datetime.utcnow)
+    fornecedores = db.relationship('FornecedorConsulta', backref='marca', lazy=True,
+                                   cascade='all, delete-orphan',
+                                   order_by='FornecedorConsulta.nome')
+
+class FornecedorConsulta(db.Model):
+    __tablename__ = 'fornecedores_consulta'
+    id          = db.Column(db.Integer, primary_key=True)
+    marca_id    = db.Column(db.Integer, db.ForeignKey('marcas_consulta.id'), nullable=False)
+    nome        = db.Column(db.String(200), nullable=False)
+    pais        = db.Column(db.String(100))
+    sub_marcas  = db.Column(db.Text, default='')   # comma-separated sub-brand names
+    observacoes = db.Column(db.Text)
+    ativo       = db.Column(db.Boolean, default=True)
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    contactos   = db.relationship('ContactoFornecedorConsulta', backref='fornecedor',
+                                   lazy=True, cascade='all, delete-orphan',
+                                   order_by='ContactoFornecedorConsulta.ordem')
+    avaliacoes  = db.relationship('AvaliacaoFornecedorConsulta', backref='fornecedor',
+                                   lazy=True, cascade='all, delete-orphan')
+
+class ContactoFornecedorConsulta(db.Model):
+    __tablename__ = 'contactos_fornecedor_consulta'
+    id            = db.Column(db.Integer, primary_key=True)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedores_consulta.id'), nullable=False)
+    nome          = db.Column(db.String(200), nullable=False)
+    email         = db.Column(db.String(200))
+    cargo         = db.Column(db.String(100))
+    lingua        = db.Column(db.String(10), default='en')   # pt, en, fr, es
+    ordem         = db.Column(db.Integer, default=0)
+
+class AvaliacaoFornecedorConsulta(db.Model):
+    __tablename__ = 'avaliacoes_fornecedor_consulta'
+    id            = db.Column(db.Integer, primary_key=True)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedores_consulta.id'), nullable=False)
+    user_id       = db.Column(db.Integer, db.ForeignKey('users.id'))
+    velocidade    = db.Column(db.Integer)   # 1-5
+    preco         = db.Column(db.Integer)   # 1-5
+    qualidade     = db.Column(db.Integer)   # 1-5
+    fiabilidade   = db.Column(db.Integer)   # 1-5
+    comentario    = db.Column(db.Text)
+    criado_em     = db.Column(db.DateTime, default=datetime.utcnow)
+    user          = db.relationship('User', foreign_keys=[user_id])

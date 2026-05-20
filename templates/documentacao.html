@@ -1,0 +1,1216 @@
+{% extends 'base.html' %}
+{% block title %}Documentação · NavTech{% endblock %}
+{% block content %}
+<style>
+/* ── Layout ── */
+.doc-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 56px);
+    align-items: start;
+}
+/* ── TOC Sidebar ── */
+.doc-toc {
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px 0 40px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+.toc-section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-dim);
+    padding: 12px 16px 4px;
+}
+.toc-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 16px; font-size: 12px; font-weight: 500;
+    color: var(--text-muted); text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+}
+.toc-item:hover { color: var(--text); background: var(--surface2); }
+.toc-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-glow); }
+.toc-icon { font-size: 14px; width: 16px; text-align: center; }
+
+/* ── Main content ── */
+.doc-main {
+    padding: 32px 40px 80px;
+    max-width: 860px;
+}
+.doc-intro {
+    background: linear-gradient(135deg, rgba(59,110,240,.12) 0%, rgba(59,110,240,.04) 100%);
+    border: 1px solid rgba(59,110,240,.2);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 32px;
+}
+.doc-intro h1 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+.doc-intro p  { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+/* ── Section header ── */
+.doc-group-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-radius: 8px;
+    margin: 32px 0 16px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .8px; color: var(--text-muted);
+}
+
+/* ── Module card ── */
+.doc-section {
+    scroll-margin-top: 70px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+.doc-section-header {
+    padding: 16px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+    cursor: pointer;
+    user-select: none;
+}
+.doc-section-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--accent-glow); border: 1px solid rgba(59,110,240,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+}
+.doc-section-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.doc-section-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.doc-toggle { margin-left: auto; font-size: 11px; color: var(--text-muted); transition: transform .2s; }
+.doc-section-body {
+    padding: 20px;
+}
+/* Collapse/expand */
+.doc-section.collapsed .doc-section-body { display: none; }
+.doc-section.collapsed .doc-toggle { transform: rotate(-90deg); }
+
+/* ── Content blocks ── */
+.doc-lead {
+    font-size: 13px; line-height: 1.7; color: var(--text-muted);
+    margin-bottom: 20px;
+}
+.doc-block {
+    margin-bottom: 20px;
+}
+.doc-block-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .7px; color: var(--text-dim); margin-bottom: 8px;
+}
+.doc-list {
+    list-style: none; display: flex; flex-direction: column; gap: 5px;
+}
+.doc-list li {
+    font-size: 12px; color: var(--text-muted); padding-left: 16px;
+    position: relative; line-height: 1.5;
+}
+.doc-list li::before { content: '·'; position: absolute; left: 4px; color: var(--accent); font-weight: 700; }
+.doc-list li strong { color: var(--text); }
+
+.doc-steps {
+    list-style: none; counter-reset: steps;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.doc-steps li {
+    counter-increment: steps;
+    display: flex; gap: 10px; align-items: flex-start;
+    font-size: 12px; color: var(--text-muted); line-height: 1.5;
+}
+.doc-steps li::before {
+    content: counter(steps);
+    min-width: 20px; height: 20px;
+    background: var(--accent); color: white;
+    border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 10px; font-weight: 700;
+    flex-shrink: 0; margin-top: 1px;
+}
+
+.doc-tip {
+    background: rgba(245,158,11,.08);
+    border: 1px solid rgba(245,158,11,.2);
+    border-radius: 6px; padding: 10px 14px;
+    font-size: 12px; color: var(--warning); line-height: 1.5;
+    margin-top: 4px;
+}
+.doc-tip::before { content: '💡 '; }
+
+.doc-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ── Update note ── */
+.doc-last-updated {
+    font-size: 11px; color: var(--text-dim);
+    text-align: right; margin-top: 4px;
+}
+
+/* Search */
+.doc-search { position: relative; margin-bottom: 20px; }
+.doc-search input {
+    width: 100%; padding: 9px 12px 9px 36px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; color: var(--text);
+}
+.doc-search::before {
+    content: '🔍'; position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); font-size: 14px; pointer-events: none;
+}
+</style>
+
+<div class="topbar">
+    <span class="page-title">📖 Documentação</span>
+    <div class="topbar-actions">
+        <span style="font-size:11px;color:var(--text-muted)">Actualizado automaticamente com cada versão</span>
+    </div>
+</div>
+
+<div class="doc-layout">
+
+    <!-- ── TOC Sidebar ── -->
+    <nav class="doc-toc" id="docToc">
+        <div class="doc-search" style="padding:0 12px;margin-bottom:12px">
+            <input type="text" placeholder="Filtrar…" id="tocSearch" oninput="filtrarToc(this.value)">
+        </div>
+
+        <div class="toc-section-label">Visão Geral</div>
+        <a href="#dashboard" class="toc-item" data-keywords="dashboard inicio início resumo kpi"><span class="toc-icon">⊞</span>Dashboard</a>
+
+        <div class="toc-section-label">Gestão</div>
+        <a href="#agenda" class="toc-item" data-keywords="agenda servicos serviços calendar calendario"><span class="toc-icon">📅</span>Agenda Digital</a>
+        <a href="#clientes" class="toc-item" data-keywords="clientes embarcacoes embarcações barcos"><span class="toc-icon">👥</span>Clientes</a>
+        <a href="#empresa" class="toc-item" data-keywords="empresa documentos certidoes certidões"><span class="toc-icon">🏢</span>Empresa</a>
+        <a href="#fornecedores" class="toc-item" data-keywords="fornecedores phc sync marcas"><span class="toc-icon">🏭</span>Fornecedores</a>
+        <a href="#funcionarios" class="toc-item" data-keywords="funcionarios funcionários rh recursos humanos"><span class="toc-icon">🪪</span>Funcionários</a>
+        <a href="#ferias" class="toc-item" data-keywords="ferias férias faltas ausencias ausências mapa"><span class="toc-icon">📅</span>Férias / Faltas</a>
+        <a href="#partilha" class="toc-item" data-keywords="partilha ficheiros files documentos"><span class="toc-icon">📁</span>Partilha</a>
+        <a href="#salarios" class="toc-item" data-keywords="salarios salários recibos irs payroll"><span class="toc-icon">💶</span>Salários</a>
+
+        <div class="toc-section-label">Logística</div>
+        <a href="#inventario" class="toc-item" data-keywords="inventario inventário analise análise abc stock"><span class="toc-icon">📈</span>Análise Inventário</a>
+        <a href="#pendentes" class="toc-item" data-keywords="pendentes associacoes associações pdf ia"><span class="toc-icon">🔗</span>Associações Pendentes</a>
+        <a href="#consultas" class="toc-item" data-keywords="consultas fornecedores email ia lingua"><span class="toc-icon">🔍</span>Consultas</a>
+        <a href="#entradas" class="toc-item" data-keywords="entradas stock recepcao recepção armazem armazém"><span class="toc-icon">📥</span>Entradas</a>
+        <a href="#pedidos" class="toc-item" data-keywords="pedidos compra purchase order aprovacao aprovação"><span class="toc-icon">🛒</span>Pedidos de Compra</a>
+        <a href="#reposicao" class="toc-item" data-keywords="reposicao reposição stock minimo mínimo alerta"><span class="toc-icon">🔄</span>Reposição de Stock</a>
+        <a href="#stock" class="toc-item" data-keywords="stock inventario inventário phc precos preços"><span class="toc-icon">📊</span>Stock</a>
+
+        <div class="toc-section-label">Técnico</div>
+        <a href="#assistencias" class="toc-item" data-keywords="assistencias assistências servico serviço os ordem trabalho"><span class="toc-icon">🔧</span>Assistências</a>
+        <a href="#embarcacoes" class="toc-item" data-keywords="embarcacoes embarcações barcos motores tecnicos técnicos"><span class="toc-icon">⚓</span>Base Dados Embarcações</a>
+        <a href="#industriais" class="toc-item" data-keywords="industriais equipamentos geradores motores"><span class="toc-icon">⚙️</span>Base Dados Industriais</a>
+        <a href="#biblioteca" class="toc-item" data-keywords="biblioteca pdf manuais documentos modelos"><span class="toc-icon">📚</span>Biblioteca PDF</a>
+        <a href="#fichas" class="toc-item" data-keywords="fichas equipamentos manutencao manutenção intervencoes"><span class="toc-icon">📋</span>Fichas Equipamentos</a>
+
+        <div class="toc-section-label">Sistema</div>
+        <a href="#changelog" class="toc-item" data-keywords="changelog versao versão historico histórico updates"><span class="toc-icon">🕐</span>Changelog</a>
+        <a href="#backlog" class="toc-item" data-keywords="backlog roadmap propostas ideias melhorias"><span class="toc-icon">📋</span>Backlog / Roadmap</a>
+    </nav>
+
+    <!-- ── Main Documentation ── -->
+    <div class="doc-main" id="docMain">
+
+        <div class="doc-intro">
+            <h1>📖 Documentação NavTech</h1>
+            <p>Guia completo de todas as funcionalidades do sistema de gestão integrada. Cada secção descreve o propósito do módulo, as suas funcionalidades principais e como utilizá-lo. Esta documentação actualiza-se automaticamente com cada nova versão do software.</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════ VISÃO GERAL -->
+        <div class="doc-group-header"><span>⊞</span> Visão Geral</div>
+
+        <!-- Dashboard -->
+        <div class="doc-section" id="dashboard">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">⊞</div>
+                <div>
+                    <div class="doc-section-title">Dashboard</div>
+                    <div class="doc-section-subtitle">Página inicial — visão geral do estado da empresa</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">O Dashboard é a página inicial do sistema e apresenta os indicadores mais relevantes da actividade da empresa numa única vista: pedidos pendentes, stock crítico, assistências abertas, próximos serviços agendados e alertas de documentos a expirar.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>KPIs em tempo real</strong> — pedidos, orçamentos, entradas, assistências</li>
+                            <li><strong>Alertas de stock mínimo</strong> — artigos abaixo do ponto de encomenda</li>
+                            <li><strong>Próximos serviços</strong> — agenda dos próximos dias</li>
+                            <li><strong>Documentos a expirar</strong> — certidões e seguros com prazo próximo</li>
+                            <li><strong>Actividade recente</strong> — últimas acções no sistema</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Aceder após login — é a página de entrada</li>
+                            <li>Verificar alertas de stock e documentos no topo</li>
+                            <li>Clicar nos tiles para navegar directamente para cada módulo</li>
+                            <li>Usar os atalhos rápidos para criar pedidos ou assistências</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">O Dashboard actualiza-se automaticamente. Os badges nos menus da sidebar também mostram contagens em tempo real (ex: pendentes, backlog).</div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════ GESTÃO -->
+        <div class="doc-group-header"><span>👥</span> Gestão</div>
+
+        <!-- Agenda Digital -->
+        <div class="doc-section" id="agenda">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📅</div>
+                <div>
+                    <div class="doc-section-title">Agenda Digital</div>
+                    <div class="doc-section-subtitle">Gestão de serviços, técnicos e registos diários de trabalho</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">A Agenda Digital substitui folhas de horas e tabelas de serviços em papel. Permite criar serviços, atribuir técnicos por dia, registar horas, materiais aplicados e deslocações, e gerar automaticamente mapas de trabalho em PDF.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Criação de serviços</strong> — associar a cliente, embarcação ou equipamento</li>
+                            <li><strong>Registos diários</strong> — horas normais, horas extra, deslocação, refeições</li>
+                            <li><strong>Materiais aplicados</strong> — integração com PHC ou registo manual</li>
+                            <li><strong>Vista mensal/semanal</strong> — calendário visual por técnico</li>
+                            <li><strong>Export PDF</strong> — relatório de serviço assinável pelo cliente</li>
+                            <li><strong>Estatísticas</strong> — horas por técnico, custo por serviço</li>
+                            <li><strong>Integração com Salários</strong> — horas extra exportadas automaticamente</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar um novo serviço com cliente e descrição</li>
+                            <li>Definir datas de início e fim previstas</li>
+                            <li>Atribuir técnicos ao serviço</li>
+                            <li>Cada técnico regista o seu dia: horas, materiais, km</li>
+                            <li>Fechar o serviço quando concluído</li>
+                            <li>Gerar PDF do relatório de serviço</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Os registos diários alimentam automaticamente os mapas de horas dos funcionários e podem ser exportados para o módulo de Salários.</div>
+            </div>
+        </div>
+
+        <!-- Clientes -->
+        <div class="doc-section" id="clientes">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">👥</div>
+                <div>
+                    <div class="doc-section-title">Clientes</div>
+                    <div class="doc-section-subtitle">Registo completo de clientes e embarcações/equipamentos</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">O módulo de Clientes centraliza toda a informação sobre os clientes da empresa: dados de contacto, embarcações associadas, histórico de serviços e assistências, e documentação relevante.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Ficha de cliente</strong> — NIF, morada, contactos, notas</li>
+                            <li><strong>Embarcações</strong> — nome, matrícula, tipo, especificações técnicas</li>
+                            <li><strong>Histórico</strong> — serviços, assistências e pedidos do cliente</li>
+                            <li><strong>Sincronização PHC</strong> — importar clientes do software de gestão</li>
+                            <li><strong>Pesquisa rápida</strong> — por nome, NIF, matrícula de embarcação</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Pesquisar cliente existente ou criar novo</li>
+                            <li>Preencher dados da empresa e contacto principal</li>
+                            <li>Adicionar embarcações ou equipamentos do cliente</li>
+                            <li>Consultar histórico na ficha do cliente</li>
+                            <li>Usar "Sincronizar PHC" para importar clientes em massa</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Ao criar um serviço ou assistência, o sistema sugere automaticamente as embarcações do cliente seleccionado.</div>
+            </div>
+        </div>
+
+        <!-- Empresa -->
+        <div class="doc-section" id="empresa">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🏢</div>
+                <div>
+                    <div class="doc-section-title">Empresa</div>
+                    <div class="doc-section-subtitle">Dados institucionais e gestão de documentos da empresa</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Centraliza toda a informação da empresa — dados fiscais, bancários, seguros — e permite fazer upload e controlar a validade de documentos oficiais como certidões permanentes, não-dívidas, apólices de seguro e outros documentos com prazo.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Dados institucionais</strong> — NIF, NIPC, CAE, conservatória, capital social</li>
+                            <li><strong>Dados bancários</strong> — banco, IBAN, SWIFT</li>
+                            <li><strong>Documentos com validade</strong> — upload PDF, alertas de expiração</li>
+                            <li><strong>Tipos suportados</strong> — certidão permanente, não-dívidas, IBAN, seguros</li>
+                            <li><strong>Alertas automáticos</strong> — Dashboard avisa documentos a expirar em 60 dias</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Aceder a Gestão → Empresa</li>
+                            <li>Preencher dados da empresa uma única vez</li>
+                            <li>Fazer upload de cada documento com data de validade</li>
+                            <li>O Dashboard alerta automaticamente quando um prazo se aproxima</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Os dados da empresa (nome, NIF, IBAN) são usados automaticamente na geração de recibos de vencimento no módulo de Salários.</div>
+            </div>
+        </div>
+
+        <!-- Fornecedores -->
+        <div class="doc-section" id="fornecedores">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🏭</div>
+                <div>
+                    <div class="doc-section-title">Fornecedores</div>
+                    <div class="doc-section-subtitle">Diretório de fornecedores sincronizado com PHC</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">O módulo de Fornecedores mantém o diretório atualizado com os fornecedores do PHC, complementado com informações de contacto adicionais (NAV fields) que não existem no PHC, como telemóvel, email directo e notas internas.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Sincronização PHC</strong> — dados base sempre actualizados</li>
+                            <li><strong>Campos NAV</strong> — campos adicionais que não sobrescrevem o PHC</li>
+                            <li><strong>Marcas associadas</strong> — que marcas/produtos cada fornecedor representa</li>
+                            <li><strong>Pesquisa</strong> — por nome, NIF, localidade, marcas</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Executar sincronização PHC para importar todos os fornecedores</li>
+                            <li>Completar campos NAV (contacto directo, notas)</li>
+                            <li>Associar marcas representadas a cada fornecedor</li>
+                            <li>Usar pesquisa para encontrar fornecedores por marca ou produto</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Para gerir fornecedores de consulta (com avaliações e geração de emails IA), use o módulo <strong>Logística → Consultas</strong>.</div>
+            </div>
+        </div>
+
+        <!-- Funcionários -->
+        <div class="doc-section" id="funcionarios">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🪪</div>
+                <div>
+                    <div class="doc-section-title">Funcionários</div>
+                    <div class="doc-section-subtitle">Registo e gestão de recursos humanos</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Gestão completa do quadro de pessoal: dados pessoais e contratuais, documentação, ficha de aptidão médica, dados para processamento salarial e atribuição a serviços na Agenda Digital.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Ficha do funcionário</strong> — dados pessoais, NIF, NISS, contrato</li>
+                            <li><strong>Documentos</strong> — BI, carta de condução, certificados</li>
+                            <li><strong>Ficha de aptidão</strong> — registo de exames médicos e validade</li>
+                            <li><strong>Dados salariais</strong> — vencimento base, subsídios, IRS</li>
+                            <li><strong>Integração</strong> — aparece na Agenda e no módulo de Salários</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar ficha do funcionário com dados pessoais</li>
+                            <li>Definir vencimento e dados contratuais</li>
+                            <li>Configurar IRS (escalão, dependentes)</li>
+                            <li>Fazer upload de documentos pessoais</li>
+                            <li>Gerir aptidão médica com data de validade do exame</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Os dados configurados aqui são usados automaticamente na geração de recibos de vencimento. Manter sempre o escalão de IRS actualizado.</div>
+            </div>
+        </div>
+
+        <!-- Férias / Faltas -->
+        <div class="doc-section" id="ferias">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📅</div>
+                <div>
+                    <div class="doc-section-title">Mapa Férias / Faltas</div>
+                    <div class="doc-section-subtitle">Controlo de ausências com saldos automáticos</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Sistema completo de gestão de ausências com fluxo de aprovação, cálculo automático de saldos de férias e integração com o calendário da empresa. Suporta 12 tipos de ausência: férias, pontes, baixas médicas, consultas, formação, teletrabalho, entre outros.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>12 tipos de ausência</strong> com impacto diferente nos saldos</li>
+                            <li><strong>Vista mensal</strong> — mapa visual com cores por tipo</li>
+                            <li><strong>Saldos automáticos</strong> — dias de férias disponíveis em tempo real</li>
+                            <li><strong>Fluxo de aprovação</strong> — pendente → aprovado/rejeitado</li>
+                            <li><strong>Feriados e fechos</strong> — configuráveis por ano</li>
+                            <li><strong>Export CSV</strong> — para entidades externas</li>
+                            <li><strong>Ajustes manuais</strong> — transitar dias do ano anterior</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Configurar feriados e fechos da empresa no início do ano</li>
+                            <li>Definir dias de direito a férias por funcionário</li>
+                            <li>Registar ausências com tipo, período e formato (dia/manhã/tarde)</li>
+                            <li>Aprovar ou rejeitar pedidos pendentes (admin)</li>
+                            <li>Consultar saldos actualizados por funcionário</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Ausências do tipo "Fériasˮ, "Ponteˮ e "Fecho Empresaˮ descontam automaticamente dos dias de férias disponíveis. Faltas injustificadas e licenças sem vencimento descontam no salário.</div>
+            </div>
+        </div>
+
+        <!-- Partilha -->
+        <div class="doc-section" id="partilha">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📁</div>
+                <div>
+                    <div class="doc-section-title">Partilha</div>
+                    <div class="doc-section-subtitle">Partilha de ficheiros entre membros da equipa</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Área de partilha interna de documentos e ficheiros entre todos os utilizadores do sistema. Funciona como um repositório acessível a toda a equipa para documentos de uso comum.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Upload de ficheiros</strong> — qualquer formato</li>
+                            <li><strong>Organização por categorias</strong> — pastas lógicas</li>
+                            <li><strong>Acesso partilhado</strong> — visível a todos os utilizadores</li>
+                            <li><strong>Download directo</strong> — aceder sem sair do sistema</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Aceder a Gestão → Partilha</li>
+                            <li>Fazer upload do ficheiro com um título descritivo</li>
+                            <li>Escolher categoria adequada</li>
+                            <li>Qualquer utilizador pode descarregar ou pré-visualizar</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Use a Partilha para documentos de uso geral como procedimentos internos, listas de preços, formulários. Para documentos de clientes ou equipamentos específicos, use as fichas respectivas.</div>
+            </div>
+        </div>
+
+        <!-- Salários -->
+        <div class="doc-section" id="salarios">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">💶</div>
+                <div>
+                    <div class="doc-section-title">Salários</div>
+                    <div class="doc-section-subtitle">Processamento salarial com cálculo automático de IRS</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Módulo de processamento salarial com cálculo automático de IRS, SS, subsídios e horas extra. Gera recibos de vencimento em PDF, envia por email e mantém histórico completo de processamentos.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Cálculo automático de IRS</strong> — tabelas AT actualizadas por escalão</li>
+                            <li><strong>Segurança Social</strong> — 11% trabalhador + 23.75% empresa</li>
+                            <li><strong>Subsídios</strong> — alimentação, férias, Natal</li>
+                            <li><strong>Horas extra</strong> — 25%/37.5%/50% conforme legislação</li>
+                            <li><strong>Recibos PDF</strong> — geração automática com dados da empresa</li>
+                            <li><strong>Envio email</strong> — recibo enviado directamente ao funcionário</li>
+                            <li><strong>Histórico</strong> — todos os processamentos arquivados</li>
+                            <li><strong>PIN de acesso</strong> — protecção extra para dados salariais</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Configurar dados salariais na ficha de cada funcionário</li>
+                            <li>No início do mês, abrir novo período de processamento</li>
+                            <li>Verificar horas extra (integradas da Agenda)</li>
+                            <li>Confirmar subsídios aplicáveis ao período</li>
+                            <li>Gerar recibos e rever antes de enviar</li>
+                            <li>Enviar recibos por email com um clique</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">O módulo de Salários está protegido por PIN separado. As horas extra registadas na Agenda Digital são importadas automaticamente para o processamento do mês.</div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════ LOGÍSTICA -->
+        <div class="doc-group-header"><span>📦</span> Logística</div>
+
+        <!-- Análise Inventário -->
+        <div class="doc-section" id="inventario">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📈</div>
+                <div>
+                    <div class="doc-section-title">Análise de Inventário</div>
+                    <div class="doc-section-subtitle">Análise avançada de stock com histórico de preços e fornecedores</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Ferramenta de análise profunda do inventário: evolução de preços de compra, comparação entre fornecedores, análise ABC (artigos por valor de consumo), histórico de compras e cálculo de necessidades.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Histórico de preços</strong> — evolução do custo de compra ao longo do tempo</li>
+                            <li><strong>Comparação fornecedores</strong> — melhor preço por artigo</li>
+                            <li><strong>Análise ABC</strong> — classificação por valor de consumo</li>
+                            <li><strong>Rotatividade</strong> — artigos com maior/menor movimento</li>
+                            <li><strong>Tendências</strong> — crescimento ou redução de consumo</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Seleccionar período de análise</li>
+                            <li>Filtrar por família, fornecedor ou artigo específico</li>
+                            <li>Analisar gráfico de evolução de preços</li>
+                            <li>Identificar artigos de classe A (alto valor) para negociação prioritária</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Use a análise ABC para identificar os 20% de artigos que representam 80% do custo de inventário. Estes devem ter stock mínimo definido no módulo de Reposição.</div>
+            </div>
+        </div>
+
+        <!-- Associações Pendentes -->
+        <div class="doc-section" id="pendentes">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🔗</div>
+                <div>
+                    <div class="doc-section-title">Associações Pendentes</div>
+                    <div class="doc-section-subtitle">Confirmar correspondências IA entre descrições de fornecedores e artigos PHC</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Quando um PDF de orçamento é importado, a IA tenta associar cada linha do orçamento ao artigo correspondente no PHC. As sugestões com menor confiança ficam pendentes para confirmação manual. Ao confirmar, o sistema aprende para o futuro.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Lista de sugestões IA</strong> — descrição do fornecedor vs artigo sugerido</li>
+                            <li><strong>Score de confiança</strong> — percentagem de certeza da sugestão</li>
+                            <li><strong>Confirmar / Rejeitar</strong> — treina o modelo de aprendizagem</li>
+                            <li><strong>Pesquisa manual</strong> — buscar o artigo correcto se a sugestão estiver errada</li>
+                            <li><strong>Histórico de aliases</strong> — correspondências aprendidas</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>O badge na sidebar mostra o número de pendentes</li>
+                            <li>Para cada sugestão, verificar se o artigo sugerido está correcto</li>
+                            <li>Confirmar se correcto — o sistema aprende</li>
+                            <li>Se errado: pesquisar o artigo correcto e associar</li>
+                            <li>Rejeitar se não for possível associar (artigo não existe)</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Quanto mais confirmações forem feitas, mais precisa fica a IA na análise automática de PDFs. Idealmente manter as pendentes a zero no final de cada semana.</div>
+            </div>
+        </div>
+
+        <!-- Consultas -->
+        <div class="doc-section" id="consultas">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🔍</div>
+                <div>
+                    <div class="doc-section-title">Consultas a Fornecedores</div>
+                    <div class="doc-section-subtitle">Base de dados de fornecedores com geração de emails de consulta por IA</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Módulo para organizar fornecedores por marca com múltiplos contactos por idioma, avaliações por critério e geração automática de emails de consulta profissionais em português, inglês, francês ou espanhol — usando IA. O utilizador copia o email gerado e envia manualmente.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Marcas com logotipo</strong> — organização visual por fabricante</li>
+                            <li><strong>Sub-marcas / referências</strong> — gamas de produto indexadas na pesquisa</li>
+                            <li><strong>Múltiplos contactos</strong> — cada um com nome, email, cargo e idioma</li>
+                            <li><strong>Avaliação por estrelas</strong> — velocidade, preço, qualidade, fiabilidade</li>
+                            <li><strong>Email IA</strong> — gera email directo e profissional no idioma do contacto</li>
+                            <li><strong>Pesquisa global</strong> — por fornecedor, marca, sub-marca, país, contacto</li>
+                            <li><strong>Cópia de email</strong> — botão para copiar para clipboard</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar uma Marca (ex: Volvo Penta) com logotipo</li>
+                            <li>Adicionar fornecedor com país e sub-marcas (ex: "Volvo D6, Volvo IPS")</li>
+                            <li>Adicionar contactos com nome, email e idioma de comunicação</li>
+                            <li>Na página da marca, seleccionar o contacto destinatário</li>
+                            <li>Escrever em português o que pretende consultar</li>
+                            <li>Clicar "✨ Gerar" — o email é gerado no idioma do contacto</li>
+                            <li>Copiar e enviar manualmente por email</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">O email gerado começa sempre com o primeiro nome do contacto ("Bom dia Jessica,") e vai directo ao assunto, sem introduzir a empresa — curto e profissional. A assinatura deve ser adicionada manualmente.</div>
+            </div>
+        </div>
+
+        <!-- Entradas -->
+        <div class="doc-section" id="entradas">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📥</div>
+                <div>
+                    <div class="doc-section-title">Entradas de Stock</div>
+                    <div class="doc-section-subtitle">Registo de recepção de mercadorias com matching de pedidos</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Regista a entrada física de mercadorias no armazém. Cada entrada pode ser associada ao pedido de compra correspondente, garantindo rastreabilidade completa desde a encomenda até à recepção em stock.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Criação de entradas</strong> — fornecedor, data, nº guia/factura</li>
+                            <li><strong>Linhas de artigo</strong> — referência, quantidade, preço unitário</li>
+                            <li><strong>Associação a pedido</strong> — fechar linhas de pedidos de compra</li>
+                            <li><strong>Histórico</strong> — todas as entradas arquivadas com PDF</li>
+                            <li><strong>Upload de documentos</strong> — guias de remessa, facturas</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Ao receber mercadoria, criar nova entrada</li>
+                            <li>Seleccionar fornecedor e introduzir nº de documento</li>
+                            <li>Adicionar linhas com artigos recebidos e quantidades</li>
+                            <li>Associar cada linha ao pedido de compra pendente</li>
+                            <li>Confirmar entrada — stock é actualizado no PHC</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Ao associar uma entrada a um pedido, o estado das linhas do pedido passa automaticamente para "Recebido", encerrando o ciclo de compra.</div>
+            </div>
+        </div>
+
+        <!-- Pedidos de Compra -->
+        <div class="doc-section" id="pedidos">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🛒</div>
+                <div>
+                    <div class="doc-section-title">Pedidos de Compra</div>
+                    <div class="doc-section-subtitle">Criação, aprovação e seguimento de encomendas a fornecedores</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Gestão completa do ciclo de compra: criação de pedidos por qualquer utilizador, aprovação pelo responsável, importação de orçamentos PDF por IA, comparação de preços e follow-up até à recepção em armazém.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Criação de pedidos</strong> — artigos PHC ou descrição livre</li>
+                            <li><strong>Fluxo de aprovação</strong> — aberto → aprovado → em curso → concluído</li>
+                            <li><strong>Import PDF IA</strong> — orçamentos analisados automaticamente</li>
+                            <li><strong>Comparação de propostas</strong> — melhor preço destacado</li>
+                            <li><strong>Follow-up por linha</strong> — estado individual de cada artigo</li>
+                            <li><strong>Associação a cliente</strong> — pedidos para projectos específicos</li>
+                            <li><strong>Estatísticas</strong> — valores por período, departamento, fornecedor</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar pedido com título e artigos necessários</li>
+                            <li>Submeter para aprovação do responsável</li>
+                            <li>Após aprovação, solicitar orçamentos aos fornecedores</li>
+                            <li>Fazer upload dos PDFs de orçamento — IA extrai os dados</li>
+                            <li>Comparar propostas e escolher a melhor</li>
+                            <li>Encomenda efectuada → registar entrada quando chegar</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">O sistema aprende com cada PDF importado. Quanto mais PDFs do mesmo fornecedor forem processados, mais precisa fica a extracção automática de artigos e preços.</div>
+            </div>
+        </div>
+
+        <!-- Reposição de Stock -->
+        <div class="doc-section" id="reposicao">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🔄</div>
+                <div>
+                    <div class="doc-section-title">Reposição de Stock</div>
+                    <div class="doc-section-subtitle">Alertas automáticos de stock mínimo e geração de pedidos de compra</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Analisa automaticamente o stock actual versus os mínimos definidos e apresenta uma lista de artigos a repor. Permite gerar pedidos de compra directamente a partir da lista de reposição, agilizando o processo de encomenda de consumíveis críticos.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Alertas de stock mínimo</strong> — artigos abaixo do ponto de encomenda</li>
+                            <li><strong>Quantidade sugerida</strong> — baseada no stock mínimo configurado</li>
+                            <li><strong>Análise de artigo</strong> — histórico de consumo e tendência</li>
+                            <li><strong>Criar pedido directo</strong> — gera PO a partir da lista de reposição</li>
+                            <li><strong>Configuração por artigo</strong> — definir stock mínimo e fornecedor preferencial</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Configurar stock mínimo por artigo (página de análise de artigo)</li>
+                            <li>Aceder regularmente à lista de reposição</li>
+                            <li>Verificar artigos abaixo do mínimo</li>
+                            <li>Seleccionar artigos a repor e gerar pedido de compra</li>
+                            <li>O pedido é criado automaticamente com as quantidades sugeridas</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Configure stock mínimo nos artigos de maior rotatividade (materiais de consumo frequente, produtos críticos). O Dashboard mostra os alertas de reposição em destaque.</div>
+            </div>
+        </div>
+
+        <!-- Stock -->
+        <div class="doc-section" id="stock">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📊</div>
+                <div>
+                    <div class="doc-section-title">Stock</div>
+                    <div class="doc-section-subtitle">Consulta em tempo real do inventário sincronizado com PHC</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Vista directa sobre o stock actual sincronizado com o PHC CS. Permite consultar quantidades, preços de custo, PVP e histórico de movimentos por artigo. Os dados reflectem sempre o estado actual do PHC após cada sincronização.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Stock em tempo real</strong> — quantidades, preço custo, PVP</li>
+                            <li><strong>Pesquisa rápida</strong> — por referência ou descrição</li>
+                            <li><strong>Ficha de artigo</strong> — histórico de preços, fornecedores habituais</li>
+                            <li><strong>Notas internas</strong> — anotações por artigo (não sobrescrevem PHC)</li>
+                            <li><strong>Alertas</strong> — stock negativo, abaixo do mínimo</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Pesquisar artigo por referência PHC ou descrição</li>
+                            <li>Ver stock actual e preços actualizados</li>
+                            <li>Clicar na referência para ver detalhe e histórico</li>
+                            <li>Adicionar notas internas se necessário</li>
+                            <li>Executar sincronização PHC para actualizar dados</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">A sincronização com PHC pode ser configurada para correr automaticamente num horário definido (ex: todos os dias às 06:00). Configurar em Admin → Integração PHC.</div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════ TÉCNICO -->
+        <div class="doc-group-header"><span>🔧</span> Técnico</div>
+
+        <!-- Assistências -->
+        <div class="doc-section" id="assistencias">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🔧</div>
+                <div>
+                    <div class="doc-section-title">Assistências</div>
+                    <div class="doc-section-subtitle">Ordens de serviço técnico — criação, seguimento e fecho</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Gestão completa das ordens de assistência técnica: abertura, atribuição de técnico, registo de intervenção, peças utilizadas, estado e fecho com relatório PDF para assinatura do cliente.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Criação de OS</strong> — cliente, equipamento, descrição do problema</li>
+                            <li><strong>Atribuição de técnico</strong> — responsável pela intervenção</li>
+                            <li><strong>Estados</strong> — aberta, em curso, aguarda peças, concluída</li>
+                            <li><strong>Histórico de intervenções</strong> — log detalhado de acções</li>
+                            <li><strong>Peças e materiais</strong> — artigos consumidos na assistência</li>
+                            <li><strong>Relatório PDF</strong> — documento profissional para assinatura</li>
+                            <li><strong>Estatísticas</strong> — tempo médio resolução, tipos de avaria</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar OS com cliente, equipamento e descrição da avaria</li>
+                            <li>Atribuir técnico responsável</li>
+                            <li>Técnico actualiza estado e regista intervenções</li>
+                            <li>Registar peças e materiais utilizados</li>
+                            <li>Ao concluir, fechar OS e gerar relatório PDF</li>
+                            <li>Cliente assina o relatório (digital ou em papel)</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">O histórico de intervenções por equipamento permite analisar avarias recorrentes e planear manutenção preventiva.</div>
+            </div>
+        </div>
+
+        <!-- Embarcações -->
+        <div class="doc-section" id="embarcacoes">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">⚓</div>
+                <div>
+                    <div class="doc-section-title">Base de Dados de Embarcações</div>
+                    <div class="doc-section-subtitle">Ficha técnica completa de embarcações com motores e componentes</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Base de dados técnica detalhada de embarcações: casco, motores, sistemas electrónicos, propulsão. Cada embarcação tem ficha própria com especificações técnicas, componentes, documentação e histórico de assistências. Associada a um cliente.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Ficha técnica</strong> — eslora, boca, calado, material, ano</li>
+                            <li><strong>Motores</strong> — marca, modelo, série, potência, horas</li>
+                            <li><strong>Componentes</strong> — IPS, jackshaft, eixos, hélices</li>
+                            <li><strong>Documentação</strong> — certificados, seguros, registo</li>
+                            <li><strong>Histórico</strong> — todas as assistências da embarcação</li>
+                            <li><strong>Pesquisa</strong> — por matrícula, modelo de motor, cliente</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar ficha da embarcação associada ao cliente</li>
+                            <li>Preencher dados de casco e identificação</li>
+                            <li>Adicionar motores com todos os dados técnicos</li>
+                            <li>Registar outros componentes relevantes</li>
+                            <li>Fazer upload de documentação da embarcação</li>
+                            <li>Consultar histórico de assistências na ficha</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">A ficha técnica da embarcação é consultada automaticamente quando se cria uma assistência, evitando re-introdução de dados.</div>
+            </div>
+        </div>
+
+        <!-- Industriais -->
+        <div class="doc-section" id="industriais">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">⚙️</div>
+                <div>
+                    <div class="doc-section-title">Base de Dados Industriais</div>
+                    <div class="doc-section-subtitle">Gestão técnica de equipamentos industriais (geradores, grupos hidráulicos, etc.)</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Similar à base de dados de embarcações, mas orientada a equipamentos industriais: geradores, grupos hidráulicos, motores industriais, quadros eléctricos. Mantém a ficha técnica completa de cada equipamento com componentes, fotos, documentação e histórico.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Tipos suportados</strong> — gerador, grupo hidráulico, motor, outro</li>
+                            <li><strong>Componentes detalhados</strong> — motor, alternador, quadro</li>
+                            <li><strong>Especificações</strong> — potência kW/kVA, tensão, frequência</li>
+                            <li><strong>Fotos e documentação</strong> — upload por componente</li>
+                            <li><strong>Localização</strong> — onde está instalado</li>
+                            <li><strong>Histórico de assistências</strong> — ligado ao módulo de Assistências</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar equipamento associado ao cliente</li>
+                            <li>Definir tipo (gerador, grupo, motor…)</li>
+                            <li>Adicionar componentes com especificações técnicas</li>
+                            <li>Fazer upload de fotos e documentação técnica</li>
+                            <li>Registar local de instalação</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Para geradores, preencha o motor E o alternador como dois componentes separados — cada um com a sua marca, modelo e número de série.</div>
+            </div>
+        </div>
+
+        <!-- Biblioteca PDF -->
+        <div class="doc-section" id="biblioteca">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📚</div>
+                <div>
+                    <div class="doc-section-title">Biblioteca PDF</div>
+                    <div class="doc-section-subtitle">Repositório de manuais técnicos e documentação organizada por modelo</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Biblioteca digital de documentação técnica: manuais de serviço, catálogos de peças, boletins técnicos, diagramas eléctricos. Organizada por marca e modelo, acessível a todos os técnicos em qualquer dispositivo.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Upload de PDFs</strong> — manuais, catálogos, boletins</li>
+                            <li><strong>Organização por modelo</strong> — marca / linha / modelo</li>
+                            <li><strong>Pesquisa</strong> — por marca, modelo, palavras-chave</li>
+                            <li><strong>Pré-visualização</strong> — ver PDF no browser sem descarregar</li>
+                            <li><strong>Versões</strong> — múltiplos documentos por modelo</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar modelo (marca + nome do modelo)</li>
+                            <li>Fazer upload dos PDFs do modelo</li>
+                            <li>Atribuir tipo de documento (manual, catálogo, etc.)</li>
+                            <li>Pesquisar por marca/modelo quando necessário em campo</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Aceder à Biblioteca num tablet ou telemóvel durante uma assistência é a forma mais rápida de consultar o manual de serviço sem sair do local de trabalho.</div>
+            </div>
+        </div>
+
+        <!-- Fichas de Equipamentos -->
+        <div class="doc-section" id="fichas">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📋</div>
+                <div>
+                    <div class="doc-section-title">Fichas de Equipamentos</div>
+                    <div class="doc-section-subtitle">Histórico de manutenção e intervenções por equipamento</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Fichas de manutenção preventiva e correctiva de equipamentos. Cada ficha regista o ciclo de vida de um equipamento: componentes, intervalos de manutenção, intervenções realizadas e próximas acções previstas.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Ficha por equipamento</strong> — associada a cliente e embarcação</li>
+                            <li><strong>Componentes</strong> — lista de peças relevantes com estado</li>
+                            <li><strong>Histórico de intervenções</strong> — data, técnico, trabalho realizado</li>
+                            <li><strong>Próxima manutenção</strong> — alerta por data ou horas de funcionamento</li>
+                            <li><strong>Documentos</strong> — fotos, relatórios, certificados</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Criar ficha para cada equipamento a monitorizar</li>
+                            <li>Definir componentes e intervalos de manutenção</li>
+                            <li>Após cada manutenção, registar a intervenção</li>
+                            <li>Definir data da próxima intervenção prevista</li>
+                            <li>Consultar alertas de manutenção no Dashboard</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Use as Fichas em combinação com as Assistências: criar uma OS para cada intervenção e associá-la à ficha do equipamento.</div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════ SISTEMA -->
+        <div class="doc-group-header"><span>⚙️</span> Sistema</div>
+
+        <!-- Changelog -->
+        <div class="doc-section" id="changelog">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">🕐</div>
+                <div>
+                    <div class="doc-section-title">Changelog</div>
+                    <div class="doc-section-subtitle">Histórico de versões e actualizações do sistema</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Registo cronológico de todas as alterações ao software: novas funcionalidades (feat), correcções de erros (fix), melhorias de performance e alterações de configuração. Cada entrada identifica a versão, data e descrição da mudança.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Versões numeradas</strong> — seguindo semântica major.minor.patch</li>
+                            <li><strong>Tipos</strong> — feat (nova funcionalidade), fix (correcção), chore (manutenção)</li>
+                            <li><strong>Filtragem</strong> — por tipo ou período</li>
+                            <li><strong>Actualização automática</strong> — cada git push actualiza o changelog</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Consultar após cada actualização do software</li>
+                            <li>Verificar que funcionalidades novas estão disponíveis</li>
+                            <li>Verificar correcções de bugs reportados anteriormente</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backlog -->
+        <div class="doc-section" id="backlog">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">📋</div>
+                <div>
+                    <div class="doc-section-title">Backlog / Roadmap</div>
+                    <div class="doc-section-subtitle">Propostas de melhoria e funcionalidades planeadas</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Plataforma colaborativa para submeter ideias de melhoria, votar em funcionalidades existentes e acompanhar o estado das melhorias planeadas. Qualquer utilizador pode propor. A gestão responde e actualiza o estado.</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Submeter proposta</strong> — qualquer utilizador</li>
+                            <li><strong>Estados</strong> — aberta, em análise, planeada, em curso, concluída, rejeitada</li>
+                            <li><strong>Módulo associado</strong> — categorizar por área do sistema</li>
+                            <li><strong>Resposta admin</strong> — feedback sobre cada proposta</li>
+                            <li><strong>Prioridade</strong> — normal, alta, crítica</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Clicar em "Nova Proposta" e descrever a melhoria</li>
+                            <li>Seleccionar o módulo e prioridade</li>
+                            <li>Acompanhar o estado na lista de propostas</li>
+                            <li>Admin: avaliar e dar resposta a cada proposta</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Para reportar erros (bugs), use também o Backlog com prioridade "Crítica". Descreva os passos para reproduzir o erro.</div>
+            </div>
+        </div>
+
+        <!-- Footer note -->
+        <div style="margin-top:40px;padding:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);text-align:center">
+            Esta documentação actualiza-se automaticamente com cada versão do software.
+            Para sugerir melhorias à documentação, use o <a href="/roadmap" style="color:var(--accent)">Backlog</a>.
+        </div>
+
+        {#
+        ════════════════════════════════════════════════════════════════════
+        COMO ADICIONAR UM NOVO MÓDULO A ESTA DOCUMENTAÇÃO
+        ════════════════════════════════════════════════════════════════════
+        1. Copiar o bloco <div class="doc-section" id="ANCHOR"> abaixo
+        2. Substituir: id, icon, title, subtitle, lead, funcionalidades, passos
+        3. Adicionar entrada no TOC: <a href="#ANCHOR" class="toc-item" data-keywords="...">
+        4. Actualizar o _DOC dict em base.html com os endpoints do novo módulo
+
+        TEMPLATE DE NOVA SECÇÃO:
+        <div class="doc-section" id="ANCHOR">
+            <div class="doc-section-header" onclick="toggleSection(this)">
+                <div class="doc-section-icon">EMOJI</div>
+                <div>
+                    <div class="doc-section-title">Nome do Módulo</div>
+                    <div class="doc-section-subtitle">Subtítulo descritivo</div>
+                </div>
+                <span class="doc-toggle">▾</span>
+            </div>
+            <div class="doc-section-body">
+                <p class="doc-lead">Descrição geral...</p>
+                <div class="doc-grid2">
+                    <div class="doc-block">
+                        <div class="doc-block-title">Funcionalidades</div>
+                        <ul class="doc-list">
+                            <li><strong>Feature</strong> — descrição</li>
+                        </ul>
+                    </div>
+                    <div class="doc-block">
+                        <div class="doc-block-title">Como utilizar</div>
+                        <ol class="doc-steps">
+                            <li>Passo 1</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="doc-tip">Dica importante.</div>
+            </div>
+        </div>
+        #}
+
+    </div><!-- end doc-main -->
+</div><!-- end doc-layout -->
+
+<script>
+/* ── Collapse / Expand sections ── */
+function toggleSection(header) {
+    header.closest('.doc-section').classList.toggle('collapsed');
+}
+
+/* ── TOC active highlight on scroll ── */
+const sections = document.querySelectorAll('.doc-section[id]');
+const tocLinks  = document.querySelectorAll('.toc-item');
+
+function updateTOC() {
+    let current = '';
+    sections.forEach(s => {
+        if (window.scrollY + 80 >= s.offsetTop) current = s.id;
+    });
+    tocLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + current));
+}
+window.addEventListener('scroll', updateTOC, { passive: true });
+updateTOC();
+
+/* ── TOC filter ── */
+function filtrarToc(q) {
+    q = q.toLowerCase().trim();
+    tocLinks.forEach(l => {
+        const kw = (l.dataset.keywords || '') + l.textContent.toLowerCase();
+        l.style.display = (!q || kw.includes(q)) ? '' : 'none';
+    });
+    document.querySelectorAll('.toc-section-label').forEach(lbl => {
+        const next = lbl.nextElementSibling;
+        lbl.style.display = (next && next.style.display !== 'none') ? '' : (q ? 'none' : '');
+    });
+}
+
+/* ── Scroll to anchor on load (from URL hash or secao param) ── */
+{% if secao %}
+const target = document.getElementById('{{ secao }}');
+if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+{% endif %}
+if (location.hash) {
+    const t = document.querySelector(location.hash);
+    if (t) setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+}
+</script>
+{% endblock %}
